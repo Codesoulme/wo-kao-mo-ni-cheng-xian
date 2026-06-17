@@ -344,3 +344,32 @@ Stage Summary:
 - 验证证据：dev.log 显示 `GET /api/game/state?characterId=... 200` 成功，prisma SELECT 查询已包含全部新字段
 - 注意：本沙箱环境 dev server 进程在每次 Bash tool 调用结束后会被环境清理（非代码问题），已用 nohup+disown 重启保持运行
 - agent-browser 浏览器沙箱无法访问 host 的 localhost/127.0.0.1（网络隔离），改用 dev.log prisma query + curl 验证
+
+---
+Task ID: 16
+Agent: main
+Task: 修复"3岁时AI文本描述变成四岁"——narrative 年龄数字与状态不一致（偶发幻觉）
+
+Work Log:
+- 根因分析：Task 11 修的是 prompt 模板里固定的 `${sc.age+1}`→`${sc.age}`（已生效，第136行确认是 sc.age）。但本次是 AI 在 narrative 文本里自由发挥写了"四岁的岳尘"，属偶发幻觉——前两岁正常、第三岁错位，不是固定 off-by-one。诱因：SCENE_PROMPTS.advance 第一句"玩家年龄增加1岁"可能误导 AI（让它描述"增加后"的年龄），且 narrative 没有约束不得写错年龄。
+- 修复 1（prompt 强化）：`src/lib/xianxia/llm.ts` SCENE_PROMPTS.advance：
+  * "玩家年龄增加1岁，你需要生成这一岁发生的关键事件" → "为本岁生成关键事件"（去掉"增加1岁"的误导）
+  * 新增约束："状态快照已给出角色当前确切年龄，narrative 中若提及主角年龄，必须与状态快照完全一致，严禁自行加减（如快照是3岁，narrative 不得写'四岁''五岁'）。不确定时用'今年''此时''这一年'等代词指代，不写具体数字。"
+- 修复 2（后处理兜底，根治）：新增 `fixNarrativeAge(narrative, correctAge, charName)` 函数：
+  * 支持 中文数字（零一二三四五六七八九十，0-99）与 阿拉伯数字 互转
+  * 三种匹配模式修正主角年龄：
+    - re1: "X岁的/那年/时，{name}"（如"四岁的岳尘"→"三岁的岳尘"）
+    - re2: 句首"X岁的/，/时/那年"（如"四岁，岳尘..."→"三岁，岳尘..."）
+    - re3: "{name}...X岁"紧邻（如"岳尘四岁那年"→"岳尘三岁那年"、"岳尘今年方四岁"→"岳尘今年方三岁"）
+  * 只替换与正确年龄不符的数字；已正确的保持不变；明显是 NPC 语境（如"八十老翁"，num>150 或无主角名上下文）不动
+  * 保持原文格式：阿拉伯数字替换为阿拉伯数字，中文数字替换为中文数字
+  * 在 generateAgeEvent / generateChoiceResult / generateInterfereResponse 三个出口都调用，narrative 与 choice.prompt 都修正
+- 验证：8 个测试用例全部通过（含用户场景"四岁的岳尘"→"三岁的岳尘"、NPC"八十老翁"不变、阿拉伯数字"4岁"→"3岁"等）
+- `bun run lint` 通过。dev server 重启正常，端口 3000 监听，POST /api/game/interfere 200。
+
+Stage Summary:
+- AI 叙事年龄错位问题根治：prompt 强约束 + 后处理兜底双保险
+- 即使 AI 仍偶尔写错年龄数字，fixNarrativeAge 会自动修正为状态快照里的正确年龄
+- NPC 年龄（如"八十老翁"）不会被误改，只修主角上下文的年龄
+- 中文数字与阿拉伯数字都支持
+- 按用户要求：本次未做 agent-browser 验证（用 bun 内联脚本验证后处理逻辑）
