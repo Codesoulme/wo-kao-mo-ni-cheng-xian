@@ -287,7 +287,7 @@ async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: st
   }
 }
 
-// 从 LLM 输出中提取 JSON（兼容 ```json ``` 包装）
+// 从 LLM 输出中提取 JSON（兼容 ```json ``` 包装、未转义字符、尾随逗号等常见问题）
 function parseJSON(content: string): any {
   let s = content.trim();
   // 移除 markdown 代码块
@@ -301,7 +301,77 @@ function parseJSON(content: string): any {
   if (start >= 0 && end > start) {
     s = s.slice(start, end + 1);
   }
-  return JSON.parse(s);
+  // 尝试直接解析
+  try {
+    return JSON.parse(s);
+  } catch {
+    // 失败则尝试修复常见问题
+    return JSON.parse(repairJSON(s));
+  }
+}
+
+// 修复 LLM 输出 JSON 的常见问题：
+// 1. 字符串值内未转义的双引号（如 narrative: "他说"你好"了"）
+// 2. 字符串值内的裸换行符（JSON 标准要求 \n）
+// 3. 尾随逗号
+// 策略：逐字符扫描，仅在字符串外应用结构修复，字符串内转义裸引号/换行
+function repairJSON(s: string): string {
+  let out = '';
+  let inStr = false;
+  let escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inStr) {
+      if (escape) {
+        out += ch;
+        escape = false;
+        continue;
+      }
+      if (ch === '\\') {
+        out += ch;
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        // 判断这是字符串结束还是裸引号：
+        // 看后面（跳过空格）是否是 , } ] : —— 若是则视为字符串结束，否则视为裸引号需转义
+        let j = i + 1;
+        while (j < s.length && (s[j] === ' ' || s[j] === '\t')) j++;
+        const nextCh = s[j];
+        if (nextCh === ',' || nextCh === '}' || nextCh === ']' || nextCh === ':' || nextCh === undefined) {
+          out += ch;
+          inStr = false;
+        } else {
+          // 裸引号，转义
+          out += '\\"';
+        }
+        continue;
+      }
+      if (ch === '\n') {
+        out += '\\n';
+        continue;
+      }
+      if (ch === '\r') {
+        out += '\\r';
+        continue;
+      }
+      if (ch === '\t') {
+        out += '\\t';
+        continue;
+      }
+      out += ch;
+    } else {
+      if (ch === '"') {
+        inStr = true;
+        out += ch;
+      } else {
+        out += ch;
+      }
+    }
+  }
+  // 移除尾随逗号（,} 或 ,]）
+  out = out.replace(/,(\s*[}\]])/g, '$1');
+  return out;
 }
 
 // ==================== 对外接口 ====================
