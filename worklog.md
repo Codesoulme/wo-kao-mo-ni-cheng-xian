@@ -189,3 +189,27 @@ Stage Summary:
 - 引擎权威原则强化：age 列为引擎独占属性，AI 不可通过 changes 修改。
 - 已存在的跳岁存档无法回退，用户可通过顶部「⋯」菜单 →「重开存档」重新开局验证。
 - 按用户要求：本次未做 agent-browser 验证。
+
+---
+Task ID: 11
+Agent: main
+Task: 修复年龄显示与 AI 叙事错位 1 岁：AI 文本说"三岁四岁"，但状态/标签页显示"2岁3岁"
+
+Work Log:
+- 根因分析：
+  - advance route 第41行 `state.age += 1` 把年龄推进到新值（如 0→1）
+  - 第50行 `buildStateContext(state, ...)` 传入的 state.age 已是新值
+  - 但 `llm.ts` buildAdvancePrompt 第127行历史代码写了 `${sc.age + 1}岁`，又多 +1
+  - 结果 prompt 告诉 AI「2 岁」→ AI 叙事「2 岁」，但实际存档 age=1
+  - 此 bug 之前被「AI 在 changes 里再加 age」掩盖（引擎 +1 + AI +1 = 2，与 prompt 的 2 对齐）
+  - 上次修复（移除 age 白名单）后，AI 不再加 age，这个隐藏的 prompt 错位暴露出来
+- 修复：`src/lib/xianxia/llm.ts` buildAdvancePrompt：
+  - `${sc.age + 1}岁` → `${sc.age}岁`
+  - 寿元剩余 `${sc.lifespan - sc.age - 1}` → `${sc.lifespan - sc.age}`
+- 确认 choose/interfere prompt 用的是 `sc.age`（正确，它们传入的是未额外推进的当前 state）
+- `bun run lint` 通过。dev server 热重载正常。
+
+Stage Summary:
+- AI 叙事年龄与状态显示现在完全一致：推进一岁，存档 +1，AI 叙事也用新岁数。
+- 这是上次跳岁修复的连带问题（隐藏的 prompt 错位被掩盖），现已一并修正。
+- 按用户要求：本次未做 agent-browser 验证。

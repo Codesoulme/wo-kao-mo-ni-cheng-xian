@@ -124,8 +124,8 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
     : '无';
 
   return `【状态快照区】
-角色：${sc.name}（${sc.gender === 'male' ? '男' : '女'}），${sc.age + 1}岁
-寿元：${sc.lifespan}岁（剩余约${sc.lifespan - sc.age - 1}岁）
+角色：${sc.name}（${sc.gender === 'male' ? '男' : '女'}），${sc.age}岁
+寿元：${sc.lifespan}岁（剩余约${sc.lifespan - sc.age}岁）
 灵根：${sc.rootDetail || sc.spiritualRoot}
 境界：${sc.realmName}${sc.realmLevel > 0 ? `（${sc.realmLevel}层）` : ''}
 修为：${sc.cultivationExp}/${sc.expToBreak}
