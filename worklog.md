@@ -373,3 +373,33 @@ Stage Summary:
 - NPC 年龄（如"八十老翁"）不会被误改，只修主角上下文的年龄
 - 中文数字与阿拉伯数字都支持
 - 按用户要求：本次未做 agent-browser 验证（用 bun 内联脚本验证后处理逻辑）
+
+---
+Task ID: 17
+Agent: main
+Task: 活性化「宝」标签页三个栏目，让 AI 按规则修改填写（修炼速度加成/装备/储物袋/奇缘异宝）
+
+Work Log:
+- 用户反馈：第三个标签页（「宝」页）三个栏目不够"活"，AI 没有按规则修改填写。需让 AI 按一定规则生成/修改物品与加成。
+- 修复 1（prompt 强化，`src/lib/xianxia/llm.ts` buildAdvancePrompt）：
+  * 新增「物品生成规则」：item_type 取值、rarity 与境界匹配（凡人/炼气 common-uncommon、筑基 uncommon-rare、金丹 rare-epic、元婴 epic-legendary、化神+ legendary-mythic）、effects 按物品类型语义（weapon→add attack、armor→add defense、scripture→必含 multiply cultivationExp 且按 rarity 分档 ×1.2~×6.0、consumable→add hp/mp/cultivationExp、artifact→add 或 multiply、accessory→add luck/comprehension）、id 格式（item_<类型缩写>_<4位随机>）、name ≤8字、description 10-40字、source 必填
+  * 新增「物品修改规则」：损毁/消耗/偷窃→removedItemIds；升级→removedItemIds 旧 + newItems 新；新获→newItems 完整字段
+  * 新增「奇缘异宝——特殊状态词条生成规则」：告知 AI 「宝」页有第四栏展示 category=special/identity 的状态词条（灵宠、命格、天赋、身份、体质），AI 可通过 newStatuses 联动修改。给出 5 类示例（灵宠/命格/天赋/身份/buff），含完整 effects 与 duration 规则（special/identity 永久、buff 限时）。每 3-5 岁酌情给一个奇缘。
+- 修复 2（UI 活性化，`src/components/xianxia/InventoryPanel.tsx` 重写）：
+  * **修炼速度卡**：拆解加成来源，显示公式 `灵根 × 功法 = 总倍率`（如 `灵根 ×1.50 × 功法 ×1.50 = ×2.25`），并逐个列出已装备功法的贡献（书图标+功法名+修为倍率），未装备功法时提示"获得功法类物品后可在储物袋装备"
+  * **已装备卡**：effects 用中文属性名展示（如 `攻击+10` 而非 `attack+10`），更易读
+  * **储物袋卡**：保持分类展示，effects 同样中文化
+  * **新增「奇缘异宝」卡**（第四栏）：展示 activeStatuses 中 category=special/identity 的词条（灵宠/命格/天赋/身份等），按 rarity 配色，含图标（灵宠→Heart、命格→Crown、天赋→Brain、身份→Star）、描述、effects、来源、duration（永久/剩余N岁）
+  * 新增 ATTR_ZH 属性中文名映射、fmtEffectZh 中文效果格式化、specialIcon 词条图标映射
+- `bun run lint` 通过。dev server 重启正常，端口 3000 监听，state API 200。
+
+Stage Summary:
+- 「宝」页四个栏目全部活性化：
+  1. 修炼速度：拆解灵根×功法加成，列出每个功法贡献
+  2. 已装备：5 槽位，中文效果展示
+  3. 储物袋：分类展示，中文效果，装备/使用操作
+  4. 奇缘异宝（新）：灵宠/命格/天赋/身份等特殊词条，AI 可通过 newStatuses 联动
+- AI 生成物品与状态词条有明确规则：rarity 与境界挂钩、effects 按类型语义、id 规范、source 必填
+- AI 联动完整：removedItemIds 删物品、newItems 加物品、newStatuses 加奇缘
+- 效果展示中文化（攻击+10、修为×1.5 等），更易读
+- 按用户要求：本次未做 agent-browser 验证

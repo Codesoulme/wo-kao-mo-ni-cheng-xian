@@ -7,12 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   ChevronDown, Package, Swords, Shield, Gem, Sparkles, BookOpen,
-  FlaskConical, Loader2, Hand, X, Check, Zap,
+  FlaskConical, Loader2, Hand, X, Check, Zap, Star, Heart, Brain, Crown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
-  ITEM_TYPE_LABEL, SLOT_LABEL, itemToSlot, EquipSlot, ItemEntry, ItemType,
+  ITEM_TYPE_LABEL, SLOT_LABEL, itemToSlot, EquipSlot, ItemEntry, ItemType, StatusEntry,
 } from '@/lib/xianxia/types';
 
 const RARITY_COLORS: Record<string, string> = {
@@ -33,21 +33,49 @@ const SLOT_ICON: Record<EquipSlot, React.ReactNode> = {
 
 const SLOT_ORDER: EquipSlot[] = ['weapon', 'armor', 'accessory', 'artifact', 'scripture'];
 
+// 特殊状态词条的图标映射（灵宠/命格/天赋/身份等）
+function specialIcon(name: string): React.ReactNode {
+  if (/灵宠|坐骑|妖兽|灵禽/.test(name)) return <Heart className="w-3.5 h-3.5" />;
+  if (/命格|命格|命途|气运|天命/.test(name)) return <Crown className="w-3.5 h-3.5" />;
+  if (/天赋|悟性|体质|灵体/.test(name)) return <Brain className="w-3.5 h-3.5" />;
+  if (/身份|师承|宗门|职位/.test(name)) return <Star className="w-3.5 h-3.5" />;
+  return <Sparkles className="w-3.5 h-3.5" />;
+}
+
 function fmtEffect(eff: any): string {
   if (eff.operation === 'add') return `${eff.target_attribute}${eff.value > 0 ? '+' : ''}${eff.value}`;
   if (eff.operation === 'multiply') return `${eff.target_attribute}×${eff.value}`;
   return `${eff.target_attribute}${eff.operation}${eff.value}`;
 }
 
+// 属性中文名映射（用于效果展示）
+const ATTR_ZH: Record<string, string> = {
+  attack: '攻击', defense: '防御', speed: '速度', hp: '气血', maxHp: '气血上限',
+  mp: '灵力', maxMp: '灵力上限', luck: '气运', comprehension: '悟性',
+  cultivationExp: '修为', lifespan: '寿元', spiritStones: '灵石', reputation: '声望',
+  elementMetal: '金', elementWood: '木', elementWater: '水', elementFire: '火', elementEarth: '土',
+};
+function attrZh(attr: string): string {
+  return ATTR_ZH[attr] || attr;
+}
+function fmtEffectZh(eff: any): string {
+  const zh = attrZh(eff.target_attribute);
+  if (eff.operation === 'add') return `${zh}${eff.value > 0 ? '+' : ''}${eff.value}`;
+  if (eff.operation === 'multiply') return `${zh}×${eff.value}`;
+  return `${zh}${eff.operation}${eff.value}`;
+}
+
 export function InventoryPanel() {
   const { character, setCharacter } = useGameStore();
-  const [busy, setBusy] = useState<string | null>(null); // 记录正在操作的 item id 或 slot
+  const [busy, setBusy] = useState<string | null>(null);
   const [bagOpen, setBagOpen] = useState(true);
+  const [specialOpen, setSpecialOpen] = useState(true);
 
   if (!character) return null;
 
   const equipped = (character.equipped || {}) as Partial<Record<EquipSlot, ItemEntry>>;
   const inventory = character.inventory || [];
+  const activeStatuses: StatusEntry[] = character.activeStatuses || [];
 
   const doAction = async (action: 'equip' | 'unequip' | 'use', payload: { itemId?: string; slot?: string }) => {
     if (!character) return;
@@ -79,24 +107,77 @@ export function InventoryPanel() {
   }
   const groupOrder: ItemType[] = ['scripture', 'weapon', 'armor', 'accessory', 'artifact', 'consumable', 'material', 'tool'];
 
-  const mult = character.cultivationMultiplier ?? 0;
+  // 修炼速度加成拆解
+  const rootMult = character.rootMultiplier ?? 0;
+  const totalMult = character.cultivationMultiplier ?? 0;
+  // 功法贡献：从已装备的 scripture 里提取 multiply cultivationExp
+  const scriptureContribs: { name: string; mult: number; rarity: string }[] = [];
+  const scripture = equipped.scripture;
+  let scriptureMult = 1;
+  if (scripture) {
+    for (const eff of scripture.effects || []) {
+      if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply' && eff.value > 0) {
+        scriptureMult *= eff.value;
+        scriptureContribs.push({ name: scripture.name, mult: eff.value, rarity: scripture.rarity });
+      }
+    }
+  }
+  // 总倍率 = 灵根 × 功法（与 engine recalcCultivationMultiplier 一致）
+  const computedTotal = rootMult * scriptureMult;
+
+  // 特殊状态词条：category 为 special/identity 的（灵宠、命格、天赋、身份等）
+  const specialStatuses = activeStatuses.filter(s => s.category === 'special' || s.category === 'identity');
 
   return (
     <div className="space-y-3 pb-2">
-      {/* 修炼速度概览 */}
+      {/* 修炼速度概览 —— 拆解加成来源 */}
       <Card className="paper-texture">
-        <CardContent className="pt-3 pb-3 px-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Zap className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs font-serif-cn">修炼速度</span>
-            </div>
-            <span className="text-sm font-bold tabular-nums" style={{ color: mult > 0 ? '#c8453c' : '#6b7280' }}>
-              ×{mult.toFixed(2)}
+        <CardHeader className="pb-1.5 pt-3">
+          <CardTitle className="text-sm flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary" />
+              修炼速度
             </span>
+            <span className="text-base font-bold tabular-nums" style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>
+              ×{totalMult.toFixed(2)}
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-1 space-y-1.5">
+          {/* 加成拆解公式 */}
+          <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
+            <span className="px-1.5 py-0.5 rounded bg-muted/40">灵根</span>
+            <span className="tabular-nums font-semibold" style={{ color: rootMult > 0 ? '#c8453c' : '#6b7280' }}>×{rootMult.toFixed(2)}</span>
+            <span className="opacity-50">×</span>
+            <span className="px-1.5 py-0.5 rounded bg-muted/40">功法</span>
+            <span className="tabular-nums font-semibold" style={{ color: scriptureMult > 1 ? '#c8453c' : '#6b7280' }}>×{scriptureMult.toFixed(2)}</span>
+            <span className="opacity-50">=</span>
+            <span className="tabular-nums font-bold" style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>×{computedTotal.toFixed(2)}</span>
           </div>
-          <p className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
-            = 灵根({character.rootMultiplier?.toFixed(1) ?? 0}) × 功法加成。装备功法类物品可提升修为获取效率。
+          {/* 功法贡献明细 */}
+          {scriptureContribs.length > 0 ? (
+            <div className="space-y-1">
+              {scriptureContribs.map((s, i) => (
+                <div key={i} className="flex items-center justify-between text-[10px] rounded px-1.5 py-1" style={{
+                  background: `${RARITY_COLORS[s.rarity] || '#6b7280'}10`,
+                }}>
+                  <span className="flex items-center gap-1 truncate">
+                    <BookOpen className="w-3 h-3 shrink-0" style={{ color: RARITY_COLORS[s.rarity] }} />
+                    <span className="font-serif-cn truncate" style={{ color: RARITY_COLORS[s.rarity] }}>{s.name}</span>
+                  </span>
+                  <span className="tabular-nums font-semibold shrink-0" style={{ color: RARITY_COLORS[s.rarity] }}>
+                    修为 ×{s.mult.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+              未装备功法。获得功法类物品后可在储物袋装备，提升修为获取效率。
+            </p>
+          )}
+          <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
+            每岁修为增量 = 基础修为 × 修炼速度。灵根决定基础倍率，功法可进一步放大。
           </p>
         </CardContent>
       </Card>
@@ -147,8 +228,12 @@ export function InventoryPanel() {
                     )}
                   </div>
                   {item && item.effects && item.effects.length > 0 && (
-                    <div className="text-[9px] text-muted-foreground mt-0.5 truncate">
-                      {item.effects.map((e: any) => fmtEffect(e)).join('，')}
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {item.effects.map((e: any, j: number) => (
+                        <span key={j} className="text-[9px] px-1 py-0 rounded bg-primary/10 text-primary">
+                          {fmtEffectZh(e)}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -231,7 +316,7 @@ export function InventoryPanel() {
                                 <div className="flex flex-wrap gap-1 mb-1.5">
                                   {item.effects.map((e: any, j: number) => (
                                     <span key={j} className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary">
-                                      {fmtEffect(e)}
+                                      {fmtEffectZh(e)}
                                     </span>
                                   ))}
                                 </div>
@@ -270,6 +355,73 @@ export function InventoryPanel() {
                     </div>
                   );
                 })
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      {/* 奇缘异宝 —— 特殊状态词条（灵宠/命格/天赋/身份等，AI 可通过 newStatuses 联动修改） */}
+      <Collapsible open={specialOpen} onOpenChange={setSpecialOpen}>
+        <Card className="paper-texture">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-2 cursor-pointer">
+              <CardTitle className="text-sm flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-primary" />
+                  奇缘异宝
+                </span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-[10px]">{specialStatuses.length}</Badge>
+                  <ChevronDown className={cn("w-4 h-4 transition-transform", specialOpen && "rotate-180")} />
+                </div>
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 space-y-1.5">
+              {specialStatuses.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  尚无奇缘。修行途中或获灵宠、或得命格、或觉醒天赋，皆显示于此。
+                </p>
+              ) : (
+                specialStatuses.map((s, i) => (
+                  <div
+                    key={s.id || i}
+                    className="rounded-md border p-2"
+                    style={{
+                      borderColor: `${RARITY_COLORS[s.rarity] || '#6b7280'}40`,
+                      background: `${RARITY_COLORS[s.rarity] || '#6b7280'}08`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="flex items-center gap-1.5 text-xs font-semibold font-serif-cn truncate" style={{ color: RARITY_COLORS[s.rarity] }}>
+                        {specialIcon(s.name)}
+                        {s.name}
+                      </span>
+                      <span className="text-[9px] px-1 rounded shrink-0 ml-1" style={{
+                        background: `${RARITY_COLORS[s.rarity]}20`,
+                        color: RARITY_COLORS[s.rarity],
+                      }}>
+                        {RARITY_LABEL[s.rarity] || s.rarity}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-relaxed mb-1">{s.description}</p>
+                    {s.effects && s.effects.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {s.effects.map((e: any, j: number) => (
+                          <span key={j} className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary">
+                            {fmtEffectZh(e)}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-[9px] text-muted-foreground/70">
+                      <span>来源：{s.source || '未知'}</span>
+                      <span>{s.duration === -1 ? '永久' : `剩余 ${s.duration} 岁`}</span>
+                    </div>
+                  </div>
+                ))
               )}
             </CardContent>
           </CollapsibleContent>
