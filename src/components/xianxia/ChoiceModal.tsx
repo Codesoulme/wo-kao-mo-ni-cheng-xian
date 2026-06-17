@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 export function ChoiceModal() {
   const {
     character, pendingChoice, setPendingChoice, setLoading, setError,
-    setCharacter, addEvent, setLastChange,
+    setCharacter, addEvent, addChoice, setLastChange,
   } = useGameStore();
   const [busy, setBusy] = useState(false);
 
@@ -39,6 +39,18 @@ export function ChoiceModal() {
       setCharacter({ ...character, ...data.state });
       setPendingChoice(null);
       setLastChange(data.changes || null);
+
+      // 记录选择
+      addChoice({
+        id: `choice-${Date.now()}`,
+        age: data.state.age,
+        prompt: pendingChoice.prompt,
+        options: pendingChoice.options,
+        chosenIndex: idx,
+        chosenText: pendingChoice.options[idx]?.text || '',
+        result: data.narrative,
+        createdAt: new Date().toISOString(),
+      });
 
       addEvent({
         id: `choice-${Date.now()}`,

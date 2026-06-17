@@ -46,6 +46,17 @@ export interface GameEvent {
   createdAt: string;
 }
 
+export interface ChoiceRecord {
+  id: string;
+  age: number;
+  prompt: string;
+  options: { text: string; hint?: string }[];
+  chosenIndex: number;
+  chosenText: string;
+  result: string;
+  createdAt?: string;
+}
+
 export interface PendingChoice {
   prompt: string;
   options: { text: string; hint?: string }[];
@@ -73,6 +84,7 @@ export interface BreakthroughCeremony {
 interface GameState {
   character: CharacterState | null;
   events: GameEvent[];
+  choices: ChoiceRecord[];
   pendingChoice: PendingChoice | null;
   fateNodes: FateNodeInfo[];
   loading: boolean;
@@ -89,6 +101,8 @@ interface GameState {
   setCharacter: (c: CharacterState | null) => void;
   setEvents: (e: GameEvent[]) => void;
   addEvent: (e: GameEvent) => void;
+  setChoices: (c: ChoiceRecord[]) => void;
+  addChoice: (c: ChoiceRecord) => void;
   setPendingChoice: (c: PendingChoice | null) => void;
   setFateNodes: (f: FateNodeInfo[]) => void;
   setLoading: (l: boolean) => void;
@@ -106,6 +120,7 @@ export const useGameStore = create<GameState>()(
     (set) => ({
       character: null,
       events: [],
+      choices: [],
       pendingChoice: null,
       fateNodes: [],
       loading: false,
@@ -119,6 +134,8 @@ export const useGameStore = create<GameState>()(
       setCharacter: (c) => set({ character: c }),
       setEvents: (e) => set({ events: e }),
       addEvent: (e) => set((s) => ({ events: [...s.events, e] })),
+      setChoices: (c) => set({ choices: c }),
+      addChoice: (c) => set((s) => ({ choices: [...s.choices, c] })),
       setPendingChoice: (c) => set({ pendingChoice: c }),
       setFateNodes: (f) => set({ fateNodes: f }),
       setLoading: (l) => set({ loading: l }),
@@ -129,7 +146,7 @@ export const useGameStore = create<GameState>()(
       setSelectedEventId: (id) => set({ selectedEventId: id }),
       setBreakthroughCeremony: (b) => set({ breakthroughCeremony: b }),
       reset: () => set({
-        character: null, events: [], pendingChoice: null, fateNodes: [],
+        character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
         loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null,
         selectedEventId: null, breakthroughCeremony: null,
       }),

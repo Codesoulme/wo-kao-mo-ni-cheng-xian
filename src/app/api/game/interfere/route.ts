@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 
 export const runtime = 'nodejs';
@@ -126,22 +126,7 @@ export async function POST(req: NextRequest) {
       ageAdvance: result.ageAdvance,
       died,
       deathReason,
-      state: {
-        age: state.age, lifespan: state.lifespan,
-        realm: state.realm, realmLevel: state.realmLevel,
-        cultivationExp: state.cultivationExp, expToBreak: state.expToBreak,
-        hp: state.hp, maxHp: state.maxHp, mp: state.mp, maxMp: state.maxMp,
-        attack: state.attack, defense: state.defense, speed: state.speed,
-        luck: state.luck, comprehension: state.comprehension,
-        spiritStones: state.spiritStones, reputation: state.reputation,
-        alive: state.alive, ascended: state.ascended,
-        causeOfDeath: state.causeOfDeath,
-        faction: state.faction, master: state.master, location: state.location,
-        elements: state.elements, fateNodes: state.fateNodes,
-        isAtChoice: state.isAtChoice,
-        spiritualRoot: state.spiritualRoot, rootDetail: state.rootDetail,
-        activeStatuses: state.activeStatuses, inventory: state.inventory,
-      },
+      state: stateToResponse(state),
     });
   } catch (err: any) {
     console.error('interfere error:', err);

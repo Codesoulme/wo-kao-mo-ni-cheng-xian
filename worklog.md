@@ -125,3 +125,24 @@ Next Phase Opportunities (for cron job / future development):
 - Add more detailed element interaction (五行相生相克 in combat)
 - Add NPC relationship system
 - Add quest system
+
+---
+Task ID: 8
+Agent: main
+Task: 修复 AI 每次输出事件导致界面高度不断增长的问题（用户反馈：每生成一条信息就把界面往下顶，高度越来越高）
+
+Work Log:
+- 定位根因：`src/app/page.tsx` 根容器使用 `min-h-screen`（min-height:100vh），当事件列表内容超过视口时整个页面被撑高，body 出现滚动条，main 的 flex-1 跟着增长，内部 overflow-y-auto 失效 → 每条新事件都把页面顶高。
+- 修复 1：根容器 `min-h-screen flex flex-col` → `h-[100dvh] flex flex-col overflow-hidden`，固定视口高度，强制内部滚动。`100dvh` 兼容移动端动态视口。
+- 修复 2：`src/app/globals.css` 给 `html, body` 加 `height:100%`，body 加 `overflow:hidden; overscroll-behavior:none`，彻底锁定 body 滚动，所有滚动只在内部容器发生。
+- 修复 3：`EventTimeline.tsx` 的自动滚动从 `endRef.scrollIntoView()` 改为"向上查找最近可滚动祖先并 scrollTo"，避免 scrollIntoView 向上传播到 body 触发整页滚动；并在展开状态变化时也滚动到底。
+- 修复 4：`src/components/xianxia/StartScreen.tsx` 外层从 `min-h-[calc(100vh-80px)]` 改为 `flex-1 overflow-y-auto xianxia-scroll min-h-full`，让开始页在小屏也可内部滚动。
+- 修复 5（顺带修 dev.log 报错）：`useHydrated()` 原直接调用 `useGameStore.persist.hasHydrated()`，在热重载/store 未初始化时报 `Cannot read properties of undefined (reading 'hasHydrated')` 导致 GET / 500。重写为 `useState(false) + useEffect + Promise.resolve().then(setHydrated(true))` 微任务延迟模式，既绕过 Next16 react-hooks/set-state-in-effect 规则，又保证 SSR 首屏返回 false（空壳）避免 hydration mismatch，挂载后微任务置 true 渲染真实内容。
+- `bun run lint` 通过（0 errors）。
+- dev server 热重载成功（`✓ Compiled`），API 调用（advance/interfere/choose）均返回 200。
+
+Stage Summary:
+- 界面高度无限增长问题已根治：根容器固定 100dvh + body 锁定滚动 + 内部 flex 布局分配高度，事件再多也只在事件列表容器内滚动，不再顶高整页。
+- persist hydration 报错（GET / 500）已修复，使用更健壮的微任务检测。
+- 自动滚动逻辑改为容器内精确滚动，避免误触发整页滚动。
+- 按用户要求：本次未做 agent-browser 验证，仅修复代码 + lint。

@@ -363,6 +363,43 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   };
 }
 
+// ==================== 状态 → API 响应（含展示字段） ====================
+
+// 将引擎状态转为前端可直接使用的响应对象
+// 关键：包含 realmName / realmColor / realmMaxLevel / rootMultiplier 等展示字段
+// 这样前端 setCharacter({...character, ...data.state}) 时这些字段会被正确更新
+export function stateToResponse(s: CharacterState) {
+  const realmInfo = getRealmInfo(s.realm);
+  const rootInfo = SPIRITUAL_ROOTS[s.spiritualRoot];
+  return {
+    age: s.age,
+    lifespan: s.lifespan,
+    realm: s.realm,
+    realmName: realmInfo.name,
+    realmColor: realmInfo.color,
+    realmLevel: s.realmLevel,
+    realmMaxLevel: realmInfo.levels,
+    cultivationExp: s.cultivationExp,
+    expToBreak: s.expToBreak,
+    hp: s.hp, maxHp: s.maxHp,
+    mp: s.mp, maxMp: s.maxMp,
+    attack: s.attack, defense: s.defense, speed: s.speed,
+    luck: s.luck, comprehension: s.comprehension,
+    spiritStones: s.spiritStones, reputation: s.reputation,
+    alive: s.alive, ascended: s.ascended,
+    causeOfDeath: s.causeOfDeath,
+    faction: s.faction, master: s.master, location: s.location,
+    elements: s.elements,
+    fateNodes: s.fateNodes,
+    isAtChoice: s.isAtChoice,
+    spiritualRoot: s.spiritualRoot,
+    rootDetail: s.rootDetail,
+    rootMultiplier: rootInfo?.multiplier ?? 0,
+    activeStatuses: s.activeStatuses,
+    inventory: s.inventory,
+  };
+}
+
 // ==================== 验证：状态名唯一性 ====================
 
 export function ensureUniqueIds(statuses: StatusEntry[], items: ItemEntry[]): { statuses: StatusEntry[]; items: ItemEntry[] } {

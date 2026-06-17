@@ -1,26 +1,78 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { StartScreen } from '@/components/xianxia/StartScreen';
 import { StatusPanel } from '@/components/xianxia/StatusPanel';
 import { EventTimeline } from '@/components/xianxia/EventTimeline';
 import { StatusList } from '@/components/xianxia/StatusList';
 import { FateNodes } from '@/components/xianxia/FateNodes';
+import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
 import { InterfereInput } from '@/components/xianxia/InterfereInput';
 import { ChoiceModal } from '@/components/xianxia/ChoiceModal';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Scroll, Sparkles, Map } from 'lucide-react';
 
+// 客户端 hydration 检测：避免 SSR/CSR mismatch
+// 用微任务延迟 setState，避免在 effect body 同步调用触发 react-hooks 规则
+// zustand persist 使用 localStorage 是同步 hydrate，组件挂载时已就绪
+function useHydrated() {
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    let active = true;
+    Promise.resolve().then(() => {
+      if (active) setHydrated(true);
+    });
+    return () => { active = false; };
+  }, []);
+  return hydrated;
+}
+
 export default function Home() {
-  const { character, events, pendingChoice } = useGameStore();
+  const {
+    character, events, pendingChoice,
+    setCharacter, setEvents, setChoices, setFateNodes,
+  } = useGameStore();
   // 当有 pendingChoice 时自动聚焦到故事 Tab
   const [tab, setTab] = useState('story');
+  const hydrated = useHydrated();
   const effectiveTab = pendingChoice ? 'story' : tab;
 
+  // 页面挂载/刷新时，若有持久化的 character 但无 events，则拉取完整状态
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!character) return;
+    // 仅当 events 为空时才拉取（避免覆盖正在使用的状态）
+    if (events.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/game/state?characterId=${character.id}`);
+        const data = await res.json();
+        if (cancelled || !data.success) return;
+        setCharacter(data.character);
+        setEvents(data.events || []);
+        setChoices(data.choices || []);
+        setFateNodes(data.fateNodes || []);
+      } catch (e) {
+        // 静默失败
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [hydrated, character?.id, events.length, setCharacter, setEvents, setChoices, setFateNodes]);
+
+  // 防止 hydration mismatch：在客户端 hydration 完成前不渲染 character 相关 UI
+  if (!hydrated) {
+    return (
+      <div className="h-[100dvh] flex flex-col overflow-hidden bg-background paper-texture ink-wash">
+        <div className="flex-1" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-background paper-texture ink-wash">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-background paper-texture ink-wash">
       {/* 顶部装饰 */}
       <header className="shrink-0 border-b border-border/40 bg-card/40 backdrop-blur">
         <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
@@ -49,9 +101,9 @@ export default function Home() {
           <StartScreen />
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col max-w-md mx-auto w-full">
-            {/* 状态面板（常驻顶部） */}
+            {/* 状态面板（常驻顶部 - 简化版） */}
             <div className="shrink-0 px-3 py-2">
-              <StatusPanel character={character} compact />
+              <StatusPanel character={character} />
             </div>
 
             {/* Tab 切换 */}
@@ -81,7 +133,7 @@ export default function Home() {
             {/* 内容区 */}
             <div className="flex-1 overflow-hidden">
               <Tabs value={effectiveTab} onValueChange={setTab} className="h-full">
-                {/* 故事 - 默认 */}
+                {/* 故事 - 默认，可折叠 */}
                 <TabsContent value="story" className="h-full m-0 data-[state=inactive]:hidden">
                   <div className="h-full flex flex-col">
                     <div className="flex-1 overflow-y-auto xianxia-scroll px-3 pb-2">
@@ -108,10 +160,10 @@ export default function Home() {
                   </div>
                 </TabsContent>
 
-                {/* 史册 */}
+                {/* 史册 - 关键节点记录 */}
                 <TabsContent value="scroll" className="h-full m-0 data-[state=inactive]:hidden">
                   <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
-                    <EventTimeline events={events} />
+                    <MilestonesLog />
                   </div>
                 </TabsContent>
               </Tabs>

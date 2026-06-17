@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 export function StartScreen() {
-  const { setCharacter, addEvent, setFateNodes, setLoading } = useGameStore();
+  const { setCharacter, setEvents, setChoices, setFateNodes, setLoading } = useGameStore();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -34,15 +34,8 @@ export function StartScreen() {
 
       setCharacter(stateData.character);
       setFateNodes(stateData.fateNodes);
-      addEvent({
-        id: `birth-${Date.now()}`,
-        age: 0,
-        title: '降生于世',
-        narrative: data.birth.background,
-        eventType: 'normal',
-        effects: [],
-        createdAt: new Date().toISOString(),
-      });
+      setEvents(stateData.events || []);
+      setChoices(stateData.choices || []);
 
       toast.success('道途初启', {
         description: `${data.birth.name} · ${data.birth.rootDetail}`,
@@ -56,7 +49,7 @@ export function StartScreen() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-80px)] px-6 py-8">
+    <div className="flex-1 overflow-y-auto xianxia-scroll flex flex-col items-center justify-center min-h-full px-6 py-8">
       {/* 标题 */}
       <div className="text-center mb-8 scroll-reveal">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">

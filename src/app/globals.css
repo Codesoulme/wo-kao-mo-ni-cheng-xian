@@ -104,9 +104,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html, body {
+    height: 100%;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "palt";
+    /* 锁定 body 滚动，所有滚动都在内部容器内完成 */
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 }
 

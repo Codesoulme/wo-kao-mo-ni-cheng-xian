@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES } from '@/lib/xianxia/types';
 
@@ -71,6 +71,26 @@ export async function POST(req: NextRequest) {
     const result = executeAIEvent(state, aiOutput);
     let finalState = result.state;
 
+    // 引擎兜底：若修为已达突破阈值且 AI 未显式触发，则自动突破
+    // 这保证修真进度不会无限卡住，且境界会正确更新到顶部信息
+    if (
+      !result.breakthroughHappened &&
+      !result.died &&
+      !finalState.ascended &&
+      finalState.alive &&
+      finalState.cultivationExp >= finalState.expToBreak
+    ) {
+      const br = tryBreakthrough(finalState);
+      if (br.success) {
+        finalState = br.state;
+        result.breakthroughHappened = true;
+        result.newRealm = br.newRealm;
+        // 突破后追加叙事提示（附加到原 narrative 后）
+        aiOutput.narrative = aiOutput.narrative + `\n\n【天道感应】修为圆满，水到渠成，你突破了境界，踏入新境域。`;
+        aiOutput.triggeredBreakthrough = true;
+      }
+    }
+
     // 寿元检查
     if (!result.died && !finalState.ascended) {
       const life = checkLifespan(finalState);
@@ -134,13 +154,17 @@ export async function POST(req: NextRequest) {
     });
 
     // 写入事件日志
+    // 若发生突破，事件类型强制为 'breakthrough'（便于史册识别）
+    const finalEventType = result.breakthroughHappened
+      ? 'breakthrough'
+      : (isFateNode ? 'fate_node' : aiOutput.eventType);
     const event = await db.eventLog.create({
       data: {
         characterId,
         age: finalState.age,
-        title: aiOutput.title,
+        title: result.breakthroughHappened ? `境界突破·${aiOutput.title}` : aiOutput.title,
         narrative: aiOutput.narrative,
-        eventType: isFateNode ? 'fate_node' : aiOutput.eventType,
+        eventType: finalEventType,
         effects: JSON.stringify(aiOutput.changes),
       },
     });
@@ -173,30 +197,4 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-function stateToResponse(s: any) {
-  return {
-    age: s.age,
-    lifespan: s.lifespan,
-    realm: s.realm,
-    realmLevel: s.realmLevel,
-    cultivationExp: s.cultivationExp,
-    expToBreak: s.expToBreak,
-    hp: s.hp, maxHp: s.maxHp,
-    mp: s.mp, maxMp: s.maxMp,
-    attack: s.attack, defense: s.defense, speed: s.speed,
-    luck: s.luck, comprehension: s.comprehension,
-    spiritStones: s.spiritStones, reputation: s.reputation,
-    alive: s.alive, ascended: s.ascended,
-    causeOfDeath: s.causeOfDeath,
-    faction: s.faction, master: s.master, location: s.location,
-    elements: s.elements,
-    fateNodes: s.fateNodes,
-    isAtChoice: s.isAtChoice,
-    spiritualRoot: s.spiritualRoot,
-    rootDetail: s.rootDetail,
-    activeStatuses: s.activeStatuses,
-    inventory: s.inventory,
-  };
 }
