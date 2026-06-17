@@ -94,9 +94,15 @@ export function ActionButtons() {
         createdAt: new Date().toISOString(),
       });
 
-      // 设置待选择
+      // 设置待选择（带上命节点前情提要，供弹窗展示完整情境）
       if (data.hasChoice && data.choice) {
-        setPendingChoice(data.choice);
+        setPendingChoice({
+          ...data.choice,
+          contextTitle: data.event.title,
+          contextNarrative: data.event.narrative,
+          contextAge: data.event.age,
+          contextFateNodeName: data.fateNodeName,
+        });
         toast('命节点触发', { description: '请做出你的抉择' });
         // 命节点中断自动推进
         autoCancelRef.current = true;

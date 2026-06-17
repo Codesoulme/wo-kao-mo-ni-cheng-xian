@@ -213,3 +213,27 @@ Stage Summary:
 - AI 叙事年龄与状态显示现在完全一致：推进一岁，存档 +1，AI 叙事也用新岁数。
 - 这是上次跳岁修复的连带问题（隐藏的 prompt 错位被掩盖），现已一并修正。
 - 按用户要求：本次未做 agent-browser 验证。
+
+---
+Task ID: 12
+Agent: main
+Task: 修复"天道抉择"弹窗盖住命节点事件文本，用户不知道情境就被迫做选择
+
+Work Log:
+- 根因：ActionButtons 推进一岁后，若 hasChoice 立即 setPendingChoice，ChoiceModal 作为全屏遮罩（fixed inset-0 z-50 bg-black/60）立即弹出，盖住故事 Tab 里刚生成的命节点事件叙事。而 pendingChoice.prompt 只是选择情境描述，不含完整事件叙事 → 用户看不到命节点铺垫就要做选择。
+- 修复 1（数据）：扩展 `store.ts` 的 `PendingChoice` 接口，新增 contextTitle / contextNarrative / contextAge / contextFateNodeName 四个可选字段，用于携带命节点事件的前情提要。
+- 修复 2（传参）：`ActionButtons.tsx` setPendingChoice 时不再只传 data.choice，而是 `{...data.choice, contextTitle: data.event.title, contextNarrative: data.event.narrative, contextAge: data.event.age, contextFateNodeName: data.fateNodeName}`。
+- 修复 3（UI）：重写 `ChoiceModal.tsx`：
+  * 弹窗顶部新增「前情提要」可折叠区块，展示命节点事件的 title + narrative（默认展开，用户可手动折叠聚焦选项）
+  * 中间「抉择情境」区块展示 pendingChoice.prompt
+  * 下方选项列表
+  * 弹窗整体 max-h-[92vh] + 内容区 overflow-y-auto xianxia-scroll，长叙事也可滚动查看，不再溢出屏幕
+  * 移动端 bottom-sheet 风格（items-end），桌面端居中（sm:items-center）
+  * 选项 active:scale 微动效
+- `bun run lint` 通过。dev server 热重载成功（✓ Compiled）。
+
+Stage Summary:
+- 命节点触发时，弹窗内会先展示完整的前情提要（事件标题+叙事），用户看清情境后再做抉择
+- 前情提要可折叠，避免叙事过长时选项被挤到屏幕外
+- 弹窗内容可滚动，移动端 bottom-sheet 风格更友好
+- 按用户要求：本次未做 agent-browser 验证。

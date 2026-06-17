@@ -3,7 +3,7 @@
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mountain, Sparkles } from 'lucide-react';
+import { Mountain, Sparkles, BookOpen, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -14,8 +14,12 @@ export function ChoiceModal() {
     setCharacter, addEvent, addChoice, setLastChange,
   } = useGameStore();
   const [busy, setBusy] = useState(false);
+  // 前情提要默认展开；用户可手动折叠以聚焦选项
+  const [contextCollapsed, setContextCollapsed] = useState(false);
 
   if (!character || !pendingChoice) return null;
+
+  const hasContext = !!(pendingChoice.contextNarrative || pendingChoice.contextTitle);
 
   const choose = async (idx: number) => {
     if (busy) return;
@@ -80,18 +84,62 @@ export function ChoiceModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <Card className="w-full max-w-md paper-texture border-primary/40 shadow-2xl scroll-reveal">
-        <CardHeader className="pb-2">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <Card className="w-full max-w-md paper-texture border-primary/40 shadow-2xl scroll-reveal flex flex-col max-h-[92vh] sm:max-h-[88vh]">
+        <CardHeader className="pb-2 shrink-0">
           <CardTitle className="text-base flex items-center gap-2 font-serif-cn">
             <Mountain className="w-4 h-4 text-primary" />
             天道抉择
+            {pendingChoice.contextFateNodeName && (
+              <span className="seal text-[10px] ml-1">{pendingChoice.contextFateNodeName}</span>
+            )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm leading-relaxed text-foreground/90 font-serif-cn whitespace-pre-wrap">
-            {pendingChoice.prompt}
-          </p>
+        <CardContent className="space-y-3 overflow-y-auto xianxia-scroll flex-1">
+          {/* 前情提要：命节点事件叙事 */}
+          {hasContext && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 overflow-hidden">
+              <button
+                onClick={() => setContextCollapsed(v => !v)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-primary/10 transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-primary shrink-0" />
+                <span className="text-xs font-semibold font-serif-cn text-primary flex-1">
+                  前情提要
+                  {pendingChoice.contextAge !== undefined && (
+                    <span className="text-muted-foreground font-normal ml-1">· {pendingChoice.contextAge}岁</span>
+                  )}
+                </span>
+                <ChevronDown className={cn(
+                  "w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0",
+                  contextCollapsed ? "" : "rotate-180"
+                )} />
+              </button>
+              {!contextCollapsed && (
+                <div className="px-3 pb-3 pt-1 space-y-1.5">
+                  {pendingChoice.contextTitle && (
+                    <h4 className="text-sm font-bold font-serif-cn text-foreground">
+                      {pendingChoice.contextTitle}
+                    </h4>
+                  )}
+                  {pendingChoice.contextNarrative && (
+                    <p className="text-xs leading-relaxed text-foreground/85 font-serif-cn whitespace-pre-wrap">
+                      {pendingChoice.contextNarrative}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 抉择情境 */}
+          <div className="rounded-lg border border-border/60 bg-card/60 p-3">
+            <p className="text-sm leading-relaxed text-foreground/90 font-serif-cn whitespace-pre-wrap">
+              {pendingChoice.prompt}
+            </p>
+          </div>
+
+          {/* 选项 */}
           <div className="space-y-2">
             {pendingChoice.options.map((opt, i) => (
               <button
@@ -100,7 +148,7 @@ export function ChoiceModal() {
                 disabled={busy}
                 className={cn(
                   "w-full text-left p-3 rounded-lg border-2 transition-all",
-                  "hover:border-primary hover:bg-primary/5",
+                  "hover:border-primary hover:bg-primary/5 active:scale-[0.99]",
                   "border-border bg-card/60",
                   busy && "opacity-50 cursor-not-allowed"
                 )}
@@ -117,6 +165,7 @@ export function ChoiceModal() {
               </button>
             ))}
           </div>
+
           {busy && (
             <div className="text-center text-xs text-muted-foreground animate-pulse pt-1">
               <Sparkles className="w-3 h-3 inline mr-1" />

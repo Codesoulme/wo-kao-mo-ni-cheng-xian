@@ -60,6 +60,11 @@ export interface ChoiceRecord {
 export interface PendingChoice {
   prompt: string;
   options: { text: string; hint?: string }[];
+  /** 命节点触发时的前情提要：刚生成的命节点事件标题与叙事 */
+  contextTitle?: string;
+  contextNarrative?: string;
+  contextAge?: number;
+  contextFateNodeName?: string;
 }
 
 export interface FateNodeInfo {
