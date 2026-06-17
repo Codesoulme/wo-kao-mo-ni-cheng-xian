@@ -60,6 +60,16 @@ export interface FateNodeInfo {
   completed: boolean;
 }
 
+export interface BreakthroughCeremony {
+  fromRealm: string;
+  fromRealmName: string;
+  toRealm: string;
+  toRealmName: string;
+  toRealmColor: string;
+  newLifespan: number;
+  statBoosts: { label: string; value: number }[];
+}
+
 interface GameState {
   character: CharacterState | null;
   events: GameEvent[];
@@ -71,6 +81,11 @@ interface GameState {
   lastBreakthrough: { newRealm: string } | null;
   lastInterfere: { classification: string; accepted: boolean; narrative: string } | null;
 
+  // 新增：事件详情抽屉
+  selectedEventId: string | null;
+  // 新增：突破仪式
+  breakthroughCeremony: BreakthroughCeremony | null;
+
   setCharacter: (c: CharacterState | null) => void;
   setEvents: (e: GameEvent[]) => void;
   addEvent: (e: GameEvent) => void;
@@ -81,6 +96,8 @@ interface GameState {
   setLastChange: (c: any[] | null) => void;
   setLastBreakthrough: (b: any | null) => void;
   setLastInterfere: (i: any | null) => void;
+  setSelectedEventId: (id: string | null) => void;
+  setBreakthroughCeremony: (b: BreakthroughCeremony | null) => void;
   reset: () => void;
 }
 
@@ -96,6 +113,8 @@ export const useGameStore = create<GameState>()(
       lastChange: null,
       lastBreakthrough: null,
       lastInterfere: null,
+      selectedEventId: null,
+      breakthroughCeremony: null,
 
       setCharacter: (c) => set({ character: c }),
       setEvents: (e) => set({ events: e }),
@@ -107,9 +126,12 @@ export const useGameStore = create<GameState>()(
       setLastChange: (c) => set({ lastChange: c }),
       setLastBreakthrough: (b) => set({ lastBreakthrough: b }),
       setLastInterfere: (i) => set({ lastInterfere: i }),
+      setSelectedEventId: (id) => set({ selectedEventId: id }),
+      setBreakthroughCeremony: (b) => set({ breakthroughCeremony: b }),
       reset: () => set({
         character: null, events: [], pendingChoice: null, fateNodes: [],
         loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null,
+        selectedEventId: null, breakthroughCeremony: null,
       }),
     }),
     {
