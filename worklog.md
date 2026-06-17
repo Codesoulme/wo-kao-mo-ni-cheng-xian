@@ -164,3 +164,28 @@ Stage Summary:
 - 顶部「⋯」菜单常驻可见，正常游戏中即可「重开存档」返回主菜单，无需等到角色死亡。
 - 附带「本局概况」弹窗，方便玩家随时查看本局进度汇总（流年记事条数、抉择次数、命节点进度等）。
 - 重开操作有二次确认，防误触清空存档。
+
+---
+Task ID: 10
+Agent: main
+Task: 修复年龄跳岁 bug：出生 0 岁，点一次推进变 2 岁（每次推进 +2 而非 +1）
+
+Work Log:
+- 定位根因：`src/lib/xianxia/engine.ts` 的 `ATTRIBUTE_BOUNDS` 白名单里包含 `age`。
+  - advance 流程：引擎第41行 `state.age += 1`（+1岁）
+  - 随后 `executeAIEvent → applyChanges` 应用 AI 的 changes，若 AI 输出 `{attribute:'age', delta:1}` 会再 +1
+  - 两者叠加 = +2 岁/次
+  - AI 之所以输出 age 变更，是因为 prompt 第171行 `可修改属性白名单：${ctx.availableAttributes.join(', ')}` 把 age 列给了 AI。
+- 修复 1（核心）：从 `ATTRIBUTE_BOUNDS` 移除 `age` 项。这样：
+  - `availableAttributes = Object.keys(ATTRIBUTE_BOUNDS)` 不再包含 age，AI 看不到 age 在白名单
+  - `applyChanges` 里 `if (!bounds) continue` 会拒绝任何 age 变更（双保险）
+  - age 推进完全由引擎独占：advance 的 `state.age += 1`，interfere 的 `state.age += ageAdvance`
+- 修复 2（prompt 双保险）：在 `llm.ts` 的 advance prompt 白名单说明后追加「严禁修改 age（年龄由天道推进，每岁固定 +1，AI 不得在 changes 中包含 age）」。
+- 确认不影响 interfere：interfere route 第52-53行用独立的 `ageAdvance` 字段推进年龄，不走 changes，故移除 age 白名单不影响干扰的耗时推进功能。
+- `bun run lint` 通过。dev server 热重载正常，advance API 200。
+
+Stage Summary:
+- 跳岁 bug 已根治：每次「岁月流转一载」严格 +1 岁。
+- 引擎权威原则强化：age 列为引擎独占属性，AI 不可通过 changes 修改。
+- 已存在的跳岁存档无法回退，用户可通过顶部「⋯」菜单 →「重开存档」重新开局验证。
+- 按用户要求：本次未做 agent-browser 验证。

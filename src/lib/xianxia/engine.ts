@@ -64,8 +64,11 @@ function safeParse<T>(s: string, fallback: T): T {
 // ==================== 属性变更应用 (引擎权威) ====================
 
 // AI 可影响的属性白名单 + 钳制范围
+// 注意：age（年龄）不在白名单内——年龄推进是引擎独占职责
+//   - advance 流程：引擎 state.age += 1
+//   - interfere 流程：引擎根据 AI 的 ageAdvance 字段推进
+//   AI 不得通过 changes 直接修改 age，否则会与引擎推进叠加导致跳岁
 const ATTRIBUTE_BOUNDS: Record<string, { min: number; max: number }> = {
-  age:             { min: 0,    max: 99999 },
   lifespan:        { min: 1,    max: 99999 },
   cultivationExp:  { min: 0,    max: 99999999 },
   hp:              { min: 0,    max: 99999 },
