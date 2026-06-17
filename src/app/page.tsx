@@ -12,8 +12,9 @@ import { InterfereInput } from '@/components/xianxia/InterfereInput';
 import { ChoiceModal } from '@/components/xianxia/ChoiceModal';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
 import { GameMenu } from '@/components/xianxia/GameMenu';
+import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Scroll, Sparkles, Map } from 'lucide-react';
+import { BookOpen, Scroll, Sparkles, Map, Package } from 'lucide-react';
 
 // 客户端 hydration 检测：避免 SSR/CSR mismatch
 // 用微任务延迟 setState，避免在 effect body 同步调用触发 react-hooks 规则
@@ -113,7 +114,7 @@ export default function Home() {
             {/* Tab 切换 */}
             <div className="shrink-0 px-3 pb-2">
               <Tabs value={effectiveTab} onValueChange={setTab} className="w-full">
-                <TabsList className="grid grid-cols-4 w-full h-9 bg-muted/40">
+                <TabsList className="grid grid-cols-5 w-full h-9 bg-muted/40">
                   <TabsTrigger value="story" className="text-xs gap-1">
                     <BookOpen className="w-3 h-3" />
                     <span className="hidden sm:inline">传</span>
@@ -121,6 +122,10 @@ export default function Home() {
                   <TabsTrigger value="status" className="text-xs gap-1">
                     <Sparkles className="w-3 h-3" />
                     <span className="hidden sm:inline">态</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="inventory" className="text-xs gap-1">
+                    <Package className="w-3 h-3" />
+                    <span className="hidden sm:inline">宝</span>
                   </TabsTrigger>
                   <TabsTrigger value="fate" className="text-xs gap-1">
                     <Map className="w-3 h-3" />
@@ -154,6 +159,13 @@ export default function Home() {
                 <TabsContent value="status" className="h-full m-0 data-[state=inactive]:hidden">
                   <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
                     <StatusList />
+                  </div>
+                </TabsContent>
+
+                {/* 宝物 - 装备/储物袋 */}
+                <TabsContent value="inventory" className="h-full m-0 data-[state=inactive]:hidden">
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
+                    <InventoryPanel />
                   </div>
                 </TabsContent>
 

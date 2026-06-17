@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, markFateNodeDone, tickStatusDurations, tryBreakthrough, stateToResponse } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, markFateNodeDone, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 
 export const runtime = 'nodejs';
@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
     state = applyChanges(state, result.changes || []);
     state = addStatuses(state, result.newStatuses || []);
     state = addItems(state, result.newItems || []);
+    if (result.removedItemIds && result.removedItemIds.length) {
+      state = removeItemsByIds(state, result.removedItemIds).state;
+    }
     if (result.memory) state = addMemory(state, result.memory);
 
     // 处理死亡
@@ -114,6 +117,8 @@ export async function POST(req: NextRequest) {
         isAtChoice: state.isAtChoice,
         statusJson: JSON.stringify(state.activeStatuses),
         inventoryJson: JSON.stringify(state.inventory),
+        equippedJson: JSON.stringify(state.equipped || {}),
+        cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
         memoryJson: JSON.stringify(state.longTermMemory),
       },
     });

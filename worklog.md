@@ -237,3 +237,42 @@ Stage Summary:
 - 前情提要可折叠，避免叙事过长时选项被挤到屏幕外
 - 弹窗内容可滚动，移动端 bottom-sheet 风格更友好
 - 按用户要求：本次未做 agent-browser 验证。
+
+---
+Task ID: 13
+Agent: main
+Task: 新增物品/装备管理页面（「宝」Tab），支持装备/卸下/使用物品，AI 可联动读取与修改（破坏/消耗物品）
+
+Work Log:
+- 数据模型扩展：
+  * types.ts: 新增 EquipSlot 类型(weapon/armor/accessory/artifact/scripture)、itemToSlot 映射、SLOT_LABEL/ITEM_TYPE_LABEL；CharacterState 加 equipped(EquippedMap) + cultivationMultiplier + rootMultiplier；AIEventOutput/ChoiceResultOutput/InterfereOutput 加 removedItemIds 字段；EngineStateContext 暴露 equipped + cultivationMultiplier
+  * prisma/schema.prisma: Character 加 equippedJson(String default "{}") + cultivationMultiplier(Float default 1.0)，db:push 成功
+- 引擎(engine.ts):
+  * dbToState 解析 equippedJson + cultivationMultiplier（旧存档兼容：缺字段时根据灵根+已装备功法重算）
+  * stateToResponse 返回 equipped/cultivationMultiplier/rootMultiplier
+  * applyChanges: cultivationExp 正向 delta 乘以 cultivationMultiplier（修炼速度受灵根+功法影响）
+  * 新增 equipItem(装备到槽位，自动替换旧装备并反向结算属性) / unequipSlot(卸下) / consumeItem(使用消耗品) / removeItemsByIds(AI 联动移除，同时处理 inventory 和 equipped) / recalcCultivationMultiplier(重算=灵根×功法倍率)
+  * executeAIEvent 接入 removedItemIds 处理
+  * buildStateContext 暴露 equipped + cultivationMultiplier 给 AI
+- LLM(llm.ts):
+  * advance prompt: 状态快照区显示修炼速度倍率说明、背包物品带 id 与效果、已装备物品带槽位/id/效果；schema 加 removedItemIds 字段并说明用法（战斗中兵器损毁、丹药消耗等填入物品 id，引擎自动移除并反向结算）
+  * interfere prompt: 同样暴露背包(id)、已装备、removedItemIds 说明
+  * 三个 sanitize 函数解析 removedItemIds（字符串数组，过滤空值）
+- API:
+  * advance/interfere/choose route: 调用 removeItemsByIds 处理 AI 移除；db.update 持久化 equippedJson + cultivationMultiplier
+  * state route: character 响应加 equipped + cultivationMultiplier
+  * 新增 POST /api/game/item: 统一物品操作(equip/unequip/use)，zod 校验，调用引擎函数，持久化，返回 stateToResponse
+- 前端:
+  * 新建 InventoryPanel 组件: 修炼速度概览卡(显示倍率=灵根×功法)、已装备5槽位(兵器/防具/饰物/法宝/功法，可卸下)、储物袋按类型分组(功法/兵器/防具/饰物/法宝/丹药/材料/器具，可装备/使用)
+  * page.tsx: Tab 从4个增至5个(传/态/宝/命/史)，新增「宝」TabsContent 渲染 InventoryPanel
+  * StatusList: 移除原储物袋只读区块(已迁至「宝」页)，加提示"装备与储物袋请查看「宝」页"，清理未用 import
+- 修复: consumeItem 原名 useConsumable 被 eslint 误判为 React Hook(use 前缀)，重命名解决
+- bun run lint 通过。dev server 热重载成功(✓ Compiled)
+
+Stage Summary:
+- 玩家可在「宝」页查看所有装备法宝与储物袋物品，进行装备/卸下/使用操作
+- 装备效果实时生效：装备武器 attack+10 立即反映在属性，装备功法(如引气决 multiply cultivationExp 1.5)立即提升修炼速度倍率
+- 修炼速度 = 灵根倍率 × 功法倍率，advance 时 AI 给的 cultivationExp 正向增量会被该倍率放大
+- AI 联动完整：AI 输出 removedItemIds 即可移除物品(战斗中兵器损毁、丹药服用、法宝碎裂)，引擎自动从储物袋或已装备中删除并反向结算属性，"活页面"实时更新
+- AI 可读取完整 inventory+equipped(含 id/效果) 用于叙事与决策
+- 按用户要求：本次未做 agent-browser 验证

@@ -32,6 +32,8 @@ export interface CharacterState {
   isAtChoice: boolean;
   activeStatuses: any[];
   inventory: any[];
+  equipped: Record<string, any>;
+  cultivationMultiplier: number;
 }
 
 export interface GameEvent {

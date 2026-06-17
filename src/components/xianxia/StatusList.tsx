@@ -2,11 +2,10 @@
 
 import { useGameStore } from '@/lib/xianxia/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useState } from 'react';
-import { ChevronDown, Package, Star } from 'lucide-react';
+import { ChevronDown, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const RARITY_COLORS: Record<string, string> = {
@@ -35,7 +34,6 @@ const ITEM_TYPE_LABEL: Record<string, string> = {
 export function StatusList() {
   const { character } = useGameStore();
   const [open, setOpen] = useState(true);
-  const [invOpen, setInvOpen] = useState(true);
 
   if (!character) return null;
 
@@ -71,7 +69,7 @@ export function StatusList() {
             </CardHeader>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0 space-y-3 max-h-80 overflow-y-auto xianxia-scroll">
+            <CardContent className="pt-0 space-y-3 max-h-[60vh] overflow-y-auto xianxia-scroll">
               {character.activeStatuses.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">尚无状态词条</p>
               ) : (
@@ -92,68 +90,9 @@ export function StatusList() {
         </Card>
       </Collapsible>
 
-      {/* 背包 */}
-      <Collapsible open={invOpen} onOpenChange={setInvOpen}>
-        <Card className="paper-texture">
-          <CollapsibleTrigger asChild>
-            <CardHeader className="pb-2 cursor-pointer">
-              <CardTitle className="text-sm flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-accent" />
-                  储物袋
-                </span>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-[10px]">
-                    {character.inventory.length}
-                  </Badge>
-                  <ChevronDown className={cn("w-4 h-4 transition-transform", invOpen && "rotate-180")} />
-                </div>
-              </CardTitle>
-            </CardHeader>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <CardContent className="pt-0 space-y-2 max-h-80 overflow-y-auto xianxia-scroll">
-              {character.inventory.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">储物袋空空如也</p>
-              ) : (
-                character.inventory.map((item, i) => (
-                  <div
-                    key={i}
-                    className="rounded-md border p-2 text-xs"
-                    style={{
-                      borderColor: `${RARITY_COLORS[item.rarity] || '#6b7280'}40`,
-                      background: `${RARITY_COLORS[item.rarity] || '#6b7280'}08`,
-                    }}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold font-serif-cn" style={{ color: RARITY_COLORS[item.rarity] }}>
-                        {item.name}
-                      </span>
-                      <span className="text-[10px] px-1 rounded" style={{
-                        background: `${RARITY_COLORS[item.rarity]}20`,
-                        color: RARITY_COLORS[item.rarity],
-                      }}>
-                        {RARITY_LABEL[item.rarity]}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">{item.description}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[10px] text-muted-foreground">
-                        {ITEM_TYPE_LABEL[item.item_type] || item.item_type}
-                      </span>
-                      {item.effects && item.effects.length > 0 && (
-                        <span className="text-[10px] text-primary">
-                          {item.effects.map((e: any) => `${e.target_attribute}${e.operation === 'add' ? (e.value > 0 ? '+' : '') : '×'}${e.value}`).join('，')}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
+      <p className="text-[10px] text-muted-foreground text-center pt-1">
+        装备与储物袋请查看「宝」页
+      </p>
     </div>
   );
 }

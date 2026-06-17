@@ -149,6 +149,8 @@ export async function POST(req: NextRequest) {
         lastEventAge: finalState.age,
         statusJson: JSON.stringify(finalState.activeStatuses),
         inventoryJson: JSON.stringify(finalState.inventory),
+        equippedJson: JSON.stringify(finalState.equipped || {}),
+        cultivationMultiplier: finalState.cultivationMultiplier ?? 1.0,
         memoryJson: JSON.stringify(finalState.longTermMemory),
       },
     });

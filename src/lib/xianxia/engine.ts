@@ -16,6 +16,11 @@ import {
   FATE_NODES,
   AIEventOutput,
   EngineStateContext,
+  EquipSlot,
+  EquippedMap,
+  ITEM_TYPE_LABEL,
+  SLOT_LABEL,
+  itemToSlot,
 } from './types';
 
 // ==================== 角色状态序列化 ====================
@@ -32,13 +37,30 @@ export interface DBCharacter {
   faction: string; master: string; location: string;
   fateNodes: string; isAtChoice: boolean; lastEventAge: number;
   statusJson: string; inventoryJson: string; memoryJson: string;
+  equippedJson: string; cultivationMultiplier: number;
 }
 
 export function dbToState(c: DBCharacter): CharacterState {
+  const rootInfo = SPIRITUAL_ROOTS[c.spiritualRoot as SpiritualRoot];
+  const equipped = safeParse<EquippedMap>(c.equippedJson || '{}', {});
+  // 旧存档可能没有 cultivationMultiplier 字段，根据灵根 + 已装备功法重算
+  let mult = Number(c.cultivationMultiplier);
+  if (!mult || Number.isNaN(mult) || mult <= 0) {
+    mult = rootInfo?.multiplier ?? 0;
+    const scripture = equipped.scripture;
+    if (scripture) {
+      for (const eff of scripture.effects || []) {
+        if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply') {
+          mult *= eff.value;
+        }
+      }
+    }
+  }
   return {
     id: c.id, name: c.name, age: c.age, lifespan: c.lifespan, gender: c.gender,
     spiritualRoot: c.spiritualRoot as SpiritualRoot,
     rootDetail: c.rootDetail,
+    rootMultiplier: rootInfo?.multiplier ?? 0,
     realm: c.realm as Realm, realmLevel: c.realmLevel,
     cultivationExp: c.cultivationExp, expToBreak: c.expToBreak,
     elements: { metal: c.elementMetal, wood: c.elementWood, water: c.elementWater, fire: c.elementFire, earth: c.elementEarth },
@@ -52,6 +74,8 @@ export function dbToState(c: DBCharacter): CharacterState {
     isAtChoice: c.isAtChoice, lastEventAge: c.lastEventAge,
     activeStatuses: safeParse<StatusEntry[]>(c.statusJson, []),
     inventory: safeParse<ItemEntry[]>(c.inventoryJson, []),
+    equipped,
+    cultivationMultiplier: mult,
     longTermMemory: safeParse<string[]>(c.memoryJson, []),
   };
 }
@@ -96,8 +120,15 @@ export function applyChanges(state: CharacterState, changes: AttributeChange[]):
     const bounds = ATTRIBUTE_BOUNDS[attr];
     if (!bounds) continue; // 引擎拒绝未知属性
 
+    // 修炼速度倍率：cultivationExp 的增量乘以 (灵根×功法) 倍率
+    // 这样 AI 给 +10 修为时，装备了引气决(×1.5)+真灵根(×1.5) 的角色实际得 +22.5→22
+    let delta = change.delta;
+    if (attr === 'cultivationExp' && next.cultivationMultiplier > 0 && delta > 0) {
+      delta = Math.round(delta * next.cultivationMultiplier);
+    }
+
     const current = (next as any)[attr] ?? 0;
-    let newVal = current + change.delta;
+    let newVal = current + delta;
 
     // 引擎钳制：不可超出范围
     newVal = Math.max(bounds.min, Math.min(bounds.max, newVal));
@@ -116,6 +147,124 @@ export function applyChanges(state: CharacterState, changes: AttributeChange[]):
     if (attr === 'maxMp' && next.mp > next.maxMp) next.mp = next.maxMp;
   }
   return next;
+}
+
+// ==================== 装备管理 (引擎权威) ====================
+
+// 把物品的 add 效果应用到角色属性（装备时 +delta，卸下时 -delta）
+function applyItemEffects(state: CharacterState, item: ItemEntry, sign: 1 | -1): CharacterState {
+  let next = { ...state };
+  const changes: AttributeChange[] = [];
+  for (const eff of item.effects || []) {
+    if (eff.operation === 'add' && ATTRIBUTE_BOUNDS[eff.target_attribute]) {
+      changes.push({
+        attribute: eff.target_attribute,
+        delta: sign * eff.value,
+        reason: sign > 0 ? `装备 ${item.name}` : `卸下 ${item.name}`,
+      });
+    }
+  }
+  if (changes.length) next = applyChanges(next, changes);
+  return next;
+}
+
+// 重算修炼倍率 = 灵根倍率 × 所有已装备功法的 multiply cultivationExp
+export function recalcCultivationMultiplier(state: CharacterState): CharacterState {
+  const rootInfo = SPIRITUAL_ROOTS[state.spiritualRoot];
+  let mult = rootInfo?.multiplier ?? 0;
+  const scripture = state.equipped?.scripture;
+  if (scripture) {
+    for (const eff of scripture.effects || []) {
+      if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply' && eff.value > 0) {
+        mult *= eff.value;
+      }
+    }
+  }
+  return { ...state, cultivationMultiplier: mult };
+}
+
+// 装备物品到对应槽位（从 inventory 移到 equipped）
+export function equipItem(state: CharacterState, itemId: string): { state: CharacterState; ok: boolean; error?: string; slot?: EquipSlot; replaced?: ItemEntry } {
+  const idx = state.inventory.findIndex(it => it.id === itemId);
+  if (idx < 0) return { state, ok: false, error: '物品不在储物袋中' };
+  const item = state.inventory[idx];
+  const slot = itemToSlot(item.item_type);
+  if (!slot) return { state, ok: false, error: '该物品不可装备' };
+
+  let next: CharacterState = { ...state, inventory: state.inventory.filter(it => it.id !== itemId), equipped: { ...state.equipped } };
+  // 若槽位已有物品，先卸下（不应用反向效果，因为下面会整体重算；但需把旧物品放回 inventory）
+  const replaced = next.equipped[slot];
+  if (replaced) {
+    next.equipped = { ...next.equipped, [slot]: undefined };
+    next.inventory = [...next.inventory, replaced];
+  }
+  // 装备新物品
+  next.equipped = { ...next.equipped, [slot]: item };
+  // 应用 add 效果
+  next = applyItemEffects(next, item, 1);
+  // 若卸下了旧物品，应用反向效果
+  if (replaced) next = applyItemEffects(next, replaced, -1);
+  // 重算修炼倍率
+  next = recalcCultivationMultiplier(next);
+  return { state: next, ok: true, slot, replaced };
+}
+
+// 卸下指定槽位的物品
+export function unequipSlot(state: CharacterState, slot: EquipSlot): { state: CharacterState; ok: boolean; error?: string; item?: ItemEntry } {
+  const item = state.equipped?.[slot];
+  if (!item) return { state, ok: false, error: '该槽位无装备' };
+  let next: CharacterState = {
+    ...state,
+    equipped: { ...state.equipped, [slot]: undefined },
+    inventory: [...state.inventory, item],
+  };
+  next = applyItemEffects(next, item, -1);
+  next = recalcCultivationMultiplier(next);
+  return { state: next, ok: true, item };
+}
+
+// 使用消耗品（consumable）：应用效果后从 inventory 移除
+export function consumeItem(state: CharacterState, itemId: string): { state: CharacterState; ok: boolean; error?: string; item?: ItemEntry } {
+  const item = state.inventory.find(it => it.id === itemId);
+  if (!item) return { state, ok: false, error: '物品不在储物袋中' };
+  if (item.item_type !== 'consumable') return { state, ok: false, error: '仅丹药类物品可使用' };
+  let next: CharacterState = {
+    ...state,
+    inventory: state.inventory.filter(it => it.id !== itemId),
+  };
+  // 应用 add 效果到属性；trigger 效果暂不处理（可后续扩展为加状态词条）
+  next = applyItemEffects(next, item, 1);
+  return { state: next, ok: true, item };
+}
+
+// AI 联动：按 id 移除物品（破坏/消耗）。可同时存在于 inventory 或 equipped。
+export function removeItemsByIds(state: CharacterState, ids: string[]): { state: CharacterState; removed: ItemEntry[] } {
+  if (!ids.length) return { state, removed: [] };
+  const idSet = new Set(ids);
+  let next = { ...state };
+  const removed: ItemEntry[] = [];
+  // 从 inventory 移除
+  const keptInv: ItemEntry[] = [];
+  for (const it of state.inventory) {
+    if (idSet.has(it.id)) removed.push(it);
+    else keptInv.push(it);
+  }
+  next.inventory = keptInv;
+  // 从 equipped 移除（并反向应用效果）
+  if (next.equipped) {
+    const newEquipped: EquippedMap = { ...next.equipped };
+    (Object.keys(newEquipped) as EquipSlot[]).forEach(slot => {
+      const it = newEquipped[slot];
+      if (it && idSet.has(it.id)) {
+        removed.push(it);
+        next = applyItemEffects(next, it, -1);
+        delete newEquipped[slot];
+      }
+    });
+    next.equipped = newEquipped;
+    next = recalcCultivationMultiplier(next);
+  }
+  return { state: next, removed };
 }
 
 // ==================== 突破处理 ====================
@@ -283,6 +432,8 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     },
     activeStatuses: state.activeStatuses,
     inventory: state.inventory,
+    equipped: state.equipped,
+    cultivationMultiplier: state.cultivationMultiplier,
     recentEvents: recentEvents.slice(-5),
     longTermMemory: state.longTermMemory.slice(-10),
     completedFateNodes: state.fateNodes,
@@ -320,6 +471,12 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 
   // 3. 添加新物品
   next = addItems(next, aiOutput.newItems || []);
+
+  // 3.5 AI 联动：移除/破坏物品（如战斗中武器被毁、丹药被消耗）
+  if (aiOutput.removedItemIds && aiOutput.removedItemIds.length) {
+    const rem = removeItemsByIds(next, aiOutput.removedItemIds);
+    next = rem.state;
+  }
 
   // 4. 添加长期记忆
   if (aiOutput.memory) next = addMemory(next, aiOutput.memory);
@@ -398,8 +555,10 @@ export function stateToResponse(s: CharacterState) {
     spiritualRoot: s.spiritualRoot,
     rootDetail: s.rootDetail,
     rootMultiplier: rootInfo?.multiplier ?? 0,
+    cultivationMultiplier: s.cultivationMultiplier,
     activeStatuses: s.activeStatuses,
     inventory: s.inventory,
+    equipped: s.equipped,
   };
 }
 

@@ -69,6 +69,10 @@ model Character {
   statusJson      String   @default("[]")
   // JSON string of inventory items
   inventoryJson   String   @default("[]")
+  // JSON string of equipped items (weapon/armor/accessory/artifact/scripture)
+  equippedJson    String   @default("{}")
+  // 修炼速度倍率（灵根 × 功法），default 1.0
+  cultivationMultiplier Float @default(1.0)
   // JSON string of memory entries (long-term)
   memoryJson      String   @default("[]")
 

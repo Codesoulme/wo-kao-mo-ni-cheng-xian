@@ -197,6 +197,26 @@ export interface StatusEffect {
 
 export type ItemType = 'weapon' | 'armor' | 'accessory' | 'artifact' | 'consumable' | 'material' | 'tool' | 'scripture';
 
+// 可装备的槽位
+export type EquipSlot = 'weapon' | 'armor' | 'accessory' | 'artifact' | 'scripture';
+
+export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
+  weapon: '兵器', armor: '防具', accessory: '饰物', artifact: '法宝',
+  consumable: '丹药', material: '材料', tool: '器具', scripture: '功法',
+};
+
+export const SLOT_LABEL: Record<EquipSlot, string> = {
+  weapon: '兵器', armor: '防具', accessory: '饰物', artifact: '法宝', scripture: '功法',
+};
+
+// 物品类型 → 可装备槽位映射（不可装备的类型返回 null）
+export function itemToSlot(type: ItemType): EquipSlot | null {
+  if (type === 'weapon' || type === 'armor' || type === 'accessory' || type === 'artifact' || type === 'scripture') {
+    return type;
+  }
+  return null;
+}
+
 export interface ItemEntry {
   id: string;
   name: string;
@@ -226,6 +246,9 @@ export interface AIEventOutput {
 
   // 新增物品
   newItems: ItemEntry[];
+
+  // 移除/消耗的物品 id 列表（AI 联动：战斗中武器被破坏、丹药被消耗等）
+  removedItemIds?: string[];
 
   // 长期记忆（写入长期记忆库）
   memory: string;
@@ -268,6 +291,7 @@ export interface ChoiceResultOutput {
   changes: AttributeChange[];
   newStatuses: StatusEntry[];
   newItems: ItemEntry[];
+  removedItemIds?: string[];
   memory: string;
   causedDeath?: boolean;
   deathReason?: string;
@@ -281,6 +305,7 @@ export interface InterfereOutput {
   changes: AttributeChange[];     // 状态变更
   newStatuses: StatusEntry[];
   newItems: ItemEntry[];
+  removedItemIds?: string[];
   memory: string;
   // 干扰可能延迟年龄推进
   ageAdvance?: number;            // 干扰消耗的时间（岁），默认 0
@@ -312,6 +337,10 @@ export interface EngineStateContext {
   };
   activeStatuses: StatusEntry[];
   inventory: ItemEntry[];
+  // 已装备物品（AI 可读取，了解玩家当前战力与功法）
+  equipped: EquippedMap;
+  // 修炼速度倍率（灵根 × 功法）
+  cultivationMultiplier: number;
   recentEvents: { age: number; title: string; narrative: string }[];
   longTermMemory: string[];
   completedFateNodes: number[];
@@ -345,6 +374,9 @@ export const FATE_NODES: FateNode[] = [
 
 // ==================== 角色状态（运行时） ====================
 
+// 已装备物品映射（槽位 → 物品）。一个物品要么在 inventory，要么在 equipped。
+export type EquippedMap = Partial<Record<EquipSlot, ItemEntry>>;
+
 export interface CharacterState {
   id: string;
   name: string;
@@ -353,6 +385,7 @@ export interface CharacterState {
   gender: string;
   spiritualRoot: SpiritualRoot;
   rootDetail: string;
+  rootMultiplier: number;
   realm: Realm;
   realmLevel: number;
   cultivationExp: number;
@@ -371,5 +404,9 @@ export interface CharacterState {
   lastEventAge: number;
   activeStatuses: StatusEntry[];
   inventory: ItemEntry[];
+  // 已装备物品（weapon/armor/accessory/artifact/scripture）
+  equipped: EquippedMap;
+  // 修炼速度倍率（灵根倍率 × 功法倍率），advance 时 cultivationExp 增量乘以此值
+  cultivationMultiplier: number;
   longTermMemory: string[];
 }

@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 
 export const runtime = 'nodejs';
@@ -46,6 +46,9 @@ export async function POST(req: NextRequest) {
       state = applyChanges(state, result.changes || []);
       state = addStatuses(state, result.newStatuses || []);
       state = addItems(state, result.newItems || []);
+      if (result.removedItemIds && result.removedItemIds.length) {
+        state = removeItemsByIds(state, result.removedItemIds).state;
+      }
       if (result.memory) state = addMemory(state, result.memory);
 
       // 干扰可能消耗时间
@@ -86,6 +89,8 @@ export async function POST(req: NextRequest) {
         faction: state.faction, master: state.master, location: state.location,
         statusJson: JSON.stringify(state.activeStatuses),
         inventoryJson: JSON.stringify(state.inventory),
+        equippedJson: JSON.stringify(state.equipped || {}),
+        cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
         memoryJson: JSON.stringify(state.longTermMemory),
       },
     });

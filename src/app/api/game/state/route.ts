@@ -63,6 +63,8 @@ export async function GET(req: NextRequest) {
         isAtChoice: char.isAtChoice,
         activeStatuses: state.activeStatuses,
         inventory: state.inventory,
+        equipped: state.equipped,
+        cultivationMultiplier: state.cultivationMultiplier,
       },
       events: events.map(e => ({
         id: e.id,
