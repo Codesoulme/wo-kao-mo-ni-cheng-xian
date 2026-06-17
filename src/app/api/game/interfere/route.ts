@@ -50,6 +50,10 @@ export async function POST(req: NextRequest) {
         state = removeItemsByIds(state, result.removedItemIds).state;
       }
       if (result.memory) state = addMemory(state, result.memory);
+      // 应用修炼心得文本（仅当 AI 输出了非空文本时覆盖）
+      if (result.cultivationInsight && result.cultivationInsight.trim()) {
+        state.cultivationInsight = result.cultivationInsight.trim();
+      }
 
       // 干扰可能消耗时间
       if (result.ageAdvance && result.ageAdvance > 0) {
@@ -91,6 +95,7 @@ export async function POST(req: NextRequest) {
         inventoryJson: JSON.stringify(state.inventory),
         equippedJson: JSON.stringify(state.equipped || {}),
         cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
+        cultivationInsight: state.cultivationInsight || '',
         memoryJson: JSON.stringify(state.longTermMemory),
       },
     });

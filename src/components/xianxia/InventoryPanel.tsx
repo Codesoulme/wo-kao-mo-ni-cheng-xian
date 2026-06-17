@@ -107,7 +107,7 @@ export function InventoryPanel() {
   }
   const groupOrder: ItemType[] = ['scripture', 'weapon', 'armor', 'accessory', 'artifact', 'consumable', 'material', 'tool'];
 
-  // 修炼速度加成拆解
+  // 修炼速度加成拆解（仅用于顶部倍率数字与 fallback 公式展示）
   const rootMult = character.rootMultiplier ?? 0;
   const totalMult = character.cultivationMultiplier ?? 0;
   // 功法贡献：从已装备的 scripture 里提取 multiply cultivationExp
@@ -122,15 +122,17 @@ export function InventoryPanel() {
       }
     }
   }
-  // 总倍率 = 灵根 × 功法（与 engine recalcCultivationMultiplier 一致）
-  const computedTotal = rootMult * scriptureMult;
+  // AI 生成的修炼心得文本（活页面核心：由 AI 按规则生成，描述当前影响修炼速度的种种因素）
+  const insightText: string = character.cultivationInsight || '';
+  // 旧存档 fallback：若 AI 尚未生成心得，显示拆解公式
+  const hasInsight = insightText.trim().length > 0;
 
   // 特殊状态词条：category 为 special/identity 的（灵宠、命格、天赋、身份等）
   const specialStatuses = activeStatuses.filter(s => s.category === 'special' || s.category === 'identity');
 
   return (
     <div className="space-y-3 pb-2">
-      {/* 修炼速度概览 —— 拆解加成来源 */}
+      {/* 修炼速度概览 —— 顶部倍率数字 + AI 生成的修炼心得文本 */}
       <Card className="paper-texture">
         <CardHeader className="pb-1.5 pt-3">
           <CardTitle className="text-sm flex items-center justify-between">
@@ -143,41 +145,62 @@ export function InventoryPanel() {
             </span>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-1 space-y-1.5">
-          {/* 加成拆解公式 */}
-          <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
-            <span className="px-1.5 py-0.5 rounded bg-muted/40">灵根</span>
-            <span className="tabular-nums font-semibold" style={{ color: rootMult > 0 ? '#c8453c' : '#6b7280' }}>×{rootMult.toFixed(2)}</span>
-            <span className="opacity-50">×</span>
-            <span className="px-1.5 py-0.5 rounded bg-muted/40">功法</span>
-            <span className="tabular-nums font-semibold" style={{ color: scriptureMult > 1 ? '#c8453c' : '#6b7280' }}>×{scriptureMult.toFixed(2)}</span>
-            <span className="opacity-50">=</span>
-            <span className="tabular-nums font-bold" style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>×{computedTotal.toFixed(2)}</span>
-          </div>
-          {/* 功法贡献明细 */}
-          {scriptureContribs.length > 0 ? (
-            <div className="space-y-1">
-              {scriptureContribs.map((s, i) => (
-                <div key={i} className="flex items-center justify-between text-[10px] rounded px-1.5 py-1" style={{
-                  background: `${RARITY_COLORS[s.rarity] || '#6b7280'}10`,
-                }}>
-                  <span className="flex items-center gap-1 truncate">
-                    <BookOpen className="w-3 h-3 shrink-0" style={{ color: RARITY_COLORS[s.rarity] }} />
-                    <span className="font-serif-cn truncate" style={{ color: RARITY_COLORS[s.rarity] }}>{s.name}</span>
-                  </span>
-                  <span className="tabular-nums font-semibold shrink-0" style={{ color: RARITY_COLORS[s.rarity] }}>
-                    修为 ×{s.mult.toFixed(2)}
-                  </span>
-                </div>
+        <CardContent className="pt-1 space-y-2">
+          {/* AI 生成的修炼心得（活页面核心） */}
+          {hasInsight ? (
+            <div className="rounded-md p-2.5 leading-relaxed text-[11px] font-serif-cn xianxia-scroll"
+              style={{
+                background: 'linear-gradient(135deg, rgba(200,69,60,0.04), rgba(60,80,90,0.04))',
+                border: '1px solid rgba(200,69,60,0.12)',
+                color: '#3a3530',
+              }}
+            >
+              {/* 心得文本：按句号/分号分段渲染，保留修仙口吻 */}
+              {insightText.split(/(?<=[。；])/).filter(s => s.trim()).map((seg, i) => (
+                <p key={i} className="mb-0.5 last:mb-0">{seg.trim()}</p>
               ))}
             </div>
           ) : (
-            <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
-              未装备功法。获得功法类物品后可在储物袋装备，提升修为获取效率。
-            </p>
+            /* 旧存档 fallback：AI 尚未生成心得时显示拆解公式 */
+            <>
+              <div className="text-[10px] text-muted-foreground flex items-center gap-1 flex-wrap">
+                <span className="px-1.5 py-0.5 rounded bg-muted/40">灵根</span>
+                <span className="tabular-nums font-semibold" style={{ color: rootMult > 0 ? '#c8453c' : '#6b7280' }}>×{rootMult.toFixed(2)}</span>
+                <span className="opacity-50">×</span>
+                <span className="px-1.5 py-0.5 rounded bg-muted/40">功法</span>
+                <span className="tabular-nums font-semibold" style={{ color: scriptureMult > 1 ? '#c8453c' : '#6b7280' }}>×{scriptureMult.toFixed(2)}</span>
+                <span className="opacity-50">=</span>
+                <span className="tabular-nums font-bold" style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>×{(rootMult * scriptureMult).toFixed(2)}</span>
+              </div>
+              {scriptureContribs.length > 0 ? (
+                <div className="space-y-1">
+                  {scriptureContribs.map((s, i) => (
+                    <div key={i} className="flex items-center justify-between text-[10px] rounded px-1.5 py-1" style={{
+                      background: `${RARITY_COLORS[s.rarity] || '#6b7280'}10`,
+                    }}>
+                      <span className="flex items-center gap-1 truncate">
+                        <BookOpen className="w-3 h-3 shrink-0" style={{ color: RARITY_COLORS[s.rarity] }} />
+                        <span className="font-serif-cn truncate" style={{ color: RARITY_COLORS[s.rarity] }}>{s.name}</span>
+                      </span>
+                      <span className="tabular-nums font-semibold shrink-0" style={{ color: RARITY_COLORS[s.rarity] }}>
+                        修为 ×{s.mult.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-[10px] text-muted-foreground/70 leading-relaxed">
+                  未装备功法。获得功法类物品后可在储物袋装备，提升修为获取效率。
+                </p>
+              )}
+              <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
+                推进一岁后，AI 将根据当前灵根、功法、装备、状态、所在等综合生成修炼心得。
+              </p>
+            </>
           )}
+          {/* 底部辅助提示：倍率来源说明（始终展示，帮助玩家理解数字含义） */}
           <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
-            每岁修为增量 = 基础修为 × 修炼速度。灵根决定基础倍率，功法可进一步放大。
+            每岁修为增量 = 基础修为 × 修炼速度（×{totalMult.toFixed(2)}）。心得由天道依当前境况评点，随境遇流转而变。
           </p>
         </CardContent>
       </Card>

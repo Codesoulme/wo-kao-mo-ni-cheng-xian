@@ -403,3 +403,52 @@ Stage Summary:
 - AI 联动完整：removedItemIds 删物品、newItems 加物品、newStatuses 加奇缘
 - 效果展示中文化（攻击+10、修为×1.5 等），更易读
 - 按用户要求：本次未做 agent-browser 验证
+
+---
+Task ID: 18
+Agent: main
+Task: 修炼速度栏活性化——去掉硬编码公式，让 AI 按显示规则生成描述性文本展示
+
+Work Log:
+- 用户反馈：「修炼速度的位置你限制的太死了！让ai去判断有什么影响修炼速度的。你甚至可以只给定一定的显示规则，让ai根据实际情况生成文本文本来展示就行了。」
+- 核心改造：新增 `cultivationInsight` 字段（AI 生成的修炼心得文本），前端修炼速度栏主体改为渲染这段文本，顶部仅保留倍率数字作概览。
+- 数据层：
+  * prisma/schema.prisma: Character 新增 `cultivationInsight String @default("")`，`bunx prisma generate` + `bunx prisma db push` 成功
+  * types.ts: CharacterState / AIEventOutput / ChoiceResultOutput / InterfereOutput / EngineStateContext 均新增 `cultivationInsight` 字段
+  * store.ts: 前端 CharacterState 接口新增 `cultivationInsight?: string`
+- 引擎层 (engine.ts):
+  * DBCharacter 接口加 cultivationInsight
+  * dbToState 读取 c.cultivationInsight
+  * dbToState 顺带修复 Task 13 遗留 bug：cultivationMultiplier 不再信任数据库旧值，始终根据灵根 + 已装备功法实时重算（旧存档天灵根倍率=1.0 的错误已修正为 3.0）
+  * buildStateContext 把 cultivationInsight 注入给 AI（让 AI 知道上一轮生成的心得，本轮可参考更新）
+  * executeAIEvent 应用 aiOutput.cultivationInsight（仅当非空时覆盖，避免被空值误清）
+  * stateToResponse 暴露 cultivationInsight 给前端
+- LLM 层 (llm.ts):
+  * buildAdvancePrompt: 状态快照区新增「当前修炼心得」区块（展示上一轮文本）；schema 新增 cultivationInsight 字段；末尾新增「修炼心得生成规则」详尽说明（60-150字、单段纯文本、覆盖灵根/功法/装备/特殊状态/所在环境/时节年岁/心境事件七维度、末尾给综合倍率感知、修仙口吻、含示例、禁 JSON 转义问题）
+  * buildChoosePrompt / buildInterferePrompt: schema 同步加 cultivationInsight 字段，并简短引用 advance 规则
+  * 三个 sanitize 函数解析 cultivationInsight（slice 400 防过长）
+- API 层:
+  * advance route: executeAIEvent 已自动应用；db.update 持久化 cultivationInsight
+  * choose route: 手动应用 result.cultivationInsight 到 state；db.update 持久化
+  * interfere route: accepted 时手动应用；db.update 持久化
+  * state route: 手写字段映射处补 cultivationInsight（未走 stateToResponse）
+- 前端 (InventoryPanel.tsx):
+  * 修炼速度卡重写：顶部倍率数字保留（×3.00）；主体改为渲染 AI 生成的 cultivationInsight 文本（按句号/分号分段，font-serif-cn，淡墨渐变背景，朱砂边框）
+  * 旧存档 fallback：若 cultivationInsight 为空（AI 尚未生成），显示原拆解公式（灵根×功法=总倍率 + 功法贡献列表），并提示"推进一岁后 AI 将生成修炼心得"
+  * 底部辅助提示始终展示：每岁修为增量公式 + "心得由天道依当前境况评点，随境遇流转而变"
+- 验证（agent-browser 端到端）：
+  * dev server 重启加载新 Prisma client
+  * curl 触发 advance：AI 成功生成心得「土天灵根根基已立，地脉传承玉简加持，洞中修炼灵气浓郁。道心渐明，悟性提升，唯年尚轻，经验不足。综合而论，修炼速度约为人之一点五倍。」（65字，覆盖灵根/功法/环境/心境/年岁，末尾给倍率感知，完全符合规则）
+  * state API 返回 cultivationInsight 字段
+  * agent-browser 注入 character 到 localStorage → 切「宝」页 → 确认修炼速度栏渲染 AI 文本：「土灵根与大地同源，温润泥土中蕴含的地脉之力可辅助修炼。感悟地脉，不仅是吸收灵气，更是与天地共鸣的过程...」
+  * 顶部倍率数字 ×3.00（天灵根 rootMultiplier=3，dbToState 实时重算后正确）
+- `bun run lint` 通过（0 errors）
+
+Stage Summary:
+- 修炼速度栏彻底活性化：从硬编码公式 `灵根×功法=总倍率` 改为 AI 按显示规则生成的描述性文本
+- AI 自主判断什么影响修炼速度：灵根根基、功法加成、装备影响、特殊状态/奇缘、所在环境、时节年岁、心境事件——七维度按当前实际有意义者取舍
+- 显示规则明确：60-150字、单段纯文本、修仙口吻、末尾给综合倍率感知、融入角色处境、随境遇流转而变
+- 三个场景（advance/choose/interfere）都生成心得，数据流闭环：Prisma → AI → engine → API → 前端
+- 顺带修复 Task 13 遗留 bug：旧存档 cultivationMultiplier 未按灵根正确初始化（天灵根显示×1.00），现 dbToState 始终实时重算
+- 旧存档 fallback 完整：AI 未生成心得时显示拆解公式，推进一岁后自动切换为 AI 文本
+- agent-browser 端到端验证通过：修炼速度栏渲染 AI 文本，倍率数字正确

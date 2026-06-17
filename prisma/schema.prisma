@@ -73,6 +73,8 @@ model Character {
   equippedJson    String   @default("{}")
   // 修炼速度倍率（灵根 × 功法），default 1.0
   cultivationMultiplier Float @default(1.0)
+  // 修炼心得：AI 生成的修炼速度说明文本（描述当前影响修炼速度的种种因素）
+  cultivationInsight String @default("")
   // JSON string of memory entries (long-term)
   memoryJson      String   @default("[]")
 

@@ -34,6 +34,7 @@ export interface CharacterState {
   inventory: any[];
   equipped: Record<string, any>;
   cultivationMultiplier: number;
+  cultivationInsight?: string;
 }
 
 export interface GameEvent {

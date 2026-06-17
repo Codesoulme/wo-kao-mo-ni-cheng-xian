@@ -38,21 +38,20 @@ export interface DBCharacter {
   fateNodes: string; isAtChoice: boolean; lastEventAge: number;
   statusJson: string; inventoryJson: string; memoryJson: string;
   equippedJson: string; cultivationMultiplier: number;
+  cultivationInsight: string;
 }
 
 export function dbToState(c: DBCharacter): CharacterState {
   const rootInfo = SPIRITUAL_ROOTS[c.spiritualRoot as SpiritualRoot];
   const equipped = safeParse<EquippedMap>(c.equippedJson || '{}', {});
-  // 旧存档可能没有 cultivationMultiplier 字段，根据灵根 + 已装备功法重算
-  let mult = Number(c.cultivationMultiplier);
-  if (!mult || Number.isNaN(mult) || mult <= 0) {
-    mult = rootInfo?.multiplier ?? 0;
-    const scripture = equipped.scripture;
-    if (scripture) {
-      for (const eff of scripture.effects || []) {
-        if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply') {
-          mult *= eff.value;
-        }
+  // cultivationMultiplier 始终根据灵根 + 已装备功法实时重算（避免旧存档遗留的过期值）
+  // 这样无论数据库里存的是什么，加载到内存后的倍率都是当前正确的
+  let mult = rootInfo?.multiplier ?? 0;
+  const scripture = equipped.scripture;
+  if (scripture) {
+    for (const eff of scripture.effects || []) {
+      if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply' && eff.value > 0) {
+        mult *= eff.value;
       }
     }
   }
@@ -76,6 +75,7 @@ export function dbToState(c: DBCharacter): CharacterState {
     inventory: safeParse<ItemEntry[]>(c.inventoryJson, []),
     equipped,
     cultivationMultiplier: mult,
+    cultivationInsight: c.cultivationInsight || '',
     longTermMemory: safeParse<string[]>(c.memoryJson, []),
   };
 }
@@ -434,6 +434,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     inventory: state.inventory,
     equipped: state.equipped,
     cultivationMultiplier: state.cultivationMultiplier,
+    cultivationInsight: state.cultivationInsight,
     recentEvents: recentEvents.slice(-5),
     longTermMemory: state.longTermMemory.slice(-10),
     completedFateNodes: state.fateNodes,
@@ -480,6 +481,12 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 
   // 4. 添加长期记忆
   if (aiOutput.memory) next = addMemory(next, aiOutput.memory);
+
+  // 4.5 更新修炼心得文本（AI 生成的修炼速度说明）
+  // 只在 AI 输出了非空文本时才覆盖，避免被空值误清
+  if (aiOutput.cultivationInsight && aiOutput.cultivationInsight.trim()) {
+    next.cultivationInsight = aiOutput.cultivationInsight.trim();
+  }
 
   // 5. 处理突破
   let breakthroughHappened = false;
@@ -556,6 +563,7 @@ export function stateToResponse(s: CharacterState) {
     rootDetail: s.rootDetail,
     rootMultiplier: rootInfo?.multiplier ?? 0,
     cultivationMultiplier: s.cultivationMultiplier,
+    cultivationInsight: s.cultivationInsight,
     activeStatuses: s.activeStatuses,
     inventory: s.inventory,
     equipped: s.equipped,

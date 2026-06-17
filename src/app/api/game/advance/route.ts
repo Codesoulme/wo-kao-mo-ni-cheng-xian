@@ -151,6 +151,7 @@ export async function POST(req: NextRequest) {
         inventoryJson: JSON.stringify(finalState.inventory),
         equippedJson: JSON.stringify(finalState.equipped || {}),
         cultivationMultiplier: finalState.cultivationMultiplier ?? 1.0,
+        cultivationInsight: finalState.cultivationInsight || '',
         memoryJson: JSON.stringify(finalState.longTermMemory),
       },
     });

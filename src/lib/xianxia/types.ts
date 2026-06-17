@@ -253,6 +253,10 @@ export interface AIEventOutput {
   // 长期记忆（写入长期记忆库）
   memory: string;
 
+  // 修炼心得：AI 根据当前角色全状态生成的修炼速度说明文本（影响修炼速度的种种因素）
+  // 显示规则见 prompt：60-150字，修仙口吻，融入角色处境，末尾给出综合倍率数值
+  cultivationInsight?: string;
+
   // 是否触发选择节点
   hasChoice: boolean;
   choice?: ChoicePrompt;
@@ -293,6 +297,8 @@ export interface ChoiceResultOutput {
   newItems: ItemEntry[];
   removedItemIds?: string[];
   memory: string;
+  // 修炼心得（同 AIEventOutput）
+  cultivationInsight?: string;
   causedDeath?: boolean;
   deathReason?: string;
 }
@@ -307,6 +313,8 @@ export interface InterfereOutput {
   newItems: ItemEntry[];
   removedItemIds?: string[];
   memory: string;
+  // 修炼心得（同 AIEventOutput；accepted=false 时可留空，引擎将保留旧文本）
+  cultivationInsight?: string;
   // 干扰可能延迟年龄推进
   ageAdvance?: number;            // 干扰消耗的时间（岁），默认 0
 }
@@ -335,6 +343,8 @@ export interface EngineStateContext {
     faction: string; master: string; location: string;
     alive: boolean; ascended: boolean;
   };
+  // 修炼心得（当前已存的修炼速度说明文本，AI 可读取参考并决定是否更新）
+  cultivationInsight: string;
   activeStatuses: StatusEntry[];
   inventory: ItemEntry[];
   // 已装备物品（AI 可读取，了解玩家当前战力与功法）
@@ -408,5 +418,7 @@ export interface CharacterState {
   equipped: EquippedMap;
   // 修炼速度倍率（灵根倍率 × 功法倍率），advance 时 cultivationExp 增量乘以此值
   cultivationMultiplier: number;
+  // 修炼心得：AI 生成的修炼速度说明文本（描述当前影响修炼速度的因素）
+  cultivationInsight: string;
   longTermMemory: string[];
 }

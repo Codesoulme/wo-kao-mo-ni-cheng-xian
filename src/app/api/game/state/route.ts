@@ -65,6 +65,7 @@ export async function GET(req: NextRequest) {
         inventory: state.inventory,
         equipped: state.equipped,
         cultivationMultiplier: state.cultivationMultiplier,
+        cultivationInsight: state.cultivationInsight || '',
       },
       events: events.map(e => ({
         id: e.id,
