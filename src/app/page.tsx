@@ -11,6 +11,7 @@ import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
 import { InterfereInput } from '@/components/xianxia/InterfereInput';
 import { ChoiceModal } from '@/components/xianxia/ChoiceModal';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
+import { GameMenu } from '@/components/xianxia/GameMenu';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Scroll, Sparkles, Map } from 'lucide-react';
 
@@ -81,15 +82,18 @@ export default function Home() {
             <span className="font-serif-cn text-sm font-bold tracking-wider">修仙模拟器</span>
           </div>
           {character && (
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-              <span className="font-serif-cn">{character.name}</span>
-              <span>·</span>
-              <span>{character.age}岁</span>
-              {character.alive ? (
-                character.ascended ? <span className="text-yellow-500">已飞升</span> : null
-              ) : (
-                <span className="text-destructive">已陨落</span>
-              )}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <span className="font-serif-cn">{character.name}</span>
+                <span>·</span>
+                <span>{character.age}岁</span>
+                {character.alive ? (
+                  character.ascended ? <span className="text-yellow-500">已飞升</span> : null
+                ) : (
+                  <span className="text-destructive">已陨落</span>
+                )}
+              </div>
+              <GameMenu />
             </div>
           )}
         </div>

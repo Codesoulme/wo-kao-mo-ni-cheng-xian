@@ -146,3 +146,21 @@ Stage Summary:
 - persist hydration 报错（GET / 500）已修复，使用更健壮的微任务检测。
 - 自动滚动逻辑改为容器内精确滚动，避免误触发整页滚动。
 - 按用户要求：本次未做 agent-browser 验证，仅修复代码 + lint。
+
+---
+Task ID: 9
+Agent: main
+Task: 用户反馈：正常游戏中没有"返回主菜单/重置存档"按钮（之前只在角色死亡/飞升时才显示重开按钮）
+
+Work Log:
+- 新建 `src/components/xianxia/GameMenu.tsx`：常驻顶部 header 右侧的「⋯」菜单按钮，使用 shadcn DropdownMenu + AlertDialog。
+- 菜单项：
+  * 「本局概况」：弹窗展示当前角色道号/灵根/境界/年岁/命节点/流年记事条数/抉择次数/所在/宗门/师承/陨落或飞升状态。
+  * 「重开存档」：二次确认弹窗（"重开存档？...确认重开"），确认后调用 store.reset() 清空所有状态返回主菜单，并 toast 提示"已重开新局"。
+- 在 `src/app/page.tsx` header 右侧 character 信息旁接入 `<GameMenu />`，只要存在 character 就常驻可见（无论存活/陨落/飞升）。
+- `bun run lint` 通过。dev server 热重载正常，API 200。
+
+Stage Summary:
+- 顶部「⋯」菜单常驻可见，正常游戏中即可「重开存档」返回主菜单，无需等到角色死亡。
+- 附带「本局概况」弹窗，方便玩家随时查看本局进度汇总（流年记事条数、抉择次数、命节点进度等）。
+- 重开操作有二次确认，防误触清空存档。
