@@ -276,3 +276,39 @@ Stage Summary:
 - AI 联动完整：AI 输出 removedItemIds 即可移除物品(战斗中兵器损毁、丹药服用、法宝碎裂)，引擎自动从储物袋或已装备中删除并反向结算属性，"活页面"实时更新
 - AI 可读取完整 inventory+equipped(含 id/效果) 用于叙事与决策
 - 按用户要求：本次未做 agent-browser 验证
+
+---
+Task ID: 14
+Agent: main
+Task: 修复"每次重生都是水木灵根"——灵根缺乏随机性，LLM 倾向输出固定结果
+
+Work Log:
+- 根因分析：`generateBirthEvent` 让 LLM 自由生成 `spiritualRoot` 和 `rootDetail`，prompt 虽然给了概率分配（无30%/杂25%/凡20%/真15%/天8%/混沌2%），但 LLM 输出缺乏真正的随机性，每次倾向生成"水木凡灵根"这种趋同结果。同时初始五行固定为 20/20/20/20/20，无法体现灵根的五行倾向。
+- 修复策略：引擎权威——灵根类型与五行组合由后端 Math.random() 按概率权重随机生成，LLM 只负责生成对应的 rootDetail 文字描述和出生叙事。
+- 修改 `src/lib/xianxia/llm.ts`：
+  * 新增 `rollSpiritualRoot()`：按 SPIRITUAL_ROOTS 的 rarity 权重（30/25/20/15/8/2）随机抽取灵根类型。
+  * 新增 `rollElements(root)`：根据灵根类型随机生成五行数值与突出元素：
+    - none 无灵根：五行皆低（8/8/8/8/8），picked=[]
+    - mixed 杂灵根：五行皆中等（18/18/18/18/18），picked=全部5种
+    - common 凡灵根：随机选 2-3 种元素突出（30-40），其余 8
+    - pure 真灵根：随机选 1 种元素突出（50-60），其余 5
+    - heavenly 天灵根：随机选 1 种元素极突出（70-80），其余 3
+    - chaos 混沌灵根：五行皆高（45/45/45/45/45），picked=全部5种
+  * 新增 `elementsToZh()`：把元素列表转中文（如 ["fire","wood"] → "火木"）。
+  * 改造 `generateBirthEvent`：
+    - 先 roll 灵根类型 + 五行组合
+    - 把已确定的灵根类型和突出属性传给 LLM，prompt 明确"灵根已由天道判定，你只需生成 rootDetail 文字描述，不要输出 spiritualRoot 字段"
+    - 返回值用后端 roll 的 root，不信任 LLM 的 spiritualRoot 输出
+    - 新增 `elements` 字段返回给 route 层
+    - fallback 路径也使用后端 roll 结果，保证即使 LLM 失败灵根仍随机
+- 修改 `src/app/api/game/new/route.ts`：
+  * 五行初始值用 `birth.elements` 覆盖原来的固定 20/20/20/20/20
+  * 删除未使用的 `rootInfo` 变量和 `SPIRITUAL_ROOTS/REALMS` import
+- `bun run lint` 通过（0 errors）。dev server 热重载正常，POST /api/game/new 200。
+
+Stage Summary:
+- 每次重生灵根真正随机：按 rarity 权重抽取（无30%/杂25%/凡20%/真15%/天8%/混沌2%），五行突出元素也随机（金木水火土等概率 shuffle）。
+- 灵根类型与五行数值联动：天灵根单属性极突出（70-80），真灵根单属性突出（50-60），凡灵根 2-3 种突出（30-40），杂灵根五行均衡（18），混沌灵根五行皆高（45），无灵根五行皆低（8）。状态页五行条形图能直观反映灵根特征。
+- 引擎权威原则强化：灵根判定权归后端，LLM 不可自由发挥，避免结果趋同。
+- 旧存档不受影响（仅影响新建角色）。用户可通过顶部「⋯」菜单 →「重开存档」重新开局验证随机性。
+- 按用户要求：本次未做 agent-browser 验证。

@@ -4,7 +4,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateBirthEvent } from '@/lib/xianxia/llm';
-import { SPIRITUAL_ROOTS, REALMS } from '@/lib/xianxia/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -15,7 +14,9 @@ export async function POST(req: NextRequest) {
     const customName: string | undefined = body?.name ? String(body.name).slice(0, 12) : undefined;
 
     const birth = await generateBirthEvent(customName);
-    const rootInfo = SPIRITUAL_ROOTS[birth.spiritualRoot as keyof typeof SPIRITUAL_ROOTS];
+
+    // 五行初始值由后端 roll（依据灵根类型），不再固定 20/20/20/20/20
+    const el = birth.elements;
 
     // 创建角色
     const character = await db.character.create({
@@ -30,11 +31,11 @@ export async function POST(req: NextRequest) {
         realmLevel: 0,
         cultivationExp: 0,
         expToBreak: 100,
-        elementMetal: 20,
-        elementWood: 20,
-        elementWater: 20,
-        elementFire: 20,
-        elementEarth: 20,
+        elementMetal: el.metal,
+        elementWood: el.wood,
+        elementWater: el.water,
+        elementFire: el.fire,
+        elementEarth: el.earth,
         hp: 100,
         maxHp: 100,
         mp: 50,

@@ -12,6 +12,10 @@ import {
   AttributeChange,
   StatusEntry,
   ItemEntry,
+  SpiritualRoot,
+  SPIRITUAL_ROOTS,
+  Element,
+  ELEMENTS,
 } from './types';
 import { ensureUniqueIds } from './engine';
 
@@ -425,7 +429,77 @@ function sanitizeInterfereOutput(raw: any): InterfereOutput {
 
 // ==================== 出生事件生成 ====================
 
-export async function generateBirthEvent(name?: string): Promise<{
+// 引擎权威：灵根类型与五行组合由后端按概率随机生成（LLM 不可自由发挥，避免每次重生结果趋同）
+// 灵根类型按 rarity 权重抽取（none30/mixed25/common20/pure15/heavenly8/chaos2）
+
+const ALL_ELEMENTS: Element[] = ['metal', 'wood', 'water', 'fire', 'earth'];
+
+function rollSpiritualRoot(): SpiritualRoot {
+  const entries = Object.entries(SPIRITUAL_ROOTS) as [SpiritualRoot, { rarity: number }][];
+  const total = entries.reduce((s, [, v]) => s + v.rarity, 0);
+  let r = Math.random() * total;
+  for (const [k, v] of entries) {
+    r -= v.rarity;
+    if (r <= 0) return k;
+  }
+  return 'mixed';
+}
+
+// 根据灵根类型随机生成五行倾向（哪些元素突出），并返回初始五行数值
+// 返回 { elements, picked }：picked 为本次突出的元素列表（用于让 LLM 生成 rootDetail）
+function rollElements(root: SpiritualRoot): { elements: Record<Element, number>; picked: Element[] } {
+  const shuffle = <T,>(arr: T[]): T[] => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  switch (root) {
+    case 'none':
+      // 无灵根：五行都很低
+      return { elements: { metal: 8, wood: 8, water: 8, fire: 8, earth: 8 }, picked: [] };
+    case 'mixed':
+      // 杂灵根：五行皆中等
+      return { elements: { metal: 18, wood: 18, water: 18, fire: 18, earth: 18 }, picked: shuffle(ALL_ELEMENTS).slice(0, 5) };
+    case 'common': {
+      // 凡灵根：2-3 种属性突出
+      const count = 2 + Math.floor(Math.random() * 2); // 2 或 3
+      const picked = shuffle(ALL_ELEMENTS).slice(0, count);
+      const elements: Record<Element, number> = { metal: 8, wood: 8, water: 8, fire: 8, earth: 8 };
+      for (const e of picked) elements[e] = 30 + Math.floor(Math.random() * 11); // 30-40
+      return { elements, picked };
+    }
+    case 'pure': {
+      // 真灵根：单属性突出
+      const picked = shuffle(ALL_ELEMENTS).slice(0, 1);
+      const elements: Record<Element, number> = { metal: 5, wood: 5, water: 5, fire: 5, earth: 5 };
+      elements[picked[0]] = 50 + Math.floor(Math.random() * 11); // 50-60
+      return { elements, picked };
+    }
+    case 'heavenly': {
+      // 天灵根：单属性极突出
+      const picked = shuffle(ALL_ELEMENTS).slice(0, 1);
+      const elements: Record<Element, number> = { metal: 3, wood: 3, water: 3, fire: 3, earth: 3 };
+      elements[picked[0]] = 70 + Math.floor(Math.random() * 11); // 70-80
+      return { elements, picked };
+    }
+    case 'chaos':
+      // 混沌灵根：五行皆高
+      return { elements: { metal: 45, wood: 45, water: 45, fire: 45, earth: 45 }, picked: shuffle(ALL_ELEMENTS).slice(0, 5) };
+    default:
+      return { elements: { metal: 18, wood: 18, water: 18, fire: 18, earth: 18 }, picked: [] };
+  }
+}
+
+// 把元素列表转中文描述（如 ["fire","wood"] → "火木"）
+function elementsToZh(els: Element[]): string {
+  return els.map(e => ELEMENTS[e].name).join('');
+}
+
+export interface BirthResult {
   name: string;
   gender: 'male' | 'female';
   rootDetail: string;
@@ -433,7 +507,27 @@ export async function generateBirthEvent(name?: string): Promise<{
   background: string;
   birthplace: string;
   family: string;
-}> {
+  // 后端 roll 出的五行数值（route 层用来覆盖默认 20/20/20/20/20）
+  elements: { metal: number; wood: number; water: number; fire: number; earth: number };
+}
+
+export async function generateBirthEvent(name?: string): Promise<BirthResult> {
+  // 1. 引擎权威：后端先 roll 灵根类型和五行组合（LLM 不可自由发挥）
+  const root = rollSpiritualRoot();
+  const { elements, picked } = rollElements(root);
+  const rootInfo = SPIRITUAL_ROOTS[root];
+  const pickedZh = elementsToZh(picked);
+
+  // 给 LLM 的灵根类型说明 + 已确定的五行组合
+  const rootTypeHint: Record<SpiritualRoot, string> = {
+    none: '无灵根（与修行无缘，五行皆弱）',
+    mixed: `五行杂灵根（金木水火土皆有，无突出）`,
+    common: `凡灵根（突出属性：${pickedZh}）`,
+    pure: `真灵根（单属性突出：${pickedZh}）`,
+    heavenly: `天灵根（单属性极突出：${pickedZh}，天赐之资）`,
+    chaos: '混沌灵根（五行皆强，亘古难寻）',
+  };
+
   const zai = await getZAI();
   const system = `${IDENTITY_PROMPT}
 
@@ -441,11 +535,11 @@ export async function generateBirthEvent(name?: string): Promise<{
 生成一名修仙主角的出生背景。要求：
 - 姓名：${name ? `玩家指定「${name}」，请采用并补充姓氏（若只有名）` : '随机生成一个有古风的修仙世界姓名'}。
 - 性别：随机 male 或 female。
-- 灵根：按概率分配（无30%、杂25%、凡20%、真15%、天8%、混沌2%）。
-- 灵根详情：如"火木凡灵根"、"金天灵根"、"五行杂灵根"等。
+- 灵根：已由天道判定为「${rootInfo.name}」，灵根详情请基于以下信息生成：${rootTypeHint[root]}。
+- 灵根详情 rootDetail 格式：如"${pickedZh}凡灵根"、"${pickedZh}真灵根"、"五行杂灵根"、"无灵根"、"${pickedZh}天灵根"、"混沌灵根"。必须与上述灵根类型和突出属性一致。
 - 出生地：修仙世界地点（如"青云山下一处凡人村落"、"东海之滨渔村"、"北荒边陲小镇"等）。
 - 家世：凡人家庭/落魄修士之后/书香门第/农户/猎户/商户等。
-- 背景：100-200字描写出生时的情境、天象、家世氛围。
+- 背景：100-200字描写出生时的情境、天象、家世氛围，可暗示灵根特征（如天灵根降生时有异象）。
 
 严格 JSON 输出。`;
 
@@ -453,12 +547,13 @@ export async function generateBirthEvent(name?: string): Promise<{
 {
   "name": "姓名",
   "gender": "male|female",
-  "spiritualRoot": "none|mixed|common|pure|heavenly|chaos",
-  "rootDetail": "灵根详情",
+  "rootDetail": "灵根详情（必须符合：${rootInfo.name}，突出属性：${pickedZh || '无'}）",
   "birthplace": "出生地",
   "family": "家世（10-30字）",
   "background": "出生背景叙事（100-200字）"
-}`;
+}
+
+注意：不要输出 spiritualRoot 字段，灵根类型已由天道判定为「${root}」，你只需生成对应的 rootDetail 文字描述。`;
 
   try {
     const completion = await zai.chat.completions.create({
@@ -473,23 +568,26 @@ export async function generateBirthEvent(name?: string): Promise<{
     return {
       name: String(raw.name || name || '佚名').slice(0, 12),
       gender: raw.gender === 'female' ? 'female' : 'male',
-      spiritualRoot: ['none','mixed','common','pure','heavenly','chaos'].includes(raw.spiritualRoot) ? raw.spiritualRoot : 'mixed',
-      rootDetail: String(raw.rootDetail || '杂灵根'),
+      // 灵根类型来自后端 roll，不信任 LLM 输出
+      spiritualRoot: root,
+      rootDetail: String(raw.rootDetail || `${rootInfo.name}`).slice(0, 40),
       birthplace: String(raw.birthplace || '凡间一村落').slice(0, 50),
       family: String(raw.family || '凡人家庭').slice(0, 50),
       background: String(raw.background || '降生于凡间').slice(0, 600),
+      elements,
     };
   } catch (err) {
     console.error('Birth generation failed:', err);
-    // fallback
+    // fallback：仍使用后端 roll 的结果，保证灵根随机性
     return {
       name: name || '李青云',
       gender: Math.random() > 0.5 ? 'male' : 'female',
-      spiritualRoot: 'mixed',
-      rootDetail: '五行杂灵根',
+      spiritualRoot: root,
+      rootDetail: `${pickedZh}${rootInfo.name}`.replace('无', '无灵根'),
       birthplace: '青云山下一处凡人村落',
       family: '农户之家',
       background: '降生之夜，天降甘霖，万物复苏。父母见此子目有灵光，心下大喜，取名为此。家虽清贫，然天性温良，邻里称善。',
+      elements,
     };
   }
 }
