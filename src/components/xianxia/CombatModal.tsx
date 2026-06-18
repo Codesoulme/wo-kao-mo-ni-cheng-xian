@@ -175,7 +175,7 @@ export function CombatModal() {
           narrative,
           eventType: 'combat',
           effects: data.drops?.length
-            ? data.drops.map((d: any) => ({ attribute: 'inventory', delta: 1, reason: `得 ${d.name}` }))
+            ? data.drops.map((d: any) => ({ kind: 'item', label: '获得', name: d.name, tone: 'positive' }))
             : [],
           createdAt: new Date().toISOString(),
         });
