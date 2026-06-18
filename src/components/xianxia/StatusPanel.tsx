@@ -84,26 +84,28 @@ export function StatusPanel({ character }: StatusPanelProps) {
                   <span className="text-[9px] px-1 rounded bg-destructive/20 text-destructive">陨落</span>
                 )}
               </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5 flex-wrap">
-                <span style={{ color: character.realmColor }} className="font-semibold">
-                  {character.realmName}{character.realmMaxLevel > 0 ? ` ${character.realmLevel + 1}层` : ''}
-                </span>
-                <span className="opacity-50">·</span>
-                <span>{genderLabel}</span>
-                <span className="opacity-50">·</span>
-                <span>{character.age}岁</span>
-                <span className="opacity-50">·</span>
-                <span className="text-amber-700/90">寿余 {lifespanLeft} 年</span>
-                <span className="opacity-50">·</span>
-                <span className="flex items-center gap-0.5 truncate max-w-[82px]">
-                  <MapPin className="w-2.5 h-2.5" />
-                  {character.location}
-                </span>
-                <span className="opacity-50">·</span>
-                <span className="flex items-center gap-0.5 text-amber-600 tabular-nums">
-                  <Coins className="w-2.5 h-2.5" />
-                  {character.spiritStones}
-                </span>
+              <div className="mt-1 space-y-1 text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span
+                    style={{ color: character.realmColor, background: `${character.realmColor}12` }}
+                    className="font-semibold rounded px-1.5 py-0.5"
+                  >
+                    {character.realmName}{character.realmMaxLevel > 0 ? ` ${character.realmLevel + 1}层` : ''}
+                  </span>
+                  <span className="rounded bg-muted/60 px-1.5 py-0.5">{genderLabel}</span>
+                  <span className="rounded bg-muted/60 px-1.5 py-0.5">{character.age}岁</span>
+                  <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700/90">寿余 {lifespanLeft} 年</span>
+                </div>
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[150px]">
+                    <MapPin className="w-2.5 h-2.5 shrink-0" />
+                    <span className="truncate">{character.location}</span>
+                  </span>
+                  <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 tabular-nums shrink-0">
+                    <Coins className="w-2.5 h-2.5" />
+                    {character.spiritStones}
+                  </span>
+                </div>
               </div>
 
               {topStatuses.length > 0 && (
