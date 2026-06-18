@@ -220,7 +220,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
               key={event.id || idx}
               className={cn(
                 "relative pl-10 scroll-reveal",
-                ageMeta.isContinuation && "-mt-0.5",
+                ageMeta.isContinuation && "-mt-1 pl-14",
                 (isFate || isBreakthrough) && "scale-100"
               )}
             >
@@ -249,6 +249,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                   isDeath ? "border-destructive/40 bg-destructive/5" :
                   isAscension ? "border-yellow-400/40 bg-yellow-400/5" :
                   isExploration ? "border-emerald-500/40 bg-emerald-500/5" :
+                  ageMeta.isContinuation ? "border-border/50 bg-card/55 border-l-4 border-l-amber-500/35 shadow-none" :
                   "border-border/60 bg-card/80",
                   "hover:shadow-md hover:border-primary/40",
                   !isExpanded && "py-2"
@@ -258,21 +259,12 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 头部 - 始终可见 */}
                 <div className="flex items-center justify-between mb-0.5 px-3 pt-2">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-primary font-serif-cn">
-                      {event.age}岁
-                    </span>
-                    {ageMeta.count > 1 && (
-                      <span
-                        className={cn(
-                          "text-[9px] px-1.5 py-0.5 rounded-full border font-serif-cn",
-                          ageMeta.isContinuation
-                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                            : "bg-primary/10 text-primary border-primary/25"
-                        )}
-                        title={`这一年共有 ${ageMeta.count} 段连续记载`}
-                      >
-                        {ageMeta.isContinuation ? `同年续记 ${toChineseOrdinal(ageMeta.index)}` : `本年起笔·共${ageMeta.count}段`}
+                    {!ageMeta.isContinuation ? (
+                      <span className="text-xs font-bold text-primary font-serif-cn">
+                        {event.age}岁
                       </span>
+                    ) : (
+                      <span className="h-px w-6 bg-amber-500/40" aria-hidden="true" />
                     )}
                     {isFate && (
                       <span className="seal text-[9px]">命</span>
@@ -280,10 +272,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                     {isBreakthrough && (
                       <span className="text-[9px] px-1 rounded bg-yellow-400/20 text-yellow-600">破</span>
                     )}
-                    <span className={cn(
-                      "text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50",
-                      ageMeta.isContinuation && "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-                    )}>
+                    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50">
                       {EVENT_LABELS[event.eventType] || '流年'}
                     </span>
                     {/* Task 20: 事件蓝图主题 chip */}
@@ -304,7 +293,8 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
 
                 {/* 标题 - 始终可见 */}
                 <h4 className={cn(
-                  "text-sm font-semibold font-serif-cn px-3",
+                  "font-semibold font-serif-cn px-3",
+                  ageMeta.isContinuation ? "text-xs text-foreground/85" : "text-sm",
                   isExpanded ? "pb-1" : "pb-2"
                 )}>
                   {event.title}
@@ -313,12 +303,6 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 正文 - 可折叠 */}
                 {isExpanded && (
                   <div className="px-3 pb-2">
-                    {ageMeta.isContinuation && (
-                      <div className="mb-1.5 text-[10px] text-amber-700 dark:text-amber-300 font-serif-cn flex items-center gap-1">
-                        <span className="h-px w-5 bg-amber-500/40" />
-                        <span>仍是{event.age}岁这一年，前事未尽，因果续写。</span>
-                      </div>
-                    )}
                     <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">
                       {event.narrative}
                     </p>
@@ -389,10 +373,6 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
 }
 
 
-function toChineseOrdinal(n: number): string {
-  const labels = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
-  return labels[n - 1] || String(n);
-}
 
 function isVisibleEffect(eff: any): boolean {
   return isVisibleNumericEventEffect(eff);

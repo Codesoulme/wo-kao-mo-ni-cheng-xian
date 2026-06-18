@@ -513,7 +513,7 @@ export function CombatModal() {
 
         {/* 底部：行动按钮区（仅 ongoing 且未结束展示时显示） */}
         {isOngoing && battleStarted && !endResult && (
-          <div className="shrink-0 border-t border-border/40 bg-card/40 p-2">
+          <div className="relative shrink-0 border-t border-border/40 bg-card/40 p-2">
             <div className="grid grid-cols-6 gap-1">
               {/* 普攻 */}
               <ActionButton
@@ -706,7 +706,7 @@ export function CombatModal() {
             </div>
 
             {busy && (
-              <div className="text-center text-[10px] text-muted-foreground animate-pulse mt-1.5">
+              <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-[calc(100%+0.35rem)] rounded-full border border-border/60 bg-background/90 px-2.5 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur animate-pulse">
                 <Loader2 className="w-3 h-3 inline mr-1 animate-spin" />
                 招式催动中...
               </div>
