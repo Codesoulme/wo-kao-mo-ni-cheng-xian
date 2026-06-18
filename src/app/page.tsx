@@ -15,6 +15,7 @@ import { MarketModal } from '@/components/xianxia/MarketModal';
 import { SecretRealmPanel } from '@/components/xianxia/SecretRealmPanel';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
 import { GameMenu } from '@/components/xianxia/GameMenu';
+import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
 import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Scroll, Sparkles, Map, Package } from 'lucide-react';
@@ -89,6 +90,9 @@ export default function Home() {
             <span className="text-base">⛰</span>
             <span className="font-serif-cn text-sm font-bold tracking-wider">修仙模拟器</span>
           </div>
+          <div className="flex items-center gap-2">
+            {!character && <AIConfigDialog />}
+          </div>
           {character && (
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
@@ -101,6 +105,7 @@ export default function Home() {
                   <span className="text-destructive">已陨落</span>
                 )}
               </div>
+              <AIConfigDialog />
               <GameMenu />
             </div>
           )}

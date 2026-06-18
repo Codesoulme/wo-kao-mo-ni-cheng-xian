@@ -7,6 +7,7 @@ import { Mountain, Sparkles, BookOpen, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 
 export function ChoiceModal() {
   const {
@@ -27,6 +28,7 @@ export function ChoiceModal() {
     setLoading(true);
     setError(null);
     try {
+      await ensureAIConfigured();
       const res = await fetch('/api/game/choose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

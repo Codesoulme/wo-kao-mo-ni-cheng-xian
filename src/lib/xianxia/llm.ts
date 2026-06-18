@@ -26,6 +26,10 @@ import { ensureUniqueIds } from './engine';
 
 let zaiInstance: any = null;
 
+export function resetZAI() {
+  zaiInstance = null;
+}
+
 async function getZAI() {
   if (!zaiInstance) {
     zaiInstance = await ZAI.create();

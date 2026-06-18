@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { REALMS } from '@/lib/xianxia/types';
 import type { GameEvent } from '@/lib/xianxia/store';
+import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 
 type AiOpportunity = {
   market: boolean;
@@ -101,6 +102,7 @@ export function ActionButtons() {
     setLastChange(null);
     setLastBreakthrough(null);
     try {
+      await ensureAIConfigured();
       const res = await fetch('/api/game/advance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Send, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 
 export function InterfereInput() {
   const { character, setLoading, setError, setCharacter, addEvent, setLastInterfere } = useGameStore();
@@ -21,6 +22,7 @@ export function InterfereInput() {
     setLoading(true);
     setError(null);
     try {
+      await ensureAIConfigured();
       const res = await fetch('/api/game/interfere', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -8,6 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Mountain, Feather } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
+import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 
 export function StartScreen() {
   const { setCharacter, setEvents, setChoices, setFateNodes, setLoading } = useGameStore();
@@ -19,6 +21,8 @@ export function StartScreen() {
     setBusy(true);
     setLoading(true);
     try {
+      await ensureAIConfigured();
+
       const res = await fetch('/api/game/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,6 +106,7 @@ export function StartScreen() {
           <div className="text-[10px] text-muted-foreground text-center leading-relaxed">
             灵根随机 · 命运无常 · 天道不佑
           </div>
+          <AIConfigDialog variant="start" />
         </CardContent>
       </Card>
 
