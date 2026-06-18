@@ -455,10 +455,165 @@ export function computeEffectiveCultivationRate(state: CharacterState): { multip
   return { multiplier, flatBonus };
 }
 
+
+// 引擎权威：把修炼速度倍率与来源条目重算回状态。
+// 用于买卖、战斗结算、物品移除等路径，防止已卖/已毁物品的旧加成残留。
+export function normalizeCultivationState(state: CharacterState): CharacterState {
+  const rate = computeEffectiveCultivationRate(state);
+  return {
+    ...state,
+    cultivationMultiplier: rate.multiplier,
+    cultivationFactors: computeCultivationFactors(state),
+  };
+}
+
 // 默认 equipNote（玩家点装备时若物品无 equipNote 则按类型生成）
 const DEFAULT_EQUIP_NOTE: Record<string, string> = {
   weapon: '手持', armor: '身穿', accessory: '佩戴', artifact: '悬身', scripture: '修习',
 };
+
+
+type ItemRarity = ItemEntry['rarity'];
+
+function safeRarityIndex(rarity?: string): number {
+  const idx = rarityIndex(String(rarity || 'common'));
+  return idx >= 0 ? idx : 0;
+}
+
+function clampRarityIndex(idx: number): ItemRarity {
+  return RARITY_ORDER[Math.max(0, Math.min(RARITY_ORDER.length - 1, idx))] as ItemRarity;
+}
+
+function makeLootId(prefix = 'loot'): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function buildLearnedCombatArts(state: CharacterState): { itemId: string; name: string; description: string; mpCost: number; power: number; rarity?: string; sourceType?: string }[] {
+  return (state.equipped || [])
+    .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
+    .map(it => ({
+      itemId: it.id,
+      name: it.name,
+      description: it.description,
+      mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
+      power: 1 + (safeRarityIndex(it.rarity) * 0.5),
+      rarity: it.rarity,
+      sourceType: it.item_type,
+    }))
+    .slice(0, 8);
+}
+
+function enemyLootTier(enemy: CombatEnemy, state: CharacterState): number {
+  const text = `${enemy.name || ''} ${enemy.description || ''} ${enemy.realm || ''}`;
+  const realmIdx = enemy.realm ? REALMS.findIndex(r => r.id === enemy.realm || r.name === enemy.realm) : -1;
+  if (/大乘|渡劫|仙|魔尊|老祖|天君/.test(text) || realmIdx >= 6) return 5;
+  if (/化神|元婴|魔君|长老/.test(text) || realmIdx >= 4) return 4;
+  if (/金丹|结丹|真人|筑基后期/.test(text) || realmIdx >= 3) return 3;
+  if (/筑基|执事|精英/.test(text) || realmIdx >= 2) return 2;
+  if (/炼气|修士|邪修|魔修|劫修|散修/.test(text) || realmIdx >= 1) return 1;
+  const playerRealmIdx = REALMS.findIndex(r => r.id === state.realm);
+  return Math.max(0, Math.min(2, playerRealmIdx));
+}
+
+function buildEnemyCarriedLoot(enemy: CombatEnemy, state: CharacterState, enemyIndex: number): { items: ItemEntry[]; spiritStones: number } {
+  const text = `${enemy.name || ''} ${enemy.description || ''}`;
+  const tier = enemyLootTier(enemy, state);
+  const baseRarity = clampRarityIndex(Math.max(0, tier - 1));
+  const betterRarity = clampRarityIndex(tier);
+  const source = `${enemy.name || '敌修'}遗物`;
+  const items: ItemEntry[] = [];
+  const addItem = (name: string, description: string, item_type: ItemEntry['item_type'], rarity: ItemRarity, effects: any[], suffix: string) => {
+    items.push({ id: makeLootId(`loot_${enemyIndex}_${suffix}`), name, description, item_type, rarity, effects, source });
+  };
+
+  const title = enemy.name || '敌修';
+  const isCultivator = /修|道人|魔|邪|劫|散人|真人|老祖|剑|宗|门/.test(text) || tier >= 1;
+  const isBeast = /妖|兽|狼|虎|蛟|蛇|蛛|狐|猿|禽|鸟/.test(text);
+
+  if (isCultivator) {
+    addItem(
+      `${title.replace(/^(蒙面|黑衣)/, '')}的储物袋`,
+      `从${title}身侧搜得的小型储物法器，袋口禁制已散，可并入自身储物之用。`,
+      'tool',
+      baseRarity,
+      [{ target_attribute: 'storageCapacity', operation: 'add', value: Math.max(8, 8 + tier * 10), description: `储物上限+${Math.max(8, 8 + tier * 10)}` }],
+      'bag'
+    );
+    addItem(
+      /剑|剑修/.test(text) ? '染血飞剑' : /魔|邪|血/.test(text) ? '血纹短刃' : '夺来的护身法器',
+      /魔|邪|血/.test(text) ? '刃上血纹未灭，仍残存几分凶煞灵机。' : '虽经斗法震荡，核心禁制尚未崩坏，可重新祭炼。',
+      /剑|刃|刀/.test(text) ? 'weapon' : 'artifact',
+      betterRarity,
+      [{ target_attribute: /剑|刃|刀/.test(text) ? 'attack' : 'defense', operation: 'add', value: Math.max(6, 8 + tier * 8), description: /剑|刃|刀/.test(text) ? `攻伐+${Math.max(6, 8 + tier * 8)}` : `护身+${Math.max(6, 8 + tier * 8)}` }],
+      'gear'
+    );
+    addItem(
+      tier >= 2 ? '回元丹' : '疗伤散',
+      `藏在${title}储物袋中的应急丹药，瓶身尚未碎裂。`,
+      'consumable',
+      baseRarity,
+      [{ target_attribute: tier >= 2 ? 'mp' : 'hp', operation: 'add', value: Math.max(30, 40 + tier * 35), description: tier >= 2 ? `回灵+${Math.max(30, 40 + tier * 35)}` : `疗伤+${Math.max(30, 40 + tier * 35)}` }],
+      'pill'
+    );
+    if (tier >= 2 || /功法|秘术|邪|魔|血/.test(text)) {
+      addItem(
+        /邪|魔|血/.test(text) ? '残缺血煞诀' : '斗法心得玉简',
+        /邪|魔|血/.test(text) ? '邪修随身携带的残缺法诀，凶险却也有可借鉴之处。' : '记有此人多年斗法心得的玉简。',
+        'scripture',
+        baseRarity,
+        [{ target_attribute: 'cultivationExp', operation: 'multiply', value: Number((1.15 + tier * 0.15).toFixed(2)), description: `参悟修行×${Number((1.15 + tier * 0.15).toFixed(2))}` }],
+        'scripture'
+      );
+    }
+  } else if (isBeast) {
+    addItem('妖兽内丹', `从${title}体内剖出的内丹，灵气未散。`, 'material', betterRarity, [{ target_attribute: 'cultivationExp', operation: 'add', value: Math.max(20, 35 + tier * 25), description: `炼化可增修为+${Math.max(20, 35 + tier * 25)}` }], 'core');
+    addItem('妖兽利爪', `${title}遗下的坚硬利爪，可作炼器材料。`, 'material', baseRarity, [{ target_attribute: 'attack', operation: 'add', value: Math.max(3, 4 + tier * 4), description: `炼器攻材+${Math.max(3, 4 + tier * 4)}` }], 'claw');
+  } else {
+    addItem('残破护符', `战后从${title}身旁拾得，虽有裂纹，灵光尚存。`, 'accessory', baseRarity, [{ target_attribute: 'luck', operation: 'add', value: 1, description: '护身气运+1' }], 'charm');
+  }
+
+  const explicitDrops = Array.isArray(enemy.drops) ? enemy.drops : [];
+  for (const d of explicitDrops.slice(0, 3)) {
+    const rarity = clampRarityIndex(safeRarityIndex(d.rarity));
+    addItem(String(d.name || '遗落材料'), `从${title}身上搜得，未在斗法中毁去。`, 'material', rarity, [], `drop_${items.length}`);
+  }
+
+  const explicitLoot = Array.isArray(enemy.lootItems) ? enemy.lootItems : [];
+  const safeExplicitLoot = explicitLoot.slice(0, 6).map((it, idx) => ({
+    ...it,
+    id: it.id || makeLootId(`enemy_${enemyIndex}_${idx}`),
+    source: it.source || source,
+  }));
+
+  const stonesBase = tier <= 0 ? 2 : 12 * Math.pow(2, tier - 1);
+  const spiritStones = Math.max(0, Math.floor(Number(enemy.lootSpiritStones ?? 0) || 0))
+    + (isCultivator ? Math.max(5, Math.floor(stonesBase + Math.random() * stonesBase)) : 0);
+
+  return { items: [...safeExplicitLoot, ...items], spiritStones };
+}
+
+export function buildCombatVictorySpoils(state: CharacterState, session: CombatSession): { items: ItemEntry[]; spiritStones: number } {
+  if (!session || session.status !== 'victory') return { items: [], spiritStones: 0 };
+  const enemies = session.enemies || [];
+  const allItems: ItemEntry[] = [];
+  let spiritStones = 0;
+  enemies.forEach((enemy, idx) => {
+    const loot = buildEnemyCarriedLoot(enemy, state, idx);
+    allItems.push(...loot.items);
+    spiritStones += loot.spiritStones;
+  });
+  const triggerDrops = Array.isArray(session.victoryDrops) ? session.victoryDrops : [];
+  allItems.push(...triggerDrops.map((it, idx) => ({ ...it, id: it.id || makeLootId(`drop_${idx}`), source: it.source || '战利所得' })));
+
+  const seen = new Set<string>();
+  const deduped = allItems.filter(item => {
+    const key = `${item.name}|${item.item_type}|${item.rarity}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, Math.max(4, 6 + enemies.length * 3));
+  return { items: deduped, spiritStones };
+}
 
 // 装备物品（从 inventory 移到 equipped 数组末尾，不限制同类型数量）
 // 不再替换同槽位物品——玩家可戴多个戒指、脖挂一串储物戒指等，由 AI 在 equipNote 中描述位置
@@ -1401,16 +1556,8 @@ export function startCombat(state: CharacterState, trigger: NonNullable<AIEventO
     playerAttack: state.attack,
     playerDefense: state.defense,
     playerSpeed: state.speed,
-    // 从已装备提取法术（scripture 类）
-    playerSkills: (state.equipped || [])
-      .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
-      .map(it => ({
-        name: it.name,
-        description: it.description,
-        mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
-        power: 1 + (['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) * 0.5),
-      }))
-      .slice(0, 4),
+    // 从已装备功法/法宝提取可施展术法（与「宝」页习得法术同源）
+    playerSkills: buildLearnedCombatArts(state).slice(0, 4),
     // 从背包提取丹药（consumable 类）
     playerItems: (state.inventory || [])
       .filter(it => it.item_type === 'consumable')
@@ -1779,16 +1926,21 @@ export function executeCombatRound(
 }
 
 // 结束战斗（清理 combatSession，但保留 log 用于事件记录）
-export function endCombat(state: CharacterState, applyDrops: boolean = true): { state: CharacterState; drops: ItemEntry[]; result: 'victory' | 'defeat' | 'fled' | 'ongoing' | null } {
-  if (!state.combatSession) return { state, drops: [], result: null };
+export function endCombat(state: CharacterState, applyDrops: boolean = true): { state: CharacterState; drops: ItemEntry[]; result: 'victory' | 'defeat' | 'fled' | 'ongoing' | null; spiritStones?: number } {
+  if (!state.combatSession) return { state, drops: [], result: null, spiritStones: 0 };
   const session = state.combatSession;
   let next: CharacterState = { ...state, combatSession: null };
   let drops: ItemEntry[] = [];
-  if (applyDrops && session.status === 'victory' && session.victoryDrops?.length) {
-    drops = session.victoryDrops;
-    next = addItems(next, drops);
+  let spiritStones = 0;
+  if (applyDrops && session.status === 'victory') {
+    const spoils = buildCombatVictorySpoils(state, session);
+    drops = spoils.items;
+    spiritStones = spoils.spiritStones;
+    if (drops.length) next = addItems(next, drops);
+    if (spiritStones > 0) next = { ...next, spiritStones: next.spiritStones + spiritStones };
+    next = normalizeCultivationState(next);
   }
-  return { state: next, drops, result: session.status };
+  return { state: next, drops, result: session.status, spiritStones };
 }
 
 // ==================== 引擎执行 AI 输出（统一入口） ====================
@@ -1882,7 +2034,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   // 不再合并 AI 输出的额外因素——AI 输出不稳定会导致条目忽隐忽现，且 AI 编造的数字
   // 与 cultivationMultiplier 脱节会让"顶部倍率"与"来源条目数字之积"不一致。
   // AI 若想体现环境/心境等动态因素，可在 cultivationInsight 文本中描述，但不得影响数值。
-  next.cultivationFactors = computeCultivationFactors(next);
+  next = normalizeCultivationState(next);
 
   // 5. 处理突破
   let breakthroughHappened = false;

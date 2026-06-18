@@ -5,7 +5,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, equipItem, unequipItem, consumeItem, stateToResponse, buildStateContext, computeCultivationFactors } from '@/lib/xianxia/engine';
+import { dbToState, equipItem, unequipItem, consumeItem, stateToResponse, buildStateContext, normalizeCultivationState } from '@/lib/xianxia/engine';
 import { generateItemActionNarrative } from '@/lib/xianxia/llm';
 import { z } from 'zod';
 
@@ -89,8 +89,8 @@ export async function POST(req: NextRequest) {
       // LLM 失败不阻塞物品操作，仅无叙事
       console.error('item action narrative failed:', err?.message || err);
     }
-    // 引擎权威：cultivationFactors 完全由引擎从 state 计算（保证数值准确且稳定不消失）
-    state.cultivationFactors = computeCultivationFactors(state);
+    // 引擎权威：修炼速度完全由灵根、已装备与有效状态实时归算。
+    state = normalizeCultivationState(state);
 
     // 持久化
     await db.character.update({

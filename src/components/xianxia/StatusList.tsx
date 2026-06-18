@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
 import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
+import { CultivationSpeedCard } from '@/components/xianxia/CultivationSpeedCard';
 import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 
 const RARITY_COLORS: Record<string, string> = {
@@ -54,6 +55,8 @@ export function StatusList() {
 
   return (
     <div className="space-y-3">
+      <CultivationSpeedCard />
+
       {/* 状态 */}
       <Collapsible open={open} onOpenChange={setOpen}>
         <Card className="paper-texture">

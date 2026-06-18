@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, stateToResponse, addItems, removeItemsByIds } from '@/lib/xianxia/engine';
+import { dbToState, stateToResponse, addItems, removeItemsByIds, normalizeCultivationState } from '@/lib/xianxia/engine';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -172,6 +172,7 @@ export async function POST(req: NextRequest) {
         source: '坊市所购',
       };
       state = addItems(state, [newItem]);
+      state = normalizeCultivationState(state);
       // 持久化
       await db.character.update({
         where: { id: characterId },
@@ -180,6 +181,8 @@ export async function POST(req: NextRequest) {
           inventoryJson: JSON.stringify(state.inventory),
           storageCapacity: state.storageCapacity,
           equippedJson: JSON.stringify(state.equipped || []),
+          cultivationMultiplier: state.cultivationMultiplier ?? 0,
+          cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
         },
       });
       // 写入事件日志（便于史册追溯）
@@ -215,6 +218,7 @@ export async function POST(req: NextRequest) {
       state = removed.state;
       // 加灵石
       state.spiritStones += sellPrice;
+      state = normalizeCultivationState(state);
       await db.character.update({
         where: { id: characterId },
         data: {
@@ -222,6 +226,8 @@ export async function POST(req: NextRequest) {
           inventoryJson: JSON.stringify(state.inventory),
           storageCapacity: state.storageCapacity,
           equippedJson: JSON.stringify(state.equipped || []),
+          cultivationMultiplier: state.cultivationMultiplier ?? 0,
+          cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
         },
       });
       // 写入事件日志

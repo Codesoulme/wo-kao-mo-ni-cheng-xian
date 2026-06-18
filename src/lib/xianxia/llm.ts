@@ -464,10 +464,10 @@ newEquippedItems：用于「AI 创造性装备」场景——例如玩家说"我
 【战斗触发字段——重要！触发独立战斗界面】
 - triggerCombat：当 eventType='combat' 且战斗重要到需要独立界面（非几句话带过）时给出。结构：
   {
-    enemies: [{id:"enemy_<4位随机>",name:"敌人名(≤8字)",description:"描述(20-50字)",hp:50,maxHp:50,attack:15,defense:5,speed:10,realm:"炼气期"}],
+    enemies: [{id:"enemy_<4位随机>",name:"敌人名(≤8字)",description:"描述(20-50字)",hp:50,maxHp:50,attack:15,defense:5,speed:10,realm:"炼气期",lootItems:[ItemEntry],lootSpiritStones:12}],
     contextTitle: "战斗标题(≤12字)",
     contextNarrative: "战斗背景叙事(50-150字，铺垫敌人出现、动机、战场)",
-    victoryDrops: [ItemEntry],  // 战斗胜利后掉落物品（可选）
+    victoryDrops: [ItemEntry],  // 战斗胜利后额外掉落物品（可选；敌人随身物优先放 enemies[].lootItems）
     defeatCost: "战败代价描述(如'重伤、失去所有灵石'，可选)"
   }
   * 敌人 hp/attack/defense 应与角色战力匹配（不要给 hp=10000 的神级敌人）
@@ -477,7 +477,8 @@ newEquippedItems：用于「AI 创造性装备」场景——例如玩家说"我
     2. 角色主动意图是 prepare_combat 且 deadline 到了
     3. pendingThreads 中的 enemy/competition 线索到了 deadline
   * 普通的小冲突（如口角、擦肩）不要触发战斗，几句话带过即可。
-  * 战斗胜利后通过 victoryDrops 给战利品；战败后通过 defeatCost 描述代价（引擎会处理死亡/重伤）。
+  * 敌修/劫修/魔修必须有随身财物意识：可在 enemies[].lootItems / lootSpiritStones 写明其未毁装备、法宝、丹药、储物袋、灵石；引擎会在胜利后按“未毁战利品”结算。
+  * 战斗胜利后通过 enemies[].lootItems/lootSpiritStones 或 victoryDrops 给战利品；战败后通过 defeatCost 描述代价（引擎会处理死亡/重伤）。
 
 statusEntry 结构：{id,name,description,category(attribute/skill/buff/debuff/special/identity/quest/environment),rarity(common/uncommon/rare/epic/legendary/mythic),duration(-1永久/正数为剩余岁数),source,effects:[{target_attribute,operation(add/multiply/override/cap/floor/trigger),value,description}]}
 
@@ -1460,6 +1461,8 @@ function sanitizeCombatEnemy(raw: any): CombatEnemy | null {
       chance: Math.max(0, Math.min(1, Number(d?.chance) || 0.5)),
       rarity: String(d?.rarity || 'common'),
     })) : undefined,
+    lootItems: sanitizeItems(raw.lootItems).slice(0, 6),
+    lootSpiritStones: Math.max(0, Math.min(999999, Math.floor(Number(raw.lootSpiritStones) || 0))),
   };
 }
 

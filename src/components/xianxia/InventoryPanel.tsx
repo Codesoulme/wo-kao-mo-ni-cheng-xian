@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   ChevronDown, Package, Swords, Shield, Gem, Sparkles, BookOpen,
-  FlaskConical, Loader2, Hand, X, Check, Zap, Star, Heart, Brain, Crown, Wrench, Backpack,
+  FlaskConical, Loader2, Hand, X, Check, Star, Heart, Brain, Crown, Wrench, Backpack, Wand2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -113,13 +113,6 @@ export function InventoryPanel() {
   }
   const groupOrder: ItemType[] = ['scripture', 'weapon', 'armor', 'accessory', 'artifact', 'consumable', 'tool', 'material'];
 
-  // 修炼速度
-  const totalMult = character.cultivationMultiplier ?? 0;
-  const flatBonus = character.cultivationFlatBonus ?? 0;
-  const factors: any[] = character.cultivationFactors || [];
-  const insightText: string = character.cultivationInsight || '';
-  const hasInsight = insightText.trim().length > 0;
-
   // 储物袋容量
   const storageCap = character.storageCapacity ?? 5;
   const invCount = inventory.length;
@@ -131,105 +124,17 @@ export function InventoryPanel() {
   // 特殊状态
   const specialStatuses = activeStatuses.filter(s => s.category === 'special' || s.category === 'identity');
 
+  // 习得的法术：当前已装备/修习的功法、法宝可在斗法中施展
+  const learnedArts = equippedList
+    .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
+    .map(it => ({
+      ...it,
+      mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
+      power: 1 + ((['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) >= 0 ? ['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) : 0) * 0.5),
+    }));
+
   return (
     <div className="space-y-3 pb-2">
-      {/* ==================== 修炼速度概览 ==================== */}
-      <Card className="paper-texture">
-        <CardHeader className="pb-1.5 pt-3">
-          <CardTitle className="text-sm flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-primary" />
-              修炼速度
-            </span>
-            <span className="text-base font-bold tabular-nums flex items-baseline gap-1">
-              <span style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>
-                ×{totalMult.toFixed(2)}
-              </span>
-              {flatBonus > 0 && (
-                <span className="text-xs" style={{ color: '#3b82f6' }}>
-                  +{flatBonus}/岁
-                </span>
-              )}
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-1 space-y-2">
-          {/* 来源条目（彩色芯片：名称按 rarity 上色 + 具体倍率数字） */}
-          {factors.length > 0 ? (
-            <div className="space-y-1">
-              <div className="text-[10px] text-muted-foreground mb-1">来源 · 名称与加成</div>
-              {factors.map((f, i) => {
-                const color = RARITY_COLORS[f.rarity] || '#6b7280';
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-md px-2 py-1 transition-colors hover:bg-muted/30"
-                    style={{
-                      background: `${color}08`,
-                      borderLeft: `2px solid ${color}80`,
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full shrink-0"
-                        style={{ background: color, boxShadow: `0 0 6px ${color}80` }}
-                      />
-                      <span
-                        className="text-xs font-serif-cn font-medium truncate"
-                        style={{ color }}
-                        title={f.name}
-                      >
-                        {f.name}
-                      </span>
-                      {f.note && (
-                        <span className="text-[9px] text-muted-foreground/80 truncate hidden sm:inline">
-                          · {f.note}
-                        </span>
-                      )}
-                    </div>
-                    <span
-                      className="text-xs tabular-nums font-semibold shrink-0 ml-2 px-1.5 py-0.5 rounded"
-                      style={{
-                        background: f.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
-                        color: f.operation === 'multiply' ? '#c8453c' : '#3b82f6',
-                      }}
-                    >
-                      {f.operation === 'multiply' ? '×' : '+'}{f.value}{f.operation === 'add' ? '/岁' : ''}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-[10px] text-muted-foreground/70 px-1 py-1">
-              {totalMult > 0
-                ? '无加成来源——修炼速度仅由灵根决定。'
-                : '凡人之躯，无灵根可引天地灵气，修为难进。'}
-            </div>
-          )}
-
-          {/* AI 生成的修炼心得文本（按句号/分号分段） */}
-          {hasInsight && (
-            <div
-              className="rounded-md p-2.5 leading-relaxed text-[11px] font-serif-cn xianxia-scroll"
-              style={{
-                background: 'linear-gradient(135deg, rgba(200,69,60,0.04), rgba(60,80,90,0.04))',
-                border: '1px solid rgba(200,69,60,0.12)',
-                color: '#3a3530',
-              }}
-            >
-              {insightText.split(/(?<=[。；])/).filter(s => s.trim()).map((seg, i) => (
-                <p key={i} className="mb-0.5 last:mb-0">{seg.trim()}</p>
-              ))}
-            </div>
-          )}
-
-          <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
-            每岁修为 = 基础 × 倍率（×{totalMult.toFixed(2)}）{flatBonus > 0 ? ` + 额外修为（${flatBonus}/岁）` : ''}。来源条目由引擎依灵根、功法、奇缘实时计算，稳定不消失。
-          </p>
-        </CardContent>
-      </Card>
-
       {/* ==================== 已装备（数组，无固定槽位） ==================== */}
       <Card className="paper-texture">
         <CardHeader className="pb-2">
@@ -320,6 +225,60 @@ export function InventoryPanel() {
           <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-1 px-0.5">
             点击装备查看详情。
           </p>
+        </CardContent>
+      </Card>
+
+      {/* ==================== 习得的法术 ==================== */}
+      <Card className="paper-texture">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <Wand2 className="w-4 h-4 text-primary" />
+              习得的法术
+            </span>
+            <Badge variant="secondary" className="text-[10px]">
+              {learnedArts.length} 门
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 space-y-1.5">
+          {learnedArts.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center py-3">
+              尚未修习可用于斗法的功法或法宝。装备功法、法宝后，此处会显现可施展之术。
+            </p>
+          ) : (
+            learnedArts.map((art, i) => {
+              const color = RARITY_COLORS[art.rarity] || '#6b7280';
+              return (
+                <div
+                  key={art.id || i}
+                  className="rounded-md border p-2 cursor-pointer transition-all hover:bg-muted/30"
+                  style={{ borderColor: `${color}40`, background: `${color}08` }}
+                  onClick={() => openDetail(art)}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <span className="flex items-center gap-1.5 min-w-0">
+                      <BookOpen className="w-3.5 h-3.5 shrink-0" style={{ color }} />
+                      <span className="text-xs font-semibold font-serif-cn truncate" style={{ color }}>
+                        {art.name}
+                      </span>
+                    </span>
+                    <span className="text-[9px] px-1 rounded shrink-0" style={{ background: `${color}20`, color }}>
+                      {art.item_type === 'artifact' ? '法宝术' : '功法术'}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+                    {art.description || '此术含而未发，斗法时可调动其灵机。'}
+                  </p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary">耗灵 {art.mpCost}</span>
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-accent/10 text-accent">威势 ×{art.power.toFixed(1)}</span>
+                    {art.equipNote && <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">{art.equipNote}</span>}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </CardContent>
       </Card>
 

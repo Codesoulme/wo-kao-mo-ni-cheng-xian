@@ -368,6 +368,9 @@ export interface CombatEnemy {
   nextAction?: string;
   nextActionDesc?: string;
   drops?: { name: string; chance: number; rarity: string }[];
+  // 敌方随身财物：被击败后，未毁掉者会作为战利品结算。
+  lootItems?: ItemEntry[];
+  lootSpiritStones?: number;
 }
 
 export interface CombatRound {

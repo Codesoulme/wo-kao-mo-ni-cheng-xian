@@ -7,7 +7,7 @@ import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import {
   dbToState, endCombat, buildStateContext, stateToResponse,
-  addItems, addThreads, completeThread, resolveHeartDemonTrial,
+  addItems, addThreads, completeThread, resolveHeartDemonTrial, normalizeCultivationState,
 } from '@/lib/xianxia/engine';
 import { generateCombatEndNarrative } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     const endResult = endCombat(state, true);
     state = endResult.state;
     const appliedDrops = endResult.drops || [];
+    const lootedSpiritStones = Math.max(0, Number(endResult.spiritStones || 0));
 
     // Task 22: 心魔试炼战斗后特殊结算——根据胜负调整心魔值
     const wasHeartDemonTrial = !!(session as any).isHeartDemonTrial;
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
       if (llmNewItems.length) {
         state = addItems(state, llmNewItems);
       }
+      state = normalizeCultivationState(state);
       // 应用新线索
       if (llmNewThreads.length) {
         state = addThreads(state, llmNewThreads);
@@ -122,6 +124,10 @@ export async function POST(req: NextRequest) {
       data: {
         hp: state.hp,
         mp: state.mp,
+        spiritStones: state.spiritStones,
+        cultivationMultiplier: state.cultivationMultiplier ?? 0,
+        cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
+        storageCapacity: state.storageCapacity ?? 5,
         alive: state.alive,
         causeOfDeath: state.causeOfDeath || '',
         inventoryJson: JSON.stringify(state.inventory || []),
@@ -142,7 +148,7 @@ export async function POST(req: NextRequest) {
     const displayEffects = buildEventDisplayEffects({
       before: stateBeforeCombatEnd,
       after: state,
-      changes: [],
+      changes: lootedSpiritStones > 0 ? [{ attribute: 'spiritStones', delta: lootedSpiritStones, reason: '缴获灵石' }] : [],
       newItems: [...appliedDrops, ...llmNewItems],
     });
 
@@ -174,6 +180,7 @@ export async function POST(req: NextRequest) {
       narrative,
       // 实际获得的战利品（含引擎应用的 + LLM 新给的）
       drops: [...appliedDrops, ...llmNewItems],
+      lootedSpiritStones,
       // LLM 联动：新线索 / 完成的线索
       newThreads: llmNewThreads,
       completeThreadIds: llmCompleteThreadIds,
