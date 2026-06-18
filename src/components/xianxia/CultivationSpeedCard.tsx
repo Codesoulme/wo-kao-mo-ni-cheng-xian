@@ -1,8 +1,10 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Zap } from 'lucide-react';
+import { ChevronDown, Zap } from 'lucide-react';
 import { useGameStore } from '@/lib/xianxia/store';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -11,11 +13,15 @@ const RARITY_COLORS: Record<string, string> = {
 
 export function CultivationSpeedCard() {
   const { character } = useGameStore();
+  const [showAllSources, setShowAllSources] = useState(false);
   if (!character) return null;
 
   const totalMult = character.cultivationMultiplier ?? 0;
   const flatBonus = character.cultivationFlatBonus ?? 0;
   const factors: any[] = buildVisibleCultivationFactors(character);
+  const groupedSources = groupCultivationFactors(factors);
+  const visibleSources = showAllSources ? groupedSources : groupedSources.slice(0, 3);
+  const hiddenSourceCount = Math.max(0, groupedSources.length - visibleSources.length);
   const insightText: string = character.cultivationInsight || '';
   const hasInsight = insightText.trim().length > 0;
 
@@ -40,50 +46,72 @@ export function CultivationSpeedCard() {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-1 space-y-2">
-        {factors.length > 0 ? (
+        {groupedSources.length > 0 ? (
           <div className="space-y-1">
-            <div className="text-[10px] text-muted-foreground mb-1">来源 · 名称与加成</div>
-            {factors.map((f, i) => {
-              const color = RARITY_COLORS[f.rarity] || '#6b7280';
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+              <span>来源 · 名称与加成</span>
+              {groupedSources.length > 3 && (
+                <span>已列 {visibleSources.length}/{groupedSources.length}</span>
+              )}
+            </div>
+            {visibleSources.map((source) => {
+              const color = source.rarity ? (RARITY_COLORS[source.rarity] || '#6b7280') : '#6b7280';
               return (
                 <div
-                  key={i}
-                  className="flex items-center justify-between rounded-md px-2 py-1 transition-colors hover:bg-muted/30"
+                  key={source.key}
+                  className="rounded-md px-2 py-1.5 transition-colors hover:bg-muted/30"
                   style={{
                     background: `${color}08`,
                     borderLeft: `2px solid ${color}80`,
                   }}
                 >
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ background: color, boxShadow: `0 0 6px ${color}80` }}
-                    />
-                    <span
-                      className="text-xs font-serif-cn font-medium truncate"
-                      style={{ color }}
-                      title={f.name}
-                    >
-                      {f.name}
-                    </span>
-                    {f.note && (
-                      <span className="text-[9px] text-muted-foreground/80 truncate hidden sm:inline">
-                        · {f.note}
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full shrink-0"
+                        style={{ background: color, boxShadow: `0 0 6px ${color}80` }}
+                      />
+                      <span
+                        className="text-xs font-serif-cn font-medium truncate"
+                        style={{ color }}
+                        title={source.name}
+                      >
+                        {source.name}
                       </span>
-                    )}
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-1 shrink-0 max-w-[46%]">
+                      {source.effects.map((eff) => (
+                        <span
+                          key={`${eff.operation}-${eff.value}-${eff.note || ''}`}
+                          className="text-[10px] tabular-nums font-semibold px-1.5 py-0.5 rounded"
+                          style={{
+                            background: eff.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
+                            color: eff.operation === 'multiply' ? '#c8453c' : '#3b82f6',
+                          }}
+                        >
+                          {formatGroupedEffect(eff)}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <span
-                    className="text-xs tabular-nums font-semibold shrink-0 ml-2 px-1.5 py-0.5 rounded"
-                    style={{
-                      background: f.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
-                      color: f.operation === 'multiply' ? '#c8453c' : '#3b82f6',
-                    }}
-                  >
-                    {f.operation === 'multiply' ? '×' : '+'}{f.value}{f.operation === 'add' ? '/岁' : ''}
-                  </span>
+                  {source.notes.length > 0 && (
+                    <div className="mt-0.5 pl-3 text-[9px] text-muted-foreground/80 truncate">
+                      {source.notes.join(' · ')}
+                    </div>
+                  )}
                 </div>
               );
             })}
+            {groupedSources.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAllSources(v => !v)}
+                className="w-full mt-1 rounded-md border border-dashed border-border/70 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
+              >
+                <ChevronDown className={cn("w-3 h-3 transition-transform", showAllSources && "rotate-180")} />
+                {showAllSources ? '收起来源' : `展开其余 ${hiddenSourceCount} 个来源`}
+              </button>
+            )}
           </div>
         ) : (
           <div className="text-[10px] text-muted-foreground/70 px-1 py-1">
@@ -163,4 +191,49 @@ function buildVisibleCultivationFactors(character: any): any[] {
   }
 
   return factors;
+}
+
+
+type GroupedCultivationSource = {
+  key: string;
+  name: string;
+  rarity?: string;
+  effects: { operation: 'multiply' | 'add'; value: number; note?: string }[];
+  notes: string[];
+};
+
+function groupCultivationFactors(factors: any[]): GroupedCultivationSource[] {
+  const groups: GroupedCultivationSource[] = [];
+  const byName = new Map<string, GroupedCultivationSource>();
+
+  for (const f of factors) {
+    if (!f?.name) continue;
+    const key = f.name;
+    let group = byName.get(key);
+    if (!group) {
+      group = { key, name: f.name, rarity: f.rarity, effects: [], notes: [] };
+      byName.set(key, group);
+      groups.push(group);
+    }
+    const value = Number(f.value);
+    if ((f.operation === 'multiply' || f.operation === 'add') && Number.isFinite(value)) {
+      const exists = group.effects.some(e => e.operation === f.operation && e.value === value);
+      if (!exists) group.effects.push({ operation: f.operation, value, note: f.note });
+    }
+    if (f.note && !group.notes.includes(f.note)) group.notes.push(f.note);
+    if (!group.rarity && f.rarity) group.rarity = f.rarity;
+  }
+
+  for (const group of groups) {
+    group.effects.sort((a, b) => {
+      if (a.operation !== b.operation) return a.operation === 'multiply' ? -1 : 1;
+      return b.value - a.value;
+    });
+  }
+
+  return groups;
+}
+
+function formatGroupedEffect(eff: { operation: 'multiply' | 'add'; value: number }): string {
+  return eff.operation === 'multiply' ? `速率 ×${eff.value}` : `每岁 +${eff.value}`;
 }
