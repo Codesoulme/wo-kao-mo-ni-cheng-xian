@@ -17,6 +17,76 @@ function buildFallbackAgeEvent(state: any, blueprint: any, ctx: any, isFateNode:
   const rate = Number(ctx?.cultivationRate?.finalRate || state.cultivationMultiplier || 1) || 1;
   const baseGain = Math.max(5, Math.round(8 * rate));
   const seed = Math.abs((age * 37) + String(state.id || state.name || '').split('').reduce((n, ch) => n + ch.charCodeAt(0), 0));
+  const realmName = ctx?.character?.realmName || '炼气';
+  const combatNames = ['邪修截杀', '妖兽搏杀', '夺宝大战', '擂台比武'];
+  const isCombatBlueprint = blueprint?.category === 'combat' || combatNames.some(name => String(blueprint?.name || '').includes(name));
+
+  if (isCombatBlueprint) {
+    const isBeast = String(blueprint?.name || '').includes('妖兽');
+    const isArena = String(blueprint?.name || '').includes('擂台');
+    const enemyName = isBeast ? '山魈妖兽' : isArena ? '擂台对手' : '蒙面邪修';
+    const enemyDesc = isBeast
+      ? `盘踞在${place}外山林的低阶妖兽，爪牙带腥，畏火却凶悍。`
+      : isArena
+        ? `与${state.name}境界相近的修士，出手谨慎，擅以法器试探。`
+        : `一路尾随${state.name}的邪修，气息阴冷，意在劫财夺物。`;
+    const enemyHp = Math.max(35, Math.round((state.maxHp || 60) * 0.65));
+    const enemyAttack = Math.max(5, Math.round((state.attack || 10) * 0.75));
+    const title = blueprint?.name || (isBeast ? '妖兽搏杀' : '邪修截杀');
+    const narrative = isArena
+      ? `${age}岁，${state.name}卷入一场修士斗法。对方先以法器试探，又借身法逼近，台下众人屏息观望；这一战不只是输赢，更关乎她这些年根基是否扎实。`
+      : `${age}岁，${state.name}行至${place}外僻静处，忽觉风声一滞。${enemyName}自林影间现身，拦住去路，杀机直逼眉心。退路已断，唯有运转灵力应战。`;
+    return {
+      title,
+      narrative,
+      eventType: 'combat',
+      changes: [],
+      newStatuses: [],
+      newItems: [],
+      removedItemIds: [],
+      newEquippedItems: [],
+      equipItemIds: [],
+      unequipItemIds: [],
+      memory: `${age}岁遭遇${title}，被迫应战。`,
+      cultivationInsight: ctx.cultivationInsight || '生死斗法最验根基，修行不只在静室之中。',
+      hasChoice: false,
+      choice: null,
+      triggeredBreakthrough: false,
+      causedDeath: false,
+      causedAscension: false,
+      newThreads: [],
+      advanceThreads: [],
+      completeThreadIds: [],
+      failThreadIds: [],
+      triggerCombat: {
+        contextTitle: title,
+        contextNarrative: narrative,
+        enemies: [{
+          id: `fallback_enemy_${Date.now().toString(36)}`,
+          name: enemyName,
+          description: enemyDesc,
+          hp: enemyHp,
+          maxHp: enemyHp,
+          attack: enemyAttack,
+          defense: Math.max(2, Math.round((state.defense || 6) * 0.65)),
+          speed: Math.max(4, Math.round((state.speed || 10) * 0.9)),
+          realm: realmName,
+          skills: [{ name: isBeast ? '扑咬' : '阴风刃', description: isBeast ? '猛扑撕咬，逼人失位' : '阴冷灵刃割向经脉', cooldown: 3, currentCooldown: 0 }],
+        }],
+        victoryDrops: isArena ? [] : [{
+          id: `fallback_drop_${Date.now().toString(36)}`,
+          name: isBeast ? '妖兽爪骨' : '染血储物袋',
+          description: isBeast ? '低阶妖兽留下的爪骨，可作炼器材料。' : '邪修随身小袋，内中或有零散灵材。',
+          rarity: 'common',
+          item_type: 'material',
+          effects: [],
+          source: title,
+        }],
+        defeatCost: isArena ? '擂台失利，声望受损' : '遭敌重创，可能遗失财物或留下伤势',
+      },
+    };
+  }
+
   const actions = [
     {
       title: '静室温功',
