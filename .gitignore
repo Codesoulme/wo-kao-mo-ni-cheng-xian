@@ -32,3 +32,8 @@ worklog.md
 .claude
 .z-ai-config
 .vercel
+
+# local sqlite databases
+prisma/*.db
+prisma/*.db-*
+
