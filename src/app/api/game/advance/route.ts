@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough, pickEventBlueprint, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tickFormations, tickHeartDemon, tryHeartDemonTrial, tickPets } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES } from '@/lib/xianxia/types';
+import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -134,6 +135,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 引擎执行 AI 输出
+    const stateBeforeEvent = { ...state };
     const result = executeAIEvent(state, aiOutput);
     let finalState = result.state;
 
@@ -299,6 +301,16 @@ export async function POST(req: NextRequest) {
     const finalEventType = result.breakthroughHappened
       ? 'breakthrough'
       : (isFateNode ? 'fate_node' : aiOutput.eventType);
+    const displayEffects = buildEventDisplayEffects({
+      before: stateBeforeEvent,
+      after: finalState,
+      changes: result.appliedChanges,
+      newStatuses: aiOutput.newStatuses,
+      newItems: aiOutput.newItems,
+      newEquippedItems: aiOutput.newEquippedItems,
+      newPets: aiOutput.newPets,
+      removedItemIds: aiOutput.removedItemIds,
+    });
     const event = await db.eventLog.create({
       data: {
         characterId,
@@ -306,7 +318,7 @@ export async function POST(req: NextRequest) {
         title: result.breakthroughHappened ? `境界突破·${aiOutput.title}` : aiOutput.title,
         narrative: aiOutput.narrative,
         eventType: finalEventType,
-        effects: JSON.stringify(aiOutput.changes),
+        effects: JSON.stringify(displayEffects),
       },
     });
 
@@ -322,6 +334,7 @@ export async function POST(req: NextRequest) {
         fateNodeName: fateNode?.name,
         // Task 20: 返回本轮蓝图主题（让前端可显示）
         blueprint: { category: blueprint.category, name: blueprint.name },
+        effects: displayEffects,
       },
       changes: result.appliedChanges,
       rejectedChanges: result.rejectedChanges,

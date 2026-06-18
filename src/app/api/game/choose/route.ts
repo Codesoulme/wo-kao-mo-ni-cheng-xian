@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, markFateNodeDone, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
+import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
     }));
 
     let state = dbToState(char);
+    const stateBeforeChoice = { ...state };
     const ctx = buildStateContext(state, recentEvents);
 
     // Task 22: 读取 pendingChoice 中的 deferredCombat（advance 时若同时有 choice + combat，战斗延迟到选择后触发）
@@ -207,6 +209,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const displayEffects = buildEventDisplayEffects({
+      before: stateBeforeChoice,
+      after: state,
+      changes: result.changes || [],
+      newStatuses: result.newStatuses,
+      newItems: result.newItems,
+      newEquippedItems: result.newEquippedItems,
+      newPets: result.newPets,
+      removedItemIds: result.removedItemIds,
+    });
+
     // 写入事件日志
     await db.eventLog.create({
       data: {
@@ -215,7 +228,7 @@ export async function POST(req: NextRequest) {
         title: `抉择：${chosenOption.text.slice(0, 12)}`,
         narrative: result.narrative,
         eventType: 'choice',
-        effects: JSON.stringify(result.changes || []),
+        effects: JSON.stringify(displayEffects),
       },
     });
 

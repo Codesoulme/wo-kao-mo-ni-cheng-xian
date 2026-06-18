@@ -189,7 +189,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
           const isAscension = event.eventType === 'ascension';
           const isBreakthrough = event.eventType === 'breakthrough';
           const isExploration = event.eventType === 'exploration';
-          const visibleEffects = (event.effects || []).filter((eff: any) => Number(eff.delta || 0) !== 0);
+          const visibleEffects = (event.effects || []).filter(isVisibleEffect);
 
           return (
             <div
@@ -290,8 +290,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                                 : "bg-muted text-muted-foreground border-border"
                             )}
                           >
-                            {ATTR_LABEL[eff.attribute] || eff.attribute}
-                            <span className="ml-0.5 tabular-nums">{eff.delta > 0 ? '+' : ''}{eff.delta}</span>
+                            {formatEffectLabel(eff)}
                           </span>
                         ))}
                       </div>
@@ -314,8 +313,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                             : "bg-muted text-muted-foreground border-border"
                         )}
                       >
-                        {ATTR_LABEL[eff.attribute] || eff.attribute}
-                        <span className="ml-0.5 tabular-nums">{eff.delta > 0 ? '+' : ''}{eff.delta}</span>
+                        {formatEffectLabel(eff)}
                       </span>
                     ))}
                     {visibleEffects.length > 4 && (
@@ -343,7 +341,24 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
   );
 }
 
-function getEffectTone(eff: { attribute?: string; delta?: number }): 'positive' | 'negative' | 'neutral' {
+
+function isVisibleEffect(eff: any): boolean {
+  if (!eff) return false;
+  if (eff.kind) return Boolean(String(eff.name || '').trim());
+  return Boolean(eff.attribute) && Number(eff.delta || 0) !== 0;
+}
+
+function formatEffectLabel(eff: any): React.ReactNode {
+  if (eff.kind) {
+    const label = String(eff.label || '获得');
+    const name = String(eff.name || '').trim();
+    return <>{label}<span className="ml-0.5 font-medium">{name}</span></>;
+  }
+  return <>{ATTR_LABEL[eff.attribute] || eff.attribute}<span className="ml-0.5 tabular-nums">{eff.delta > 0 ? '+' : ''}{eff.delta}</span></>;
+}
+
+function getEffectTone(eff: { attribute?: string; delta?: number; kind?: string; tone?: 'positive' | 'negative' | 'neutral' }): 'positive' | 'negative' | 'neutral' {
+  if (eff.tone) return eff.tone;
   const delta = Number(eff.delta || 0);
   if (delta === 0) return 'neutral';
 

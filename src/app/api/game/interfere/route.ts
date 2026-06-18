@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
+import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
     }));
 
     let state = dbToState(char);
+    const stateBeforeInterfere = { ...state };
     const ctx = buildStateContext(state, recentEvents);
 
     const result = await generateInterfereResponse(ctx, input.trim());
@@ -152,6 +154,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const displayEffects = result.accepted ? buildEventDisplayEffects({
+      before: stateBeforeInterfere,
+      after: state,
+      changes: result.changes || [],
+      newStatuses: result.newStatuses,
+      newItems: result.newItems,
+      newEquippedItems: result.newEquippedItems,
+      newPets: result.newPets,
+      removedItemIds: result.removedItemIds,
+    }) : [];
+
     // 写入干扰日志
     await db.interferenceLog.create({
       data: {
@@ -160,7 +173,7 @@ export async function POST(req: NextRequest) {
         input: input.trim(),
         classification: result.classification,
         response: result.narrative,
-        effects: JSON.stringify(result.accepted ? result.changes : []),
+        effects: JSON.stringify(displayEffects),
         accepted: result.accepted,
       },
     });
@@ -173,7 +186,7 @@ export async function POST(req: NextRequest) {
         title: result.accepted ? '干扰·天道回响' : '干扰·世界如常',
         narrative: result.narrative,
         eventType: 'interference',
-        effects: JSON.stringify(result.accepted ? result.changes : []),
+        effects: JSON.stringify(displayEffects),
       },
     });
 
