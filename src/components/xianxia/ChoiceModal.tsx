@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
+import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
 
 export function ChoiceModal() {
   const {
@@ -139,6 +140,13 @@ export function ChoiceModal() {
             <p className="text-sm leading-relaxed text-foreground/90 font-serif-cn whitespace-pre-wrap">
               {pendingChoice.prompt}
             </p>
+          </div>
+
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
+            <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200 font-serif-cn">
+              天道抉择需要 AI 接口生成后续剧情。若点击选项提示未配置，请先在这里配置 AI 接口，再继续选择。
+            </p>
+            <AIConfigDialog variant="start" />
           </div>
 
           {/* 选项 */}
