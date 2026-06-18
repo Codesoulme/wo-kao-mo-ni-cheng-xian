@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Swords, Shield, Gem, Sparkles, BookOpen, FlaskConical, Package, Wrench,
 } from 'lucide-react';
+import { formatItemEffectLabel } from '@/lib/xianxia/display';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
