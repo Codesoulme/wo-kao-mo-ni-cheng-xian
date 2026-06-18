@@ -40,6 +40,7 @@ export function CombatModal() {
   // 先让玩家读完事件缘由，再进入战斗操作界面
   const [battleStarted, setBattleStarted] = useState(false);
   const lastSessionIdRef = useRef<string | null>(null);
+  const logScrollRef = useRef<HTMLDivElement | null>(null);
   // 上一次的 HP/MP 快照，用于计算差值生成飘字
   const prevHpRef = useRef<{ player: number; enemy: number } | null>(null);
 
@@ -53,6 +54,12 @@ export function CombatModal() {
       setBattleStarted(false);
     }
   }, [session?.id]);
+  useEffect(() => {
+    const el = logScrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [session?.id, session?.log?.length, battleStarted, endResult?.status]);
+
   if (!character) return null;
   const isOngoing = !!session && session.status === 'ongoing';
   // 显示条件：战斗进行中 OR 有待展示的 endResult
@@ -122,12 +129,15 @@ export function CombatModal() {
         }, 1200);
       }
 
-      // 更新角色（含 combatSession）
-      setCharacter({ ...character, ...data.state });
-
-      // 若战斗结束，调用 /api/game/combat/end 获取战后叙事
+      // 若战斗结束，先立刻进入结果态，避免 combatSession.status 已非 ongoing 而结果叙事尚未返回时闪回叙事页。
       if (data.ended) {
-        await endCombat(data.state?.combatSession?.status || data.endStatus);
+        const status = data.state?.combatSession?.status || data.endStatus;
+        setEndResult({ status, narrative: '战局尘埃落定，余波仍在胸臆间回荡……' });
+        setCharacter({ ...character, ...data.state });
+        await endCombat(status);
+      } else {
+        // 更新角色（含 combatSession）
+        setCharacter({ ...character, ...data.state });
       }
     } catch (err: any) {
       setError(err.message);
@@ -198,7 +208,7 @@ export function CombatModal() {
   const playerMpPct = session && session.playerMaxMp > 0 ? (session.playerMp / session.playerMaxMp) * 100 : 0;
   const enemyHpPct = enemy && enemy.maxHp > 0 ? (enemy.hp / enemy.maxHp) * 100 : 0;
 
-  // 战斗日志：最近 5 条，倒序展示（最新在底部）
+  // 战斗日志：最近 5 条，最新在底部
   const recentLog: any[] = session ? (session.log || []).slice(-5) : [];
 
   // 玩家可用法术
@@ -456,7 +466,7 @@ export function CombatModal() {
             <div className="text-[10px] text-muted-foreground mb-1 px-1 font-serif-cn">
               战斗记录
             </div>
-            <div className="rounded-lg border border-border/60 bg-card/40 p-2 max-h-60 overflow-y-auto xianxia-scroll space-y-1.5">
+            <div ref={logScrollRef} className="rounded-lg border border-border/60 bg-card/40 p-2 max-h-60 overflow-y-auto xianxia-scroll space-y-1.5">
               {recentLog.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground text-center py-3 font-serif-cn">
                   战端初启，尚未交锋...

@@ -426,18 +426,21 @@ export function InventoryPanel() {
                               <p className="text-[10px] text-muted-foreground leading-relaxed mb-1">{item.description}</p>
                               {item.effects && item.effects.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mb-1.5">
-                                  {item.effects.map((e: any, j: number) => fmtEffectZh(e)).filter(Boolean).map((label: string, j: number) => (
-                                    <span
-                                      key={j}
-                                      className="text-[9px] px-1 py-0.5 rounded"
-                                      style={{
-                                        background: e.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
-                                        color: e.operation === 'multiply' ? '#c8453c' : '#3b82f6',
-                                      }}
-                                    >
-                                      {label}
-                                    </span>
-                                  ))}
+                                  {item.effects
+                                    .map((eff: any, j: number) => ({ eff, label: fmtEffectZh(eff), j }))
+                                    .filter((x: { label: string }) => Boolean(x.label))
+                                    .map(({ eff, label, j }: { eff: any; label: string; j: number }) => (
+                                      <span
+                                        key={j}
+                                        className="text-[9px] px-1 py-0.5 rounded"
+                                        style={{
+                                          background: eff.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
+                                          color: eff.operation === 'multiply' ? '#c8453c' : '#3b82f6',
+                                        }}
+                                      >
+                                        {label}
+                                      </span>
+                                    ))}
                                 </div>
                               )}
                               {(canEquip || canUse) && (
@@ -532,18 +535,21 @@ export function InventoryPanel() {
                       <p className="text-[10px] text-muted-foreground leading-relaxed mb-1">{s.description}</p>
                       {s.effects && s.effects.length > 0 && (
                         <div className="flex flex-wrap gap-1 mb-1">
-                          {s.effects.map((e: any, j: number) => (
-                            <span
-                              key={j}
-                              className="text-[9px] px-1 py-0.5 rounded"
-                              style={{
-                                background: e.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
-                                color: e.operation === 'multiply' ? '#c8453c' : '#3b82f6',
-                              }}
-                            >
-                              {label}
-                            </span>
-                          ))}
+                          {s.effects
+                            .map((eff: any, j: number) => ({ eff, label: fmtEffectZh(eff), j }))
+                            .filter((x: { label: string }) => Boolean(x.label))
+                            .map(({ eff, label, j }: { eff: any; label: string; j: number }) => (
+                              <span
+                                key={j}
+                                className="text-[9px] px-1 py-0.5 rounded"
+                                style={{
+                                  background: eff.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
+                                  color: eff.operation === 'multiply' ? '#c8453c' : '#3b82f6',
+                                }}
+                              >
+                                {label}
+                              </span>
+                            ))}
                         </div>
                       )}
                       <div className="flex items-center justify-between text-[9px] text-muted-foreground/70">

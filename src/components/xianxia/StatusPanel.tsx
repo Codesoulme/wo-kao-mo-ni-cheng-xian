@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { CharacterState } from '@/lib/xianxia/store';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
-import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain } from 'lucide-react';
+import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle } from 'lucide-react';
 
 interface StatusPanelProps {
   character: CharacterState;
@@ -28,6 +28,9 @@ export function StatusPanel({ character }: StatusPanelProps) {
     { label: '运', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
     { label: '悟', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
   ];
+  const topStatuses = (character.activeStatuses || [])
+    .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
+    .slice(0, 4);
 
   return (
     <>
@@ -81,6 +84,30 @@ export function StatusPanel({ character }: StatusPanelProps) {
                   {character.location}
                 </span>
               </div>
+
+              {topStatuses.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {topStatuses.map((s: any, idx: number) => {
+                    const negative = s.category === 'debuff' || /伤|毒|虚|痛|劫|魔|损|衰/.test(s.name);
+                    const color = negative ? '#c8453c' : '#2f8f5b';
+                    return (
+                      <span
+                        key={s.id || `${s.name}-${idx}`}
+                        className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm"
+                        style={{ borderColor: `${color}40`, background: `${color}10`, color }}
+                        title={`${s.name}：${s.description || ''}${s.duration === -1 ? '（长驻）' : s.duration ? `（余 ${s.duration} 岁）` : ''}`}
+                      >
+                        {negative ? <AlertTriangle className="w-2.5 h-2.5" /> : <Leaf className="w-2.5 h-2.5" />}
+                        <span className="max-w-[72px] truncate">{s.name}</span>
+                        {s.duration && s.duration !== -1 && <span className="opacity-70">{s.duration}岁</span>}
+                      </span>
+                    );
+                  })}
+                  {(character.activeStatuses || []).length > topStatuses.length && (
+                    <span className="text-[9px] text-muted-foreground px-1 py-0.5">+{(character.activeStatuses || []).length - topStatuses.length}</span>
+                  )}
+                </div>
+              )}
 
               <div className="mt-1.5 grid grid-cols-5 gap-1">
                 {quickStats.map(stat => (
