@@ -1,5 +1,6 @@
 // 修仙模拟器 - 核心引擎类型定义
 // 基于"引擎权威 + AI 提议"混合架构
+// Task 20: 事件蓝图 / 角色意图 / 未决线索 / 战斗系统
 
 // ==================== 境界系统 ====================
 
@@ -240,6 +241,160 @@ export interface ItemEntry {
   equipNote?: string;
 }
 
+// ==================== 事件蓝图系统 (Task 20 - 解决事件单一化) ====================
+
+// 事件主题分类——每岁由引擎从蓝图池中按权重抽取一个主题，AI 必须围绕此主题生成事件
+// 解决"除了修炼就是修炼"的问题：强制 AI 多样化事件类型
+export type BlueprintCategory =
+  | 'cultivation'    // 修炼类（基础修炼、突破前夜、功法参悟）
+  | 'encounter'      // 奇遇类（秘境、传承、灵物现世）
+  | 'social'         // 人际类（师门、同门、结识、争风）
+  | 'combat'         // 争斗类（妖兽、邪修、夺宝、擂台）
+  | 'trade'          // 商业类（坊市、淘宝、典当、交易）
+  | 'exploration'    // 探索类（秘境、洞府、遗迹、地脉）
+  | 'heritage'       // 传承类（前辈指点、玉简、心法传承）
+  | 'trial'          // 试炼类（宗门任务、心魔试炼、雷劫前夕）
+  | 'emotion'        // 情感类（尘缘、故人、恩怨、亲情）
+  | 'inner_demon'    // 心魔类（心魔侵扰、道心动摇、执念）
+  | 'thread_resolve' // 未决线索推进（必须触发，引擎专用）
+  | 'daily';         // 凡俗日常（童年、家事、市井）
+
+export interface EventBlueprint {
+  category: BlueprintCategory;
+  name: string;           // 主题名称（如"坊市淘宝""妖兽搏杀""心魔试炼"）
+  description: string;    // 主题描述（指导 AI 应围绕什么展开）
+  weight: number;         // 抽取权重
+  minRealm: number;       // 最低境界 idx（0=mortal, 1=qi_refining...）
+  maxRealm: number;       // 最高境界 idx
+  minAge: number;         // 最低年龄
+  maxAge: number;         // 最高年龄
+  requireFaction?: boolean; // 是否需要宗门
+  examples: string[];     // 该主题下的事件灵感样例（AI 可参考但不可照抄）
+}
+
+// 事件蓝图池——参考《凡人修仙传》修仙世界，覆盖各境界各阶段
+export const EVENT_BLUEPRINTS: EventBlueprint[] = [
+  // ===== 凡人阶段（0-12岁）=====
+  { category: 'daily', name: '童年趣事', description: '凡人童年日常，家人互动、邻里趣事、初识世界', weight: 30, minRealm: 0, maxRealm: 1, minAge: 0, maxAge: 12, examples: ['与邻家孩童嬉闹', '帮父母做家务', '第一次见到行脚商', '夜里听爷爷讲修仙传说'] },
+  { category: 'encounter', name: '灵气初触', description: '凡人阶段偶然感知天地灵气，为日后修仙埋下伏笔', weight: 15, minRealm: 0, maxRealm: 1, minAge: 4, maxAge: 14, examples: ['梦见云中仙人', '山间偶遇采药老者', '夜里听到奇怪声响', '触碰到祖传玉佩发热'] },
+  { category: 'social', name: '家族变故', description: '家世相关变故，磨砺心性、影响性格', weight: 10, minRealm: 0, maxRealm: 2, minAge: 5, maxAge: 20, examples: ['父亲染病', '家中遭贼', '兄长离家闯荡', '母亲传授家传手艺'] },
+  { category: 'inner_demon', name: '幼年执念', description: '童年时期埋下执念，影响日后道心', weight: 8, minRealm: 0, maxRealm: 1, minAge: 6, maxAge: 14, examples: ['目睹不公立誓强大', '亲人离世立志长生', '受人欺辱暗下决心'] },
+
+  // ===== 炼气期 =====
+  { category: 'cultivation', name: '引气入体', description: '炼气期修炼日常，感知灵气、运转功法、洗筋伐髓', weight: 18, minRealm: 1, maxRealm: 2, minAge: 8, maxAge: 60, examples: ['首次引气入体成功', '打通某条经脉', '功法参悟有新得', '灵气汇聚丹田'] },
+  { category: 'trade', name: '坊市淘宝', description: '前往坊市购买/出售物品，可能有意外收获', weight: 15, minRealm: 1, maxRealm: 6, minAge: 12, maxAge: 9999, examples: ['坊市捡漏得灵草', '典当旧物换灵石', '与商贩讨价还价', '黑市淘宝遇险'] },
+  { category: 'social', name: '同门切磋', description: '与同门师兄弟切磋斗法、增进情谊或结怨', weight: 12, minRealm: 1, maxRealm: 5, minAge: 12, maxAge: 9999, requireFaction: true, examples: ['与师兄切磋法术', '与师妹论道', '与同门争夺资源', '帮师弟解惑'] },
+  { category: 'exploration', name: '宗门历练', description: '宗门安排的历练任务，外出执行', weight: 12, minRealm: 1, maxRealm: 5, minAge: 12, maxAge: 9999, requireFaction: true, examples: ['清理山门附近妖兽', '采药任务', '护送商队', '巡查边境'] },
+  { category: 'combat', name: '妖兽搏杀', description: '遭遇妖兽，进入战斗或巧妙避开', weight: 14, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['山林遇狼妖', '洞府惊现蛇妖', '溪边逢蟹怪', '高空遇鹰妖'] },
+  { category: 'combat', name: '邪修截杀', description: '遭遇邪修、魔修，劫财或夺宝', weight: 10, minRealm: 1, maxRealm: 7, minAge: 14, maxAge: 9999, examples: ['夜行遇蒙面人', '林中遇血修', '客栈遇魔修', '路上遇劫匪'] },
+
+  // ===== 筑基-金丹 =====
+  { category: 'encounter', name: '秘境现世', description: '秘境、洞府、遗迹开启，机缘与危险并存', weight: 12, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['古修洞府出世', '秘境百年一开', '海底遗迹浮现', '空中楼阁显形'] },
+  { category: 'heritage', name: '前辈传承', description: '得到前辈高人指点或传承玉简', weight: 10, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['梦中得前辈传法', '洞府拾得玉简', '前辈残魂指点', '观壁画悟道'] },
+  { category: 'trade', name: '拍卖大会', description: '大型拍卖会、交易会，珍品云集', weight: 8, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['宗门联合拍卖', '坊市年度大拍', '散修私下交易会'] },
+  { category: 'combat', name: '擂台比武', description: '宗门擂台、修仙界比武大会', weight: 10, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['宗门年度比武', '跨宗门友谊赛', '修仙界新秀赛'] },
+  { category: 'exploration', name: '采灵寻宝', description: '深入险地采集灵草、寻找灵矿', weight: 12, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['深入毒雾谷采药', '海底寻珊瑚', '火山口取火晶', '冰原采雪莲'] },
+  { category: 'social', name: '尘缘纠葛', description: '情感纠葛、故人重逢、恩怨清算', weight: 8, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['故人来访', '旧爱重逢', '恩人求助', '仇人现身'] },
+  { category: 'inner_demon', name: '道心试炼', description: '道心动摇、心魔侵扰、执念爆发', weight: 8, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['修炼走火入魔', '心魔幻境', '执念难破', '道心拷问'] },
+
+  // ===== 元婴以上 =====
+  { category: 'combat', name: '夺宝大战', description: '高阶修士争夺天材地宝，混战爆发', weight: 10, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['灵宝出世群雄逐鹿', '秘境中争夺宝物', '拍卖会后遭截杀'] },
+  { category: 'heritage', name: '大能遗府', description: '探索大能前辈留下的洞府，机缘与考验', weight: 8, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['元婴前辈遗府', '化神老怪坐化之地', '上古仙人遗迹'] },
+  { category: 'trial', name: '雷劫前夕', description: '渡劫前的准备与天象异变', weight: 8, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['天象异变', '道友提醒渡劫', '闭关备战雷劫'] },
+  { category: 'social', name: '收徒传道', description: '高境界收徒、传承道统', weight: 6, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['偶遇良材收为徒', '宗门委托授业', '点化有缘人'] },
+
+  // ===== 通用 =====
+  { category: 'cultivation', name: '闭关参悟', description: '闭关参悟功法、磨砺境界', weight: 14, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['闭关参悟功法', '观天地悟道', '磨砺心境', '参悟阵法'] },
+  { category: 'cultivation', name: '突破前夜', description: '修为将满，酝酿突破的关键时刻', weight: 10, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['修为圆满待破', '心魔试炼前夕', '突破前兆'] },
+  { category: 'trade', name: '炼器寻材', description: '为炼器、炼丹寻找材料', weight: 8, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['寻炼器灵材', '求炼丹辅药', '找阵法材料'] },
+  { category: 'social', name: '师门任务', description: '宗门指派的任务，完成可获贡献', weight: 10, minRealm: 1, maxRealm: 6, minAge: 12, maxAge: 9999, requireFaction: true, examples: ['宗门指派任务', '师门差遣', '代师传讯'] },
+];
+
+// ==================== 角色主动意图系统 (Task 20 - 解决角色太蠢) ====================
+
+// 角色根据自身处境生成的"主动意图"——AI 必须在事件中体现这些意图的执行
+// 例：即将宗门比赛 → "备战比赛"意图 → AI 应让角色主动准备武器、炼丹、请教
+export interface CharacterIntent {
+  id: string;
+  type: 'prepare_combat' | 'gather_resources' | 'seek_mentor' | 'avoid_danger' | 'resolve_thread'
+        | 'cultivate_diligently' | 'explore_opportunity' | 'socialize' | 'trade' | 'breakthrough';
+  title: string;          // 意图标题（如"备战宗门比武"）
+  description: string;    // 意图描述（指导 AI 如何在事件中体现）
+  priority: number;       // 优先级 1-10（10 最高）
+  relatedThreadId?: string; // 关联的未决线索 id（若有）
+}
+
+// ==================== 未决线索系统 (Task 20 - 解决 AI 记忆丢失) ====================
+
+// 持久化的"未决线索"——重要剧情线索会被记录并在后续推进/到期触发
+// 例："三个月后宗门比武"、"仇敌王某誓要报复"、"师门委托炼丹"
+export interface PendingThread {
+  id: string;
+  title: string;             // 线索标题
+  description: string;       // 线索描述（人/事/时/地/因）
+  category: 'competition' | 'enemy' | 'quest' | 'promise' | 'mystery' | 'romance' | 'debt' | 'inheritance';
+  startAge: number;          // 触发年龄
+  deadlineAge: number;       // 截止年龄（到期必须触发对应事件）
+  status: 'pending' | 'urgent' | 'resolved' | 'failed';
+  progress: number;          // 0-100 进度
+  relatedMemoryIds?: string[]; // 关联的长期记忆
+  reward?: string;           // 完成奖励描述
+  failureCost?: string;      // 失败代价描述
+}
+
+// ==================== 战斗系统 (Task 20) ====================
+
+export interface CombatEnemy {
+  id: string;
+  name: string;             // 敌人名称
+  description: string;       // 敌人描述
+  hp: number; maxHp: number;
+  attack: number; defense: number; speed: number;
+  realm?: string;            // 敌人境界（用于战力参考）
+  skills?: { name: string; description: string; cooldown: number; currentCooldown: number }[];
+  // 敌人当前意图（AI 生成）：'attack' | 'skill' | 'defend' | 'flee'
+  nextAction?: string;
+  nextActionDesc?: string;
+  drops?: { name: string; chance: number; rarity: string }[];
+}
+
+export interface CombatRound {
+  round: number;
+  playerAction: string;       // 玩家行动描述
+  playerActionType: 'attack' | 'skill' | 'item' | 'defend' | 'flee' | 'scripture';
+  playerDamage?: number;      // 玩家造成的伤害
+  playerHeal?: number;        // 玩家回复
+  enemyAction?: string;       // 敌人行动描述（可能为空，如玩家逃跑成功）
+  enemyActionType?: string;
+  enemyDamage?: number;       // 敌人造成的伤害
+  narrative: string;          // 本回合叙事
+  playerHpAfter: number;
+  enemyHpAfter: number;
+  playerMpAfter?: number;
+}
+
+export interface CombatSession {
+  id: string;
+  enemies: CombatEnemy[];     // 敌人列表（支持多敌）
+  currentEnemyIdx: number;    // 当前攻击的敌人索引
+  round: number;              // 当前回合数
+  log: CombatRound[];         // 战斗日志
+  status: 'ongoing' | 'victory' | 'defeat' | 'fled';
+  startAge: number;           // 战斗开始时的年龄
+  contextTitle?: string;      // 战斗背景标题
+  contextNarrative?: string;  // 战斗背景叙事
+  // 玩家战斗属性快照（含装备加成）
+  playerHp: number; playerMaxHp: number;
+  playerMp: number; playerMaxMp: number;
+  playerAttack: number; playerDefense: number; playerSpeed: number;
+  // 玩家可用的法术/法宝（从 equipped 提取）
+  playerSkills?: { name: string; description: string; mpCost: number; power: number }[];
+  // 玩家可用的丹药（从 inventory 的 consumable 提取）
+  playerItems?: { itemId: string; name: string; description: string; effect: string }[];
+  // 战斗胜利后掉落（由 AI 在结束叙事中给出，引擎在 endCombat 中应用）
+  victoryDrops?: ItemEntry[];
+}
+
 // ==================== AI 输出结构 (EngineCommand) ====================
 
 export type InputClass = 'action' | 'dialogue' | 'overreach' | 'rule_manipulation';
@@ -295,6 +450,26 @@ export interface AIEventOutput {
 
   // 是否飞升
   causedAscension?: boolean;
+
+  // ===== Task 20 新增 =====
+  // AI 添加新的未决线索（如"三个月后宗门比武""仇敌誓要报复"）
+  newThreads?: PendingThread[];
+  // AI 推进现有线索的进度（id + 进度增量）
+  advanceThreads?: { id: string; progressDelta: number; note?: string }[];
+  // AI 标记完成的线索 id 列表
+  completeThreadIds?: string[];
+  // AI 标记失败的线索 id 列表（如错过 deadline）
+  failThreadIds?: string[];
+  // AI 触发战斗（eventType='combat' 时必须给出）
+  triggerCombat?: {
+    enemies: CombatEnemy[];
+    contextTitle: string;
+    contextNarrative: string;
+    // 战斗胜利后 AI 给出的掉落物品（endCombat 时应用）
+    victoryDrops?: ItemEntry[];
+    // 战斗失败的代价（如死亡、重伤、被夺宝）
+    defeatCost?: string;
+  };
 }
 
 export interface AttributeChange {
@@ -329,6 +504,18 @@ export interface ChoiceResultOutput {
   cultivationInsight?: string;
   causedDeath?: boolean;
   deathReason?: string;
+  // ===== Task 20 新增 =====
+  newThreads?: PendingThread[];
+  advanceThreads?: { id: string; progressDelta: number; note?: string }[];
+  completeThreadIds?: string[];
+  failThreadIds?: string[];
+  triggerCombat?: {
+    enemies: CombatEnemy[];
+    contextTitle: string;
+    contextNarrative: string;
+    victoryDrops?: ItemEntry[];
+    defeatCost?: string;
+  };
 }
 
 // 干扰模拟输出
@@ -348,6 +535,19 @@ export interface InterfereOutput {
   cultivationInsight?: string;
   // 干扰可能延迟年龄推进
   ageAdvance?: number;            // 干扰消耗的时间（岁），默认 0
+  // ===== Task 20 新增 =====
+  newThreads?: PendingThread[];
+  advanceThreads?: { id: string; progressDelta: number; note?: string }[];
+  completeThreadIds?: string[];
+  failThreadIds?: string[];
+  // 干扰可能触发战斗（如玩家主动攻击某人、闯入妖兽领地）
+  triggerCombat?: {
+    enemies: CombatEnemy[];
+    contextTitle: string;
+    contextNarrative: string;
+    victoryDrops?: ItemEntry[];
+    defeatCost?: string;
+  };
 }
 
 // ==================== 引擎状态上下文 (注入给 AI) ====================
@@ -386,12 +586,23 @@ export interface EngineStateContext {
   storageCapacity: number;
   // 修炼速度倍率（灵根 × 功法 × 其他装备的乘法效果之和）
   cultivationMultiplier: number;
-  recentEvents: { age: number; title: string; narrative: string }[];
+  recentEvents: { age: number; title: string; narrative: string; eventType: string }[];
   longTermMemory: string[];
   completedFateNodes: number[];
   // 引擎能力告知
   availableAttributes: string[];   // AI 可改的属性列表
   nextFateNode?: { index: number; name: string; realm: string };
+  // ===== Task 20 新增 =====
+  // 本轮事件蓝图主题（引擎抽取，AI 必须围绕此主题生成事件）
+  blueprint?: EventBlueprint;
+  // 未决线索列表（AI 必须保持连续性；deadlineAge 临近的标记为 urgent）
+  pendingThreads: PendingThread[];
+  // 角色主动意图（AI 应在事件中体现意图的执行）
+  characterIntents: CharacterIntent[];
+  // 最近 5 次事件类型（用于避免重复，AI 不得连续生成同类事件）
+  recentEventTypes: string[];
+  // 最近 3 次蓝图分类（避免连续同类主题）
+  recentBlueprintCategories: string[];
 }
 
 // ==================== 命节点 ====================
@@ -461,4 +672,11 @@ export interface CharacterState {
   // 修炼速度来源结构化条目（前端按 rarity 给来源上色 + 显示具体倍率数字）
   cultivationFactors: CultivationFactor[];
   longTermMemory: string[];
+  // ===== Task 20 新增 =====
+  // 未决线索列表（重要剧情线索，会在后续推进/到期触发）
+  pendingThreads: PendingThread[];
+  // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）
+  characterIntents: CharacterIntent[];
+  // 进行中的战斗（若有；持久化以支持页面刷新恢复）
+  combatSession: CombatSession | null;
 }

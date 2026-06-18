@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough, pickEventBlueprint, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES } from '@/lib/xianxia/types';
 
@@ -34,9 +34,13 @@ export async function POST(req: NextRequest) {
       age: e.age,
       title: e.title,
       narrative: e.narrative,
+      eventType: e.eventType,
     }));
 
     let state = dbToState(char);
+    // Task 20: 抽取本轮事件蓝图（避开最近 3 次同类）
+    const recentBlueprintCategories = (state as any)._recentBlueprintCategories || [];
+    const blueprint = pickEventBlueprint(state, recentBlueprintCategories);
     // 推进年龄
     state.age += 1;
     // 持续状态 duration -1
@@ -47,7 +51,9 @@ export async function POST(req: NextRequest) {
     const isFateNode = fateNodeIdx !== null;
     const fateNode = isFateNode ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
 
+    // Task 20: 把蓝图注入 ctx
     const ctx = buildStateContext(state, recentEvents);
+    ctx.blueprint = blueprint;
 
     // 调用 LLM 生成事件
     const aiOutput = await generateAgeEvent(ctx, isFateNode);
@@ -125,6 +131,10 @@ export async function POST(req: NextRequest) {
       : '';
 
     // 持久化
+    // Task 20: 更新 recentEventTypes / recentBlueprintCategories（用于反重复）
+    const recentEventTypes = [...((state as any)._recentEventTypes || []), aiOutput.eventType || 'normal'].slice(-5);
+    const newRecentBlueprintCategories = [...recentBlueprintCategories, blueprint.category].slice(-3);
+
     await db.character.update({
       where: { id: characterId },
       data: {
@@ -168,6 +178,12 @@ export async function POST(req: NextRequest) {
         cultivationFactorsJson: JSON.stringify(finalState.cultivationFactors || []),
         pendingChoiceJson,
         memoryJson: JSON.stringify(finalState.longTermMemory),
+        // Task 20 新字段
+        pendingThreadsJson: JSON.stringify(finalState.pendingThreads || []),
+        characterIntentsJson: JSON.stringify(finalState.characterIntents || []),
+        combatStateJson: finalState.combatSession ? JSON.stringify(finalState.combatSession) : '',
+        recentEventTypesJson: JSON.stringify(recentEventTypes),
+        recentBlueprintCategoriesJson: JSON.stringify(newRecentBlueprintCategories),
       },
     });
 
@@ -197,6 +213,8 @@ export async function POST(req: NextRequest) {
         eventType: event.eventType,
         isFateNode,
         fateNodeName: fateNode?.name,
+        // Task 20: 返回本轮蓝图主题（让前端可显示）
+        blueprint: { category: blueprint.category, name: blueprint.name },
       },
       changes: result.appliedChanges,
       rejectedChanges: result.rejectedChanges,
@@ -206,6 +224,8 @@ export async function POST(req: NextRequest) {
       died: result.died,
       deathReason: result.deathReason,
       ascended: finalState.ascended,
+      // Task 20: 是否触发战斗（前端据此打开 CombatModal）
+      triggeredCombat: !!finalState.combatSession,
       state: stateToResponse(finalState),
     });
   } catch (err: any) {

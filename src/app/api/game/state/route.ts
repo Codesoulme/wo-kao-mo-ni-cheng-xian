@@ -78,6 +78,10 @@ export async function GET(req: NextRequest) {
         cultivationFlatBonus: rate.flatBonus,
         cultivationInsight: state.cultivationInsight || '',
         cultivationFactors: state.cultivationFactors || [],
+        // Task 20 新字段
+        pendingThreads: state.pendingThreads || [],
+        characterIntents: state.characterIntents || [],
+        combatSession: state.combatSession || null,
       },
       pendingChoice,
       events: events.map(e => ({

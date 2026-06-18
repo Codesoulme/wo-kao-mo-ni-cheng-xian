@@ -35,6 +35,36 @@ const EVENT_LABELS: Record<string, string> = {
   interference: '干扰',
 };
 
+// Task 20: 事件蓝图 category → 配色（避免 indigo/blue 主色调）
+const BLUEPRINT_STYLE: Record<string, { bg: string; text: string; border: string }> = {
+  combat:       { bg: 'bg-red-500/15',     text: 'text-red-700 dark:text-red-300',     border: 'border-red-500/40' },
+  encounter:    { bg: 'bg-yellow-500/15',  text: 'text-yellow-700 dark:text-yellow-300', border: 'border-yellow-500/40' },
+  trade:        { bg: 'bg-green-500/15',   text: 'text-green-700 dark:text-green-300', border: 'border-green-500/40' },
+  social:       { bg: 'bg-cyan-500/15',    text: 'text-cyan-700 dark:text-cyan-300',   border: 'border-cyan-500/40' },
+  cultivation:  { bg: 'bg-purple-500/15',  text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-500/40' },
+  inner_demon:  { bg: 'bg-pink-500/15',    text: 'text-pink-700 dark:text-pink-300',   border: 'border-pink-500/40' },
+  heritage:     { bg: 'bg-orange-500/15',  text: 'text-orange-700 dark:text-orange-300', border: 'border-orange-500/40' },
+  exploration:  { bg: 'bg-teal-500/15',    text: 'text-teal-700 dark:text-teal-300',   border: 'border-teal-500/40' },
+  trial:        { bg: 'bg-amber-500/15',   text: 'text-amber-700 dark:text-amber-300', border: 'border-amber-500/40' },
+  daily:        { bg: 'bg-muted/40',       text: 'text-muted-foreground',              border: 'border-muted-foreground/30' },
+};
+
+function BlueprintChip({ blueprint }: { blueprint?: { category: string; name: string } }) {
+  if (!blueprint) return null;
+  const style = BLUEPRINT_STYLE[blueprint.category] || BLUEPRINT_STYLE.daily;
+  return (
+    <span
+      className={cn(
+        "text-[9px] px-1.5 py-0.5 rounded border font-serif-cn",
+        style.bg, style.text, style.border
+      )}
+      title={`主题：${blueprint.name}`}
+    >
+      {blueprint.name}
+    </span>
+  );
+}
+
 export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true }: EventTimelineProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -204,6 +234,8 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                     <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50">
                       {EVENT_LABELS[event.eventType] || '流年'}
                     </span>
+                    {/* Task 20: 事件蓝图主题 chip */}
+                    <BlueprintChip blueprint={event.blueprint} />
                   </div>
                   <div className="flex items-center gap-1">
                     {event.fateNodeName && (

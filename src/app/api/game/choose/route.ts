@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, markFateNodeDone, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, markFateNodeDone, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 
 export const runtime = 'nodejs';
@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       age: e.age,
       title: e.title,
       narrative: e.narrative,
+      eventType: e.eventType,
     }));
 
     let state = dbToState(char);
@@ -73,6 +74,23 @@ export async function POST(req: NextRequest) {
     // 引擎权威：cultivationFactors 完全由引擎从 state 计算（灵根 + 功法 + 状态词条）
     // 不再合并 AI 输出——AI 输出不稳定会导致条目忽隐忽现，且编造的数字与 multiplier 脱节
     state.cultivationFactors = computeCultivationFactors(state);
+    // Task 20: 应用未决线索变更
+    if (result.newThreads && result.newThreads.length) state = addThreads(state, result.newThreads);
+    if (result.advanceThreads && result.advanceThreads.length) {
+      for (const adv of result.advanceThreads) {
+        if (adv.id) state = advanceThread(state, adv.id, adv.progressDelta || 0, adv.note);
+      }
+    }
+    if (result.completeThreadIds && result.completeThreadIds.length) {
+      for (const id of result.completeThreadIds) state = completeThread(state, id);
+    }
+    if (result.failThreadIds && result.failThreadIds.length) {
+      for (const id of result.failThreadIds) state = failThread(state, id);
+    }
+    // Task 20: 触发战斗
+    if (result.triggerCombat && result.triggerCombat.enemies?.length) {
+      state = startCombat(state, result.triggerCombat);
+    }
 
     // 处理死亡
     let died = false;
@@ -144,6 +162,10 @@ export async function POST(req: NextRequest) {
         cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
         pendingChoiceJson: '',
         memoryJson: JSON.stringify(state.longTermMemory),
+        // Task 20 新字段
+        pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
+        characterIntentsJson: JSON.stringify(state.characterIntents || []),
+        combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : '',
       },
     });
 
@@ -180,6 +202,8 @@ export async function POST(req: NextRequest) {
       newItems: result.newItems,
       died,
       deathReason,
+      // Task 20: 是否触发战斗（前端据此打开 CombatModal）
+      triggeredCombat: !!state.combatSession,
       state: stateToResponse(state),
     });
   } catch (err: any) {

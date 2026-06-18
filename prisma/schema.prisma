@@ -83,6 +83,17 @@ model Character {
   pendingChoiceJson  String   @default("")
   // JSON string of memory entries (long-term)
   memoryJson      String   @default("[]")
+  // ===== Task 20 新增 =====
+  // 未决线索 JSON（PendingThread[]）—— 重要剧情线索持久化，避免 AI 记忆丢失
+  pendingThreadsJson String @default("[]")
+  // 角色主动意图 JSON（CharacterIntent[]）—— 引擎根据处境生成
+  characterIntentsJson String @default("[]")
+  // 进行中的战斗 JSON（CombatSession）—— 持久化以支持页面刷新恢复
+  combatStateJson String @default("")
+  // 最近事件类型列表（用于反重复机制）
+  recentEventTypesJson String @default("[]")
+  // 最近蓝图分类列表（用于反重复机制）
+  recentBlueprintCategoriesJson String @default("[]")
 
   events          EventLog[]
   choices         ChoiceLog[]

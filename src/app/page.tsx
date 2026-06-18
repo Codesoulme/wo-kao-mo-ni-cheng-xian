@@ -10,6 +10,7 @@ import { FateNodes } from '@/components/xianxia/FateNodes';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
 import { InterfereInput } from '@/components/xianxia/InterfereInput';
 import { ChoiceModal } from '@/components/xianxia/ChoiceModal';
+import { CombatModal } from '@/components/xianxia/CombatModal';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
 import { GameMenu } from '@/components/xianxia/GameMenu';
 import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
@@ -201,6 +202,9 @@ export default function Home() {
 
       {/* 选择弹窗 */}
       <ChoiceModal />
+
+      {/* 战斗弹窗（全屏，最上层；combatSession.status='ongoing' 时显示） */}
+      <CombatModal />
     </div>
   );
 }

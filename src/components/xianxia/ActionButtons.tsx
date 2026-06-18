@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
-import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square } from 'lucide-react';
+import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { REALMS } from '@/lib/xianxia/types';
@@ -36,6 +36,8 @@ export function ActionButtons() {
   const isDead = !character.alive;
   const isAscended = character.ascended;
   const atChoice = !!pendingChoice;
+  // Task 20: 战斗进行中时禁用推进
+  const inCombat = !!(character.combatSession && character.combatSession.status === 'ongoing');
 
   // 触发突破仪式
   const triggerBreakthroughCeremony = (newState: any, oldChar: typeof character) => {
@@ -61,7 +63,7 @@ export function ActionButtons() {
   };
 
   const advance = async () => {
-    if (advancingRef.current || atChoice || isDead || isAscended) return;
+    if (advancingRef.current || atChoice || isDead || isAscended || inCombat) return;
     advancingRef.current = true;
     setLoading(true);
     setError(null);
@@ -91,6 +93,8 @@ export function ActionButtons() {
         effects: data.changes || [],
         isFateNode: data.isFateNode,
         fateNodeName: data.fateNodeName,
+        // Task 20: 蓝图主题（让 EventTimeline 显示主题 chip）
+        blueprint: data.event.blueprint,
         createdAt: new Date().toISOString(),
       });
 
@@ -105,6 +109,12 @@ export function ActionButtons() {
         });
         toast('命节点触发', { description: '请做出你的抉择' });
         // 命节点中断自动推进
+        autoCancelRef.current = true;
+      }
+
+      // Task 20: 触发战斗 → 中断自动推进，提示玩家
+      if (data.triggeredCombat) {
+        toast('战斗触发', { description: '请进入战斗界面应战' });
         autoCancelRef.current = true;
       }
 
@@ -133,7 +143,7 @@ export function ActionButtons() {
 
   // 一键十载：连续推进 N 年
   const autoAdvance = async (years: number) => {
-    if (advancingRef.current || atChoice || isDead || isAscended) return;
+    if (advancingRef.current || atChoice || isDead || isAscended || inCombat) return;
     autoCancelRef.current = false;
     setAutoTotal(years);
     setAutoCount(years);
@@ -172,11 +182,13 @@ export function ActionButtons() {
       <div className="flex items-center gap-2">
         <Button
           onClick={advance}
-          disabled={loading || atChoice || isDead || isAscended || isAutoRunning}
+          disabled={loading || atChoice || isDead || isAscended || isAutoRunning || inCombat}
           className={cn(
             "flex-1 h-10 font-serif-cn tracking-wider transition-all",
             isDead || isAscended
               ? "bg-muted text-muted-foreground"
+              : inCombat
+              ? "bg-destructive/20 text-destructive border border-destructive/40"
               : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg hover:shadow-primary/30"
           )}
         >
@@ -190,13 +202,15 @@ export function ActionButtons() {
             <><Play className="w-4 h-4 mr-2" />已飞升</>
           ) : atChoice ? (
             <><SkipForward className="w-4 h-4 mr-2" />待抉择</>
+          ) : inCombat ? (
+            <><Swords className="w-4 h-4 mr-2" />战斗进行中</>
           ) : (
             <><SkipForward className="w-4 h-4 mr-2" />岁月流转一载</>
           )}
         </Button>
 
         {/* 一键十载 / 停止 */}
-        {!isDead && !isAscended && (
+        {!isDead && !isAscended && !inCombat && (
           isAutoRunning ? (
             <Button
               onClick={stopAuto}

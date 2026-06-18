@@ -22,6 +22,14 @@ import {
   SLOT_LABEL,
   itemToSlot,
   CultivationFactor,
+  EventBlueprint,
+  EVENT_BLUEPRINTS,
+  BlueprintCategory,
+  CharacterIntent,
+  PendingThread,
+  CombatEnemy,
+  CombatRound,
+  CombatSession,
 } from './types';
 
 // ==================== 角色状态序列化 ====================
@@ -42,6 +50,12 @@ export interface DBCharacter {
   cultivationMultiplier: number;
   cultivationInsight: string;
   cultivationFactorsJson: string;
+  // ===== Task 20 新增 =====
+  pendingThreadsJson: string;
+  characterIntentsJson: string;
+  combatStateJson: string;
+  recentEventTypesJson: string;
+  recentBlueprintCategoriesJson: string;
 }
 
 // 旧存档 equippedJson 可能是 slot-map（{weapon: {...}}）或已是数组（[{...}]）
@@ -76,6 +90,12 @@ export function dbToState(c: DBCharacter): CharacterState {
   const equipped = parseEquippedJson(c.equippedJson || '[]');
   const inventory = safeParse<ItemEntry[]>(c.inventoryJson, []);
   const storageCapacity = c.storageCapacity ?? 5;
+  // Task 20: 解析新字段
+  const pendingThreads = safeParse<PendingThread[]>(c.pendingThreadsJson || '[]', []);
+  const characterIntents = safeParse<CharacterIntent[]>(c.characterIntentsJson || '[]', []);
+  const combatSession = c.combatStateJson ? safeParse<CombatSession | null>(c.combatStateJson, null) : null;
+  const recentEventTypes = safeParse<string[]>(c.recentEventTypesJson || '[]', []);
+  const recentBlueprintCategories = safeParse<string[]>(c.recentBlueprintCategoriesJson || '[]', []);
   const state: CharacterState = {
     id: c.id, name: c.name, age: c.age, lifespan: c.lifespan, gender: c.gender,
     spiritualRoot: c.spiritualRoot as SpiritualRoot,
@@ -102,7 +122,15 @@ export function dbToState(c: DBCharacter): CharacterState {
     cultivationInsight: c.cultivationInsight || '',
     cultivationFactors: [],
     longTermMemory: safeParse<string[]>(c.memoryJson, []),
+    // Task 20 新字段
+    pendingThreads,
+    characterIntents,
+    combatSession,
   };
+  // 持久化的 recentEventTypes / recentBlueprintCategories 不进 state（仅 ctx 用），但需要保留
+  // 这里通过闭包变量传给 buildStateContext（在 advance route 中调用）
+  (state as any)._recentEventTypes = recentEventTypes;
+  (state as any)._recentBlueprintCategories = recentBlueprintCategories;
   const rate = computeEffectiveCultivationRate(state);
   state.cultivationMultiplier = rate.multiplier;
   state.cultivationFactors = computeCultivationFactors(state);
@@ -630,14 +658,14 @@ export function alchemy(
   const pillName = namePool?.[Math.floor(Math.random() * namePool.length)] || `${mainElement}元丹`;
 
   // 丹药效果
-  const effects = pillEffects(mainElement, pillRarity);
+  const effects = pillEffects(mainElement, pillRarity) as any;
 
   const pill: ItemEntry = {
     id: `item_pil_${mainElement}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     name: pillName,
     description: `以${materials.map(m => m.name).join('、')}炼制而成的${pillRarity === 'common' ? '凡品' : pillRarity === 'legendary' ? '传说' : ''}丹药，蕴含${mainElement === 'fire' ? '火' : mainElement === 'water' ? '水' : mainElement === 'wood' ? '木' : mainElement === 'metal' ? '金' : '土'}属性之力`,
     item_type: 'consumable',
-    rarity: pillRarity,
+    rarity: pillRarity as any,
     effects,
     source: '炼丹炉所炼',
   };
@@ -845,10 +873,21 @@ export function markFateNodeDone(state: CharacterState, nodeIndex: number): Char
 
 // ==================== 引擎状态上下文构建 ====================
 
-export function buildStateContext(state: CharacterState, recentEvents: { age: number; title: string; narrative: string }[]): EngineStateContext {
+export function buildStateContext(state: CharacterState, recentEvents: { age: number; title: string; narrative: string; eventType?: string }[]): EngineStateContext {
   const realmInfo = getRealmInfo(state.realm);
   // 找下一个未完成的命节点
   const nextNode = FATE_NODES.find(n => !state.fateNodes.includes(n.index));
+  // Task 20: 推进 urgent 线索状态（deadlineAge - age <= 3 视为 urgent）
+  const threads = (state.pendingThreads || []).map(t => ({
+    ...t,
+    status: (t.status === 'pending' && (t.deadlineAge - state.age) <= 3) ? 'urgent' as const : t.status,
+  }));
+  // Task 20: 引擎根据当前处境生成角色主动意图（每岁重算）
+  const intents = generateCharacterIntents(state, threads);
+  state.characterIntents = intents;
+  // recentEventTypes / recentBlueprintCategories 来自 dbToState 的临时闭包变量
+  const recentEventTypes = (state as any)._recentEventTypes || [];
+  const recentBlueprintCategories = (state as any)._recentBlueprintCategories || [];
   return {
     character: {
       name: state.name,
@@ -878,12 +917,460 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     cultivationMultiplier: state.cultivationMultiplier,
     cultivationInsight: state.cultivationInsight,
     cultivationFactors: state.cultivationFactors,
-    recentEvents: recentEvents.slice(-5),
+    recentEvents: recentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
     longTermMemory: state.longTermMemory.slice(-10),
     completedFateNodes: state.fateNodes,
     availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
+    // Task 20 新字段
+    pendingThreads: threads,
+    characterIntents: intents,
+    recentEventTypes,
+    recentBlueprintCategories,
   };
+}
+
+// ==================== Task 20: 事件蓝图选择 ====================
+
+// 从蓝图池中按权重抽取一个主题，避开最近 3 次的同类分类，匹配角色境界/年龄/宗门
+export function pickEventBlueprint(state: CharacterState, recentBlueprintCategories: string[]): EventBlueprint {
+  const realmIdx = REALMS.findIndex(r => r.id === state.realm);
+  const recentSet = new Set(recentBlueprintCategories.slice(-3));
+  // 1. 优先检查到期/紧急的 pendingThreads —— 若有，强制走 thread_resolve
+  const urgentThreads = (state.pendingThreads || []).filter(t =>
+    t.status === 'pending' && state.age >= t.deadlineAge - 1
+  );
+  if (urgentThreads.length > 0) {
+    return {
+      category: 'thread_resolve',
+      name: '线索推进',
+      description: `本轮必须推进未决线索：「${urgentThreads[0].title}」。该线索 deadlineAge=${urgentThreads[0].deadlineAge}，当前 age=${state.age}。AI 必须围绕此线索生成关键事件，要么完成它、要么推进进度、要么因错过而失败。`,
+      weight: 0, minRealm: 0, maxRealm: 99, minAge: 0, maxAge: 99999,
+      examples: [`${urgentThreads[0].title}：${urgentThreads[0].description}`],
+    };
+  }
+  // 2. 否则从蓝图池筛选合适的
+  const candidates = EVENT_BLUEPRINTS.filter(b => {
+    if (realmIdx < b.minRealm || realmIdx > b.maxRealm) return false;
+    if (state.age < b.minAge || state.age > b.maxAge) return false;
+    if (b.requireFaction && !state.faction) return false;
+    return true;
+  });
+  if (candidates.length === 0) {
+    // 兜底：返回一个普通修炼主题
+    return EVENT_BLUEPRINTS[0];
+  }
+  // 3. 加权抽取（最近 3 次的分类权重减半，避免连续同类）
+  const weighted = candidates.map(b => ({
+    blueprint: b,
+    weight: recentSet.has(b.category) ? b.weight * 0.3 : b.weight,
+  }));
+  const total = weighted.reduce((s, w) => s + w.weight, 0);
+  let r = Math.random() * total;
+  for (const w of weighted) {
+    r -= w.weight;
+    if (r <= 0) return w.blueprint;
+  }
+  return weighted[0].blueprint;
+}
+
+// ==================== Task 20: 角色主动意图生成 ====================
+
+// 引擎根据角色当前处境生成"主动意图"，AI 必须在事件中体现这些意图的执行
+// 解决"角色太蠢"问题：快比赛了会主动备战、有仇敌会主动防备、灵石富余会主动淘宝等
+export function generateCharacterIntents(state: CharacterState, threads: PendingThread[]): CharacterIntent[] {
+  const intents: CharacterIntent[] = [];
+  const now = state.age;
+  // 1. 检查 pendingThreads —— 临近 deadline 的线索生成对应意图
+  for (const t of threads) {
+    if (t.status !== 'pending' && t.status !== 'urgent') continue;
+    const remaining = t.deadlineAge - now;
+    if (remaining <= 0) continue;
+    if (t.category === 'competition' && remaining <= 5) {
+      intents.push({
+        id: `intent_comp_${t.id}`,
+        type: 'prepare_combat',
+        title: `备战·${t.title}`,
+        description: `「${t.title}」将在 ${remaining} 岁后到来。角色应主动准备战斗装备、炼制或购买丹药、磨砺功法、请教前辈。若无武器应设法获取，若修为不足应闭关苦修。`,
+        priority: 9,
+        relatedThreadId: t.id,
+      });
+    } else if (t.category === 'enemy' && remaining <= 10) {
+      intents.push({
+        id: `intent_enemy_${t.id}`,
+        type: 'avoid_danger',
+        title: `防备·${t.title}`,
+        description: `「${t.title}」可能近期发作。角色应主动防备：随身携带防身法器、避免独行险地、寻求师长庇护或同门结伴。`,
+        priority: 8,
+        relatedThreadId: t.id,
+      });
+    } else if (t.category === 'quest' && remaining <= 5) {
+      intents.push({
+        id: `intent_quest_${t.id}`,
+        type: 'resolve_thread',
+        title: `推进·${t.title}`,
+        description: `「${t.title}」deadline 临近，角色应主动推进任务进度，采集材料、完成委托、寻觅目标等。`,
+        priority: 8,
+        relatedThreadId: t.id,
+      });
+    } else if (t.category === 'debt' && remaining <= 3) {
+      intents.push({
+        id: `intent_debt_${t.id}`,
+        type: 'gather_resources',
+        title: `还债·${t.title}`,
+        description: `「${t.title}」即将到期，角色应主动筹措灵石或物品偿债，否则将有严重后果。`,
+        priority: 9,
+        relatedThreadId: t.id,
+      });
+    }
+  }
+  // 2. 修为接近突破阈值 → 闭关意图
+  if (state.cultivationExp >= state.expToBreak * 0.8) {
+    intents.push({
+      id: `intent_break_${now}`,
+      type: 'breakthrough',
+      title: '酝酿突破',
+      description: '修为将满，应闭关参悟、稳固道心、准备突破。若有突破辅助丹药应及早服用。',
+      priority: 7,
+    });
+  }
+  // 3. 灵石富余且无紧迫事项 → 淘宝/交易意图
+  if (state.spiritStones >= 50 && intents.length === 0 && state.age >= 12) {
+    intents.push({
+      id: `intent_trade_${now}`,
+      type: 'trade',
+      title: '坊市寻宝',
+      description: '灵石充裕，可前往坊市淘宝、补充丹药或材料。若有缺武器/防具应优先购置。',
+      priority: 4,
+    });
+  }
+  // 4. 无武器且境界炼气以上 → 寻武器意图
+  if (state.realm !== 'mortal' && state.age >= 10) {
+    const hasWeapon = (state.equipped || []).some(it => it.item_type === 'weapon');
+    if (!hasWeapon) {
+      intents.push({
+        id: `intent_weapon_${now}`,
+        type: 'gather_resources',
+        title: '寻觅兵器',
+        description: '已入修行却无趁手兵器，应主动寻一把剑/刀/杖/法宝防身。',
+        priority: 6,
+      });
+    }
+  }
+  // 5. 限制最多保留 5 个意图（按优先级排序）
+  intents.sort((a, b) => b.priority - a.priority);
+  return intents.slice(0, 5);
+}
+
+// ==================== Task 20: 未决线索管理 ====================
+
+export function addThreads(state: CharacterState, threads: PendingThread[]): CharacterState {
+  if (!threads.length) return state;
+  const existingIds = new Set((state.pendingThreads || []).map(t => t.id));
+  const newThreads = threads.filter(t => t && t.id && !existingIds.has(t.id)).map(t => ({
+    ...t,
+    status: t.status || 'pending',
+    progress: t.progress || 0,
+  }));
+  if (!newThreads.length) return state;
+  return { ...state, pendingThreads: [...(state.pendingThreads || []), ...newThreads] };
+}
+
+export function advanceThread(state: CharacterState, threadId: string, progressDelta: number, note?: string): CharacterState {
+  const threads = (state.pendingThreads || []).map(t => {
+    if (t.id !== threadId) return t;
+    const progress = Math.max(0, Math.min(100, (t.progress || 0) + progressDelta));
+    return { ...t, progress };
+  });
+  return { ...state, pendingThreads: threads };
+}
+
+export function completeThread(state: CharacterState, threadId: string): CharacterState {
+  const threads = (state.pendingThreads || []).map(t =>
+    t.id === threadId ? { ...t, status: 'resolved' as const, progress: 100 } : t
+  );
+  return { ...state, pendingThreads: threads };
+}
+
+export function failThread(state: CharacterState, threadId: string): CharacterState {
+  const threads = (state.pendingThreads || []).map(t =>
+    t.id === threadId ? { ...t, status: 'failed' as const } : t
+  );
+  return { ...state, pendingThreads: threads };
+}
+
+// 检查线索 deadline —— 若有线索已过期（age > deadlineAge）且未完成，标记为 failed
+export function checkThreadDeadlines(state: CharacterState): { state: CharacterState; failed: PendingThread[] } {
+  const failed: PendingThread[] = [];
+  let changed = false;
+  const threads = (state.pendingThreads || []).map(t => {
+    if (t.status === 'pending' && state.age > t.deadlineAge) {
+      changed = true;
+      failed.push(t);
+      return { ...t, status: 'failed' as const };
+    }
+    return t;
+  });
+  if (!changed) return { state, failed: [] };
+  return { state: { ...state, pendingThreads: threads }, failed };
+}
+
+// ==================== Task 20: 战斗系统 ====================
+
+// 启动战斗：从 AI 触发的 triggerCombat 创建 CombatSession
+export function startCombat(state: CharacterState, trigger: NonNullable<AIEventOutput['triggerCombat']>): CharacterState {
+  const session: CombatSession = {
+    id: `combat_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    enemies: trigger.enemies.map(e => ({ ...e, maxHp: e.maxHp || e.hp, currentCooldown: 0 })),
+    currentEnemyIdx: 0,
+    round: 1,
+    log: [],
+    status: 'ongoing',
+    startAge: state.age,
+    contextTitle: trigger.contextTitle,
+    contextNarrative: trigger.contextNarrative,
+    playerHp: state.hp,
+    playerMaxHp: state.maxHp,
+    playerMp: state.mp,
+    playerMaxMp: state.maxMp,
+    playerAttack: state.attack,
+    playerDefense: state.defense,
+    playerSpeed: state.speed,
+    // 从已装备提取法术（scripture 类）
+    playerSkills: (state.equipped || [])
+      .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
+      .map(it => ({
+        name: it.name,
+        description: it.description,
+        mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
+        power: 1 + (['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) * 0.5),
+      }))
+      .slice(0, 4),
+    // 从背包提取丹药（consumable 类）
+    playerItems: (state.inventory || [])
+      .filter(it => it.item_type === 'consumable')
+      .slice(0, 6)
+      .map(it => ({
+        itemId: it.id,
+        name: it.name,
+        description: it.description,
+        effect: (it.effects || []).map(e => `${e.operation === 'add' ? '+' : '×'}${e.value} ${e.target_attribute}`).join('，') || '无效果',
+      })),
+    victoryDrops: trigger.victoryDrops,
+  };
+  return { ...state, combatSession: session };
+}
+
+// 战斗伤害计算（简化版：基于攻防差 + 随机浮动）
+function computeDamage(attack: number, defense: number, power: number = 1, variance: number = 0.2): number {
+  const base = Math.max(1, attack - defense * 0.5);
+  const dmg = base * power * (1 + (Math.random() * 2 - 1) * variance);
+  return Math.max(1, Math.floor(dmg));
+}
+
+// 执行一回合战斗
+// action: 'attack' | 'skill' | 'item' | 'defend' | 'flee' | 'scripture'
+// payload: skillIdx | itemId 等
+export interface CombatActionResult {
+  state: CharacterState;
+  round: CombatRound;
+  ended: boolean;
+  endStatus?: 'victory' | 'defeat' | 'fled';
+  victoryDrops?: ItemEntry[];
+}
+
+export function executeCombatRound(
+  state: CharacterState,
+  action: 'attack' | 'skill' | 'item' | 'defend' | 'flee',
+  payload?: { skillIdx?: number; itemId?: string },
+): CombatActionResult {
+  if (!state.combatSession || state.combatSession.status !== 'ongoing') {
+    return {
+      state,
+      round: { round: 0, playerAction: '', playerActionType: 'attack', narrative: '战斗已结束', playerHpAfter: state.hp, enemyHpAfter: 0 },
+      ended: true,
+    };
+  }
+  const session = { ...state.combatSession };
+  const enemy = session.enemies[session.currentEnemyIdx];
+  if (!enemy) {
+    return {
+      state: { ...state, combatSession: { ...session, status: 'victory' } },
+      round: { round: session.round, playerAction: '战场无敌', playerActionType: 'attack', narrative: '已无敌人', playerHpAfter: session.playerHp, enemyHpAfter: 0 },
+      ended: true,
+      endStatus: 'victory',
+    };
+  }
+  let playerHp = session.playerHp;
+  let playerMp = session.playerMp;
+  let enemyHp = enemy.hp;
+  let playerDamageDealt = 0;
+  let playerHeal = 0;
+  let enemyDamageDealt = 0;
+  let narrative = '';
+  let playerActionDesc = '';
+  let playerActionType: CombatRound['playerActionType'] = 'attack';
+
+  // 玩家行动
+  if (action === 'attack') {
+    playerActionType = 'attack';
+    playerActionDesc = '挥出攻招';
+    playerDamageDealt = computeDamage(session.playerAttack, enemy.defense);
+    enemyHp -= playerDamageDealt;
+    narrative += `你出招攻向${enemy.name}，造成 ${playerDamageDealt} 点伤害。`;
+  } else if (action === 'skill' && payload?.skillIdx != null) {
+    playerActionType = 'skill';
+    const skill = session.playerSkills?.[payload.skillIdx];
+    if (!skill) {
+      return {
+        state,
+        round: { round: session.round, playerAction: '法术失败', playerActionType: 'skill', narrative: '法术不存在', playerHpAfter: playerHp, enemyHpAfter: enemyHp },
+        ended: false,
+      };
+    }
+    if (playerMp < skill.mpCost) {
+      return {
+        state,
+        round: { round: session.round, playerAction: `试图施展${skill.name}`, playerActionType: 'skill', narrative: '灵力不足，法术施展失败！', playerHpAfter: playerHp, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
+        ended: false,
+      };
+    }
+    playerMp -= skill.mpCost;
+    playerActionDesc = `施展${skill.name}`;
+    playerDamageDealt = computeDamage(session.playerAttack, enemy.defense, skill.power, 0.3);
+    enemyHp -= playerDamageDealt;
+    narrative += `你催动${skill.name}，灵力化为攻伐之力，造成 ${playerDamageDealt} 点伤害。`;
+  } else if (action === 'item' && payload?.itemId) {
+    playerActionType = 'item';
+    const item = state.inventory.find(it => it.id === payload.itemId);
+    if (!item) {
+      return {
+        state,
+        round: { round: session.round, playerAction: '使用丹药', playerActionType: 'item', narrative: '物品不存在', playerHpAfter: playerHp, enemyHpAfter: enemyHp },
+        ended: false,
+      };
+    }
+    playerActionDesc = `服用${item.name}`;
+    for (const eff of item.effects || []) {
+      if (eff.operation === 'add' && eff.target_attribute === 'hp') {
+        const heal = eff.value;
+        playerHp = Math.min(session.playerMaxHp, playerHp + heal);
+        playerHeal = heal;
+      } else if (eff.operation === 'add' && eff.target_attribute === 'mp') {
+        playerMp = Math.min(session.playerMaxMp, playerMp + eff.value);
+      }
+    }
+    narrative += `你服下${item.name}，回复 ${playerHeal} 点气血。`;
+    // 消耗物品
+    state = { ...state, inventory: state.inventory.filter(it => it.id !== payload.itemId) };
+    session.playerItems = (session.playerItems || []).filter(it => it.itemId !== payload.itemId);
+  } else if (action === 'defend') {
+    playerActionType = 'defend';
+    playerActionDesc = '凝神防御';
+    narrative += '你凝神戒备，减少本回合受到的伤害。';
+  } else if (action === 'flee') {
+    playerActionType = 'flee';
+    playerActionDesc = '转身遁走';
+    // 逃跑成功率：速度差 + 随机
+    const fleeChance = 0.3 + (session.playerSpeed - enemy.speed) * 0.02;
+    if (Math.random() < fleeChance) {
+      narrative += '你身形一闪，成功脱离战场。';
+      const endSession: CombatSession = { ...session, status: 'fled' };
+      return {
+        state: { ...state, combatSession: endSession, hp: playerHp, mp: playerMp },
+        round: { round: session.round, playerAction: playerActionDesc, playerActionType, narrative, playerHpAfter: playerHp, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
+        ended: true,
+        endStatus: 'fled',
+      };
+    } else {
+      narrative += '你试图遁走，却被对方缠住，未能脱身！';
+    }
+  }
+
+  // 检查敌人是否被击败
+  if (enemyHp <= 0) {
+    enemyHp = 0;
+    narrative += `${enemy.name}倒下！`;
+    // 检查是否还有其他敌人
+    const nextIdx = session.enemies.findIndex((e, i) => i > session.currentEnemyIdx && e.hp > 0);
+    if (nextIdx < 0) {
+      // 全部敌人被击败 → 胜利
+      const updatedEnemies = session.enemies.map((e, i) => i === session.currentEnemyIdx ? { ...e, hp: 0 } : e);
+      const endSession: CombatSession = { ...session, enemies: updatedEnemies, status: 'victory', playerHp, playerMp };
+      narrative += '战场归于沉寂，你胜了！';
+      return {
+        state: { ...state, combatSession: endSession, hp: playerHp, mp: playerMp },
+        round: { round: session.round, playerAction: playerActionDesc, playerActionType, playerDamage: playerDamageDealt, playerHeal, narrative, playerHpAfter: playerHp, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
+        ended: true,
+        endStatus: 'victory',
+        victoryDrops: session.victoryDrops,
+      };
+    } else {
+      // 切换到下一个敌人
+      session.currentEnemyIdx = nextIdx;
+      narrative += `新的对手${session.enemies[nextIdx].name}逼近！`;
+    }
+  } else {
+    // 敌人未死 → 敌人反击
+    const enemyDmg = action === 'defend'
+      ? Math.floor(computeDamage(enemy.attack, session.playerDefense, 1, 0.2) * 0.5)
+      : computeDamage(enemy.attack, session.playerDefense, 1, 0.2);
+    enemyDamageDealt = enemyDmg;
+    playerHp -= enemyDmg;
+    narrative += `${enemy.name}反扑，对你造成 ${enemyDmg} 点伤害。`;
+    // 玩家死亡判定
+    if (playerHp <= 0) {
+      playerHp = 0;
+      const endSession: CombatSession = { ...session, status: 'defeat', playerHp: 0 };
+      narrative += '你气血耗尽，败下阵来...';
+      return {
+        state: { ...state, combatSession: endSession, hp: 0, alive: false, causeOfDeath: `战死于${enemy.name}之手` },
+        round: { round: session.round, playerAction: playerActionDesc, playerActionType, playerDamage: playerDamageDealt, enemyDamage: enemyDamageDealt, narrative, playerHpAfter: 0, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
+        ended: true,
+        endStatus: 'defeat',
+      };
+    }
+  }
+
+  // 更新敌人 HP 并推进回合
+  const updatedEnemies = session.enemies.map((e, i) => i === session.currentEnemyIdx ? { ...e, hp: enemyHp } : e);
+  const newSession: CombatSession = {
+    ...session,
+    enemies: updatedEnemies,
+    round: session.round + 1,
+    log: [...session.log, {
+      round: session.round,
+      playerAction: playerActionDesc,
+      playerActionType,
+      playerDamage: playerDamageDealt,
+      playerHeal,
+      enemyDamage: enemyDamageDealt,
+      narrative,
+      playerHpAfter: playerHp,
+      enemyHpAfter: enemyHp,
+      playerMpAfter: playerMp,
+    }],
+    playerHp,
+    playerMp,
+  };
+  return {
+    state: { ...state, combatSession: newSession, hp: playerHp, mp: playerMp },
+    round: newSession.log[newSession.log.length - 1],
+    ended: false,
+  };
+}
+
+// 结束战斗（清理 combatSession，但保留 log 用于事件记录）
+export function endCombat(state: CharacterState, applyDrops: boolean = true): { state: CharacterState; drops: ItemEntry[]; result: 'victory' | 'defeat' | 'fled' | 'ongoing' | null } {
+  if (!state.combatSession) return { state, drops: [], result: null };
+  const session = state.combatSession;
+  let next: CharacterState = { ...state, combatSession: null };
+  let drops: ItemEntry[] = [];
+  if (applyDrops && session.status === 'victory' && session.victoryDrops?.length) {
+    drops = session.victoryDrops;
+    next = addItems(next, drops);
+  }
+  return { state: next, drops, result: session.status };
 }
 
 // ==================== 引擎执行 AI 输出（统一入口） ====================
@@ -990,6 +1477,43 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     next.realm = 'ascension';
   }
 
+  // ===== Task 20: 应用未决线索 / 战斗触发 =====
+  // 7.1 添加新线索
+  if (aiOutput.newThreads && aiOutput.newThreads.length) {
+    next = addThreads(next, aiOutput.newThreads);
+  }
+  // 7.2 推进现有线索进度
+  if (aiOutput.advanceThreads && aiOutput.advanceThreads.length) {
+    for (const adv of aiOutput.advanceThreads) {
+      if (adv.id && typeof adv.progressDelta === 'number') {
+        next = advanceThread(next, adv.id, adv.progressDelta, adv.note);
+      }
+    }
+  }
+  // 7.3 标记完成的线索
+  if (aiOutput.completeThreadIds && aiOutput.completeThreadIds.length) {
+    for (const id of aiOutput.completeThreadIds) {
+      next = completeThread(next, id);
+    }
+  }
+  // 7.4 标记失败的线索
+  if (aiOutput.failThreadIds && aiOutput.failThreadIds.length) {
+    for (const id of aiOutput.failThreadIds) {
+      next = failThread(next, id);
+    }
+  }
+  // 7.5 检查线索 deadline —— 过期未完成的标记为 failed
+  const threadCheck = checkThreadDeadlines(next);
+  next = threadCheck.state;
+
+  // 7.6 触发战斗（若 AI 给出 triggerCombat）
+  if (aiOutput.triggerCombat && aiOutput.triggerCombat.enemies?.length) {
+    next = startCombat(next, aiOutput.triggerCombat);
+  }
+
+  // 8. 角色主动意图重新生成（每岁重算）
+  next.characterIntents = generateCharacterIntents(next, next.pendingThreads);
+
   const appliedChanges = (aiOutput.changes || []).filter(ch => ATTRIBUTE_BOUNDS[ch.attribute]);
 
   return {
@@ -1044,6 +1568,10 @@ export function stateToResponse(s: CharacterState) {
     activeStatuses: s.activeStatuses,
     inventory: s.inventory,
     equipped: s.equipped,
+    // Task 20 新字段
+    pendingThreads: s.pendingThreads || [],
+    characterIntents: s.characterIntents || [],
+    combatSession: s.combatSession || null,
   };
 }
 
