@@ -72,7 +72,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       if (!data.success) throw new Error(data.error || '保存失败');
       setStatus({ configured: true, config: data.config });
       setApiKey('');
-      toast.success('AI 接口配置已保存', { description: '已写入本地 .z-ai-config，不会提交到 Git' });
+      toast.success('AI 接口配置已保存', { description: '已写入本地 .xianxia-ai-config，不会提交到 Git' });
       setOpen(false);
     } catch (err: any) {
       toast.error('AI 配置保存失败', { description: err.message });
@@ -133,7 +133,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
             AI 接口配置
           </DialogTitle>
           <DialogDescription>
-            本游戏依赖 AI 生成剧情。配置会保存到项目根目录 .z-ai-config，本地使用，不会上传仓库。
+            本游戏依赖 AI 生成剧情。配置会保存到项目根目录 .xianxia-ai-config，本地使用，不会上传仓库。
           </DialogDescription>
         </DialogHeader>
 
@@ -159,7 +159,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
               placeholder="例如：https://api.example.com/v1"
               autoComplete="off"
             />
-            <p className="text-[10px] text-muted-foreground">z-ai-web-dev-sdk 要求 baseUrl 通常包含 /v1。</p>
+            <p className="text-[10px] text-muted-foreground">请填写兼容 OpenAI Chat Completions 的 Base URL，例如火山方舟接口地址。</p>
           </div>
 
           <div className="space-y-2">

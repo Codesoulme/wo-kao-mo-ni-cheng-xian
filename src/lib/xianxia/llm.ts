@@ -37,19 +37,19 @@ type RuntimeAIConfig = {
 
 let cachedAIConfig: RuntimeAIConfig | null = null;
 
-export function resetZAI() {
+export function resetGameAI() {
   cachedAIConfig = null;
 }
 
 async function loadAIConfig(): Promise<RuntimeAIConfig> {
   if (cachedAIConfig) return cachedAIConfig;
-  const raw = await fs.readFile(path.join(process.cwd(), '.z-ai-config'), 'utf-8');
+  const raw = await fs.readFile(path.join(process.cwd(), '.xianxia-ai-config'), 'utf-8');
   const cfg = JSON.parse(raw);
   const baseUrl = String(cfg?.baseUrl || '').trim().replace(/\/+$/, '');
   const apiKey = String(cfg?.apiKey || '').trim();
   const model = String(cfg?.model || cfg?.modelName || 'ark-code-latest').trim() || 'ark-code-latest';
   if (!baseUrl || !apiKey) {
-    throw new Error('AI 配置不完整，请在设置中填写 Base URL 和 API Key');
+    throw new Error('游戏 AI 配置不完整，请在设置中填写 Base URL 和 API Key');
   }
   cachedAIConfig = {
     baseUrl,
@@ -712,7 +712,14 @@ removedItemIds：若玩家行动导致物品消耗/损坏（如服用丹药、�
 // ==================== LLM 调用 ====================
 
 async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: string): Promise<any> {
-  const fullSystem = `${systemPrompt}\n\n${scenePrompt}`;
+  const fullSystem = `${systemPrompt}
+
+${scenePrompt}`;
+  const content = await callLLMText(fullSystem, userPrompt);
+  return parseJSON(content);
+}
+
+async function callLLMText(systemPrompt: string, userPrompt: string): Promise<string> {
   try {
     const cfg = await loadAIConfig();
     const headers: Record<string, string> = {
@@ -728,7 +735,7 @@ async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: st
       body: JSON.stringify({
         model: cfg.model,
         messages: [
-          { role: 'system', content: fullSystem },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
         thinking: { type: 'disabled' },
@@ -737,12 +744,10 @@ async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: st
     const text = await res.text();
     let data: any = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-    if (!res.ok) {
-      throw new Error(`AI 接口请求失败：${aiErrorMessage(data || text, res.status)}`);
-    }
+    if (!res.ok) throw new Error(`AI 接口请求失败：${aiErrorMessage(data || text, res.status)}`);
     const content = data?.choices?.[0]?.message?.content || '';
     if (!content) throw new Error('AI 接口返回为空');
-    return parseJSON(content);
+    return content;
   } catch (err: any) {
     console.error('LLM call failed:', err?.message || err);
     throw err;
@@ -1161,15 +1166,7 @@ ${item.equipNote ? '装备位置：' + item.equipNote : ''}
 - 严禁 JSON 转义问题：文本内不得出现裸双引号、裸换行符`;
 
   try {
-    const zai = await getZAI();
-    const completion = await zai.chat.completions.create(withModel({
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      thinking: { type: 'disabled' },
-    }));
-    const content = completion.choices[0]?.message?.content || '';
+    const content = await callLLMText(system, user);
     const raw = parseJSON(content);
     return {
       narrative: String(raw?.narrative || `${actionZh}了${item.name}`).slice(0, 200),
@@ -1227,15 +1224,7 @@ ${rawSummary}
 }`;
 
   try {
-    const zai = await getZAI();
-    const completion = await zai.chat.completions.create(withModel({
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      thinking: { type: 'disabled' },
-    }));
-    const content = completion.choices[0]?.message?.content || '';
+    const content = await callLLMText(system, user);
     const raw = parseJSON(content);
     const narrative = String(raw?.narrative || '').trim();
     return narrative ? narrative.slice(0, 260) : round.narrative;
@@ -1303,15 +1292,7 @@ ${ctx.pendingThreads?.length ? ctx.pendingThreads.map(t => `- ${t.title}（截�
 - 若有战利品，不要在 newItems 重复给（引擎已应用 drops），仅叙事提及即可`;
 
   try {
-    const zai = await getZAI();
-    const completion = await zai.chat.completions.create(withModel({
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      thinking: { type: 'disabled' },
-    }));
-    const content = completion.choices[0]?.message?.content || '';
+    const content = await callLLMText(system, user);
     const raw = parseJSON(content);
     return {
       narrative: String(raw?.narrative || `${result === 'victory' ? '胜了' : result === 'defeat' ? '败了' : '脱身了'}`).slice(0, 400),
@@ -1696,15 +1677,7 @@ export async function generateBirthEvent(name?: string): Promise<BirthResult> {
 注意：不要输出 spiritualRoot 字段，灵根类型已由天道判定为「${root}」，你只需生成对应的 rootDetail 文字描述。`;
 
   try {
-    const zai = await getZAI();
-    const completion = await zai.chat.completions.create(withModel({
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ],
-      thinking: { type: 'disabled' },
-    }));
-    const content = completion.choices[0]?.message?.content || '';
+    const content = await callLLMText(system, user);
     const raw = parseJSON(content);
     return {
       name: String(raw.name || name || '佚名').slice(0, 12),

@@ -2,7 +2,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 
-const CONFIG_PATH = path.join(process.cwd(), '.z-ai-config');
+const CONFIG_PATH = path.join(process.cwd(), '.xianxia-ai-config');
 
 type SavedConfig = {
   baseUrl?: string;

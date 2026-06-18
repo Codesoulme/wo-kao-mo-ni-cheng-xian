@@ -319,7 +319,7 @@ function ExplorationResult() {
                 className="h-8"
               >
                 <ScrollText className="w-3.5 h-3.5 mr-1" />
-                <span className="text-xs font-serif-cn">收入史册</span>
+                <span className="text-xs font-serif-cn">查看史册</span>
               </Button>
             ) : <span />}
             <Button
@@ -340,7 +340,7 @@ export function SecretRealmPanel() {
   const {
     character, explorationOpen, setExplorationOpen,
     setCharacter, addEvent, setLastChange, setLoading, setError,
-    setLastExploration, setPendingChoice,
+    setLastExploration, setPendingChoice, setSelectedEventId,
   } = useGameStore();
   const [busyRealmId, setBusyRealmId] = useState<string | null>(null);
 
@@ -419,8 +419,9 @@ export function SecretRealmPanel() {
       setLastChange(data.changes || null);
 
       // 添加事件
+      const eventId = data.event.id || `event-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       addEvent({
-        id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: eventId,
         age: data.event.age,
         title: data.event.title,
         narrative: data.event.narrative,
@@ -433,7 +434,7 @@ export function SecretRealmPanel() {
 
       // 设置探索结果弹窗
       setLastExploration({
-        eventId: data.event.id,
+        eventId,
         age: data.event.age,
         realmName: data.event.realmName,
         realmTier: data.event.realmTier,
@@ -443,8 +444,9 @@ export function SecretRealmPanel() {
         effects: data.event.effects || data.changes || [],
       });
 
-      // 关闭秘境面板（让结果弹窗独占）
+      // 关闭秘境面板（让结果弹窗独占），同时把本次探索写成当前史册事件
       setExplorationOpen(false);
+      setSelectedEventId(eventId);
 
       // 处理选择 / 战斗 / 死亡
       if (data.hasChoice && data.choice) {

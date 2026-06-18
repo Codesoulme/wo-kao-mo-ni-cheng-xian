@@ -19,7 +19,6 @@ export const metadata: Metadata = {
   keywords: ["修仙", "模拟器", "修真", "AI", "Xianxia", "Cultivation"],
   authors: [{ name: "天道" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
     title: "我靠模拟成仙",

@@ -1,9 +1,9 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { resetZAI } from '@/lib/xianxia/llm';
+import { resetGameAI } from '@/lib/xianxia/llm';
 
-type ZAIConfig = {
+type GameAIConfig = {
   baseUrl: string;
   apiKey: string;
   chatId?: string;
@@ -11,7 +11,7 @@ type ZAIConfig = {
   model?: string;
 };
 
-const CONFIG_PATH = path.join(process.cwd(), '.z-ai-config');
+const CONFIG_PATH = path.join(process.cwd(), '.xianxia-ai-config');
 
 function maskKey(key: string) {
   if (!key) return '';
@@ -19,7 +19,7 @@ function maskKey(key: string) {
   return `${key.slice(0, 4)}****${key.slice(-4)}`;
 }
 
-async function readConfig(): Promise<ZAIConfig | null> {
+async function readConfig(): Promise<GameAIConfig | null> {
   try {
     const raw = await fs.readFile(CONFIG_PATH, 'utf-8');
     const cfg = JSON.parse(raw);
@@ -73,12 +73,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '请填写 API Key' }, { status: 400 });
     }
 
-    const config: ZAIConfig = { baseUrl, apiKey, model: model || 'ark-code-latest' };
+    const config: GameAIConfig = { baseUrl, apiKey, model: model || 'ark-code-latest' };
     if (chatId) config.chatId = chatId;
     if (userId) config.userId = userId;
 
     await fs.writeFile(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, { encoding: 'utf-8', mode: 0o600 });
-    resetZAI();
+    resetGameAI();
 
     return NextResponse.json({
       success: true,
