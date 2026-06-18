@@ -468,8 +468,17 @@ export interface AIEventOutput {
   hasChoice: boolean;
   choice?: ChoicePrompt;
 
-  // 是否触发突破
+  // 是否触发突破。AI 只能提出突破请求，具体突破层数由引擎按因果与数值校验。
   triggeredBreakthrough?: boolean;
+  // 连破/大幅突破由头：若 AI 想让角色一次连破多层或跨大境界，必须给出足够具体的原因。
+  breakthroughReason?: string;
+  // AI 希望突破到的目标小层（1 基显示层数）；引擎会按资质、修为、由头强弱限制。
+  breakthroughTargetLevel?: number;
+  // AI 希望突破到的目标大境界；没有充分由头时引擎会拒绝跨大境界。
+  breakthroughTargetRealm?: Realm;
+
+  // 同一岁内的补充事件文本，用于把复杂年份拆成多段史册记录，避免一段叙事过长或漏写关键过程。
+  extraEvents?: { title: string; narrative: string; eventType?: AIEventOutput['eventType'] }[];
 
   // 是否死亡
   causedDeath?: boolean;

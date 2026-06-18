@@ -162,7 +162,11 @@ export async function POST(req: NextRequest) {
       finalState.alive &&
       finalState.cultivationExp >= finalState.expToBreak
     ) {
-      const br = tryBreakthrough(finalState);
+      const br = tryBreakthrough(finalState, {
+        reason: aiOutput.breakthroughReason,
+        targetRealm: aiOutput.breakthroughTargetRealm,
+        targetLevel: aiOutput.breakthroughTargetLevel,
+      });
       if (br.success) {
         finalState = br.state;
         result.breakthroughHappened = true;
@@ -302,8 +306,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 写入事件日志
-    // 若发生突破，事件类型强制为 'breakthrough'（便于史册识别）
+    // 写入事件日志；同一岁允许多段史册记录，避免复杂年份只塞进一段文本。
     const finalEventType = result.breakthroughHappened
       ? 'breakthrough'
       : (isFateNode ? 'fate_node' : aiOutput.eventType);
@@ -317,34 +320,69 @@ export async function POST(req: NextRequest) {
       newPets: aiOutput.newPets,
       removedItemIds: aiOutput.removedItemIds,
     });
-    const event = await db.eventLog.create({
-      data: {
-        characterId,
-        age: finalState.age,
-        title: result.breakthroughHappened ? `境界突破·${aiOutput.title}` : aiOutput.title,
-        narrative: aiOutput.narrative,
-        eventType: finalEventType,
-        effects: JSON.stringify(displayEffects),
-      },
-    });
+
+    const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[] }[] = [{
+      title: result.breakthroughHappened ? `境界突破·${aiOutput.title}` : aiOutput.title,
+      narrative: aiOutput.narrative,
+      eventType: finalEventType,
+      effects: displayEffects,
+    }];
+
+    for (const extra of aiOutput.extraEvents || []) {
+      eventDrafts.push({
+        title: extra.title,
+        narrative: extra.narrative,
+        eventType: extra.eventType || 'normal',
+        effects: [],
+      });
+    }
+
+    // 兜底：若数值已突破但主叙事/额外叙事都没写破境过程，自动补一条独立破境事件。
+    const allNarrative = eventDrafts.map(e => `${e.title}\n${e.narrative}`).join('\n');
+    if (result.breakthroughHappened && !/突破|破境|冲关|贯通|筑基|炼气|金丹|元婴|化神|大乘|渡劫/.test(allNarrative)) {
+      eventDrafts.push({
+        title: result.breakthroughMajor ? '破开大关' : '气脉更进',
+        narrative: result.breakthroughMajor
+          ? `前事既定，灵机终于在丹田深处汇成一线。你收摄心神，循着这一缕契机冲开关隘，气海轰鸣，旧境如壳裂去，新的天地在神识中徐徐展开。`
+          : `前事既定，积蓄已久的灵息终于贯通周身。你闭目调息，将浮动气机一寸寸压入丹田，待最后一缕滞涩化开，修为水到渠成，更进一层。`,
+        eventType: 'breakthrough',
+        effects: [],
+      });
+    }
+
+    const createdEvents = [];
+    for (const [idx, draft] of eventDrafts.entries()) {
+      const created = await db.eventLog.create({
+        data: {
+          characterId,
+          age: finalState.age,
+          title: draft.title,
+          narrative: draft.narrative,
+          eventType: draft.eventType,
+          effects: JSON.stringify(draft.effects),
+        },
+      });
+      createdEvents.push({
+        id: created.id,
+        age: created.age,
+        title: created.title,
+        narrative: created.narrative,
+        eventType: created.eventType,
+        isFateNode: idx === 0 ? isFateNode : false,
+        fateNodeName: idx === 0 ? fateNode?.name : undefined,
+        blueprint: idx === 0 ? { category: blueprint.category, name: blueprint.name } : undefined,
+        effects: draft.effects,
+        createdAt: created.createdAt,
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      event: {
-        id: event.id,
-        age: event.age,
-        title: event.title,
-        narrative: event.narrative,
-        eventType: event.eventType,
-        isFateNode,
-        fateNodeName: fateNode?.name,
-        // Task 20: 返回本轮蓝图主题（让前端可显示）
-        blueprint: { category: blueprint.category, name: blueprint.name },
-        effects: displayEffects,
-      },
+      event: createdEvents[0],
+      events: createdEvents,
       changes: result.appliedChanges,
       rejectedChanges: result.rejectedChanges,
-      breakthrough: result.breakthroughHappened ? { newRealm: result.newRealm, major: Boolean(result.breakthroughMajor) } : null,
+      breakthrough: result.breakthroughHappened ? { newRealm: result.newRealm, major: Boolean(result.breakthroughMajor), steps: result.breakthroughSteps || 1 } : null,
       hasChoice: aiOutput.hasChoice,
       choice: aiOutput.choice,
       died: result.died,

@@ -754,48 +754,78 @@ export function alchemy(
 
 // ==================== 突破处理 ====================
 
-export function tryBreakthrough(state: CharacterState): { state: CharacterState; success: boolean; newRealm?: Realm; major?: boolean } {
+export function tryBreakthrough(
+  state: CharacterState,
+  intent?: { reason?: string; targetRealm?: Realm; targetLevel?: number }
+): { state: CharacterState; success: boolean; newRealm?: Realm; major?: boolean; steps?: number; reasonAccepted?: boolean } {
   if (state.cultivationExp < state.expToBreak) {
     return { state, success: false };
   }
 
-  const info = getRealmInfo(state.realm);
-  // 引擎权威：普通突破优先提升小境界；只有当前大境界已满层，才晋入下一大境界。
-  // realmLevel 为 0 基索引，显示层会显示 realmLevel + 1 层。
-  if (info.levels > 0 && state.realmLevel < info.levels - 1) {
-    const minor = tryMinorBreakthrough(state);
-    if (minor.advanced) return { state: minor.state, success: true, newRealm: state.realm, major: false };
+  // 修仙世界允许「连破数境」，但不能无因果乱跳。
+  // 普通积累：最多升一小层；有明确奇遇/丹药/传承/顿悟等由头，且修为溢出足够时，可连续突破。
+  const reason = String(intent?.reason || '').trim();
+  const hasStrongReason = /奇遇|传承|顿悟|丹|灵药|天材地宝|灌顶|秘境|仙缘|雷劫|天劫|血脉|功法|灵脉|机缘/.test(reason);
+  const requestedTargetRealm = intent?.targetRealm;
+  const requestedTargetLevel = Number(intent?.targetLevel || 0);
+  const allowChain = hasStrongReason && (Boolean(requestedTargetRealm) || requestedTargetLevel > state.realmLevel + 1);
+  const maxSteps = allowChain ? 4 : 1;
+
+  let next: CharacterState = { ...state };
+  let steps = 0;
+  let major = false;
+  let lastRealm: Realm | undefined;
+
+  while (steps < maxSteps && next.cultivationExp >= next.expToBreak) {
+    const info = getRealmInfo(next.realm);
+
+    // 小境界优先；只有满层时才进入下一大境界。
+    if (info.levels > 0 && next.realmLevel < info.levels - 1) {
+      const minor = tryMinorBreakthrough(next);
+      if (!minor.advanced) break;
+      next = minor.state;
+      steps += 1;
+      lastRealm = next.realm;
+    } else {
+      const nextRealm = getNextRealm(next.realm);
+      if (!nextRealm) break;
+      const nextInfo = getRealmInfo(nextRealm);
+      const remainingExp = Math.max(0, next.cultivationExp - next.expToBreak);
+      const realmIdx = Math.max(1, REALMS.findIndex(r => r.id === nextRealm));
+      const boost = 1.15 + realmIdx * 0.12;
+      next = {
+        ...next,
+        realm: nextRealm,
+        realmLevel: 0,
+        cultivationExp: remainingExp,
+        expToBreak: nextInfo.expPerLevel,
+        lifespan: Math.max(next.lifespan, nextInfo.baseLifespan),
+        maxHp: Math.floor(next.maxHp * boost),
+        maxMp: Math.floor(next.maxMp * boost),
+        attack: Math.floor(next.attack * boost),
+        defense: Math.floor(next.defense * boost),
+        speed: Math.floor(next.speed * boost),
+      };
+      next.hp = next.maxHp;
+      next.mp = next.maxMp;
+      steps += 1;
+      major = true;
+      lastRealm = nextRealm;
+    }
+
+    // 无强因果时，永远只允许一跳，防止「资质普通无奇遇，炼气一层直筑基」。
+    if (!allowChain) break;
+
+    // 若 AI 给了明确目标，到达目标后停止；目标是显示层数（1基），内部 realmLevel 为0基。
+    if (requestedTargetRealm && next.realm === requestedTargetRealm) {
+      if (!requestedTargetLevel || next.realmLevel + 1 >= requestedTargetLevel) break;
+    } else if (!requestedTargetRealm && requestedTargetLevel && next.realmLevel + 1 >= requestedTargetLevel) {
+      break;
+    }
   }
 
-  const nextRealm = getNextRealm(state.realm);
-  if (!nextRealm) {
-    // 已达最高境界（渡劫→飞升由特殊事件处理）
-    return { state, success: false };
-  }
-
-  const nextInfo = getRealmInfo(nextRealm);
-  const remainingExp = Math.max(0, state.cultivationExp - state.expToBreak);
-  const newState: CharacterState = {
-    ...state,
-    realm: nextRealm,
-    realmLevel: 0,
-    cultivationExp: remainingExp,
-    expToBreak: nextInfo.expPerLevel,
-    lifespan: Math.max(state.lifespan, nextInfo.baseLifespan),
-  };
-
-  // 大境界突破提升基础属性；倍率基于新大境界，但避免早期境界数值爆炸
-  const realmIdx = Math.max(1, REALMS.findIndex(r => r.id === nextRealm));
-  const boost = 1.15 + realmIdx * 0.12;
-  newState.maxHp = Math.floor(state.maxHp * boost);
-  newState.hp = newState.maxHp;
-  newState.maxMp = Math.floor(state.maxMp * boost);
-  newState.mp = newState.maxMp;
-  newState.attack = Math.floor(state.attack * boost);
-  newState.defense = Math.floor(state.defense * boost);
-  newState.speed = Math.floor(state.speed * boost);
-
-  return { state: newState, success: true, newRealm: nextRealm, major: true };
+  if (steps <= 0) return { state, success: false };
+  return { state: next, success: true, newRealm: lastRealm || next.realm, major, steps, reasonAccepted: allowChain };
 }
 
 // ==================== 小境界提升 ====================
@@ -1658,6 +1688,8 @@ export interface EngineExecutionResult {
   breakthroughHappened: boolean;
   newRealm?: Realm;
   breakthroughMajor?: boolean;
+  breakthroughSteps?: number;
+  breakthroughReasonAccepted?: boolean;
   died: boolean;
   deathReason?: string;
 }
@@ -1744,13 +1776,21 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   let breakthroughHappened = false;
   let newRealm: Realm | undefined;
   let breakthroughMajor = false;
+  let breakthroughSteps = 0;
+  let breakthroughReasonAccepted = false;
   if (aiOutput.triggeredBreakthrough) {
-    const br = tryBreakthrough(next);
+    const br = tryBreakthrough(next, {
+      reason: aiOutput.breakthroughReason,
+      targetRealm: aiOutput.breakthroughTargetRealm,
+      targetLevel: aiOutput.breakthroughTargetLevel,
+    });
     if (br.success) {
       next = br.state;
       breakthroughHappened = true;
       newRealm = br.newRealm;
       breakthroughMajor = Boolean(br.major);
+      breakthroughSteps = br.steps || 1;
+      breakthroughReasonAccepted = Boolean(br.reasonAccepted);
     }
   }
 
@@ -1836,6 +1876,8 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     breakthroughHappened,
     newRealm,
     breakthroughMajor,
+    breakthroughSteps,
+    breakthroughReasonAccepted,
     died,
     deathReason,
   };

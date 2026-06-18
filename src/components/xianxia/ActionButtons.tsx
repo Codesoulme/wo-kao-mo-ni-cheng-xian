@@ -116,20 +116,20 @@ export function ActionButtons() {
       setLastChange(data.changes || null);
       if (data.breakthrough) setLastBreakthrough(data.breakthrough);
 
-      // 添加事件
-      addEvent({
-        id: `event-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        age: data.event.age,
-        title: data.event.title,
-        narrative: data.event.narrative,
-        eventType: data.event.eventType,
-        effects: data.changes || [],
-        isFateNode: data.isFateNode,
-        fateNodeName: data.fateNodeName,
-        // Task 20: 蓝图主题（让 EventTimeline 显示主题 chip）
-        blueprint: data.event.blueprint,
-        createdAt: new Date().toISOString(),
-      });
+      // 添加事件；后端可能返回同一岁多段史册记录
+      const returnedEvents = Array.isArray(data.events) && data.events.length ? data.events : [data.event];
+      returnedEvents.forEach((evt: any, idx: number) => addEvent({
+        id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+        age: evt.age,
+        title: evt.title,
+        narrative: evt.narrative,
+        eventType: evt.eventType,
+        effects: evt.effects || (idx === 0 ? (data.changes || []) : []),
+        isFateNode: evt.isFateNode,
+        fateNodeName: evt.fateNodeName,
+        blueprint: evt.blueprint,
+        createdAt: evt.createdAt || new Date().toISOString(),
+      }));
 
       // 设置待选择（带上命节点前情提要，供弹窗展示完整情境）
       if (data.hasChoice && data.choice) {
