@@ -4,7 +4,7 @@ import { GameEvent } from '@/lib/xianxia/store';
 import { cn } from '@/lib/utils';
 import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } from '@/lib/xianxia/display';
 import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface EventTimelineProps {
   events: GameEvent[];
@@ -86,6 +86,19 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
   const [allExpanded, setAllExpanded] = useState(false);
   // 跟踪上次 events 长度，用于在事件数量变化时重置展开状态
   const [prevEventsLen, setPrevEventsLen] = useState(events.length);
+  const lastAutoScrollLenRef = useRef(events.length);
+
+  const sameAgeMeta = useMemo(() => {
+    const ageCounts = new Map<number, number>();
+    const ageSeen = new Map<number, number>();
+    for (const event of events) ageCounts.set(event.age, (ageCounts.get(event.age) || 0) + 1);
+    return events.map(event => {
+      const count = ageCounts.get(event.age) || 1;
+      const index = (ageSeen.get(event.age) || 0) + 1;
+      ageSeen.set(event.age, index);
+      return { count, index, isContinuation: count > 1 && index > 1 };
+    });
+  }, [events]);
 
   // 当事件数量变化时，重置展开状态：默认展开最后 N 条
   // 使用"渲染期间调整状态"模式（React 推荐）避免 useEffect 内 setState
@@ -107,8 +120,13 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
     });
   }
 
-  // 自动滚动到最新事件：仅滚动最近的滚动容器，避免向上传播到 body
+  // 只在新增史册事件时滚到最新；切换标签页或展开/折叠不改变玩家离开时的位置。
   useEffect(() => {
+    if (events.length <= lastAutoScrollLenRef.current) {
+      lastAutoScrollLenRef.current = events.length;
+      return;
+    }
+    lastAutoScrollLenRef.current = events.length;
     const el = endRef.current;
     if (!el) return;
     // 向上查找最近的可滚动祖先
@@ -122,7 +140,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
       }
       node = node.parentElement;
     }
-  }, [events.length, expandedSet]);
+  }, [events.length]);
 
   const toggle = (idx: number) => {
     setExpandedSet(prev => {
@@ -195,12 +213,14 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
           const isBreakthrough = event.eventType === 'breakthrough';
           const isExploration = event.eventType === 'exploration';
           const visibleEffects = (event.effects || []).filter(isVisibleEffect);
+          const ageMeta = sameAgeMeta[idx] || { count: 1, index: 1, isContinuation: false };
 
           return (
             <div
               key={event.id || idx}
               className={cn(
                 "relative pl-10 scroll-reveal",
+                ageMeta.isContinuation && "-mt-0.5",
                 (isFate || isBreakthrough) && "scale-100"
               )}
             >
@@ -241,13 +261,29 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                     <span className="text-xs font-bold text-primary font-serif-cn">
                       {event.age}岁
                     </span>
+                    {ageMeta.count > 1 && (
+                      <span
+                        className={cn(
+                          "text-[9px] px-1.5 py-0.5 rounded-full border font-serif-cn",
+                          ageMeta.isContinuation
+                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                            : "bg-primary/10 text-primary border-primary/25"
+                        )}
+                        title={`这一年共有 ${ageMeta.count} 段连续记载`}
+                      >
+                        {ageMeta.isContinuation ? `同年续记 ${toChineseOrdinal(ageMeta.index)}` : `本年起笔·共${ageMeta.count}段`}
+                      </span>
+                    )}
                     {isFate && (
                       <span className="seal text-[9px]">命</span>
                     )}
                     {isBreakthrough && (
                       <span className="text-[9px] px-1 rounded bg-yellow-400/20 text-yellow-600">破</span>
                     )}
-                    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50">
+                    <span className={cn(
+                      "text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50",
+                      ageMeta.isContinuation && "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    )}>
                       {EVENT_LABELS[event.eventType] || '流年'}
                     </span>
                     {/* Task 20: 事件蓝图主题 chip */}
@@ -277,6 +313,12 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 正文 - 可折叠 */}
                 {isExpanded && (
                   <div className="px-3 pb-2">
+                    {ageMeta.isContinuation && (
+                      <div className="mb-1.5 text-[10px] text-amber-700 dark:text-amber-300 font-serif-cn flex items-center gap-1">
+                        <span className="h-px w-5 bg-amber-500/40" />
+                        <span>仍是{event.age}岁这一年，前事未尽，因果续写。</span>
+                      </div>
+                    )}
                     <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">
                       {event.narrative}
                     </p>
@@ -346,6 +388,11 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
   );
 }
 
+
+function toChineseOrdinal(n: number): string {
+  const labels = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  return labels[n - 1] || String(n);
+}
 
 function isVisibleEffect(eff: any): boolean {
   return isVisibleNumericEventEffect(eff);
