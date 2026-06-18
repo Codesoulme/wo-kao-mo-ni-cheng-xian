@@ -9,6 +9,7 @@ import {
   addItems, addThreads, completeThread, resolveHeartDemonTrial,
 } from '@/lib/xianxia/engine';
 import { generateCombatEndNarrative } from '@/lib/xianxia/llm';
+import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -25,6 +26,7 @@ export async function POST(req: NextRequest) {
     if (!char) return NextResponse.json({ success: false, error: '角色不存在' }, { status: 404 });
 
     let state = dbToState(char as any);
+    const stateBeforeCombatEnd = { ...state };
 
     if (!state.combatSession) {
       return NextResponse.json({ success: false, error: '当前无战斗会话' }, { status: 400 });
@@ -135,6 +137,13 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const displayEffects = buildEventDisplayEffects({
+      before: stateBeforeCombatEnd,
+      after: state,
+      changes: [],
+      newItems: [...appliedDrops, ...llmNewItems],
+    });
+
     // 写入战斗事件日志（让史册可查）
     try {
       await db.eventLog.create({
@@ -148,11 +157,7 @@ export async function POST(req: NextRequest) {
             : `战斗·遁·${(enemies[0]?.name || '敌').slice(0, 6)}`,
           narrative,
           eventType: 'combat',
-          effects: JSON.stringify(
-            appliedDrops.length
-              ? appliedDrops.map(d => ({ attribute: 'inventory', delta: 1, reason: `得 ${d.name}` }))
-              : []
-          ),
+          effects: JSON.stringify(displayEffects),
         },
       });
     } catch {

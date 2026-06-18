@@ -22,6 +22,7 @@ import {
   recordExploration,
 } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
+import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -129,6 +130,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 引擎执行 AI 输出
+    const stateBeforeExploration = { ...state };
     const result = executeAIEvent(state, aiOutput);
     let finalState = result.state;
 
@@ -187,6 +189,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const displayEffects = buildEventDisplayEffects({
+      before: stateBeforeExploration,
+      after: finalState,
+      changes: result.appliedChanges,
+      newStatuses: aiOutput.newStatuses,
+      newItems: aiOutput.newItems,
+      newEquippedItems: aiOutput.newEquippedItems,
+      newPets: aiOutput.newPets,
+      removedItemIds: aiOutput.removedItemIds,
+    });
+
     // 写入事件日志（eventType='exploration' 便于史册识别）
     const event = await db.eventLog.create({
       data: {
@@ -195,7 +208,7 @@ export async function POST(req: NextRequest) {
         title: aiOutput.title,
         narrative: aiOutput.narrative,
         eventType: 'exploration',
-        effects: JSON.stringify(aiOutput.changes),
+        effects: JSON.stringify(displayEffects),
       },
     });
 
@@ -211,6 +224,7 @@ export async function POST(req: NextRequest) {
         realmName: realm.name,
         realmTier: realm.tier,
         realmIcon: realm.icon,
+        effects: displayEffects,
       },
       changes: result.appliedChanges,
       rejectedChanges: result.rejectedChanges,
