@@ -282,9 +282,9 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                             key={i}
                             className={cn(
                               "text-[10px] px-1.5 py-0.5 rounded border",
-                              eff.delta > 0
+                              getEffectTone(eff) === 'positive'
                                 ? "bg-green-500/10 text-green-700 border-green-500/30"
-                                : eff.delta < 0
+                                : getEffectTone(eff) === 'negative'
                                 ? "bg-red-500/10 text-red-700 border-red-500/30"
                                 : "bg-muted text-muted-foreground border-border"
                             )}
@@ -306,9 +306,9 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                         key={i}
                         className={cn(
                           "text-[9px] px-1 py-0.5 rounded border",
-                          eff.delta > 0
+                          getEffectTone(eff) === 'positive'
                             ? "bg-green-500/10 text-green-700 border-green-500/30"
-                            : eff.delta < 0
+                            : getEffectTone(eff) === 'negative'
                             ? "bg-red-500/10 text-red-700 border-red-500/30"
                             : "bg-muted text-muted-foreground border-border"
                         )}
@@ -340,6 +340,19 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
       </div>
     </div>
   );
+}
+
+function getEffectTone(eff: { attribute?: string; delta?: number }): 'positive' | 'negative' | 'neutral' {
+  const delta = Number(eff.delta || 0);
+  if (delta === 0) return 'neutral';
+
+  // 心魔是反向属性：心魔上升是负面，心魔下降才是正面
+  const reversedAttributes = new Set(['heartDemon']);
+  if (reversedAttributes.has(eff.attribute || '')) {
+    return delta > 0 ? 'negative' : 'positive';
+  }
+
+  return delta > 0 ? 'positive' : 'negative';
 }
 
 const ATTR_LABEL: Record<string, string> = {
