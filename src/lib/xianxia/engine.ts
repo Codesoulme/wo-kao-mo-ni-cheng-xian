@@ -106,8 +106,10 @@ export function dbToState(c: DBCharacter): CharacterState {
   const inventory = safeParse<ItemEntry[]>(c.inventoryJson, []);
   const storageCapacity = c.storageCapacity ?? 5;
   // Task 20: 解析新字段
-  const pendingThreads = safeParse<PendingThread[]>(c.pendingThreadsJson || '[]', []);
-  const characterIntents = safeParse<CharacterIntent[]>(c.characterIntentsJson || '[]', []);
+  const parsedPendingThreads = safeParse<PendingThread[]>(c.pendingThreadsJson || '[]', []);
+  const pendingThreads = Array.isArray(parsedPendingThreads) ? parsedPendingThreads : [];
+  const parsedCharacterIntents = safeParse<CharacterIntent[]>(c.characterIntentsJson || '[]', []);
+  const characterIntents = Array.isArray(parsedCharacterIntents) ? parsedCharacterIntents : [];
   const combatSession = c.combatStateJson ? safeParse<CombatSession | null>(c.combatStateJson, null) : null;
   const recentEventTypes = safeParse<string[]>(c.recentEventTypesJson || '[]', []);
   const recentBlueprintCategories = safeParse<string[]>(c.recentBlueprintCategoriesJson || '[]', []);
@@ -1097,10 +1099,18 @@ export function markFateNodeDone(state: CharacterState, nodeIndex: number): Char
 
 export function buildStateContext(state: CharacterState, recentEvents: { age: number; title: string; narrative: string; eventType?: string }[]): EngineStateContext {
   const realmInfo = getRealmInfo(state.realm);
+  const completedFateNodes = Array.isArray(state.fateNodes) ? state.fateNodes : [];
+  const safePendingThreads = Array.isArray(state.pendingThreads) ? state.pendingThreads : [];
+  const safeRecentEvents = Array.isArray(recentEvents) ? recentEvents : [];
+  const safeActiveStatuses = Array.isArray(state.activeStatuses) ? state.activeStatuses : [];
+  const safeInventory = Array.isArray(state.inventory) ? state.inventory : [];
+  const safeEquipped = Array.isArray(state.equipped) ? state.equipped : [];
+  const safeCultivationFactors = Array.isArray(state.cultivationFactors) ? state.cultivationFactors : [];
+  const safeLongTermMemory = Array.isArray(state.longTermMemory) ? state.longTermMemory : [];
   // 找下一个未完成的命节点
-  const nextNode = FATE_NODES.find(n => !state.fateNodes.includes(n.index));
+  const nextNode = FATE_NODES.find(n => !completedFateNodes.includes(n.index));
   // Task 20: 推进 urgent 线索状态（deadlineAge - age <= 3 视为 urgent）
-  const threads = (state.pendingThreads || []).map(t => ({
+  const threads = safePendingThreads.map(t => ({
     ...t,
     status: (t.status === 'pending' && (t.deadlineAge - state.age) <= 3) ? 'urgent' as const : t.status,
   }));
@@ -1123,7 +1133,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
       realmLevel: state.realmLevel,
       cultivationExp: state.cultivationExp,
       expToBreak: state.expToBreak,
-      elements: state.elements,
+      elements: state.elements || { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
       hp: state.hp, maxHp: state.maxHp,
       mp: state.mp, maxMp: state.maxMp,
       attack: state.attack, defense: state.defense, speed: state.speed,
@@ -1134,16 +1144,16 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
       // Task 22: 心魔值——AI 可看到，可用 changes 中 attribute='heartDemon' 调整
       heartDemon: state.heartDemon ?? 0,
     },
-    activeStatuses: state.activeStatuses,
-    inventory: state.inventory,
-    equipped: state.equipped,
+    activeStatuses: safeActiveStatuses,
+    inventory: safeInventory,
+    equipped: safeEquipped,
     storageCapacity: state.storageCapacity,
     cultivationMultiplier: state.cultivationMultiplier,
     cultivationInsight: state.cultivationInsight,
-    cultivationFactors: state.cultivationFactors,
-    recentEvents: recentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
-    longTermMemory: state.longTermMemory.slice(-10),
-    completedFateNodes: state.fateNodes,
+    cultivationFactors: safeCultivationFactors,
+    recentEvents: safeRecentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
+    longTermMemory: safeLongTermMemory.slice(-10),
+    completedFateNodes,
     availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
     // Task 20 新字段
@@ -1152,9 +1162,9 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     recentEventTypes,
     recentBlueprintCategories,
     // Task 23 新字段
-    pets: state.pets || [],
+    pets: Array.isArray(state.pets) ? state.pets : [],
     // Task 24 新字段
-    exploredRealms: state.exploredRealms || [],
+    exploredRealms: Array.isArray(state.exploredRealms) ? state.exploredRealms : [],
     currentExploration: (state as any)._currentExploration,
   };
 }
@@ -1231,11 +1241,12 @@ export function pickEventBlueprint(state: CharacterState, recentBlueprintCategor
 
 // 引擎根据角色当前处境生成"主动意图"，AI 必须在事件中体现这些意图的执行
 // 解决"角色太蠢"问题：快比赛了会主动备战、有仇敌会主动防备、灵石富余会主动淘宝等
-export function generateCharacterIntents(state: CharacterState, threads: PendingThread[]): CharacterIntent[] {
+export function generateCharacterIntents(state: CharacterState, threads?: PendingThread[] | null): CharacterIntent[] {
   const intents: CharacterIntent[] = [];
   const now = state.age;
+  const safeThreads = Array.isArray(threads) ? threads : Array.isArray((state as any).pendingThreads) ? (state as any).pendingThreads : [];
   // 1. 检查 pendingThreads —— 临近 deadline 的线索生成对应意图
-  for (const t of threads) {
+  for (const t of safeThreads) {
     if (t.status !== 'pending' && t.status !== 'urgent') continue;
     const remaining = t.deadlineAge - now;
     if (remaining <= 0) continue;

@@ -986,18 +986,19 @@ function numToZhAge(n: number): string {
   return (ZH_AGE[tens] ?? String(tens)) + '十' + (ones ? (ZH_AGE[ones] ?? String(ones)) : '');
 }
 
-function fixNarrativeAge(narrative: string, correctAge: number, charName: string): string {
+function fixNarrativeAge(narrative: string, correctAge: number, charName?: string): string {
   if (!narrative) return narrative;
+  const safeCharName = String(charName || '').trim();
   let out = narrative;
   // 匹配"数字+岁+的+角色名"或"数字+岁+的+主角"等明确指代主角的模式
   // 中文数字或阿拉伯数字，0-99
   const numPat = '([0-9]+|[零一二三四五六七八九十]{1,3})';
   // 模式1："X岁的{name}" / "X岁那年{name}" / "X岁时，{name}"
-  const re1 = new RegExp(`${numPat}岁(?:的|那年|时[，,]?)(.{0,2}?)${escapeRegExp(charName)}`, 'g');
+  const re1 = safeCharName ? new RegExp(`${numPat}岁(?:的|那年|时[，,]?)(.{0,2}?)${escapeRegExp(safeCharName)}`, 'g') : null;
   // 模式2：句首"X岁，"或"X岁的"开头（通常指代主角）
   const re2 = new RegExp(`^${numPat}岁(?:的|，|时|那年)`, 'g');
   // 模式3："{name}...X岁" 紧邻（中间部分用非捕获组，保证数字是第一个捕获组）
-  const re3 = new RegExp(`${escapeRegExp(charName)}(?:[\\s\\S]{0,8}?)${numPat}岁`, 'g');
+  const re3 = safeCharName ? new RegExp(`${escapeRegExp(safeCharName)}(?:[\\s\\S]{0,8}?)${numPat}岁`, 'g') : null;
 
   const replaceNum = (m: string, g1: string, ...rest: any[]) => {
     const num = zhAgeToNum(g1);
@@ -1009,14 +1010,14 @@ function fixNarrativeAge(narrative: string, correctAge: number, charName: string
     return m.replace(g1, replacement);
   };
 
-  out = out.replace(re1, replaceNum);
+  if (re1) out = out.replace(re1, replaceNum);
   out = out.replace(re2, replaceNum);
-  out = out.replace(re3, replaceNum);
+  if (re3) out = out.replace(re3, replaceNum);
   return out;
 }
 
 function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export async function generateAgeEvent(ctx: EngineStateContext, isFateNode: boolean): Promise<AIEventOutput> {
@@ -1366,6 +1367,19 @@ function sanitizeEventOutput(raw: any): AIEventOutput {
     failThreadIds: Array.isArray(raw?.failThreadIds) ? raw.failThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
     triggerCombat: sanitizeTriggerCombat(raw?.triggerCombat),
   };
+}
+
+function sanitizeRealmProfilePatch(raw: any) {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: any = {};
+  if (raw.name) out.name = String(raw.name).slice(0, 16);
+  if (raw.shortName) out.shortName = String(raw.shortName).slice(0, 8);
+  if (raw.color) out.color = String(raw.color).slice(0, 32);
+  if (Number.isFinite(Number(raw.maxLevel))) out.maxLevel = Math.max(1, Math.min(999, Math.round(Number(raw.maxLevel))));
+  if (Number.isFinite(Number(raw.powerMultiplier))) out.powerMultiplier = Math.max(0.5, Math.min(9, Number(raw.powerMultiplier)));
+  if (Number.isFinite(Number(raw.expMultiplier))) out.expMultiplier = Math.max(0.2, Math.min(20, Number(raw.expMultiplier)));
+  if (raw.reason) out.reason = String(raw.reason).slice(0, 160);
+  return Object.keys(out).length ? out : undefined;
 }
 
 // 净化物品数组（用于 newEquippedItems）
