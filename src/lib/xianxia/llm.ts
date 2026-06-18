@@ -99,6 +99,7 @@ const SCENE_PROMPTS: Record<string, string> = {
 - 【最重要】本轮事件必须围绕"事件蓝图"主题展开（见下方"事件蓝图区"）。蓝图由天道抽取，你不可更改主题，只能围绕它生成具体事件。
 - 事件应符合玩家当前境界、年龄、灵根、宗门、所在位置的状态。
 - 状态快照已给出角色"当前确切年龄"，narrative 中若提及主角年龄，必须与状态快照完全一致，严禁自行加减（如快照是3岁，narrative 不得写"四岁""五岁"）。不确定时用"今年""此时""这一年"等代词指代，不写具体数字。
+- 若一年没有大战/大机缘，也必须写出角色的具体行动：修炼、谋生、寻药、交际、读书、游历、疗伤、照料灵宠、处理人情等；严禁写成"未有大事""无事发生"。普通年份也应至少有合理的小收获、小代价或线索推进。
 - 若角色拥有天生体质、轮回带入的功法/命格/法宝/灵宠，必须把它们当作当前角色真实条件，合理影响事件概率、NPC态度、修炼方式、战斗风格和机缘走向。
 - 凡人阶段（0-12岁）多为童年、家族、初识灵气等凡俗事件。
 - 炼气-筑基阶段多为入门修炼、寻师问道、宗门琐事、初次历练、坊市淘宝、妖兽搏杀。
@@ -850,7 +851,7 @@ function extractFields(s: string): any {
   if (!found) return null;
   // 若 narrative 仍为空，给个占位避免空白事件
   if (!result.narrative) {
-    result.narrative = '岁月如流，未有大事。';
+    result.narrative = '这一年虽未见惊天变故，角色仍按自身处境修炼、谋生或寻访机缘，日常积累也在悄然改变道途。';
   }
   return result;
 }
@@ -1322,7 +1323,7 @@ function sanitizeEventOutput(raw: any): AIEventOutput {
 
   return {
     title: String(raw?.title || '岁月流转').slice(0, 32),
-    narrative: String(raw?.narrative || '岁月如流，无事发生。'),
+    narrative: String(raw?.narrative || '这一年未见惊天变故，但角色仍在修炼、谋生、游历或交际中推进自己的道途。'),
     eventType: ['normal','fate_node','choice','combat','breakthrough','death','ascension'].includes(raw?.eventType) ? raw.eventType : 'normal',
     changes,
     newStatuses: filterMeaningfulStatuses(statuses as any),

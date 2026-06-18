@@ -11,6 +11,74 @@ import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+function buildFallbackAgeEvent(state: any, blueprint: any, ctx: any, isFateNode: boolean) {
+  const rate = Number(ctx?.cultivationRate?.finalRate || state.cultivationMultiplier || 1) || 1;
+  const baseGain = Math.max(6, Math.round(10 * rate));
+  const actions = [
+    {
+      title: '闭关温养',
+      narrative: `${state.age}岁，${state.name}没有等天命垂青，而是在${state.location || '暂居之地'}寻了一处清静角落，按旧法吐纳运气。晨昏之间，灵息虽薄，却也一点点沉入丹田；偶有滞涩，便以行走、采水、静坐调匀身心。`,
+      changes: [{ attribute: 'cultivationExp', delta: baseGain, reason: '一岁勤修不辍' }],
+      insight: `这一年以稳固根基为主，按当前修炼速度约积累${baseGain}点修行进境。`,
+    },
+    {
+      title: '溪畔寻药',
+      narrative: `${state.age}岁，${state.name}沿${state.location || '居所'}附近山水寻找可用草木，白日辨药，夜里温习吐纳。虽未撞见惊天机缘，却学会分辨几味养气小草，也借奔走磨了心性。`,
+      changes: [
+        { attribute: 'cultivationExp', delta: Math.max(4, Math.round(baseGain * 0.75)), reason: '采药间隙修行' },
+        { attribute: 'luck', delta: 1, reason: '熟悉附近山水草木' },
+      ],
+      insight: `采药与吐纳并行，修行进境约${Math.max(4, Math.round(baseGain * 0.75))}点。`,
+    },
+    {
+      title: '人间历练',
+      narrative: `${state.age}岁，${state.name}没有久坐空耗，而是帮村人修桥、护送商队一程，又在夜深时独自运转周天。凡尘琐事不显赫，却让她更明白人心冷暖，也让气息在劳作后更易沉稳。`,
+      changes: [
+        { attribute: 'cultivationExp', delta: Math.max(5, Math.round(baseGain * 0.65)), reason: '劳作之后静修' },
+        { attribute: 'reputation', delta: 1, reason: '凡尘中积下一点口碑' },
+      ],
+      insight: `凡事磨心，劳作后静修，仍得${Math.max(5, Math.round(baseGain * 0.65))}点修行进境。`,
+    },
+    {
+      title: '夜读残篇',
+      narrative: `${state.age}岁，${state.name}从旧书摊换来几页残破修行札记。文字残缺，未必尽真，她便一边辨伪，一边以自身气感印证。数月下来，没有一步登天，却少走了几分岔路。`,
+      changes: [
+        { attribute: 'cultivationExp', delta: Math.max(5, Math.round(baseGain * 0.8)), reason: '参读残篇后修行' },
+        { attribute: 'comprehension', delta: 1, reason: '辨读修行札记' },
+      ],
+      insight: `残篇不足成法，却能校正吐纳，约得${Math.max(5, Math.round(baseGain * 0.8))}点修行进境。`,
+    },
+  ];
+  const picked = actions[Math.abs((state.age || 0) + String(blueprint?.category || '').length) % actions.length];
+  const hint = blueprint?.name ? `这一年原本隐有「${blueprint.name}」的因果影子，但天机晦暗，最终只落在日常选择与细碎积累里。` : '';
+  return {
+    title: picked.title,
+    narrative: `${picked.narrative}${hint ? `
+
+${hint}` : ''}`,
+    eventType: isFateNode ? 'fate_node' : 'normal',
+    changes: picked.changes,
+    newStatuses: [],
+    newItems: [],
+    removedItemIds: [],
+    newEquippedItems: [],
+    equipItemIds: [],
+    unequipItemIds: [],
+    memory: `${state.age}岁，${picked.title}。`,
+    cultivationInsight: picked.insight,
+    hasChoice: false,
+    choice: null,
+    triggeredBreakthrough: false,
+    causedDeath: false,
+    causedAscension: false,
+    newThreads: [],
+    advanceThreads: [],
+    completeThreadIds: [],
+    failThreadIds: [],
+    triggerCombat: null,
+  };
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -82,31 +150,7 @@ export async function POST(req: NextRequest) {
     } catch (llmErr: any) {
       // Task 21: LLM 失败兜底——保证游戏不卡死，依然推进年龄并保存进度
       console.error('LLM advance failed, using fallback:', llmErr?.message || llmErr);
-      const blueprintName = blueprint?.name || '岁月';
-      aiOutput = {
-        title: `${blueprintName}·流年`,
-        narrative: `${state.age}岁，${state.name}于${state.location || '此地'}度日。${blueprint ? `天道示现"${blueprint.name}"之象。` : ''}岁月流转，未有大事。`,
-        eventType: isFateNode ? 'fate_node' : 'normal',
-        changes: [],
-        newStatuses: [],
-        newItems: [],
-        removedItemIds: [],
-        newEquippedItems: [],
-        equipItemIds: [],
-        unequipItemIds: [],
-        memory: `${state.age}岁流年`,
-        cultivationInsight: ctx.cultivationInsight || '',
-        hasChoice: false,
-        choice: null,
-        triggeredBreakthrough: false,
-        causedDeath: false,
-        causedAscension: false,
-        newThreads: [],
-        advanceThreads: [],
-        completeThreadIds: [],
-        failThreadIds: [],
-        triggerCombat: null,
-      };
+      aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode);
     }
 
     // 引擎执行 AI 输出
