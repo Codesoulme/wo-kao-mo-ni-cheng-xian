@@ -459,11 +459,16 @@ export function computeEffectiveCultivationRate(state: CharacterState): { multip
 // 引擎权威：把修炼速度倍率与来源条目重算回状态。
 // 用于买卖、战斗结算、物品移除等路径，防止已卖/已毁物品的旧加成残留。
 export function normalizeCultivationState(state: CharacterState): CharacterState {
-  const rate = computeEffectiveCultivationRate(state);
-  return {
+  const normalizedState: CharacterState = {
     ...state,
+    inventory: (state.inventory || []).map(normalizeCultivationBearingItem),
+    equipped: (state.equipped || []).map(normalizeCultivationBearingItem),
+  };
+  const rate = computeEffectiveCultivationRate(normalizedState);
+  return {
+    ...normalizedState,
     cultivationMultiplier: rate.multiplier,
-    cultivationFactors: computeCultivationFactors(state),
+    cultivationFactors: computeCultivationFactors(normalizedState),
   };
 }
 
@@ -1160,45 +1165,60 @@ export function tickNaturalRecovery(state: CharacterState): CharacterState {
 
 // ==================== 物品管理 ====================
 
+
+const VALID_ITEM_TYPES_FOR_NORMALIZE = new Set(['weapon', 'armor', 'accessory', 'artifact', 'consumable', 'material', 'tool', 'scripture']);
+const SCRIPTURE_NAME_RE = /诀|决|经|典|录|篇|章|解|式|术|功法|心法|秘籍|玉简|心得|真经|真解|引气|凝气|吐纳/;
+const CULTIVATION_EFFECT_ALIASES = new Set(['cultivationExp', 'cultivation', 'cultivationRate', 'cultivationMultiplier', 'cultivation_speed', '修为', '修炼速度']);
+
+function defaultScriptureMultiplier(rarity?: string): number {
+  const multByRarity: Record<string, number> = {
+    common: 1.3, uncommon: 1.7, rare: 2.5, epic: 3.5, legendary: 4.5, mythic: 5.5,
+  };
+  return multByRarity[rarity || ''] || 1.5;
+}
+
+function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
+  const hasStorageEffect = (it.effects || []).some(e => e.target_attribute === 'storageCapacity' && e.operation === 'add' && e.value > 0);
+  let itemType = it.item_type;
+  if (!VALID_ITEM_TYPES_FOR_NORMALIZE.has(itemType)) {
+    itemType = hasStorageEffect ? 'tool' : 'material';
+  } else if (hasStorageEffect && itemType !== 'tool') {
+    itemType = 'tool';
+  }
+
+  const isScriptureByName = SCRIPTURE_NAME_RE.test(`${it.name || ''}${it.description || ''}`);
+  if (isScriptureByName && itemType !== 'scripture') {
+    itemType = 'scripture';
+  }
+
+  let effects = Array.isArray(it.effects) ? it.effects.map(e => {
+    if (CULTIVATION_EFFECT_ALIASES.has(e.target_attribute) && e.target_attribute !== 'cultivationExp') {
+      return { ...e, target_attribute: 'cultivationExp' };
+    }
+    return e;
+  }) : [];
+
+  if (itemType === 'scripture' && !effects.some(e => e.target_attribute === 'cultivationExp' && e.operation === 'multiply')) {
+    const mult = defaultScriptureMultiplier(it.rarity as string);
+    effects = [...effects, {
+      target_attribute: 'cultivationExp',
+      operation: 'multiply',
+      value: mult,
+      description: `修习此功法，修为流转加速×${mult}`,
+    }];
+  }
+
+  return { ...it, item_type: itemType as any, effects };
+}
+
 // 添加物品到 inventory。若物品是储物袋（含 storageCapacity 效果的 tool），自动增加 storageCapacity。
 // 兜底：若 AI 给了无效 item_type（如 'storage'），但物品含 storageCapacity 效果，则强转 item_type='tool'。
 // 兜底：若物品名含功法关键词（诀/经/典/录/篇/功法）但 item_type 不是 scripture，强转 scripture 并补默认效果
 // Task 22: 容量限制——超过 storageCapacity 时丢弃多余物品（储物袋本身优先保留，因可扩容）
 export function addItems(state: CharacterState, items: ItemEntry[]): CharacterState {
   if (!items.length) return state;
-  // 规整化物品：确保 item_type 合法；储物袋 item_type 必为 'tool'；功法名必为 'scripture'
-  const VALID_TYPES = new Set(['weapon', 'armor', 'accessory', 'artifact', 'consumable', 'material', 'tool', 'scripture']);
-  const SCRIPTURE_NAME_RE = /诀|决|经|典|录|篇|章|解|式|术|功法|心法|秘籍|玉简|真经|真解|引气|凝气|吐纳/;
-  const normalized = items.map(it => {
-    const hasStorageEffect = (it.effects || []).some(e => e.target_attribute === 'storageCapacity' && e.operation === 'add' && e.value > 0);
-    let itemType = it.item_type;
-    if (!VALID_TYPES.has(itemType)) {
-      // 无效类型兜底：含 storageCapacity 效果 → tool；否则 material
-      itemType = hasStorageEffect ? 'tool' : 'material';
-    } else if (hasStorageEffect && itemType !== 'tool') {
-      itemType = 'tool';
-    }
-    // 功法名兜底：若名含功法关键词但 item_type 不是 scripture，强转 scripture
-    const isScriptureByName = SCRIPTURE_NAME_RE.test(it.name || '');
-    if (isScriptureByName && itemType !== 'scripture') {
-      itemType = 'scripture';
-    }
-    let effects = it.effects || [];
-    // 若是 scripture 但无 multiply cultivationExp 效果，补一条默认（按 rarity 分档）
-    if (itemType === 'scripture' && !effects.some(e => e.target_attribute === 'cultivationExp' && e.operation === 'multiply')) {
-      const multByRarity: Record<string, number> = {
-        common: 1.3, uncommon: 1.7, rare: 2.5, epic: 3.5, legendary: 4.5, mythic: 5.5,
-      };
-      const mult = multByRarity[it.rarity as string] || 1.5;
-      effects = [...effects, {
-        target_attribute: 'cultivationExp',
-        operation: 'multiply',
-        value: mult,
-        description: `修习此功法，修为流转加速×${mult}`,
-      }];
-    }
-    return { ...it, item_type: itemType as any, effects };
-  });
+  // 规整化物品：确保储物袋、功法、玉简/心得等可被后续修炼速度归算识别。
+  const normalized = items.map(normalizeCultivationBearingItem);
 
   // Task 22: 计算加入后的总容量（含本批储物袋扩容），按容量限制裁剪
   let bagBoost = 0;
