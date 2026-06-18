@@ -197,7 +197,7 @@ export interface StatusEffect {
 
 export type ItemType = 'weapon' | 'armor' | 'accessory' | 'artifact' | 'consumable' | 'material' | 'tool' | 'scripture';
 
-// 可装备的槽位
+// 可装备的类型（用于判定 itemToSlot —— 仅用于「是否可装备」布尔判断；不再限制每种类型数量上限）
 export type EquipSlot = 'weapon' | 'armor' | 'accessory' | 'artifact' | 'scripture';
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
@@ -209,12 +209,21 @@ export const SLOT_LABEL: Record<EquipSlot, string> = {
   weapon: '兵器', armor: '防具', accessory: '饰物', artifact: '法宝', scripture: '功法',
 };
 
-// 物品类型 → 可装备槽位映射（不可装备的类型返回 null）
+// 物品类型 → 是否可装备（不再返回固定槽位；装备数量上限由 AI 判断）
 export function itemToSlot(type: ItemType): EquipSlot | null {
   if (type === 'weapon' || type === 'armor' || type === 'accessory' || type === 'artifact' || type === 'scripture') {
     return type;
   }
   return null;
+}
+
+// 修炼速度来源结构化条目：AI 输出 + 前端按 rarity 上色显示来源名称与具体倍率数字
+export interface CultivationFactor {
+  name: string;                  // 来源名称（如「土天灵根」「《引气诀》」「聚灵佩」）
+  value: number;                  // 数值（如 3.0、1.5、0.2）
+  operation: 'multiply' | 'add';  // 倍率 or 加成
+  rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  note?: string;                  // 简短说明（如「修为流转加速」「灵气汇聚」）
 }
 
 export interface ItemEntry {
@@ -225,6 +234,10 @@ export interface ItemEntry {
   rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
   effects: StatusEffect[];
   source: string;
+  // 装备位置备注（自由文本，由 AI 给出或玩家装备时按类型默认生成）
+  // 例：「左手」「右手中指」「项链·储物戒指×5」「腰悬」「头戴」
+  // 不再限制每种类型装备数量上限——玩家可戴十个戒指、脖挂一串储物戒指等
+  equipNote?: string;
 }
 
 // ==================== AI 输出结构 (EngineCommand) ====================
@@ -250,12 +263,25 @@ export interface AIEventOutput {
   // 移除/消耗的物品 id 列表（AI 联动：战斗中武器被破坏、丹药被消耗等）
   removedItemIds?: string[];
 
+  // AI 直接放入已装备的物品（含 equipNote 自由文本，如「项链·储物戒指串」）
+  // 用于 AI 创造性装备场景：玩家说「把储物戒指串成项链戴脖子上」→ AI 用此字段放置
+  newEquippedItems?: ItemEntry[];
+
+  // AI 想把背包里已有的物品装备上去的 id 列表（引擎自动移动 inventory→equipped）
+  equipItemIds?: string[];
+
+  // AI 想卸下已装备物品的 id 列表（引擎自动移动 equipped→inventory）
+  unequipItemIds?: string[];
+
   // 长期记忆（写入长期记忆库）
   memory: string;
 
   // 修炼心得：AI 根据当前角色全状态生成的修炼速度说明文本（影响修炼速度的种种因素）
   // 显示规则见 prompt：60-150字，修仙口吻，融入角色处境，末尾给出综合倍率数值
   cultivationInsight?: string;
+
+  // 修炼速度来源结构化列表（前端按 rarity 给来源名称上色 + 显示具体倍率数字）
+  cultivationFactors?: CultivationFactor[];
 
   // 是否触发选择节点
   hasChoice: boolean;
@@ -296,9 +322,13 @@ export interface ChoiceResultOutput {
   newStatuses: StatusEntry[];
   newItems: ItemEntry[];
   removedItemIds?: string[];
+  newEquippedItems?: ItemEntry[];
+  equipItemIds?: string[];
+  unequipItemIds?: string[];
   memory: string;
   // 修炼心得（同 AIEventOutput）
   cultivationInsight?: string;
+  cultivationFactors?: CultivationFactor[];
   causedDeath?: boolean;
   deathReason?: string;
 }
@@ -312,9 +342,13 @@ export interface InterfereOutput {
   newStatuses: StatusEntry[];
   newItems: ItemEntry[];
   removedItemIds?: string[];
+  newEquippedItems?: ItemEntry[];
+  equipItemIds?: string[];
+  unequipItemIds?: string[];
   memory: string;
   // 修炼心得（同 AIEventOutput；accepted=false 时可留空，引擎将保留旧文本）
   cultivationInsight?: string;
+  cultivationFactors?: CultivationFactor[];
   // 干扰可能延迟年龄推进
   ageAdvance?: number;            // 干扰消耗的时间（岁），默认 0
 }
@@ -345,11 +379,15 @@ export interface EngineStateContext {
   };
   // 修炼心得（当前已存的修炼速度说明文本，AI 可读取参考并决定是否更新）
   cultivationInsight: string;
+  // 修炼速度来源结构化列表（AI 可读取上一轮的来源条目，本轮可调整）
+  cultivationFactors: CultivationFactor[];
   activeStatuses: StatusEntry[];
   inventory: ItemEntry[];
-  // 已装备物品（AI 可读取，了解玩家当前战力与功法）
-  equipped: EquippedMap;
-  // 修炼速度倍率（灵根 × 功法）
+  // 已装备物品数组（无槽位上限，AI 可创造性装备：项链·储物戒指串、十指皆戴戒指等）
+  equipped: ItemEntry[];
+  // 储物袋容量上限（无袋 5；获得储物袋后增加）
+  storageCapacity: number;
+  // 修炼速度倍率（灵根 × 功法 × 其他装备的乘法效果之和）
   cultivationMultiplier: number;
   recentEvents: { age: number; title: string; narrative: string }[];
   longTermMemory: string[];
@@ -384,7 +422,8 @@ export const FATE_NODES: FateNode[] = [
 
 // ==================== 角色状态（运行时） ====================
 
-// 已装备物品映射（槽位 → 物品）。一个物品要么在 inventory，要么在 equipped。
+// 兼容旧存档：旧格式为 Partial<Record<EquipSlot, ItemEntry>>（slot-map），新格式为 ItemEntry[]（数组）
+// dbToState 会在加载时把旧 slot-map 自动转换为数组
 export type EquippedMap = Partial<Record<EquipSlot, ItemEntry>>;
 
 export interface CharacterState {
@@ -414,11 +453,15 @@ export interface CharacterState {
   lastEventAge: number;
   activeStatuses: StatusEntry[];
   inventory: ItemEntry[];
-  // 已装备物品（weapon/armor/accessory/artifact/scripture）
-  equipped: EquippedMap;
-  // 修炼速度倍率（灵根倍率 × 功法倍率），advance 时 cultivationExp 增量乘以此值
+  // 已装备物品数组（不再有 5 槽位上限——AI 可创造性放置，玩家也可戴多枚戒指等）
+  equipped: ItemEntry[];
+  // 储物袋容量上限（无袋 5；获得储物袋物品后增加；储物袋物品本身不占容量）
+  storageCapacity: number;
+  // 修炼速度倍率（灵根倍率 × 所有已装备物品的 multiply cultivationExp 效果之积）
   cultivationMultiplier: number;
   // 修炼心得：AI 生成的修炼速度说明文本（描述当前影响修炼速度的因素）
   cultivationInsight: string;
+  // 修炼速度来源结构化条目（前端按 rarity 给来源上色 + 显示具体倍率数字）
+  cultivationFactors: CultivationFactor[];
   longTermMemory: string[];
 }

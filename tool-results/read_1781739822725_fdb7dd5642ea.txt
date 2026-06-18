@@ -1,0 +1,804 @@
+     1→     1→// 修仙模拟器 - 引擎核心
+     2→     2→// 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
+     3→     3→// AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
+     4→     4→
+     5→     5→import {
+     6→     6→  CharacterState,
+     7→     7→  AttributeChange,
+     8→     8→  StatusEntry,
+     9→     9→  ItemEntry,
+    10→    10→  Realm,
+    11→    11→  REALMS,
+    12→    12→  getRealmInfo,
+    13→    13→  getNextRealm,
+    14→    14→  SpiritualRoot,
+    15→    15→  SPIRITUAL_ROOTS,
+    16→    16→  FATE_NODES,
+    17→    17→  AIEventOutput,
+    18→    18→  EngineStateContext,
+    19→    19→  EquipSlot,
+    20→    20→  EquippedMap,
+    21→    21→  ITEM_TYPE_LABEL,
+    22→    22→  SLOT_LABEL,
+    23→    23→  itemToSlot,
+    24→    24→} from './types';
+    25→    25→
+    26→    26→// ==================== 角色状态序列化 ====================
+    27→    27→
+    28→    28→export interface DBCharacter {
+    29→    29→  id: string; name: string; age: number; lifespan: number; gender: string;
+    30→    30→  spiritualRoot: string; rootDetail: string; realm: string; realmLevel: number;
+    31→    31→  cultivationExp: number; expToBreak: number;
+    32→    32→  elementMetal: number; elementWood: number; elementWater: number; elementFire: number; elementEarth: number;
+    33→    33→  hp: number; maxHp: number; mp: number; maxMp: number;
+    34→    34→  attack: number; defense: number; speed: number; luck: number; comprehension: number;
+    35→    35→  spiritStones: number; reputation: number;
+    36→    36→  alive: boolean; ascended: boolean; causeOfDeath: string;
+    37→    37→  faction: string; master: string; location: string;
+    38→    38→  fateNodes: string; isAtChoice: boolean; lastEventAge: number;
+    39→    39→  statusJson: string; inventoryJson: string; memoryJson: string;
+    40→    40→  equippedJson: string; cultivationMultiplier: number;
+    41→    41→  cultivationInsight: string;
+    42→    42→}
+    43→    43→
+    44→    44→export function dbToState(c: DBCharacter): CharacterState {
+    45→    45→  const rootInfo = SPIRITUAL_ROOTS[c.spiritualRoot as SpiritualRoot];
+    46→    46→  const equipped = safeParse<EquippedMap>(c.equippedJson || '{}', {});
+    47→    47→  // cultivationMultiplier 始终根据灵根 + 已装备功法实时重算（避免旧存档遗留的过期值）
+    48→    48→  // 这样无论数据库里存的是什么，加载到内存后的倍率都是当前正确的
+    49→    49→  let mult = rootInfo?.multiplier ?? 0;
+    50→    50→  const scripture = equipped.scripture;
+    51→    51→  if (scripture) {
+    52→    52→    for (const eff of scripture.effects || []) {
+    53→    53→      if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply' && eff.value > 0) {
+    54→    54→        mult *= eff.value;
+    55→    55→      }
+    56→    56→    }
+    57→    57→  }
+    58→    58→  return {
+    59→    59→    id: c.id, name: c.name, age: c.age, lifespan: c.lifespan, gender: c.gender,
+    60→    60→    spiritualRoot: c.spiritualRoot as SpiritualRoot,
+    61→    61→    rootDetail: c.rootDetail,
+    62→    62→    rootMultiplier: rootInfo?.multiplier ?? 0,
+    63→    63→    realm: c.realm as Realm, realmLevel: c.realmLevel,
+    64→    64→    cultivationExp: c.cultivationExp, expToBreak: c.expToBreak,
+    65→    65→    elements: { metal: c.elementMetal, wood: c.elementWood, water: c.elementWater, fire: c.elementFire, earth: c.elementEarth },
+    66→    66→    hp: c.hp, maxHp: c.maxHp, mp: c.mp, maxMp: c.maxMp,
+    67→    67→    attack: c.attack, defense: c.defense, speed: c.speed,
+    68→    68→    luck: c.luck, comprehension: c.comprehension,
+    69→    69→    spiritStones: c.spiritStones, reputation: c.reputation,
+    70→    70→    alive: c.alive, ascended: c.ascended, causeOfDeath: c.causeOfDeath,
+    71→    71→    faction: c.faction, master: c.master, location: c.location,
+    72→    72→    fateNodes: c.fateNodes ? c.fateNodes.split(',').filter(Boolean).map(Number) : [],
+    73→    73→    isAtChoice: c.isAtChoice, lastEventAge: c.lastEventAge,
+    74→    74→    activeStatuses: safeParse<StatusEntry[]>(c.statusJson, []),
+    75→    75→    inventory: safeParse<ItemEntry[]>(c.inventoryJson, []),
+    76→    76→    equipped,
+    77→    77→    cultivationMultiplier: mult,
+    78→    78→    cultivationInsight: c.cultivationInsight || '',
+    79→    79→    longTermMemory: safeParse<string[]>(c.memoryJson, []),
+    80→    80→  };
+    81→    81→}
+    82→    82→
+    83→    83→function safeParse<T>(s: string, fallback: T): T {
+    84→    84→  if (!s) return fallback;
+    85→    85→  try { return JSON.parse(s) as T; } catch { return fallback; }
+    86→    86→}
+    87→    87→
+    88→    88→// ==================== 属性变更应用 (引擎权威) ====================
+    89→    89→
+    90→    90→// AI 可影响的属性白名单 + 钳制范围
+    91→    91→// 注意：age（年龄）不在白名单内——年龄推进是引擎独占职责
+    92→    92→//   - advance 流程：引擎 state.age += 1
+    93→    93→//   - interfere 流程：引擎根据 AI 的 ageAdvance 字段推进
+    94→    94→//   AI 不得通过 changes 直接修改 age，否则会与引擎推进叠加导致跳岁
+    95→    95→const ATTRIBUTE_BOUNDS: Record<string, { min: number; max: number }> = {
+    96→    96→  lifespan:        { min: 1,    max: 99999 },
+    97→    97→  cultivationExp:  { min: 0,    max: 99999999 },
+    98→    98→  hp:              { min: 0,    max: 99999 },
+    99→    99→  maxHp:           { min: 1,    max: 99999 },
+   100→   100→  mp:              { min: 0,    max: 99999 },
+   101→   101→  maxMp:           { min: 0,    max: 99999 },
+   102→   102→  attack:          { min: 0,    max: 99999 },
+   103→   103→  defense:         { min: 0,    max: 99999 },
+   104→   104→  speed:           { min: 0,    max: 99999 },
+   105→   105→  luck:            { min: 0,    max: 100 },
+   106→   106→  comprehension:   { min: 0,    max: 100 },
+   107→   107→  spiritStones:    { min: 0,    max: 99999999 },
+   108→   108→  reputation:      { min: -9999,max: 99999 },
+   109→   109→  elementMetal:    { min: 0,    max: 100 },
+   110→   110→  elementWood:     { min: 0,    max: 100 },
+   111→   111→  elementWater:    { min: 0,    max: 100 },
+   112→   112→  elementFire:     { min: 0,    max: 100 },
+   113→   113→  elementEarth:    { min: 0,    max: 100 },
+   114→   114→};
+   115→   115→
+   116→   116→export function applyChanges(state: CharacterState, changes: AttributeChange[]): CharacterState {
+   117→   117→  const next = { ...state };
+   118→   118→  for (const change of changes) {
+   119→   119→    const attr = change.attribute;
+   120→   120→    const bounds = ATTRIBUTE_BOUNDS[attr];
+   121→   121→    if (!bounds) continue; // 引擎拒绝未知属性
+   122→   122→
+   123→   123→    // 修炼速度倍率：cultivationExp 的增量乘以 (灵根×功法) 倍率
+   124→   124→    // 这样 AI 给 +10 修为时，装备了引气决(×1.5)+真灵根(×1.5) 的角色实际得 +22.5→22
+   125→   125→    let delta = change.delta;
+   126→   126→    if (attr === 'cultivationExp' && next.cultivationMultiplier > 0 && delta > 0) {
+   127→   127→      delta = Math.round(delta * next.cultivationMultiplier);
+   128→   128→    }
+   129→   129→
+   130→   130→    const current = (next as any)[attr] ?? 0;
+   131→   131→    let newVal = current + delta;
+   132→   132→
+   133→   133→    // 引擎钳制：不可超出范围
+   134→   134→    newVal = Math.max(bounds.min, Math.min(bounds.max, newVal));
+   135→   135→    (next as any)[attr] = newVal;
+   136→   136→
+   137→   137→    // 派生约束
+   138→   138→    if (attr === 'hp' && newVal <= 0) {
+   139→   139→      next.hp = 0;
+   140→   140→      next.alive = false;
+   141→   141→      if (!next.causeOfDeath) next.causeOfDeath = '气血耗尽，陨落';
+   142→   142→    }
+   143→   143→    if (attr === 'lifespan' && next.age >= next.lifespan) {
+   144→   144→      // 寿元检查由 age 推进时触发
+   145→   145→    }
+   146→   146→    if (attr === 'maxHp' && next.hp > next.maxHp) next.hp = next.maxHp;
+   147→   147→    if (attr === 'maxMp' && next.mp > next.maxMp) next.mp = next.maxMp;
+   148→   148→  }
+   149→   149→  return next;
+   150→   150→}
+   151→   151→
+   152→   152→// ==================== 装备管理 (引擎权威) ====================
+   153→   153→
+   154→   154→// 把物品的 add 效果应用到角色属性（装备时 +delta，卸下时 -delta）
+   155→   155→function applyItemEffects(state: CharacterState, item: ItemEntry, sign: 1 | -1): CharacterState {
+   156→   156→  let next = { ...state };
+   157→   157→  const changes: AttributeChange[] = [];
+   158→   158→  for (const eff of item.effects || []) {
+   159→   159→    if (eff.operation === 'add' && ATTRIBUTE_BOUNDS[eff.target_attribute]) {
+   160→   160→      changes.push({
+   161→   161→        attribute: eff.target_attribute,
+   162→   162→        delta: sign * eff.value,
+   163→   163→        reason: sign > 0 ? `装备 ${item.name}` : `卸下 ${item.name}`,
+   164→   164→      });
+   165→   165→    }
+   166→   166→  }
+   167→   167→  if (changes.length) next = applyChanges(next, changes);
+   168→   168→  return next;
+   169→   169→}
+   170→   170→
+   171→   171→// 重算修炼倍率 = 灵根倍率 × 所有已装备功法的 multiply cultivationExp
+   172→   172→export function recalcCultivationMultiplier(state: CharacterState): CharacterState {
+   173→   173→  const rootInfo = SPIRITUAL_ROOTS[state.spiritualRoot];
+   174→   174→  let mult = rootInfo?.multiplier ?? 0;
+   175→   175→  const scripture = state.equipped?.scripture;
+   176→   176→  if (scripture) {
+   177→   177→    for (const eff of scripture.effects || []) {
+   178→   178→      if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply' && eff.value > 0) {
+   179→   179→        mult *= eff.value;
+   180→   180→      }
+   181→   181→    }
+   182→   182→  }
+   183→   183→  return { ...state, cultivationMultiplier: mult };
+   184→   184→}
+   185→   185→
+   186→   186→// 装备物品到对应槽位（从 inventory 移到 equipped）
+   187→   187→export function equipItem(state: CharacterState, itemId: string): { state: CharacterState; ok: boolean; error?: string; slot?: EquipSlot; replaced?: ItemEntry } {
+   188→   188→  const idx = state.inventory.findIndex(it => it.id === itemId);
+   189→   189→  if (idx < 0) return { state, ok: false, error: '物品不在储物袋中' };
+   190→   190→  const item = state.inventory[idx];
+   191→   191→  const slot = itemToSlot(item.item_type);
+   192→   192→  if (!slot) return { state, ok: false, error: '该物品不可装备' };
+   193→   193→
+   194→   194→  let next: CharacterState = { ...state, inventory: state.inventory.filter(it => it.id !== itemId), equipped: { ...state.equipped } };
+   195→   195→  // 若槽位已有物品，先卸下（不应用反向效果，因为下面会整体重算；但需把旧物品放回 inventory）
+   196→   196→  const replaced = next.equipped[slot];
+   197→   197→  if (replaced) {
+   198→   198→    next.equipped = { ...next.equipped, [slot]: undefined };
+   199→   199→    next.inventory = [...next.inventory, replaced];
+   200→   200→  }
+   201→   201→  // 装备新物品
+   202→   202→  next.equipped = { ...next.equipped, [slot]: item };
+   203→   203→  // 应用 add 效果
+   204→   204→  next = applyItemEffects(next, item, 1);
+   205→   205→  // 若卸下了旧物品，应用反向效果
+   206→   206→  if (replaced) next = applyItemEffects(next, replaced, -1);
+   207→   207→  // 重算修炼倍率
+   208→   208→  next = recalcCultivationMultiplier(next);
+   209→   209→  return { state: next, ok: true, slot, replaced };
+   210→   210→}
+   211→   211→
+   212→   212→// 卸下指定槽位的物品
+   213→   213→export function unequipSlot(state: CharacterState, slot: EquipSlot): { state: CharacterState; ok: boolean; error?: string; item?: ItemEntry } {
+   214→   214→  const item = state.equipped?.[slot];
+   215→   215→  if (!item) return { state, ok: false, error: '该槽位无装备' };
+   216→   216→  let next: CharacterState = {
+   217→   217→    ...state,
+   218→   218→    equipped: { ...state.equipped, [slot]: undefined },
+   219→   219→    inventory: [...state.inventory, item],
+   220→   220→  };
+   221→   221→  next = applyItemEffects(next, item, -1);
+   222→   222→  next = recalcCultivationMultiplier(next);
+   223→   223→  return { state: next, ok: true, item };
+   224→   224→}
+   225→   225→
+   226→   226→// 使用消耗品（consumable）：应用效果后从 inventory 移除
+   227→   227→export function consumeItem(state: CharacterState, itemId: string): { state: CharacterState; ok: boolean; error?: string; item?: ItemEntry } {
+   228→   228→  const item = state.inventory.find(it => it.id === itemId);
+   229→   229→  if (!item) return { state, ok: false, error: '物品不在储物袋中' };
+   230→   230→  if (item.item_type !== 'consumable') return { state, ok: false, error: '仅丹药类物品可使用' };
+   231→   231→  let next: CharacterState = {
+   232→   232→    ...state,
+   233→   233→    inventory: state.inventory.filter(it => it.id !== itemId),
+   234→   234→  };
+   235→   235→  // 应用 add 效果到属性；trigger 效果暂不处理（可后续扩展为加状态词条）
+   236→   236→  next = applyItemEffects(next, item, 1);
+   237→   237→  return { state: next, ok: true, item };
+   238→   238→}
+   239→   239→
+   240→   240→// AI 联动：按 id 移除物品（破坏/消耗）。可同时存在于 inventory 或 equipped。
+   241→   241→export function removeItemsByIds(state: CharacterState, ids: string[]): { state: CharacterState; removed: ItemEntry[] } {
+   242→   242→  if (!ids.length) return { state, removed: [] };
+   243→   243→  const idSet = new Set(ids);
+   244→   244→  let next = { ...state };
+   245→   245→  const removed: ItemEntry[] = [];
+   246→   246→  // 从 inventory 移除
+   247→   247→  const keptInv: ItemEntry[] = [];
+   248→   248→  for (const it of state.inventory) {
+   249→   249→    if (idSet.has(it.id)) removed.push(it);
+   250→   250→    else keptInv.push(it);
+   251→   251→  }
+   252→   252→  next.inventory = keptInv;
+   253→   253→  // 从 equipped 移除（并反向应用效果）
+   254→   254→  if (next.equipped) {
+   255→   255→    const newEquipped: EquippedMap = { ...next.equipped };
+   256→   256→    (Object.keys(newEquipped) as EquipSlot[]).forEach(slot => {
+   257→   257→      const it = newEquipped[slot];
+   258→   258→      if (it && idSet.has(it.id)) {
+   259→   259→        removed.push(it);
+   260→   260→        next = applyItemEffects(next, it, -1);
+   261→   261→        delete newEquipped[slot];
+   262→   262→      }
+   263→   263→    });
+   264→   264→    next.equipped = newEquipped;
+   265→   265→    next = recalcCultivationMultiplier(next);
+   266→   266→  }
+   267→   267→  return { state: next, removed };
+   268→   268→}
+   269→   269→
+   270→   270→// ==================== 炼丹炉系统 ====================
+   271→   271→
+   272→   272→// 丹药命名表：按元素 + rarity
+   273→   273→const PILL_NAMES_BY_ELEMENT: Record<string, { common: string[]; uncommon: string[]; rare: string[]; epic: string[]; legendary: string[] }> = {
+   274→   274→  fire: {
+   275→   275→    common: ['赤焰散', '火元丸'],
+   276→   276→    uncommon: ['烈火丹', '赤阳丹'],
+   277→   277→    rare: ['炎阳真丹', '焚天丹'],
+   278→   278→    epic: ['九转火元丹', '太阳真火丹'],
+   279→   279→    legendary: ['涅槃真丹', '三昧真火丹'],
+   280→   280→  },
+   281→   281→  water: {
+   282→   282→    common: ['寒水散', '水元丸'],
+   283→   283→    uncommon: ['玄冰丹', '凝露丹'],
+   284→   284→    rare: ['玄冰真丹', '北海神丹'],
+   285→   285→    epic: ['九转玄冰丹', '太阴真水丹'],
+   286→   286→    legendary: ['混沌玄冰丹', '天河真水丹'],
+   287→   287→  },
+   288→   288→  wood: {
+   289→   289→    common: ['青木散', '木元丸'],
+   290→   290→    uncommon: ['生机丹', '回春丹'],
+   291→   291→    rare: ['青木真丹', '造化丹'],
+   292→   292→    epic: ['九转青木丹', '长生丹'],
+   293→   293→    legendary: ['造化真丹', '万木朝宗丹'],
+   294→   294→  },
+   295→   295→  metal: {
+   296→   296→    common: ['锐金散', '金元丸'],
+   297→   297→    uncommon: ['庚金丹', '锋锐丹'],
+   298→   298→    rare: ['庚金真丹', '白虎丹'],
+   299→   299→    epic: ['九转庚金丹', '太白真金丹'],
+   300→   300→    legendary: ['诛仙剑意丹', '白虎真形丹'],
+   301→   301→  },
+   302→   302→  earth: {
+   303→   303→    common: ['厚土散', '土元丸'],
+   304→   304→    uncommon: ['戊土丹', '磐石丹'],
+   305→   305→    rare: ['戊土真丹', '黄中丹'],
+   306→   306→    epic: ['九转戊土丹', '后土真丹'],
+   307→   307→    legendary: ['玄黄造化丹', '大地之心丹'],
+   308→   308→  },
+   309→   309→};
+   310→   310→
+   311→   311→// 丹药效果表：按元素 + rarity
+   312→   312→function pillEffects(element: string, rarity: string): { target_attribute: string; operation: string; value: number; description: string }[] {
+   313→   313→  const powerByRarity: Record<string, number> = { common: 15, uncommon: 30, rare: 60, epic: 120, legendary: 250, mythic: 500 };
+   314→   314→  const power = powerByRarity[rarity] || 15;
+   315→   315→  const effByElement: Record<string, { target: string; desc: string }[]> = {
+   316→   316→    fire: [{ target: 'attack', desc: '火力催动，攻伐加成' }, { target: 'maxHp', desc: '阳火淬体，气血略增' }],
+   317→   317→    water: [{ target: 'maxMp', desc: '玄水润脉，灵力提升' }, { target: 'mp', desc: '补水培元，灵力恢复' }],
+   318→   318→    wood: [{ target: 'hp', desc: '木气生机，气血恢复' }, { target: 'cultivationExp', desc: '木气滋养，修为微增' }],
+   319→   319→    metal: [{ target: 'attack', desc: '金锐之气，攻伐提升' }, { target: 'speed', desc: '金气轻灵，身法加快' }],
+   320→   320→    earth: [{ target: 'defense', desc: '土气厚重，防御加固' }, { target: 'maxHp', desc: '土气培元，气血上限增' }],
+   321→   321→  };
+   322→   322→  const effs = effByElement[element] || effByElement.wood;
+   323→   323→  return effs.map(e => ({
+   324→   324→    target_attribute: e.target,
+   325→   325→    operation: 'add',
+   326→   326→    value: Math.round(power * 0.8),
+   327→   327→    description: e.desc,
+   328→   328→  }));
+   329→   329→}
+   330→   330→
+   331→   331→// 从材料的 effects 中提取主要元素倾向
+   332→   332→function extractMaterialElement(item: ItemEntry): string | null {
+   333→   333→  for (const eff of item.effects || []) {
+   334→   334→    if (eff.target_attribute === 'elementFire') return 'fire';
+   335→   335→    if (eff.target_attribute === 'elementWater') return 'water';
+   336→   336→    if (eff.target_attribute === 'elementWood') return 'wood';
+   337→   337→    if (eff.target_attribute === 'elementMetal') return 'metal';
+   338→   338→    if (eff.target_attribute === 'elementEarth') return 'earth';
+   339→   339→  }
+   340→   340→  return null;
+   341→   341→}
+   342→   342→
+   343→   343→const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+   344→   344→function rarityIndex(r: string): number {
+   345→   345→  return RARITY_ORDER.indexOf(r);
+   346→   346→}
+   347→   347→
+   348→   348→// 炼丹炉：消耗 2-3 个材料 + 灵石，有概率炼出丹药
+   349→   349→// 成功率 = 30% + 悟性*0.4% + 灵根倍率*5% + 平均材料 rarity*8% - 5%（每多一个材料扣减）
+   350→   350→// 成功：丹药 rarity = clamp(平均材料 rarity ± 1)，效果按主要元素
+   351→   351→// 失败：得一枚"废丹"（common consumable，恢复 5hp）
+   352→   352→export interface AlchemyResult {
+   353→   353→  state: CharacterState;
+   354→   354→  ok: boolean;
+   355→   355→  error?: string;
+   356→   356→  success: boolean;
+   357→   357→  narrative: string;
+   358→   358→  product?: ItemEntry;
+   359→   359→  consumedMaterials: ItemEntry[];
+   360→   360→  spiritStoneCost: number;
+   361→   361→  successRate: number;
+   362→   362→}
+   363→   363→
+   364→   364→export function alchemy(
+   365→   365→  state: CharacterState,
+   366→   366→  materialIds: string[],
+   367→   367→  spiritStoneCost: number = 10
+   368→   368→): AlchemyResult {
+   369→   369→  // 校验材料数量
+   370→   370→  if (materialIds.length < 2 || materialIds.length > 3) {
+   371→   371→    return { state, ok: false, error: '须选 2-3 件材料入炉', success: false, narrative: '', consumedMaterials: [], spiritStoneCost: 0, successRate: 0 };
+   372→   372→  }
+   373→   373→  // 校验材料都在储物袋
+   374→   374→  const materials: ItemEntry[] = [];
+   375→   375→  for (const id of materialIds) {
+   376→   376→    const m = state.inventory.find(it => it.id === id);
+   377→   377→    if (!m) return { state, ok: false, error: '材料不在储物袋中', success: false, narrative: '', consumedMaterials: [], spiritStoneCost: 0, successRate: 0 };
+   378→   378→    materials.push(m);
+   379→   379→  }
+   380→   380→  // 校验灵石
+   381→   381→  if (state.spiritStones < spiritStoneCost) {
+   382→   382→    return { state, ok: false, error: `灵石不足，需 ${spiritStoneCost} 灵石`, success: false, narrative: '', consumedMaterials: [], spiritStoneCost: 0, successRate: 0 };
+   383→   383→  }
+   384→   384→
+   385→   385→  // 计算成功率
+   386→   386→  const comprehensionBonus = state.comprehension * 0.4;
+   387→   387→  const rootBonus = (state.rootMultiplier || 0) * 5;
+   388→   388→  const avgRarityIdx = materials.reduce((s, m) => s + rarityIndex(m.rarity), 0) / materials.length;
+   389→   389→  const rarityBonus = avgRarityIdx * 8;
+   390→   390→  const countPenalty = (materials.length - 2) * 5;
+   391→   391→  let successRate = 30 + comprehensionBonus + rootBonus + rarityBonus - countPenalty;
+   392→   392→  successRate = Math.max(10, Math.min(95, successRate));
+   393→   393→
+   394→   394→  // 消耗材料 + 灵石
+   395→   395→  let next: CharacterState = {
+   396→   396→    ...state,
+   397→   397→    inventory: state.inventory.filter(it => !materialIds.includes(it.id)),
+   398→   398→    spiritStones: state.spiritStones - spiritStoneCost,
+   399→   399→  };
+   400→   400→
+   401→   401→  // 判定成功
+   402→   402→  const roll = Math.random() * 100;
+   403→   403→  const success = roll < successRate;
+   404→   404→
+   405→   405→  if (!success) {
+   406→   406→    // 失败：得废丹
+   407→   407→    const wastePill: ItemEntry = {
+   408→   408→      id: `item_pil_waste_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+   409→   409→      name: '废丹',
+   410→   410→      description: '炼丹失败所成的焦黑丹药，仅余微薄药力',
+   411→   411→      item_type: 'consumable',
+   412→   412→      rarity: 'common',
+   413→   413→      effects: [{ target_attribute: 'hp', operation: 'add', value: 5, description: '勉强可服，恢复少许气血' }],
+   414→   414→      source: '炼丹失败所得',
+   415→   415→    };
+   416→   416→    next.inventory = [...next.inventory, wastePill];
+   417→   417→    return {
+   418→   418→      state: next,
+   419→   419→      ok: true,
+   420→   420→      success: false,
+   421→   421→      narrative: `丹炉中骤然炸响，${materials.map(m => m.name).join('、')}化为飞灰。你心有不甘，从残渣中刮得一枚焦黑废丹。`,
+   422→   422→      product: wastePill,
+   423→   423→      consumedMaterials: materials,
+   424→   424→      spiritStoneCost,
+   425→   425→      successRate,
+   426→   426→    };
+   427→   427→  }
+   428→   428→
+   429→   429→  // 成功：判定主要元素（取材料中最常出现的元素）
+   430→   430→  const elementCounts: Record<string, number> = {};
+   431→   431→  for (const m of materials) {
+   432→   432→    const el = extractMaterialElement(m);
+   433→   433→    if (el) elementCounts[el] = (elementCounts[el] || 0) + 1;
+   434→   434→  }
+   435→   435→  let mainElement = 'wood';
+   436→   436→  let maxCount = 0;
+   437→   437→  for (const [el, cnt] of Object.entries(elementCounts)) {
+   438→   438→    if (cnt > maxCount) { maxCount = cnt; mainElement = el; }
+   439→   439→  }
+   440→   440→  // 若材料无元素倾向，按灵根五行倾向取（简化为木）
+   441→   441→  if (maxCount === 0) mainElement = 'wood';
+   442→   442→
+   443→   443→  // 丹药 rarity：平均材料 rarity ± 1（随机浮动）
+   444→   444→  const avgIdx = Math.round(avgRarityIdx);
+   445→   445→  const drift = Math.random() < 0.4 ? (Math.random() < 0.5 ? -1 : 1) : 0;
+   446→   446→  let pillRarityIdx = Math.max(0, Math.min(4, avgIdx + drift)); // 不超过 legendary
+   447→   447→  const pillRarity = RARITY_ORDER[pillRarityIdx];
+   448→   448→
+   449→   449→  // 丹药名
+   450→   450→  const namePool = PILL_NAMES_BY_ELEMENT[mainElement]?.[pillRarity as 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'];
+   451→   451→  const pillName = namePool?.[Math.floor(Math.random() * namePool.length)] || `${mainElement}元丹`;
+   452→   452→
+   453→   453→  // 丹药效果
+   454→   454→  const effects = pillEffects(mainElement, pillRarity);
+   455→   455→
+   456→   456→  const pill: ItemEntry = {
+   457→   457→    id: `item_pil_${mainElement}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+   458→   458→    name: pillName,
+   459→   459→    description: `以${materials.map(m => m.name).join('、')}炼制而成的${pillRarity === 'common' ? '凡品' : pillRarity === 'legendary' ? '传说' : ''}丹药，蕴含${mainElement === 'fire' ? '火' : mainElement === 'water' ? '水' : mainElement === 'wood' ? '木' : mainElement === 'metal' ? '金' : '土'}属性之力`,
+   460→   460→    item_type: 'consumable',
+   461→   461→    rarity: pillRarity,
+   462→   462→    effects,
+   463→   463→    source: '炼丹炉所炼',
+   464→   464→  };
+   465→   465→
+   466→   466→  next.inventory = [...next.inventory, pill];
+   467→   467→
+   468→   468→  const elementZh = mainElement === 'fire' ? '火' : mainElement === 'water' ? '水' : mainElement === 'wood' ? '木' : mainElement === 'metal' ? '金' : '土';
+   469→   469→  const rarityZh: Record<string, string> = { common: '凡品', uncommon: '良品', rare: '稀有', epic: '史诗', legendary: '传说' };
+   470→   470→
+   471→   471→  return {
+   472→   472→    state: next,
+   473→   473→    ok: true,
+   474→   474→    success: true,
+   475→   475→    narrative: `丹炉中异光乍现，${elementZh}属灵气汇聚成形。你心念一动，扣住炉盖——一颗${rarityZh[pillRarity]}丹药跃然而出：${pillName}。`,
+   476→   476→    product: pill,
+   477→   477→    consumedMaterials: materials,
+   478→   478→    spiritStoneCost,
+   479→   479→    successRate,
+   480→   480→  };
+   481→   481→}
+   482→   482→
+   483→   483→// ==================== 突破处理 ====================
+   484→   484→
+   485→   485→export function tryBreakthrough(state: CharacterState): { state: CharacterState; success: boolean; newRealm?: Realm } {
+   486→   486→  if (state.cultivationExp < state.expToBreak) {
+   487→   487→    return { state, success: false };
+   488→   488→  }
+   489→   489→  const nextRealm = getNextRealm(state.realm);
+   490→   490→  if (!nextRealm) {
+   491→   491→    // 已达最高境界（渡劫→飞升由特殊事件处理）
+   492→   492→    return { state, success: false };
+   493→   493→  }
+   494→   494→
+   495→   495→  const nextInfo = getRealmInfo(nextRealm);
+   496→   496→  const newState: CharacterState = {
+   497→   497→    ...state,
+   498→   498→    realm: nextRealm,
+   499→   499→    realmLevel: 0,
+   500→   500→    cultivationExp: 0,
+   501→   501→    expToBreak: nextInfo.expPerLevel,
+   502→   502→    lifespan: Math.max(state.lifespan, nextInfo.baseLifespan),
+   503→   503→  };
+   504→   504→
+   505→   505→  // 突破提升基础属性
+   506→   506→  const realmIdx = REALMS.findIndex(r => r.id === nextRealm);
+   507→   507→  const boost = 1 + realmIdx * 0.5;
+   508→   508→  newState.maxHp = Math.floor(state.maxHp * boost);
+   509→   509→  newState.hp = newState.maxHp;
+   510→   510→  newState.maxMp = Math.floor(state.maxMp * boost);
+   511→   511→  newState.mp = newState.maxMp;
+   512→   512→  newState.attack = Math.floor(state.attack * boost);
+   513→   513→  newState.defense = Math.floor(state.defense * boost);
+   514→   514→  newState.speed = Math.floor(state.speed * boost);
+   515→   515→
+   516→   516→  return { state: newState, success: true, newRealm: nextRealm };
+   517→   517→}
+   518→   518→
+   519→   519→// ==================== 小境界提升 ====================
+   520→   520→
+   521→   521→export function tryMinorBreakthrough(state: CharacterState): { state: CharacterState; advanced: boolean } {
+   522→   522→  const info = getRealmInfo(state.realm);
+   523→   523→  if (state.realmLevel >= info.levels - 1) {
+   524→   524→    return { state, advanced: false };
+   525→   525→  }
+   526→   526→  const newState: CharacterState = {
+   527→   527→    ...state,
+   528→   528→    realmLevel: state.realmLevel + 1,
+   529→   529→    cultivationExp: state.cultivationExp - state.expToBreak,
+   530→   530→    expToBreak: Math.floor(state.expToBreak * 1.3),
+   531→   531→    maxHp: Math.floor(state.maxHp * 1.1),
+   532→   532→    hp: state.maxHp * 1.1 > state.maxHp ? Math.floor(state.maxHp * 1.1) : state.hp,
+   533→   533→    maxMp: Math.floor(state.maxMp * 1.1),
+   534→   534→    attack: Math.floor(state.attack * 1.08),
+   535→   535→    defense: Math.floor(state.defense * 1.08),
+   536→   536→    speed: Math.floor(state.speed * 1.05),
+   537→   537→  };
+   538→   538→  return { state: newState, advanced: true };
+   539→   539→}
+   540→   540→
+   541→   541→// ==================== 寿元检查 ====================
+   542→   542→
+   543→   543→export function checkLifespan(state: CharacterState): { state: CharacterState; died: boolean; reason?: string } {
+   544→   544→  if (!state.alive) return { state, died: false };
+   545→   545→  if (state.age >= state.lifespan) {
+   546→   546→    return {
+   547→   547→      state: { ...state, alive: false, hp: 0, causeOfDeath: '寿元已尽，坐化于世' },
+   548→   548→      died: true,
+   549→   549→      reason: '寿元已尽，坐化于世',
+   550→   550→    };
+   551→   551→  }
+   552→   552→  return { state, died: false };
+   553→   553→}
+   554→   554→
+   555→   555→// ==================== 命节点检查 ====================
+   556→   556→
+   557→   557→export function checkFateNode(state: CharacterState): number | null {
+   558→   558→  if (!state.alive) return null;
+   559→   559→  for (const node of FATE_NODES) {
+   560→   560→    if (state.fateNodes.includes(node.index)) continue;
+   561→   561→    if (state.age >= node.triggerAge.min && state.age <= node.triggerAge.max) {
+   562→   562→      // 检查境界是否已达到命节点境界
+   563→   563→      const realmIdx = REALMS.findIndex(r => r.id === state.realm);
+   564→   564→      const nodeRealmIdx = REALMS.findIndex(r => r.id === node.realm);
+   565→   565→      if (realmIdx >= nodeRealmIdx - 1) {
+   566→   566→        return node.index;
+   567→   567→      }
+   568→   568→    }
+   569→   569→  }
+   570→   570→  return null;
+   571→   571→}
+   572→   572→
+   573→   573→// ==================== 状态词条管理 ====================
+   574→   574→
+   575→   575→export function addStatuses(state: CharacterState, statuses: StatusEntry[]): CharacterState {
+   576→   576→  if (!statuses.length) return state;
+   577→   577→  const existingIds = new Set(state.activeStatuses.map(s => s.id));
+   578→   578→  const newStatuses = statuses.filter(s => !existingIds.has(s.id));
+   579→   579→  return { ...state, activeStatuses: [...state.activeStatuses, ...newStatuses] };
+   580→   580→}
+   581→   581→
+   582→   582→export function tickStatusDurations(state: CharacterState): CharacterState {
+   583→   583→  // 每过一岁，持续状态 duration -1
+   584→   584→  const ticked = state.activeStatuses.map(s => ({
+   585→   585→    ...s,
+   586→   586→    duration: s.duration === -1 ? -1 : s.duration - 1,
+   587→   587→  }));
+   588→   588→  const alive = ticked.filter(s => s.duration === -1 || s.duration > 0);
+   589→   589→  return { ...state, activeStatuses: alive };
+   590→   590→}
+   591→   591→
+   592→   592→// ==================== 物品管理 ====================
+   593→   593→
+   594→   594→export function addItems(state: CharacterState, items: ItemEntry[]): CharacterState {
+   595→   595→  if (!items.length) return state;
+   596→   596→  return { ...state, inventory: [...state.inventory, ...items] };
+   597→   597→}
+   598→   598→
+   599→   599→// ==================== 记忆管理 ====================
+   600→   600→
+   601→   601→export function addMemory(state: CharacterState, memory: string): CharacterState {
+   602→   602→  if (!memory || !memory.trim()) return state;
+   603→   603→  const next = [...state.longTermMemory, memory];
+   604→   604→  // 最多保留 50 条长期记忆
+   605→   605→  if (next.length > 50) {
+   606→   606→    return { ...state, longTermMemory: next.slice(-50) };
+   607→   607→  }
+   608→   608→  return { ...state, longTermMemory: next };
+   609→   609→}
+   610→   610→
+   611→   611→// ==================== 标记命节点完成 ====================
+   612→   612→
+   613→   613→export function markFateNodeDone(state: CharacterState, nodeIndex: number): CharacterState {
+   614→   614→  if (state.fateNodes.includes(nodeIndex)) return state;
+   615→   615→  return { ...state, fateNodes: [...state.fateNodes, nodeIndex] };
+   616→   616→}
+   617→   617→
+   618→   618→// ==================== 引擎状态上下文构建 ====================
+   619→   619→
+   620→   620→export function buildStateContext(state: CharacterState, recentEvents: { age: number; title: string; narrative: string }[]): EngineStateContext {
+   621→   621→  const realmInfo = getRealmInfo(state.realm);
+   622→   622→  // 找下一个未完成的命节点
+   623→   623→  const nextNode = FATE_NODES.find(n => !state.fateNodes.includes(n.index));
+   624→   624→  return {
+   625→   625→    character: {
+   626→   626→      name: state.name,
+   627→   627→      age: state.age,
+   628→   628→      lifespan: state.lifespan,
+   629→   629→      gender: state.gender,
+   630→   630→      spiritualRoot: state.spiritualRoot,
+   631→   631→      rootDetail: state.rootDetail,
+   632→   632→      realm: state.realm,
+   633→   633→      realmName: realmInfo.name,
+   634→   634→      realmLevel: state.realmLevel,
+   635→   635→      cultivationExp: state.cultivationExp,
+   636→   636→      expToBreak: state.expToBreak,
+   637→   637→      elements: state.elements,
+   638→   638→      hp: state.hp, maxHp: state.maxHp,
+   639→   639→      mp: state.mp, maxMp: state.maxMp,
+   640→   640→      attack: state.attack, defense: state.defense, speed: state.speed,
+   641→   641→      luck: state.luck, comprehension: state.comprehension,
+   642→   642→      spiritStones: state.spiritStones, reputation: state.reputation,
+   643→   643→      faction: state.faction, master: state.master, location: state.location,
+   644→   644→      alive: state.alive, ascended: state.ascended,
+   645→   645→    },
+   646→   646→    activeStatuses: state.activeStatuses,
+   647→   647→    inventory: state.inventory,
+   648→   648→    equipped: state.equipped,
+   649→   649→    cultivationMultiplier: state.cultivationMultiplier,
+   650→   650→    cultivationInsight: state.cultivationInsight,
+   651→   651→    recentEvents: recentEvents.slice(-5),
+   652→   652→    longTermMemory: state.longTermMemory.slice(-10),
+   653→   653→    completedFateNodes: state.fateNodes,
+   654→   654→    availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
+   655→   655→    nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
+   656→   656→  };
+   657→   657→}
+   658→   658→
+   659→   659→// ==================== 引擎执行 AI 输出（统一入口） ====================
+   660→   660→
+   661→   661→export interface EngineExecutionResult {
+   662→   662→  state: CharacterState;
+   663→   663→  appliedChanges: AttributeChange[];
+   664→   664→  rejectedChanges: AttributeChange[];
+   665→   665→  breakthroughHappened: boolean;
+   666→   666→  newRealm?: Realm;
+   667→   667→  died: boolean;
+   668→   668→  deathReason?: string;
+   669→   669→}
+   670→   670→
+   671→   671→export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): EngineExecutionResult {
+   672→   672→  let next = { ...state };
+   673→   673→  const rejected: AttributeChange[] = [];
+   674→   674→
+   675→   675→  // 1. 应用属性变更
+   676→   676→  const before = next;
+   677→   677→  next = applyChanges(next, aiOutput.changes || []);
+   678→   678→  // 识别被拒绝的（属性不在白名单的）
+   679→   679→  for (const ch of aiOutput.changes || []) {
+   680→   680→    if (!ATTRIBUTE_BOUNDS[ch.attribute]) rejected.push(ch);
+   681→   681→  }
+   682→   682→
+   683→   683→  // 2. 添加新状态词条
+   684→   684→  next = addStatuses(next, aiOutput.newStatuses || []);
+   685→   685→
+   686→   686→  // 3. 添加新物品
+   687→   687→  next = addItems(next, aiOutput.newItems || []);
+   688→   688→
+   689→   689→  // 3.5 AI 联动：移除/破坏物品（如战斗中武器被毁、丹药被消耗）
+   690→   690→  if (aiOutput.removedItemIds && aiOutput.removedItemIds.length) {
+   691→   691→    const rem = removeItemsByIds(next, aiOutput.removedItemIds);
+   692→   692→    next = rem.state;
+   693→   693→  }
+   694→   694→
+   695→   695→  // 4. 添加长期记忆
+   696→   696→  if (aiOutput.memory) next = addMemory(next, aiOutput.memory);
+   697→   697→
+   698→   698→  // 4.5 更新修炼心得文本（AI 生成的修炼速度说明）
+   699→   699→  // 只在 AI 输出了非空文本时才覆盖，避免被空值误清
+   700→   700→  if (aiOutput.cultivationInsight && aiOutput.cultivationInsight.trim()) {
+   701→   701→    next.cultivationInsight = aiOutput.cultivationInsight.trim();
+   702→   702→  }
+   703→   703→
+   704→   704→  // 5. 处理突破
+   705→   705→  let breakthroughHappened = false;
+   706→   706→  let newRealm: Realm | undefined;
+   707→   707→  if (aiOutput.triggeredBreakthrough) {
+   708→   708→    const br = tryBreakthrough(next);
+   709→   709→    if (br.success) {
+   710→   710→      next = br.state;
+   711→   711→      breakthroughHappened = true;
+   712→   712→      newRealm = br.newRealm;
+   713→   713→    }
+   714→   714→  }
+   715→   715→
+   716→   716→  // 6. 处理死亡
+   717→   717→  let died = false;
+   718→   718→  let deathReason: string | undefined;
+   719→   719→  if (aiOutput.causedDeath) {
+   720→   720→    next.alive = false;
+   721→   721→    next.causeOfDeath = aiOutput.deathReason || '陨落于劫难';
+   722→   722→    died = true;
+   723→   723→    deathReason = next.causeOfDeath;
+   724→   724→  }
+   725→   725→
+   726→   726→  // 7. 处理飞升
+   727→   727→  if (aiOutput.causedAscension) {
+   728→   728→    next.ascended = true;
+   729→   729→    next.alive = true; // 飞升不算死亡
+   730→   730→    next.realm = 'ascension';
+   731→   731→  }
+   732→   732→
+   733→   733→  const appliedChanges = (aiOutput.changes || []).filter(ch => ATTRIBUTE_BOUNDS[ch.attribute]);
+   734→   734→
+   735→   735→  return {
+   736→   736→    state: next,
+   737→   737→    appliedChanges,
+   738→   738→    rejectedChanges: rejected,
+   739→   739→    breakthroughHappened,
+   740→   740→    newRealm,
+   741→   741→    died,
+   742→   742→    deathReason,
+   743→   743→  };
+   744→   744→}
+   745→   745→
+   746→   746→// ==================== 状态 → API 响应（含展示字段） ====================
+   747→   747→
+   748→   748→// 将引擎状态转为前端可直接使用的响应对象
+   749→   749→// 关键：包含 realmName / realmColor / realmMaxLevel / rootMultiplier 等展示字段
+   750→   750→// 这样前端 setCharacter({...character, ...data.state}) 时这些字段会被正确更新
+   751→   751→export function stateToResponse(s: CharacterState) {
+   752→   752→  const realmInfo = getRealmInfo(s.realm);
+   753→   753→  const rootInfo = SPIRITUAL_ROOTS[s.spiritualRoot];
+   754→   754→  return {
+   755→   755→    age: s.age,
+   756→   756→    lifespan: s.lifespan,
+   757→   757→    realm: s.realm,
+   758→   758→    realmName: realmInfo.name,
+   759→   759→    realmColor: realmInfo.color,
+   760→   760→    realmLevel: s.realmLevel,
+   761→   761→    realmMaxLevel: realmInfo.levels,
+   762→   762→    cultivationExp: s.cultivationExp,
+   763→   763→    expToBreak: s.expToBreak,
+   764→   764→    hp: s.hp, maxHp: s.maxHp,
+   765→   765→    mp: s.mp, maxMp: s.maxMp,
+   766→   766→    attack: s.attack, defense: s.defense, speed: s.speed,
+   767→   767→    luck: s.luck, comprehension: s.comprehension,
+   768→   768→    spiritStones: s.spiritStones, reputation: s.reputation,
+   769→   769→    alive: s.alive, ascended: s.ascended,
+   770→   770→    causeOfDeath: s.causeOfDeath,
+   771→   771→    faction: s.faction, master: s.master, location: s.location,
+   772→   772→    elements: s.elements,
+   773→   773→    fateNodes: s.fateNodes,
+   774→   774→    isAtChoice: s.isAtChoice,
+   775→   775→    spiritualRoot: s.spiritualRoot,
+   776→   776→    rootDetail: s.rootDetail,
+   777→   777→    rootMultiplier: rootInfo?.multiplier ?? 0,
+   778→   778→    cultivationMultiplier: s.cultivationMultiplier,
+   779→   779→    cultivationInsight: s.cultivationInsight,
+   780→   780→    activeStatuses: s.activeStatuses,
+   781→   781→    inventory: s.inventory,
+   782→   782→    equipped: s.equipped,
+   783→   783→  };
+   784→   784→}
+   785→   785→
+   786→   786→// ==================== 验证：状态名唯一性 ====================
+   787→   787→
+   788→   788→export function ensureUniqueIds(statuses: StatusEntry[], items: ItemEntry[]): { statuses: StatusEntry[]; items: ItemEntry[] } {
+   789→   789→  const usedIds = new Set<string>();
+   790→   790→  const fixStatuses = statuses.map(s => {
+   791→   791→    let id = s.id || `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+   792→   792→    while (usedIds.has(id)) id = `${id}_${Math.random().toString(36).slice(2, 6)}`;
+   793→   793→    usedIds.add(id);
+   794→   794→    return { ...s, id };
+   795→   795→  });
+   796→   796→  const fixItems = items.map(it => {
+   797→   797→    let id = it.id || `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+   798→   798→    while (usedIds.has(id)) id = `${id}_${Math.random().toString(36).slice(2, 6)}`;
+   799→   799→    usedIds.add(id);
+   800→   800→    return { ...it, id };
+   801→   801→  });
+   802→   802→  return { statuses: fixStatuses, items: fixItems };
+   803→   803→}
+   804→   804→

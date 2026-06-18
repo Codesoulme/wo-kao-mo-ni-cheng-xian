@@ -32,6 +32,14 @@ export async function GET(req: NextRequest) {
     const realmInfo = REALMS.find(r => r.id === state.realm);
     const rootInfo = SPIRITUAL_ROOTS[state.spiritualRoot];
 
+    // 解析 pendingChoice（若有）：让前端页面刷新后能恢复 ChoiceModal
+    let pendingChoice: any = null;
+    if (char.isAtChoice && char.pendingChoiceJson) {
+      try {
+        pendingChoice = JSON.parse(char.pendingChoiceJson);
+      } catch { pendingChoice = null; }
+    }
+
     return NextResponse.json({
       success: true,
       character: {
@@ -64,9 +72,12 @@ export async function GET(req: NextRequest) {
         activeStatuses: state.activeStatuses,
         inventory: state.inventory,
         equipped: state.equipped,
+        storageCapacity: state.storageCapacity,
         cultivationMultiplier: state.cultivationMultiplier,
         cultivationInsight: state.cultivationInsight || '',
+        cultivationFactors: state.cultivationFactors || [],
       },
+      pendingChoice,
       events: events.map(e => ({
         id: e.id,
         age: e.age,

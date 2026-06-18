@@ -32,9 +32,14 @@ export interface CharacterState {
   isAtChoice: boolean;
   activeStatuses: any[];
   inventory: any[];
-  equipped: Record<string, any>;
+  // 已装备物品数组（无槽位上限，AI 可创造性放置）
+  equipped: any[];
+  // 储物袋容量上限（无袋 5；获得储物袋后增加）
+  storageCapacity: number;
   cultivationMultiplier: number;
   cultivationInsight?: string;
+  // 修炼速度来源条目（前端按 rarity 给来源名称上色 + 具体数字）
+  cultivationFactors?: { name: string; value: number; operation: 'multiply' | 'add'; rarity?: string; note?: string }[];
 }
 
 export interface GameEvent {

@@ -112,6 +112,18 @@ export async function POST(req: NextRequest) {
       finalState.isAtChoice = true;
     }
 
+    // 持久化 pendingChoice（让页面刷新后可恢复，避免 ChoiceModal 丢失导致卡死）
+    const pendingChoiceJson = (aiOutput.hasChoice && aiOutput.choice)
+      ? JSON.stringify({
+          prompt: aiOutput.choice.prompt,
+          options: aiOutput.choice.options,
+          contextTitle: aiOutput.title,
+          contextNarrative: aiOutput.narrative,
+          contextAge: finalState.age,
+          contextFateNodeName: fateNode?.name,
+        })
+      : '';
+
     // 持久化
     await db.character.update({
       where: { id: characterId },
@@ -149,9 +161,12 @@ export async function POST(req: NextRequest) {
         lastEventAge: finalState.age,
         statusJson: JSON.stringify(finalState.activeStatuses),
         inventoryJson: JSON.stringify(finalState.inventory),
-        equippedJson: JSON.stringify(finalState.equipped || {}),
+        equippedJson: JSON.stringify(finalState.equipped || []),
+        storageCapacity: finalState.storageCapacity ?? 5,
         cultivationMultiplier: finalState.cultivationMultiplier ?? 1.0,
         cultivationInsight: finalState.cultivationInsight || '',
+        cultivationFactorsJson: JSON.stringify(finalState.cultivationFactors || []),
+        pendingChoiceJson,
         memoryJson: JSON.stringify(finalState.longTermMemory),
       },
     });

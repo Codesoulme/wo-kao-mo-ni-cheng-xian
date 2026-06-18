@@ -69,12 +69,18 @@ model Character {
   statusJson      String   @default("[]")
   // JSON string of inventory items
   inventoryJson   String   @default("[]")
-  // JSON string of equipped items (weapon/armor/accessory/artifact/scripture)
-  equippedJson    String   @default("{}")
-  // 修炼速度倍率（灵根 × 功法），default 1.0
+  // JSON string of equipped items (array of ItemEntry, no slot limit — AI may equip multiples of same type)
+  equippedJson    String   @default("[]")
+  // 储物袋容量上限（无袋时默认 5；获得储物袋后增加）
+  storageCapacity Int      @default(5)
+  // 修炼速度倍率（灵根 × 功法 × 其他装备），default 1.0
   cultivationMultiplier Float @default(1.0)
   // 修炼心得：AI 生成的修炼速度说明文本（描述当前影响修炼速度的种种因素）
   cultivationInsight String @default("")
+  // 修炼速度来源结构化列表 JSON（{name,value,operation,rarity,note}[]）—— 前端按来源名称彩色高亮 + 具体数字
+  cultivationFactorsJson String @default("[]")
+  // 待抉择的命节点选择数据（hasChoice=true 时持久化，玩家选择后清空；避免页面刷新丢失）
+  pendingChoiceJson  String   @default("")
   // JSON string of memory entries (long-term)
   memoryJson      String   @default("[]")
 

@@ -34,7 +34,7 @@ function useHydrated() {
 export default function Home() {
   const {
     character, events, pendingChoice,
-    setCharacter, setEvents, setChoices, setFateNodes,
+    setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice,
   } = useGameStore();
   // 当有 pendingChoice 时自动聚焦到故事 Tab
   const [tab, setTab] = useState('story');
@@ -57,12 +57,16 @@ export default function Home() {
         setEvents(data.events || []);
         setChoices(data.choices || []);
         setFateNodes(data.fateNodes || []);
+        // 恢复 pendingChoice（修复：页面刷新后 isAtChoice=true 但 pendingChoice 丢失导致卡死）
+        if (data.pendingChoice && data.character?.isAtChoice) {
+          setPendingChoice(data.pendingChoice);
+        }
       } catch (e) {
         // 静默失败
       }
     })();
     return () => { cancelled = true; };
-  }, [hydrated, character?.id, events.length, setCharacter, setEvents, setChoices, setFateNodes]);
+  }, [hydrated, character?.id, events.length, setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice]);
 
   // 防止 hydration mismatch：在客户端 hydration 完成前不渲染 character 相关 UI
   if (!hydrated) {

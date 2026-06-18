@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 
 export const runtime = 'nodejs';
@@ -49,10 +49,34 @@ export async function POST(req: NextRequest) {
       if (result.removedItemIds && result.removedItemIds.length) {
         state = removeItemsByIds(state, result.removedItemIds).state;
       }
+      // AI 联动：创造性装备（玩家干扰“把储物戒指串成项链”等）
+      if (result.newEquippedItems && result.newEquippedItems.length) {
+        const ensured = ensureUniqueIds([], result.newEquippedItems).items;
+        state = { ...state, equipped: [...(state.equipped || []), ...ensured] };
+        for (const it of ensured) state = applyItemEffects(state, it, 1);
+        state = recalcCultivationMultiplier(state);
+      }
+      if (result.equipItemIds && result.equipItemIds.length) {
+        state = equipItemsByIds(state, result.equipItemIds).state;
+      }
+      if (result.unequipItemIds && result.unequipItemIds.length) {
+        state = unequipItemsByIds(state, result.unequipItemIds).state;
+      }
       if (result.memory) state = addMemory(state, result.memory);
-      // 应用修炼心得文本（仅当 AI 输出了非空文本时覆盖）
+      // 应用修炼心得文本 + 结构化来源条目（仅当 AI 输出了非空文本时覆盖）
       if (result.cultivationInsight && result.cultivationInsight.trim()) {
         state.cultivationInsight = result.cultivationInsight.trim();
+      }
+      // 引擎权威：cultivationFactors 由引擎从 state 计算（合并 AI 补充的额外因素）
+      if (result.cultivationFactors && Array.isArray(result.cultivationFactors) && result.cultivationFactors.length) {
+        const engineFactors = computeCultivationFactors(state);
+        const engineNames = new Set(engineFactors.map(f => f.name));
+        const aiExtras = result.cultivationFactors
+          .filter((f: any) => f && f.name && typeof f.value === 'number' && !engineNames.has(String(f.name)))
+          .slice(0, 6);
+        state.cultivationFactors = [...engineFactors, ...aiExtras];
+      } else {
+        state.cultivationFactors = computeCultivationFactors(state);
       }
 
       // 干扰可能消耗时间
@@ -93,9 +117,11 @@ export async function POST(req: NextRequest) {
         faction: state.faction, master: state.master, location: state.location,
         statusJson: JSON.stringify(state.activeStatuses),
         inventoryJson: JSON.stringify(state.inventory),
-        equippedJson: JSON.stringify(state.equipped || {}),
+        equippedJson: JSON.stringify(state.equipped || []),
+        storageCapacity: state.storageCapacity ?? 5,
         cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
         cultivationInsight: state.cultivationInsight || '',
+        cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
         memoryJson: JSON.stringify(state.longTermMemory),
       },
     });

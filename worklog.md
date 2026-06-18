@@ -452,3 +452,169 @@ Stage Summary:
 - 顺带修复 Task 13 遗留 bug：旧存档 cultivationMultiplier 未按灵根正确初始化（天灵根显示×1.00），现 dbToState 始终实时重算
 - 旧存档 fallback 完整：AI 未生成心得时显示拆解公式，推进一岁后自动切换为 AI 文本
 - agent-browser 端到端验证通过：修炼速度栏渲染 AI 文本，倍率数字正确
+
+---
+Task ID: 19
+Agent: main
+Task: 修炼速度栏来源名称彩色显示+具体数字；已装备栏去占位符+点击弹窗+无数量上限；储物袋容量系统+获得即扩容；使用物品时通知 AI 更新相关文本
+
+Work Log:
+- 用户反馈（4 点）：
+  1. 修炼速度栏：来源名称用不同颜色显示，每段描述让 AI 加点具体的数字（加了多少修炼速度倍率）
+  2. 已装备栏：不要占位符，AI 知道玩家装备了啥就写上去啥，名称用特殊颜色显示，点击弹窗看装备详细信息；储物袋里的东西装备时要告诉 AI 让它更新这里；不要限制每种类型装备数量上限（如戒指可戴 10 个、脖挂一串储物戒指等），由 AI 判断合理性
+  3. 储物袋本身不需要装备，获得了就直接加储物袋容纳上限；没有储物袋的时候身上能带的东西应该有限
+  4. 使用什么东西都要告诉 AI，让它修改相关文本
+
+- 数据模型改造（prisma/schema.prisma）：
+  * equippedJson 默认值从 `'{}'` 改为 `'[]'`（slot-map → 数组）
+  * 新增 `storageCapacity Int @default(5)`（无袋时上限 5）
+  * 新增 `cultivationFactorsJson String @default("[]")`（结构化来源条目持久化）
+  * 执行 `bunx prisma db push` + `bunx prisma generate` 成功
+
+- 类型层（types.ts）：
+  * 新增 `CultivationFactor` 接口：{name, value, operation: 'multiply'|'add', rarity?, note?}
+  * 新增 `ItemEntry.equipNote?: string`（装备位置自由文本，如"左手"、"项链·储物戒指×5"）
+  * `CharacterState.equipped` 从 `EquippedMap`（slot-map）改为 `ItemEntry[]`（数组，无槽位上限）
+  * `CharacterState` 新增 `storageCapacity: number` 与 `cultivationFactors: CultivationFactor[]`
+  * `AIEventOutput` / `ChoiceResultOutput` / `InterfereOutput` 新增 `newEquippedItems?: ItemEntry[]`、`equipItemIds?: string[]`、`unequipItemIds?: string[]`、`cultivationFactors?: CultivationFactor[]`
+  * `EngineStateContext` 同步暴露 `storageCapacity`、`cultivationFactors`
+  * 保留 `EquippedMap` 类型导出作兼容
+
+- 引擎层（engine.ts）：
+  * `DBCharacter` 接口加 `storageCapacity` 与 `cultivationFactorsJson`
+  * 新增 `parseEquippedJson(raw)`：兼容旧存档 slot-map 格式，自动转换为数组（带默认 equipNote）
+  * 新增 `isStorageBag(item)`：判定 tool 类物品且 effects 含 storageCapacity add
+  * `dbToState`：解析 equippedJson（兼容两种格式）+ storageCapacity + cultivationFactorsJson；旧存档若无 factors 则按当前 state 实时计算
+  * 新增 `computeCultivationFactors(state)` 引擎权威函数：从 state 计算来源条目（灵根 + 已装备物品的 cultivationExp 效果 + 状态词条的 cultivationExp 效果），保证数值准确
+  * `recalcCultivationMultiplier` 改为遍历所有已装备物品（不再只看 scripture 槽位）
+  * `equipItem` 改为追加到 equipped 数组（不再替换同槽位）；储物袋拒绝装备（提示"无需装备，获得即扩容"）；自动补默认 equipNote（手持/身穿/佩戴/悬身/修习）
+  * `unequipItem(state, itemId)` 按 id 卸下（替代原 `unequipSlot(state, slot)`）
+  * 新增 `equipItemsByIds(state, ids)` / `unequipItemsByIds(state, ids)` 用于 AI 联动批量装备/卸下
+  * `removeItemsByIds` 适配数组 equipped；若移除的是储物袋，反向扣减 storageCapacity
+  * `addItems` 引擎兜底规整化：
+    - 无效 item_type（如 'storage'）→ tool（若含 storageCapacity 效果）或 material
+    - 名含功法关键词（诀/决/经/典/录/篇/章/解/式/术/功法/心法/秘籍/玉简/真经/真解/引气/凝气/吐纳）但非 scripture → 强转 scripture
+    - scripture 但无 multiply cultivationExp 效果 → 按 rarity 补默认（common ×1.3 / uncommon ×1.7 / rare ×2.5 / epic ×3.5 / legendary ×4.5 / mythic ×5.5）
+    - 储物袋获得即扩容 storageCapacity
+  * `executeAIEvent` 应用 newEquippedItems / equipItemIds / unequipItemIds；cultivationFactors 由引擎计算与 AI 补充合并去重
+  * `buildStateContext` 暴露 storageCapacity + cultivationFactors 给 AI
+  * `stateToResponse` 暴露 storageCapacity + cultivationFactors
+
+- LLM 层（llm.ts）：
+  * `buildAdvancePrompt`：
+    - 状态快照区展示储物袋容量（"3/10件（已有储物袋）"或"3/5件（无储物袋，上限仅 5 件）"）
+    - 已装备改为数组展示（带 equipNote）
+    - 告知 AI：装备栏无槽位上限，玩家可戴多枚戒指、脖挂一串储物戒指等，由 AI 判断合理性
+    - 告知 AI：玩家可通过 newEquippedItems 创造性装备（如"储物戒指项链"合成条目，equipNote 描述位置）
+    - 告知 AI：equipItemIds / unequipItemIds 用于装备/卸下已有物品
+    - 告知 AI：储物袋是 tool 类物品含 storageCapacity 效果，获得即扩容
+    - 告知 AI：若背包已满（invCount >= storageCapacity），不可再给 newItems
+    - cultivationFactors 字段：引擎自动计算基础来源（灵根+功法+状态词条），AI 只需输出额外因素（环境/心境/时节）； cultivationInsight 文本必须点名来源名称 + 具体数字
+    - 强化规则：叙事中提及的物品必须落入 newItems（不可只叙事不给物品）
+  * `buildChoosePrompt` / `buildInterferePrompt`：同步加 newEquippedItems / equipItemIds / unequipItemIds / cultivationFactors 字段；interfere 加"装备栏创造权"与"使用物品规则"两段详细说明
+  * 新增 `generateItemActionNarrative(ctx, action, item)` 函数：玩家装备/卸下/使用物品后调用 LLM 生成 30-80 字动作叙事 + 更新 cultivationInsight + cultivationFactors；失败时返回最小可用结果不阻塞物品操作
+  * 三个 sanitize 函数解析新字段（newEquippedItems、equipItemIds、unequipItemIds、cultivationFactors）
+  * 新增 `sanitizeItems` / `sanitizeFactors` 辅助函数
+
+- API 路由：
+  * `/api/game/item` 完全重写：
+    - action=equip 调 `equipItem`，action=unequip 调 `unequipItem`（按 itemId 不按 slot），action=use 调 `consumeItem`
+    - **修复关键 bug**：原代码未将 equipItem 返回的 state 赋值给 state 变量，导致装备不生效；现 `state = r.state`
+    - 装备/卸下/使用后调 `generateItemActionNarrative` 生成动作叙事 + 更新修炼心得
+    - cultivationFactors 由 `computeCultivationFactors(state)` 计算（保证数值准确），AI 的额外因素合并去重
+    - 持久化 equippedJson（数组格式）+ storageCapacity + cultivationFactorsJson
+    - 动作叙事写入 EventLog（让史册可查）
+    - 返回 { success, message, narrative, state }
+  * `/api/game/advance`：persist equippedJson 数组 + storageCapacity + cultivationFactorsJson
+  * `/api/game/choose` / `/api/game/interfere`：应用 newEquippedItems（含 ensureUniqueIds + applyItemEffects + recalcCultivationMultiplier）+ equipItemIds + unequipItemIds；cultivationFactors 引擎计算 + AI 补充合并；persist 新字段
+  * `/api/game/state`：返回 storageCapacity + cultivationFactors
+
+- 前端 store.ts：
+  * `CharacterState` 新增 `storageCapacity: number`、`cultivationFactors?: {...}[]`
+  * `equipped` 改为 `any[]`（数组）
+
+- 前端 InventoryPanel.tsx 完全重写：
+  * **修炼速度卡**：
+    - 顶部倍率数字保留
+    - 新增"来源 · 名称与加成"区：每个来源条目按 rarity 上色显示名称（左侧带彩色光点），右侧倍率数字显示在红/蓝徽标（multiply=红，add=蓝），左侧带彩色边框
+    - AI 生成的 cultivationInsight 文本（按句号/分号分段渲染）
+    - 旧存档 fallback：若无 factors，显示"推进一岁后 AI 将综合生成来源条目"
+  * **已装备卡**：
+    - 完全去掉固定 5 槽位占位符
+    - 动态渲染 equippedList 数组，每项：稀有度彩色图标 + 名称（rarity 色彩）+ equipNote 徽标 + effects 芯片（前 3 个，多余的 +N）+ 卸下按钮
+    - 空时显示"身无长物。获得装备后可在储物袋装备。"
+    - 点击任意装备 → 打开 ItemDetailDialog
+    - 底部提示"点击装备查看详情。装备数量无上限，由天道判断合理性。"
+  * **储物袋卡**：
+    - 标题右侧新增容量徽标：`{invCount}/{storageCap}` + （无袋/有袋标记）
+    - 容量满时红色警告条，将满时黄色提示
+    - 储物袋物品（isStorageBag）显示"储物袋"特殊徽标，且不显示装备按钮
+    - 物品按类型分组，每组带类型图标 + 名称（rarity 色彩）+ effects 芯片 + 装备/使用按钮 + 来源
+    - 点击物品 → 打开 ItemDetailDialog
+  * **ItemDetailDialog**（新组件）：
+    - 顶部彩色 banner（按稀有度渐变背景 + 边框）
+    - 物品名（rarity 色彩）+ 稀有度徽标 + 类型徽标 + equipNote
+    - 描述 / 效果（彩色芯片，multiply=红 add=蓝）/ 来源 / id
+    - 底部操作栏：装备/使用/卸下按钮（根据物品状态显示）
+
+- 端到端验证（agent-browser + curl）：
+  * 创建新角色"李测试甲"（土木水凡灵根，rootMultiplier 0.8）
+  * 推进 1 岁：cultivationFactors = [{name:"土木水凡灵根", value:0.8, operation:"multiply", rarity:"uncommon", note:"灵根根基"}]
+  * UI「宝」页修炼速度栏正确显示：×0.80 顶部数字 + 来源条目（绿色名称 + 红色 ×0.8 徽标）+ AI 心得文本（"土木水凡灵根×0.8，根基已立..."）
+  * 已装备栏显示"身无长物"（无占位符）
+  * 储物袋显示"0/5 · 无袋"
+  * 点击物品打开 ItemDetailDialog（VLM 验证：稀有度 banner + 名称 + 描述 + 来源 + id）
+  * 另开测试角色"炎千雪"（火真灵根 pure，rootMultiplier 1.5）：
+    - 推进至 7 岁触发灵根觉醒命节点，选择"请求父亲教导" → 获得《炎阳引气诀》（AI 误给 material 类型，引擎兜底未匹配关键词）
+    - 干扰获取《火元心法》（名含"心法"关键词）→ 引擎兜底强转 scripture + 补默认 ×1.7 uncommon 效果
+    - 装备《火元心法》：cultivationMultiplier 从 1.5 升至 2.55（1.5×1.7）✓
+    - cultivationFactors 含两条：火真灵根 ×1.5 (rare 蓝色) + 《火元心法》 ×1.7 (uncommon 绿色) ✓
+    - AI 生成装备叙事："炎千雪取出《火元心法》，盘膝而坐，心神沉浸于火行奥义..."
+    - 动作叙事写入 EventLog
+- `bun run lint` 通过（0 errors）
+
+Stage Summary:
+- 修炼速度栏彻底活性化 + 数值准确：
+  * 来源名称按稀有度彩色显示（common 灰 / uncommon 绿 / rare 蓝 / epic 紫 / legendary 金 / mythic 粉）
+  * 具体倍率数字显示在红/蓝徽标（multiply 红、add 蓝）
+  * 引擎权威：cultivationFactors 由 `computeCultivationFactors(state)` 计算（灵根 + 已装备功法 + 状态词条），AI 只补充环境/心境等额外因素，保证数值与 cultivationMultiplier 一致
+  * AI 生成的 cultivationInsight 文本必须点名来源名称 + 具体数字（如"修习《引气诀》×1.5，腰悬聚灵佩+0.2"）
+
+- 已装备栏彻底去占位符化 + 无数量上限：
+  * 不再固定 5 槽位，动态渲染 equipped 数组（AI 知道什么就显示什么）
+  * 同类型装备可多件：玩家可戴 10 个戒指、脖挂一串储物戒指等，由 AI 判断合理性
+  * AI 可通过 newEquippedItems 创造性装备（如"储物戒指项链"合成条目，equipNote="脖挂·储物戒指×5"）
+  * AI 可通过 equipItemIds / unequipItemIds 装备/卸下已有物品
+  * 点击装备打开 ItemDetailDialog 看详情，弹窗含装备/使用/卸下按钮
+
+- 储物袋容量系统完整：
+  * 无袋时 capacity=5，有袋后增加（bag.effects 含 storageCapacity add）
+  * 储物袋本身是 tool 类物品，获得即扩容，无需装备（equipItem 拒绝并提示）
+  * 移除储物袋时反向扣减 storageCapacity
+  * UI 显示 `invCount/capacity` 徽标 + 无袋标记；满时红色警告，将满时黄色提示
+  * AI 在 prompt 中被告知容量信息，背包满时不可再给新物品
+
+- 使用物品通知 AI：
+  * 玩家装备/卸下/使用物品后，调 `generateItemActionNarrative` 让 AI 生成 30-80 字动作叙事 + 更新 cultivationInsight + cultivationFactors
+  * 动作叙事写入 EventLog（让史册可查）
+  * LLM 失败时不阻塞物品操作（返回最小可用结果）
+
+- 引擎兜底（防御 AI 不规范输出）：
+  * 无效 item_type（如 'storage'）→ tool（若含 storageCapacity）或 material
+  * 名含功法关键词（诀/经/典/录/篇/章/解/式/术/功法/心法/秘籍/玉简/真经/真解/引气/凝气/吐纳）但非 scripture → 强转 scripture
+  * scripture 但无 multiply cultivationExp 效果 → 按 rarity 补默认（×1.3~×5.5）
+  * 叙事中提及的物品必须落入 newItems（prompt 强化）
+
+- 修复 item route 关键 bug：原代码未将 equipItem/unequipItem/consumeItem 返回的 state 赋值给 state 变量，导致装备/卸下/使用不生效；现已修复
+
+- 旧存档兼容：
+  * equippedJson 旧 slot-map 格式自动转换为数组（带默认 equipNote）
+  * cultivationFactorsJson 为空时按当前 state 实时计算
+  * storageCapacity 缺失时默认 5
+
+- agent-browser + VLM 端到端验证通过：
+  * 来源名称绿色（uncommon rarity）✓
+  * ×0.8 数字红色徽标（multiply operation）✓
+  * 储物袋容量徽标 ✓
+  * 已装备栏无占位符 ✓
+  * 物品详情弹窗彩色 banner + 完整信息 ✓
