@@ -34,7 +34,7 @@ export function CultivationSpeedCard() {
             修炼速度
           </span>
           <span className="text-base font-bold tabular-nums flex items-baseline gap-1">
-            <span style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>
+            <span style={{ color: multiplierTone(totalMult).color }}>
               ×{totalMult.toFixed(2)}
             </span>
             {flatBonus > 0 && (
@@ -84,10 +84,7 @@ export function CultivationSpeedCard() {
                         <span
                           key={`${eff.operation}-${eff.value}-${eff.note || ''}`}
                           className="text-[10px] tabular-nums font-semibold px-1.5 py-0.5 rounded"
-                          style={{
-                            background: eff.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
-                            color: eff.operation === 'multiply' ? '#c8453c' : '#3b82f6',
-                          }}
+                          style={effectPillStyle(eff)}
                         >
                           {formatGroupedEffect(eff)}
                         </span>
@@ -236,4 +233,22 @@ function groupCultivationFactors(factors: any[]): GroupedCultivationSource[] {
 
 function formatGroupedEffect(eff: { operation: 'multiply' | 'add'; value: number }): string {
   return eff.operation === 'multiply' ? `速率 ×${eff.value}` : `每岁 +${eff.value}`;
+}
+
+
+function multiplierTone(value: number): { color: string; background: string } {
+  if (value > 1) return { color: '#059669', background: '#10b98118' };
+  if (value < 1) return { color: '#dc2626', background: '#ef444418' };
+  return { color: '#6b7280', background: '#6b728018' };
+}
+
+function effectPillStyle(eff: { operation: 'multiply' | 'add'; value: number }): React.CSSProperties {
+  if (eff.operation === 'multiply') {
+    const tone = multiplierTone(eff.value);
+    return { background: tone.background, color: tone.color };
+  }
+  return {
+    background: eff.value >= 0 ? '#3b82f615' : '#ef444418',
+    color: eff.value >= 0 ? '#3b82f6' : '#dc2626',
+  };
 }
