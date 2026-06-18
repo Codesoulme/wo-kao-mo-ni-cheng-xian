@@ -33,6 +33,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   const loadStatus = async () => {
     setChecking(true);
@@ -76,6 +77,27 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       toast.error('AI 配置保存失败', { description: err.message });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testConnection = async () => {
+    if (testing) return;
+    setTesting(true);
+    try {
+      const res = await fetch('/api/ai-config/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ baseUrl, apiKey, model, chatId, userId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '测试连接失败');
+      toast.success('AI 连接测试成功', {
+        description: `模型 ${data.model || model} 可用，耗时 ${data.elapsedMs ?? '?'}ms`,
+      });
+    } catch (err: any) {
+      toast.error('AI 连接测试失败', { description: err.message });
+    } finally {
+      setTesting(false);
     }
   };
 
