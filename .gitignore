@@ -1,0 +1,34 @@
+﻿# dependencies
+node_modules
+
+# next.js
+.next
+out
+build
+next-env.d.ts
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.*
+
+# logs
+*.log
+server.log
+dev.log
+
+# local runtime / non-game artifacts
+db
+agent-ctx
+tool-results
+upload
+download
+examples
+mini-services
+.zscripts
+*.png
+--full-page
+worklog.md
+.claude
+.z-ai-config
+.vercel

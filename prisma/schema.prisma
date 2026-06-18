@@ -1,0 +1,158 @@
+// 修仙模拟器 - Prisma Schema
+// Engine-authority hybrid: all state changes validated by engine
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 玩家角色 - core character state
+model Character {
+  id              String   @id @default(cuid())
+  name            String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // 基础信息
+  age             Int      @default(0)        // 当前年龄（岁）
+  lifespan        Int      @default(80)       // 寿元上限
+  gender          String   @default("male")   // male/female
+
+  // 修仙核心
+  spiritualRoot   String   @default("none")   // 灵根: none/mixed/common/heavenly/chaos
+  rootDetail      String   @default("")       // 灵根详情，如 "火木双灵根"
+  realm           String   @default("mortal") // 境界: mortal/qi_refining/foundation/golden_core/nascent_soul/spirit_severing/great_vehicle/tribulation/ascension
+  realmLevel      Int      @default(0)        // 当前境界内的小境界（0-9）
+  cultivationExp  Int      @default(0)        // 当前境界内修为
+  expToBreak      Int      @default(100)      // 突破所需修为
+
+  // 五行倾向 (金木水火土，0-100，归一化)
+  elementMetal    Int      @default(20)
+  elementWood     Int      @default(20)
+  elementWater    Int      @default(20)
+  elementFire     Int      @default(20)
+  elementEarth    Int      @default(20)
+
+  // 基础属性
+  hp              Int      @default(100)
+  maxHp           Int      @default(100)
+  mp              Int      @default(50)
+  maxMp           Int      @default(50)
+  attack          Int      @default(10)
+  defense         Int      @default(5)
+  speed           Int      @default(10)
+  luck            Int      @default(50)       // 气运 0-100
+  comprehension   Int      @default(50)       // 悟性 0-100
+
+  // 资源
+  spiritStones    Int      @default(0)        // 灵石
+  reputation      Int      @default(0)        // 声望
+
+  // 状态
+  alive           Boolean  @default(true)
+  ascended        Boolean  @default(false)
+  causeOfDeath    String   @default("")
+  faction         String   @default("")       // 宗门
+  master          String   @default("")       // 师承
+  location        String   @default("凡间")   // 当前所在
+
+  // 命节点进度（已完成命节点序号列表，逗号分隔）
+  fateNodes       String   @default("")
+  isAtChoice      Boolean  @default(false)    // 是否处于选择节点
+  lastEventAge    Int      @default(-1)       // 上次事件发生的年龄
+
+  // JSON string of current active status entries
+  statusJson      String   @default("[]")
+  // JSON string of inventory items
+  inventoryJson   String   @default("[]")
+  // JSON string of equipped items (array of ItemEntry, no slot limit — AI may equip multiples of same type)
+  equippedJson    String   @default("[]")
+  // 储物袋容量上限（无袋时默认 5；获得储物袋后增加）
+  storageCapacity Int      @default(5)
+  // 修炼速度倍率（灵根 × 功法 × 其他装备），default 1.0
+  cultivationMultiplier Float @default(1.0)
+  // 修炼心得：AI 生成的修炼速度说明文本（描述当前影响修炼速度的种种因素）
+  cultivationInsight String @default("")
+  // 修炼速度来源结构化列表 JSON（{name,value,operation,rarity,note}[]）—— 前端按来源名称彩色高亮 + 具体数字
+  cultivationFactorsJson String @default("[]")
+  // 待抉择的命节点选择数据（hasChoice=true 时持久化，玩家选择后清空；避免页面刷新丢失）
+  pendingChoiceJson  String   @default("")
+  // JSON string of memory entries (long-term)
+  memoryJson      String   @default("[]")
+  // ===== Task 20 新增 =====
+  // 未决线索 JSON（PendingThread[]）—— 重要剧情线索持久化，避免 AI 记忆丢失
+  pendingThreadsJson String @default("[]")
+  // 角色主动意图 JSON（CharacterIntent[]）—— 引擎根据处境生成
+  characterIntentsJson String @default("[]")
+  // 进行中的战斗 JSON（CombatSession）—— 持久化以支持页面刷新恢复
+  combatStateJson String @default("")
+  // 最近事件类型列表（用于反重复机制）
+  recentEventTypesJson String @default("[]")
+  // 最近蓝图分类列表（用于反重复机制）
+  recentBlueprintCategoriesJson String @default("[]")
+  // ===== Task 22 新增 =====
+  // 心魔值 0-100：杀生/邪修/未解执念会增加；静修/净化物品/岁月流逝会减少
+  // 高心魔值会触发心魔试炼战斗事件，严重影响修炼效率，90+ 有走火入魔风险
+  heartDemon     Int      @default(0)
+
+  // ===== Task 23 新增 =====
+  // 灵宠 JSON（Pet[]）—— 玩家收服的灵宠，参战、护院、增加修炼效率
+  // 灵宠有独立 hp/attack/loyalty/satiety，每岁需要喂养（消耗材料类物品）
+  petsJson       String   @default("[]")
+
+  // ===== Task 24 新增 =====
+  // 秘境探索记录 JSON（ExplorationRecord[]）—— 玩家已探秘境 + 冷却追踪
+  // 每条记录：{ realmId, lastExploredAge, timesExplored, bestReward? }
+  exploredRealmsJson String @default("[]")
+
+  events          EventLog[]
+  choices         ChoiceLog[]
+  interferences   InterferenceLog[]
+}
+
+// 事件日志
+model EventLog {
+  id           String   @id @default(cuid())
+  characterId  String
+  character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  age          Int
+  title        String                       // 事件标题
+  narrative    String                       // AI 生成的叙事
+  eventType    String   @default("normal")  // normal/fate_node/choice/interference/combat/breakthrough/death
+  effects      String   @default("[]")      // JSON: 状态变更列表
+  createdAt    DateTime @default(now())
+
+  @@index([characterId, age])
+}
+
+// 选择日志
+model ChoiceLog {
+  id           String   @id @default(cuid())
+  characterId  String
+  character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  age          Int
+  prompt       String                       // 选择提示
+  options      String                       // JSON: 选项列表
+  chosenIndex  Int                          // 玩家选择的索引
+  chosenText   String                       // 玩家选择的文本
+  result       String                       // 选择结果叙事
+  createdAt    DateTime @default(now())
+}
+
+// 玩家干扰日志
+model InterferenceLog {
+  id           String   @id @default(cuid())
+  characterId  String
+  character    Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  age          Int
+  input        String                       // 玩家输入
+  classification String @default("action")  // action/dialogue/overreach/rule_manipulation
+  response     String                       // AI 回应叙事
+  effects      String   @default("[]")      // JSON: 状态变更
+  accepted     Boolean  @default(true)      // 是否被接受（false=静默拒绝）
+  createdAt    DateTime @default(now())
+}
