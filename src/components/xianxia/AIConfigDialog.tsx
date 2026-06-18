@@ -189,11 +189,21 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
             </div>
           </div>
 
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setOpen(false)} disabled={loading}>取消</Button>
-            <Button className="flex-1" onClick={save} disabled={loading || !baseUrl.trim() || (!status.configured && !apiKey.trim()) || !model.trim()}>
-              {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中</> : '保存配置'}
+          <div className="space-y-2 pt-2">
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={testConnection}
+              disabled={testing || loading || !baseUrl.trim() || (!status.configured && !apiKey.trim()) || !model.trim()}
+            >
+              {testing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />测试中</> : '测试连接'}
             </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)} disabled={loading || testing}>取消</Button>
+              <Button className="flex-1" onClick={save} disabled={loading || testing || !baseUrl.trim() || (!status.configured && !apiKey.trim()) || !model.trim()}>
+                {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中</> : '保存配置'}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

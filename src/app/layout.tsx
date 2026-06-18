@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "修仙模拟器 · 我要修真",
+  title: "我靠模拟成仙",
   description: "AI 驱动的修仙模拟器手游，以年龄为引，天道执笔，演绎你的修真之路。",
   keywords: ["修仙", "模拟器", "修真", "AI", "Xianxia", "Cultivation"],
   authors: [{ name: "天道" }],
@@ -22,9 +22,9 @@ export const metadata: Metadata = {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "修仙模拟器 · 我要修真",
-    description: "AI 驱动的修仙模拟器手游",
-    siteName: "修仙模拟器",
+    title: "我靠模拟成仙",
+    description: "AI 驱动的文字修仙模拟游戏",
+    siteName: "我靠模拟成仙",
     type: "website",
   },
 };

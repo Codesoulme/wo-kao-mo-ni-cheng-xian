@@ -88,7 +88,7 @@ export default function Home() {
         <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-base">⛰</span>
-            <span className="font-serif-cn text-sm font-bold tracking-wider">修仙模拟器</span>
+            <span className="font-serif-cn text-sm font-bold tracking-wider">我靠模拟成仙</span>
           </div>
           <div className="flex items-center gap-2">
             {!character && <AIConfigDialog />}
