@@ -186,7 +186,7 @@ export function MarketModal() {
 
   return (
     <div className="fixed inset-0 z-[55] flex items-end sm:items-center justify-center p-0 sm:p-3 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <Card className="w-full max-w-md paper-texture border-amber-500/40 shadow-2xl flex flex-col max-h-[100dvh] sm:max-h-[92vh] rounded-none sm:rounded-lg overflow-hidden">
+      <Card className="w-full max-w-md paper-texture border-amber-500/40 shadow-2xl flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh] rounded-none sm:rounded-lg overflow-hidden">
         {/* 顶部：坊市淘宝 + 关闭按钮 + 灵石数 */}
         <CardHeader className="pb-2 shrink-0 border-b border-amber-500/30 bg-amber-500/5">
           <CardTitle className="text-base flex items-center gap-2 font-serif-cn">
@@ -219,8 +219,8 @@ export function MarketModal() {
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">
-          <Tabs value={tab} onValueChange={(v) => setTab(v as 'buy' | 'sell')} className="flex-1 flex flex-col overflow-hidden">
+        <CardContent className="flex-1 min-h-0 overflow-hidden p-0 flex flex-col">
+          <Tabs value={tab} onValueChange={(v) => setTab(v as 'buy' | 'sell')} className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="shrink-0 px-3 pt-2">
               <TabsList className="grid grid-cols-2 w-full h-9 bg-muted/40">
                 <TabsTrigger value="buy" className="text-xs gap-1">
@@ -235,8 +235,8 @@ export function MarketModal() {
             </div>
 
             {/* 购买 Tab */}
-            <TabsContent value="buy" className="flex-1 overflow-hidden m-0 data-[state=inactive]:hidden">
-              <div className="h-full overflow-y-auto xianxia-scroll px-3 py-2 space-y-2 max-h-[calc(100dvh-180px)]">
+            <TabsContent value="buy" className="flex-1 min-h-0 overflow-hidden m-0 data-[state=inactive]:hidden flex flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto xianxia-scroll px-3 pt-2 pb-8 space-y-2 overscroll-contain">
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                     <Loader2 className="w-5 h-5 animate-spin mb-2" />
@@ -341,8 +341,8 @@ export function MarketModal() {
             </TabsContent>
 
             {/* 出售 Tab */}
-            <TabsContent value="sell" className="flex-1 overflow-hidden m-0 data-[state=inactive]:hidden">
-              <div className="h-full overflow-y-auto xianxia-scroll px-3 py-2 space-y-2 max-h-[calc(100dvh-180px)]">
+            <TabsContent value="sell" className="flex-1 min-h-0 overflow-hidden m-0 data-[state=inactive]:hidden flex flex-col">
+              <div className="flex-1 min-h-0 overflow-y-auto xianxia-scroll px-3 pt-2 pb-8 space-y-2 overscroll-contain">
                 {loading ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                     <Loader2 className="w-5 h-5 animate-spin mb-2" />
