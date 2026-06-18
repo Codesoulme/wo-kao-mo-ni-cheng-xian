@@ -541,7 +541,7 @@ export function CombatModal() {
                     <span className="text-[8px] text-muted-foreground">{skills.length || 0}</span>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="w-56">
+                <DropdownMenuContent align="center" className="z-[80] w-56">
                   <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
                     选择法术施展
                   </div>
@@ -589,7 +589,7 @@ export function CombatModal() {
                     <span className="text-[8px] text-muted-foreground">{pills.length || 0}</span>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="w-56">
+                <DropdownMenuContent align="center" className="z-[80] w-56">
                   <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
                     选择丹药服用
                   </div>
@@ -632,7 +632,7 @@ export function CombatModal() {
                     <span className="text-[8px] text-muted-foreground">{talismans.length || 0}</span>
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="w-56">
+                <DropdownMenuContent align="center" className="z-[80] w-56">
                   <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
                     激发符箓（单次消耗）
                   </div>
@@ -659,8 +659,7 @@ export function CombatModal() {
                       return (
                         <DropdownMenuItem
                           key={i}
-                          onSelect={(e) => {
-                            e.preventDefault();
+                          onClick={() => {
                             const itemId = it.id || it.itemId;
                             if (itemId) doAction('talisman', { itemId });
                           }}

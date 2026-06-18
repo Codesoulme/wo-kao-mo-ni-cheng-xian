@@ -52,8 +52,12 @@ const BLUEPRINT_STYLE: Record<string, { bg: string; text: string; border: string
   daily:        { bg: 'bg-muted/40',       text: 'text-muted-foreground',              border: 'border-muted-foreground/30' },
 };
 
-function BlueprintChip({ blueprint }: { blueprint?: { category: string; name: string } }) {
+function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: string; name: string }; eventType?: string }) {
   if (!blueprint) return null;
+  // “突破前夜/酝酿突破”是生成主题，不是玩家已成功突破的标签；成功破境只由 breakthrough 事件本身呈现。
+  if (blueprint.category === 'cultivation' && /突破|冲关|破境/.test(blueprint.name || '') && eventType !== 'breakthrough') {
+    return null;
+  }
   const style = BLUEPRINT_STYLE[blueprint.category] || BLUEPRINT_STYLE.daily;
   return (
     <span
@@ -247,7 +251,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                       {EVENT_LABELS[event.eventType] || '流年'}
                     </span>
                     {/* Task 20: 事件蓝图主题 chip */}
-                    <BlueprintChip blueprint={event.blueprint} />
+                    <BlueprintChip blueprint={event.blueprint} eventType={event.eventType} />
                   </div>
                   <div className="flex items-center gap-1">
                     {event.fateNodeName && (

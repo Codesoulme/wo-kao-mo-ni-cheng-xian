@@ -224,9 +224,6 @@ export async function POST(req: NextRequest) {
     });
 
     // 写入事件日志；同一岁允许多段史册记录，避免复杂年份只塞进一段文本。
-    const finalEventType = result.breakthroughHappened
-      ? 'breakthrough'
-      : (isFateNode ? 'fate_node' : aiOutput.eventType);
     const displayEffects = buildEventDisplayEffects({
       before: stateBeforeEvent,
       after: finalState,
@@ -238,10 +235,19 @@ export async function POST(req: NextRequest) {
       removedItemIds: aiOutput.removedItemIds,
     });
 
+    const isSuccessfulBreakthroughText = (title?: string, narrative?: string) =>
+      /成功|破境|更进|踏入|晋入|成就|贯通/.test(`${title || ''}
+${narrative || ''}`);
+    const visibleEventType = (eventType?: string, title?: string, narrative?: string) => {
+      if (eventType !== 'breakthrough') return eventType || 'normal';
+      return result.breakthroughHappened && isSuccessfulBreakthroughText(title, narrative) ? 'breakthrough' : 'normal';
+    };
+
     const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[] }[] = [{
-      title: result.breakthroughHappened ? `境界突破·${aiOutput.title}` : aiOutput.title,
+      // 主事件只记录这一年发生的因果；不要因为最终数值成功突破，就把“冲关前夜/开始冲关”提前包装成已破境。
+      title: aiOutput.title,
       narrative: aiOutput.narrative,
-      eventType: finalEventType,
+      eventType: isFateNode ? 'fate_node' : visibleEventType(aiOutput.eventType, aiOutput.title, aiOutput.narrative),
       effects: displayEffects,
     }];
 
@@ -249,22 +255,30 @@ export async function POST(req: NextRequest) {
       eventDrafts.push({
         title: extra.title,
         narrative: extra.narrative,
-        eventType: extra.eventType || 'normal',
+        eventType: visibleEventType(extra.eventType || 'normal', extra.title, extra.narrative),
         effects: [],
       });
     }
 
-    // 兜底：若数值已突破但主叙事/额外叙事都没写破境过程，自动补一条独立破境事件。
-    const allNarrative = eventDrafts.map(e => `${e.title}\n${e.narrative}`).join('\n');
-    if (result.breakthroughHappened && !/突破|破境|冲关|贯通|筑基|炼气|金丹|元婴|化神|大乘|渡劫/.test(allNarrative)) {
-      eventDrafts.push({
-        title: result.breakthroughMajor ? '破开大关' : '气脉更进',
-        narrative: result.breakthroughMajor
-          ? `前事既定，灵机终于在丹田深处汇成一线。你收摄心神，循着这一缕契机冲开关隘，气海轰鸣，旧境如壳裂去，新的天地在神识中徐徐展开。`
-          : `前事既定，积蓄已久的灵息终于贯通周身。你闭目调息，将浮动气机一寸寸压入丹田，待最后一缕滞涩化开，修为水到渠成，更进一层。`,
-        eventType: 'breakthrough',
-        effects: [],
-      });
+    // 若引擎最终确认已经突破，单独追加一条破境成功记载。
+    // 只有这条显示“破/突破”标签，避免“开始突破/酝酿突破”的过程事件被误标为已成功。
+    if (result.breakthroughHappened) {
+      const alreadyHasSuccessEvent = eventDrafts.some(e =>
+        e.eventType === 'breakthrough' && isSuccessfulBreakthroughText(e.title, e.narrative)
+      );
+      if (!alreadyHasSuccessEvent) {
+        const targetLayer = typeof result.breakthroughSteps === 'number' && result.breakthroughSteps > 1
+          ? `连进${result.breakthroughSteps}层`
+          : (result.breakthroughMajor ? '踏入新境' : '更进一层');
+        eventDrafts.push({
+          title: result.breakthroughMajor ? '破境成功' : '气脉贯通',
+          narrative: result.breakthroughMajor
+            ? `先前诸般因果终于汇成一线。你收束心神，压住翻涌气机，待最后一道关隘松动，周身灵息轰然贯通，旧境如壳裂去，自此${targetLayer}。`
+            : `先前的修持在此刻水到渠成。你闭目调息，将浮动灵机一寸寸纳入丹田，待滞涩尽化，气脉清明，自此${targetLayer}。`,
+          eventType: 'breakthrough',
+          effects: [],
+        });
+      }
     }
 
     const createdEvents: any[] = [];

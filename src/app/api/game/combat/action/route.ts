@@ -52,12 +52,15 @@ export async function POST(req: NextRequest) {
     if (sessionBefore && result.round) {
       const enemyName = sessionBefore.enemies?.[sessionBefore.currentEnemyIdx]?.name;
       const ctx = buildStateContext(state, []);
-      const narrative = await generateCombatRoundNarrative({
-        ctx,
-        sessionBefore,
-        round: result.round,
-        enemyName,
-      });
+      const narrative = await Promise.race([
+        generateCombatRoundNarrative({
+          ctx,
+          sessionBefore,
+          round: result.round,
+          enemyName,
+        }),
+        new Promise<string>((resolve) => setTimeout(() => resolve(result.round.narrative), 3500)),
+      ]);
       result.round.narrative = narrative;
       if (state.combatSession?.log?.length) {
         const log = [...state.combatSession.log];
