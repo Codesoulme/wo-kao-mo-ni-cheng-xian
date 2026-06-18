@@ -189,6 +189,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
           const isAscension = event.eventType === 'ascension';
           const isBreakthrough = event.eventType === 'breakthrough';
           const isExploration = event.eventType === 'exploration';
+          const visibleEffects = (event.effects || []).filter((eff: any) => Number(eff.delta || 0) !== 0);
 
           return (
             <div
@@ -275,9 +276,9 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                       {event.narrative}
                     </p>
                     {/* 效果 */}
-                    {event.effects && event.effects.length > 0 && (
+                    {visibleEffects.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">
-                        {event.effects.map((eff: any, i: number) => (
+                        {visibleEffects.map((eff: any, i: number) => (
                           <span
                             key={i}
                             className={cn(
@@ -299,9 +300,9 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 )}
 
                 {/* 折叠态效果摘要 */}
-                {!isExpanded && event.effects && event.effects.length > 0 && (
+                {!isExpanded && visibleEffects.length > 0 && (
                   <div className="px-3 pb-1 flex flex-wrap gap-1">
-                    {event.effects.slice(0, 4).map((eff: any, i: number) => (
+                    {visibleEffects.slice(0, 4).map((eff: any, i: number) => (
                       <span
                         key={i}
                         className={cn(
@@ -317,9 +318,9 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                         <span className="ml-0.5 tabular-nums">{eff.delta > 0 ? '+' : ''}{eff.delta}</span>
                       </span>
                     ))}
-                    {event.effects.length > 4 && (
+                    {visibleEffects.length > 4 && (
                       <span className="text-[9px] text-muted-foreground px-1">
-                        +{event.effects.length - 4}
+                        +{visibleEffects.length - 4}
                       </span>
                     )}
                   </div>
