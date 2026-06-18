@@ -5,7 +5,7 @@ import { CharacterState } from '@/lib/xianxia/store';
 import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
-import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle, Coins } from 'lucide-react';
+import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle, Coins, Sprout } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface StatusPanelProps {
@@ -26,6 +26,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
     ? Math.max(0, Math.min(100, (character.cultivationExp / character.expToBreak) * 100))
     : 0;
   const genderLabel = character.gender === 'male' ? '男' : character.gender === 'female' ? '女' : character.gender || '未知';
+  const rootLabel = character.rootDetail || character.spiritualRoot || '无灵根';
   const quickStats = [
     { label: '攻', value: character.attack, icon: <Sword className="w-2.5 h-2.5" />, color: '#c8453c' },
     { label: '防', value: character.defense, icon: <Shield className="w-2.5 h-2.5" />, color: '#2e5c8a' },
@@ -96,10 +97,14 @@ export function StatusPanel({ character }: StatusPanelProps) {
                   <span className="rounded bg-muted/60 px-1.5 py-0.5">{character.age}岁</span>
                   <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700/90">寿余 {lifespanLeft} 年</span>
                 </div>
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[150px]">
+                <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                  <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[120px]">
                     <MapPin className="w-2.5 h-2.5 shrink-0" />
                     <span className="truncate">{character.location}</span>
+                  </span>
+                  <span className="flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[110px] shrink">
+                    <Sprout className="w-2.5 h-2.5 shrink-0" />
+                    <span className="truncate">{rootLabel}</span>
                   </span>
                   <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 tabular-nums shrink-0">
                     <Coins className="w-2.5 h-2.5" />

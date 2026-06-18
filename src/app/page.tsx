@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { StartScreen } from '@/components/xianxia/StartScreen';
 import { StatusPanel } from '@/components/xianxia/StatusPanel';
@@ -44,6 +44,18 @@ export default function Home() {
   const [tab, setTab] = useState('story');
   const hydrated = useHydrated();
   const effectiveTab = pendingChoice ? 'story' : tab;
+  const storyScrollRef = useRef<HTMLDivElement | null>(null);
+  const storyScrollTopRef = useRef(0);
+
+  useEffect(() => {
+    if (effectiveTab !== 'story') return;
+    const node = storyScrollRef.current;
+    if (!node) return;
+    const top = storyScrollTopRef.current;
+    requestAnimationFrame(() => {
+      if (storyScrollRef.current) storyScrollRef.current.scrollTop = top;
+    });
+  }, [effectiveTab]);
 
   // 页面挂载/刷新时，若有持久化的 character 但无 events，则拉取完整状态
   useEffect(() => {
@@ -144,9 +156,13 @@ export default function Home() {
             <div className="flex-1 overflow-hidden">
               <Tabs value={effectiveTab} onValueChange={setTab} className="h-full">
                 {/* 故事 - 默认，可折叠 */}
-                <TabsContent value="story" className="h-full m-0 data-[state=inactive]:hidden">
+                <TabsContent value="story" forceMount className="h-full m-0 data-[state=inactive]:hidden">
                   <div className="h-full flex flex-col">
-                    <div className="flex-1 overflow-y-auto xianxia-scroll px-3 pb-2">
+                    <div
+                      ref={storyScrollRef}
+                      onScroll={(e) => { storyScrollTopRef.current = e.currentTarget.scrollTop; }}
+                      className="flex-1 overflow-y-auto xianxia-scroll px-3 pb-2"
+                    >
                       <EventTimeline events={events} />
                     </div>
                     {/* 推进按钮 */}
