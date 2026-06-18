@@ -322,12 +322,6 @@ export function InventoryPanel() {
         </CardContent>
       </Card>
 
-      {/* Task 21: 阵法管理面板 */}
-      <FormationPanel />
-
-      {/* Task 23: 灵宠管理面板 */}
-      <PetPanel />
-
       {/* ==================== 储物袋（含容量显示） ==================== */}
       <Collapsible open={bagOpen} onOpenChange={setBagOpen}>
         <Card className="paper-texture">
@@ -482,6 +476,14 @@ export function InventoryPanel() {
           </CollapsibleContent>
         </Card>
       </Collapsible>
+
+
+      {/* Task 21: 阵法管理面板 */}
+      <FormationPanel />
+
+      {/* Task 23: 灵宠管理面板 */}
+      <PetPanel />
+
 
       {/* 炼丹炉 */}
       <AlchemyFurnace />
