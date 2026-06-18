@@ -5,6 +5,7 @@ import { CharacterState } from '@/lib/xianxia/store';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
 import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface StatusPanelProps {
   character: CharacterState;
@@ -36,9 +37,17 @@ export function StatusPanel({ character }: StatusPanelProps) {
     <>
       <div className="paper-texture rounded-xl border border-border/60 shadow-sm overflow-hidden">
         {/* 顶部角色信息 - 可点击展开详情 */}
-        <button
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setDetailOpen(true)}
-          className="w-full text-left relative px-3 py-2.5 bg-gradient-to-r from-secondary/40 to-transparent hover:from-secondary/60 transition-colors"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setDetailOpen(true);
+            }
+          }}
+          className="w-full text-left relative px-3 py-2.5 bg-gradient-to-r from-secondary/40 to-transparent hover:from-secondary/60 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-3">
             {/* 境界球（可点击） */}
@@ -91,16 +100,66 @@ export function StatusPanel({ character }: StatusPanelProps) {
                     const negative = s.category === 'debuff' || /伤|毒|虚|痛|劫|魔|损|衰/.test(s.name);
                     const color = negative ? '#c8453c' : '#2f8f5b';
                     return (
-                      <span
-                        key={s.id || `${s.name}-${idx}`}
-                        className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm"
-                        style={{ borderColor: `${color}40`, background: `${color}10`, color }}
-                        title={`${s.name}：${s.description || ''}${s.duration === -1 ? '（长驻）' : s.duration ? `（余 ${s.duration} 岁）` : ''}`}
-                      >
-                        {negative ? <AlertTriangle className="w-2.5 h-2.5" /> : <Leaf className="w-2.5 h-2.5" />}
-                        <span className="max-w-[72px] truncate">{s.name}</span>
-                        {s.duration && s.duration !== -1 && <span className="opacity-70">{s.duration}岁</span>}
-                      </span>
+                      <Popover key={s.id || `${s.name}-${idx}`}>
+                        <PopoverTrigger asChild>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm cursor-pointer hover:scale-[1.02] transition-transform"
+                            style={{ borderColor: `${color}40`, background: `${color}10`, color }}
+                          >
+                            {negative ? <AlertTriangle className="w-2.5 h-2.5" /> : <Leaf className="w-2.5 h-2.5" />}
+                            <span className="max-w-[72px] truncate">{s.name}</span>
+                            {s.duration && s.duration !== -1 && <span className="opacity-70">{s.duration}岁</span>}
+                          </span>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="start"
+                          side="bottom"
+                          className="w-64 p-3 paper-texture border-primary/20 shadow-xl"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="space-y-2 font-serif-cn">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="text-sm font-bold" style={{ color }}>{s.name}</div>
+                                <div className="text-[10px] text-muted-foreground mt-0.5">
+                                  {statusCategoryLabel(s.category)}
+                                  <span className="mx-1 opacity-50">·</span>
+                                  {s.duration === -1 ? '长驻' : s.duration ? `余 ${s.duration} 岁` : '短暂'}
+                                </div>
+                              </div>
+                              <span
+                                className="shrink-0 rounded-full border px-1.5 py-0.5 text-[9px]"
+                                style={{ borderColor: `${color}40`, background: `${color}10`, color }}
+                              >
+                                {negative ? '负面' : '增益'}
+                              </span>
+                            </div>
+                            {s.description && (
+                              <p className="text-[11px] leading-relaxed text-foreground/85 whitespace-pre-wrap">
+                                {s.description}
+                              </p>
+                            )}
+                            {s.source && (
+                              <div className="text-[10px] text-muted-foreground">
+                                来源：{s.source}
+                              </div>
+                            )}
+                            {Array.isArray(s.effects) && s.effects.length > 0 && (
+                              <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
+                                {s.effects.slice(0, 4).map((eff: any, k: number) => (
+                                  <span key={k} className="rounded bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                                    {eff.description || '状态影响'}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     );
                   })}
                   {(character.activeStatuses || []).length > topStatuses.length && (
@@ -144,7 +203,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
               </div>
             </div>
           </div>
-        </button>
+        </div>
       </div>
 
       {/* 详情抽屉 */}
@@ -155,6 +214,21 @@ export function StatusPanel({ character }: StatusPanelProps) {
       />
     </>
   );
+}
+
+
+function statusCategoryLabel(category?: string): string {
+  switch (category) {
+    case 'buff': return '增益';
+    case 'debuff': return '负面';
+    case 'special': return '奇遇';
+    case 'attribute': return '资质';
+    case 'skill': return '功法';
+    case 'environment': return '环境';
+    case 'identity': return '身份';
+    case 'quest': return '线索';
+    default: return '状态';
+  }
 }
 
 function MiniBar({ icon, color, pct, label }: {
