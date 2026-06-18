@@ -218,32 +218,22 @@ export function CombatModal() {
   // Task 23: 参战灵宠
   const petCombatant = (session as any)?.petCombatant || null;
   // Task 23: 战斗中可用的符箓（从 inventory 提取，通过 effects 中的 target_attribute 判定）
+  const talismanTargets = new Set(['talisman_attack', 'talisman_defense', 'talisman_heal', 'talisman_escape', 'talisman_stun']);
+  const getEffectTarget = (e: any) => e?.target_attribute || e?.targetAttribute || e?.attribute || '';
   const talismans: any[] = (character?.inventory || []).filter((it: any) => {
     if (it.item_type !== 'consumable') return false;
-    return (it.effects || []).some((e: any) =>
-      e.target_attribute === 'talisman_attack' ||
-      e.target_attribute === 'talisman_defense' ||
-      e.target_attribute === 'talisman_heal' ||
-      e.target_attribute === 'talisman_escape' ||
-      e.target_attribute === 'talisman_stun'
-    );
+    return (it.effects || []).some((e: any) => talismanTargets.has(getEffectTarget(e)));
   });
   // 普通丹药（非符箓的 consumable）
   const pills: any[] = (session?.playerItems || []).filter((it: any) => {
     const item = (character?.inventory || []).find((i: any) => i.id === it.itemId);
     if (!item) return false;
-    return !(item.effects || []).some((e: any) =>
-      e.target_attribute === 'talisman_attack' ||
-      e.target_attribute === 'talisman_defense' ||
-      e.target_attribute === 'talisman_heal' ||
-      e.target_attribute === 'talisman_escape' ||
-      e.target_attribute === 'talisman_stun'
-    );
+    return !(item.effects || []).some((e: any) => talismanTargets.has(getEffectTarget(e)));
   });
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <Card className="w-full max-w-md paper-texture border-destructive/50 shadow-2xl flex flex-col max-h-[100dvh] rounded-none sm:rounded-lg sm:max-h-[96vh] sm:my-2">
+      <Card className="w-full max-w-md paper-texture border-destructive/50 shadow-2xl flex flex-col h-[100dvh] sm:h-[96vh] rounded-none sm:rounded-lg sm:my-2 overflow-hidden">
         {/* 顶部：战斗标题 + 红色装饰边框（session 可能为 null——endResult 显示场景） */}
         <CardHeader className="pb-2 shrink-0 border-b-2 border-destructive/40 bg-destructive/5">
           <CardTitle className="text-base flex items-center gap-2 font-serif-cn text-destructive">
@@ -267,9 +257,9 @@ export function CombatModal() {
           )}
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-y-auto xianxia-scroll space-y-3 p-3">
+        <CardContent className="flex-1 min-h-0 overflow-hidden p-3 flex flex-col">
           {session && !battleStarted && !endResult && (
-            <div className="rounded-lg border-2 border-destructive/40 bg-destructive/5 p-3 space-y-3">
+            <div className="flex-1 min-h-0 overflow-y-auto xianxia-scroll rounded-lg border-2 border-destructive/40 bg-destructive/5 p-3 space-y-3">
               <div className="space-y-1">
                 <div className="text-xs font-bold font-serif-cn text-destructive">
                   {session.contextTitle || '战端将启'}
@@ -296,7 +286,7 @@ export function CombatModal() {
             </div>
           )}
 
-          {(!session || battleStarted || endResult) && (<>
+          {(!session || battleStarted || endResult) && (<div className="flex-1 min-h-0 flex flex-col gap-2">
           {/* 事件缘由叙事（可折叠） */}
           {session?.contextNarrative && (
             <div className="rounded-lg border border-border/60 bg-card/40 overflow-hidden">
@@ -323,7 +313,7 @@ export function CombatModal() {
 
           {/* 敌方信息（顶部） */}
           {enemy && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2 relative overflow-visible">
+            <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 space-y-1.5 relative overflow-visible">
               {/* Task 22: 敌人伤害飘字 */}
               <FloatNumbersOverlay floats={floats.filter(f => f.target === 'enemy')} />
               <div className="flex items-center justify-between">
@@ -383,7 +373,7 @@ export function CombatModal() {
 
           {/* 玩家信息（session 可能为 null——endResult 显示场景跳过） */}
           {session && (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2 relative overflow-visible">
+          <div className="shrink-0 rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-1.5 relative overflow-visible">
             {/* Task 22: 玩家伤害飘字 */}
             <FloatNumbersOverlay floats={floats.filter(f => f.target === 'player')} />
             <div className="flex items-center justify-between">
@@ -462,11 +452,11 @@ export function CombatModal() {
 
           {/* 战斗日志（session 可能为 null——endResult 显示场景跳过） */}
           {session && (
-          <div>
-            <div className="text-[10px] text-muted-foreground mb-1 px-1 font-serif-cn">
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="shrink-0 text-[10px] text-muted-foreground mb-1 px-1 font-serif-cn">
               战斗记录
             </div>
-            <div ref={logScrollRef} className="rounded-lg border border-border/60 bg-card/40 p-2 max-h-60 overflow-y-auto xianxia-scroll space-y-1.5">
+            <div ref={logScrollRef} className="flex-1 min-h-[96px] rounded-lg border border-border/60 bg-card/40 p-2 overflow-y-auto xianxia-scroll space-y-1.5 overscroll-contain">
               {recentLog.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground text-center py-3 font-serif-cn">
                   战端初启，尚未交锋...
@@ -518,7 +508,7 @@ export function CombatModal() {
               </Button>
             </div>
           )}
-          </>)}
+          </div>)}
         </CardContent>
 
         {/* 底部：行动按钮区（仅 ongoing 且未结束展示时显示） */}
@@ -650,13 +640,7 @@ export function CombatModal() {
                     <DropdownMenuItem disabled>无符箓可用</DropdownMenuItem>
                   ) : (
                     talismans.map((it, i) => {
-                      const talismanType = (it.effects || []).find((e: any) =>
-                        e.target_attribute === 'talisman_attack' ||
-                        e.target_attribute === 'talisman_defense' ||
-                        e.target_attribute === 'talisman_heal' ||
-                        e.target_attribute === 'talisman_escape' ||
-                        e.target_attribute === 'talisman_stun'
-                      );
+                      const talismanType = (it.effects || []).find((e: any) => talismanTargets.has(getEffectTarget(e)));
                       const typeLabel: Record<string, string> = {
                         talisman_attack: '攻',
                         talisman_defense: '防',
@@ -671,13 +655,17 @@ export function CombatModal() {
                         talisman_escape: '#a16207',
                         talisman_stun: '#7c3aed',
                       };
-                      const tt = talismanType?.target_attribute || '';
+                      const tt = getEffectTarget(talismanType);
                       return (
                         <DropdownMenuItem
                           key={i}
-                          onClick={() => doAction('talisman', { itemId: it.id })}
+                          onSelect={(e) => {
+                            e.preventDefault();
+                            const itemId = it.id || it.itemId;
+                            if (itemId) doAction('talisman', { itemId });
+                          }}
                           disabled={busy}
-                          className="flex items-start gap-2 py-2"
+                          className="flex items-start gap-2 py-2 cursor-pointer"
                         >
                           <span className="text-[9px] px-1 py-0.5 rounded shrink-0" style={{
                             background: `${tColor[tt] || '#6b7280'}25`,

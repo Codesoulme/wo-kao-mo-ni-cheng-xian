@@ -1419,26 +1419,33 @@ export function executeCombatRound(
       };
     }
     playerActionDesc = `激发${item.name}`;
-    // 根据 effects 中的 target_attribute 判定符箓类型
+    // 根据 effects 中的 target_attribute 判定符箓类型，兼容 AI 可能写出的 targetAttribute/attribute 别名
+    let talismanResolved = false;
     for (const eff of item.effects || []) {
-      if (eff.target_attribute === 'talisman_attack' && eff.operation === 'add') {
+      const target = (eff as any).target_attribute || (eff as any).targetAttribute || (eff as any).attribute || '';
+      const operation = (eff as any).operation || 'add';
+      if (target === 'talisman_attack' && operation === 'add') {
         // 攻击符：直接对敌人造成 value 伤害（无视防御一半）
         const dmg = Math.max(1, Math.floor(eff.value - enemy.defense * 0.3));
         playerDamageDealt = dmg;
         enemyHp -= dmg;
+        talismanResolved = true;
         narrative += `你激发${item.name}，符箓化为攻伐之力轰向${enemy.name}，造成 ${dmg} 点伤害。`;
-      } else if (eff.target_attribute === 'talisman_defense' && eff.operation === 'add') {
+      } else if (target === 'talisman_defense' && operation === 'add') {
         // 防御符：本回合减伤 value
         session.talismanDefenseActive = eff.value;
+        talismanResolved = true;
         narrative += `你激发${item.name}，符箓化为护体金光，本回合可减伤 ${eff.value} 点。`;
-      } else if (eff.target_attribute === 'talisman_heal' && eff.operation === 'add') {
+      } else if (target === 'talisman_heal' && operation === 'add') {
         // 治疗符：回复 HP
         const heal = eff.value;
         playerHp = Math.min(session.playerMaxHp, playerHp + heal);
         playerHeal = heal;
+        talismanResolved = true;
         narrative += `你激发${item.name}，符箓化为温润灵光，回复 ${heal} 点气血。`;
-      } else if (eff.target_attribute === 'talisman_escape' && eff.operation === 'add') {
+      } else if (target === 'talisman_escape' && operation === 'add') {
         // 遁逃符：高概率逃跑
+        talismanResolved = true;
         const escapeChance = Math.min(0.95, 0.5 + eff.value * 0.1);
         if (Math.random() < escapeChance) {
           narrative += `你激发${item.name}，符箓化为金光裹身，瞬间脱离战场！`;
@@ -1455,11 +1462,15 @@ export function executeCombatRound(
         } else {
           narrative += `你激发${item.name}，但灵力被压制，未能脱身。`;
         }
-      } else if (eff.target_attribute === 'talisman_stun' && eff.operation === 'add') {
+      } else if (target === 'talisman_stun' && operation === 'add') {
         // 镇压符：让敌人本回合无法行动
         session.enemyStunned = true;
+        talismanResolved = true;
         narrative += `你激发${item.name}，符箓化为镇压力量，${enemy.name}本回合无法行动！`;
       }
+    }
+    if (!talismanResolved) {
+      narrative += `你激发${item.name}，符纸微燃，灵光散入战局。`;
     }
     // 消耗符箓（除遁逃符已消耗外）
     state = { ...state, inventory: state.inventory.filter(it => it.id !== payload.itemId) };
