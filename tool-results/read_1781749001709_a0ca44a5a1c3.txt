@@ -1,0 +1,582 @@
+     1→'use client';
+     2→
+     3→import { useState } from 'react';
+     4→import { useGameStore } from '@/lib/xianxia/store';
+     5→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+     6→import { Badge } from '@/components/ui/badge';
+     7→import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+     8→import {
+     9→  ChevronDown, Package, Swords, Shield, Gem, Sparkles, BookOpen,
+    10→  FlaskConical, Loader2, Hand, X, Check, Zap, Star, Heart, Brain, Crown, Wrench, Backpack,
+    11→} from 'lucide-react';
+    12→import { cn } from '@/lib/utils';
+    13→import { toast } from 'sonner';
+    14→import {
+    15→  ITEM_TYPE_LABEL, itemToSlot, ItemType, StatusEntry,
+    16→} from '@/lib/xianxia/types';
+    17→import { AlchemyFurnace } from './AlchemyFurnace';
+    18→import { ItemDetailDialog } from './ItemDetailDialog';
+    19→
+    20→const RARITY_COLORS: Record<string, string> = {
+    21→  common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
+    22→  epic: '#a855f7', legendary: '#d4af37', mythic: '#ec4899',
+    23→};
+    24→const RARITY_LABEL: Record<string, string> = {
+    25→  common: '凡品', uncommon: '良品', rare: '稀有', epic: '史诗', legendary: '传说', mythic: '神话',
+    26→};
+    27→
+    28→const TYPE_ICON: Record<string, React.ReactNode> = {
+    29→  weapon: <Swords className="w-3.5 h-3.5" />,
+    30→  armor: <Shield className="w-3.5 h-3.5" />,
+    31→  accessory: <Gem className="w-3.5 h-3.5" />,
+    32→  artifact: <Sparkles className="w-3.5 h-3.5" />,
+    33→  scripture: <BookOpen className="w-3.5 h-3.5" />,
+    34→  consumable: <FlaskConical className="w-3.5 h-3.5" />,
+    35→  material: <Package className="w-3.5 h-3.5" />,
+    36→  tool: <Wrench className="w-3.5 h-3.5" />,
+    37→};
+    38→
+    39→// 特殊状态词条的图标映射（灵宠/命格/天赋/身份等）
+    40→function specialIcon(name: string): React.ReactNode {
+    41→  if (/灵宠|坐骑|妖兽|灵禽/.test(name)) return <Heart className="w-3.5 h-3.5" />;
+    42→  if (/命格|命途|气运|天命/.test(name)) return <Crown className="w-3.5 h-3.5" />;
+    43→  if (/天赋|悟性|体质|灵体/.test(name)) return <Brain className="w-3.5 h-3.5" />;
+    44→  if (/身份|师承|宗门|职位/.test(name)) return <Star className="w-3.5 h-3.5" />;
+    45→  return <Sparkles className="w-3.5 h-3.5" />;
+    46→}
+    47→
+    48→// 属性中文名映射
+    49→const ATTR_ZH: Record<string, string> = {
+    50→  attack: '攻击', defense: '防御', speed: '速度', hp: '气血', maxHp: '气血上限',
+    51→  mp: '灵力', maxMp: '灵力上限', luck: '气运', comprehension: '悟性',
+    52→  cultivationExp: '修为', lifespan: '寿元', spiritStones: '灵石', reputation: '声望',
+    53→  elementMetal: '金', elementWood: '木', elementWater: '水', elementFire: '火', elementEarth: '土',
+    54→  storageCapacity: '储物袋容量',
+    55→};
+    56→function attrZh(attr: string): string {
+    57→  return ATTR_ZH[attr] || attr;
+    58→}
+    59→function fmtEffectZh(eff: any): string {
+    60→  const zh = attrZh(eff.target_attribute);
+    61→  if (eff.operation === 'add') return `${zh}${eff.value > 0 ? '+' : ''}${eff.value}`;
+    62→  if (eff.operation === 'multiply') return `${zh}×${eff.value}`;
+    63→  return `${zh}${eff.operation}${eff.value}`;
+    64→}
+    65→
+    66→// 判定物品是否是储物袋（含 storageCapacity 效果的 tool）
+    67→function isStorageBag(item: any): boolean {
+    68→  if (!item || item.item_type !== 'tool') return false;
+    69→  return (item.effects || []).some((e: any) => e.target_attribute === 'storageCapacity' && e.operation === 'add' && e.value > 0);
+    70→}
+    71→
+    72→export function InventoryPanel() {
+    73→  const { character, setCharacter } = useGameStore();
+    74→  const [busy, setBusy] = useState<string | null>(null);
+    75→  const [bagOpen, setBagOpen] = useState(true);
+    76→  const [specialOpen, setSpecialOpen] = useState(true);
+    77→  const [detailItem, setDetailItem] = useState<any>(null);
+    78→  const [detailOpen, setDetailOpen] = useState(false);
+    79→
+    80→  if (!character) return null;
+    81→
+    82→  const equippedList: any[] = Array.isArray(character.equipped) ? character.equipped : [];
+    83→  const inventory: any[] = character.inventory || [];
+    84→  const activeStatuses: StatusEntry[] = character.activeStatuses || [];
+    85→
+    86→  const doAction = async (action: 'equip' | 'unequip' | 'use', payload: { itemId?: string }) => {
+    87→    if (!character) return;
+    88→    const key = payload.itemId || action;
+    89→    setBusy(key);
+    90→    try {
+    91→      const res = await fetch('/api/game/item', {
+    92→        method: 'POST',
+    93→        headers: { 'Content-Type': 'application/json' },
+    94→        body: JSON.stringify({ characterId: character.id, action, ...payload }),
+    95→      });
+    96→      const data = await res.json();
+    97→      if (!data.success) throw new Error(data.error || '操作失败');
+    98→      setCharacter({ ...character, ...data.state });
+    99→      if (data.narrative) {
+   100→        toast.success(data.message, { description: data.narrative });
+   101→      } else {
+   102→        toast.success(data.message);
+   103→      }
+   104→    } catch (err: any) {
+   105→      toast.error('操作失败', { description: err.message });
+   106→    } finally {
+   107→      setBusy(null);
+   108→    }
+   109→  };
+   110→
+   111→  // 打开物品详情弹窗
+   112→  const openDetail = (item: any) => {
+   113→    setDetailItem(item);
+   114→    setDetailOpen(true);
+   115→  };
+   116→
+   117→  // 储物袋按类型分组
+   118→  const grouped: Record<string, any[]> = {};
+   119→  for (const it of inventory) {
+   120→    const t = it.item_type || 'material';
+   121→    if (!grouped[t]) grouped[t] = [];
+   122→    grouped[t].push(it);
+   123→  }
+   124→  const groupOrder: ItemType[] = ['scripture', 'weapon', 'armor', 'accessory', 'artifact', 'consumable', 'tool', 'material'];
+   125→
+   126→  // 修炼速度
+   127→  const totalMult = character.cultivationMultiplier ?? 0;
+   128→  const flatBonus = character.cultivationFlatBonus ?? 0;
+   129→  const factors: any[] = character.cultivationFactors || [];
+   130→  const insightText: string = character.cultivationInsight || '';
+   131→  const hasInsight = insightText.trim().length > 0;
+   132→
+   133→  // 储物袋容量
+   134→  const storageCap = character.storageCapacity ?? 5;
+   135→  const invCount = inventory.length;
+   136→  const hasBag = inventory.some(i => isStorageBag(i));
+   137→  const capacityRatio = storageCap > 0 ? invCount / storageCap : 0;
+   138→  const capacityWarn = capacityRatio >= 1;
+   139→  const capacityNearFull = capacityRatio >= 0.8 && !capacityWarn;
+   140→
+   141→  // 特殊状态词条
+   142→  const specialStatuses = activeStatuses.filter(s => s.category === 'special' || s.category === 'identity');
+   143→
+   144→  return (
+   145→    <div className="space-y-3 pb-2">
+   146→      {/* ==================== 修炼速度概览 ==================== */}
+   147→      <Card className="paper-texture">
+   148→        <CardHeader className="pb-1.5 pt-3">
+   149→          <CardTitle className="text-sm flex items-center justify-between">
+   150→            <span className="flex items-center gap-2">
+   151→              <Zap className="w-4 h-4 text-primary" />
+   152→              修炼速度
+   153→            </span>
+   154→            <span className="text-base font-bold tabular-nums flex items-baseline gap-1">
+   155→              <span style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>
+   156→                ×{totalMult.toFixed(2)}
+   157→              </span>
+   158→              {flatBonus > 0 && (
+   159→                <span className="text-xs" style={{ color: '#3b82f6' }}>
+   160→                  +{flatBonus}/岁
+   161→                </span>
+   162→              )}
+   163→            </span>
+   164→          </CardTitle>
+   165→        </CardHeader>
+   166→        <CardContent className="pt-1 space-y-2">
+   167→          {/* 来源条目（彩色芯片：名称按 rarity 上色 + 具体倍率数字） */}
+   168→          {factors.length > 0 ? (
+   169→            <div className="space-y-1">
+   170→              <div className="text-[10px] text-muted-foreground mb-1">来源 · 名称与加成</div>
+   171→              {factors.map((f, i) => {
+   172→                const color = RARITY_COLORS[f.rarity] || '#6b7280';
+   173→                return (
+   174→                  <div
+   175→                    key={i}
+   176→                    className="flex items-center justify-between rounded-md px-2 py-1 transition-colors hover:bg-muted/30"
+   177→                    style={{
+   178→                      background: `${color}08`,
+   179→                      borderLeft: `2px solid ${color}80`,
+   180→                    }}
+   181→                  >
+   182→                    <div className="flex items-center gap-1.5 min-w-0">
+   183→                      <span
+   184→                        className="w-1.5 h-1.5 rounded-full shrink-0"
+   185→                        style={{ background: color, boxShadow: `0 0 6px ${color}80` }}
+   186→                      />
+   187→                      <span
+   188→                        className="text-xs font-serif-cn font-medium truncate"
+   189→                        style={{ color }}
+   190→                        title={f.name}
+   191→                      >
+   192→                        {f.name}
+   193→                      </span>
+   194→                      {f.note && (
+   195→                        <span className="text-[9px] text-muted-foreground/80 truncate hidden sm:inline">
+   196→                          · {f.note}
+   197→                        </span>
+   198→                      )}
+   199→                    </div>
+   200→                    <span
+   201→                      className="text-xs tabular-nums font-semibold shrink-0 ml-2 px-1.5 py-0.5 rounded"
+   202→                      style={{
+   203→                        background: f.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
+   204→                        color: f.operation === 'multiply' ? '#c8453c' : '#3b82f6',
+   205→                      }}
+   206→                    >
+   207→                      {f.operation === 'multiply' ? '×' : '+'}{f.value}
+   208→                    </span>
+   209→                  </div>
+   210→                );
+   211→              })}
+   212→            </div>
+   213→          ) : (
+   214→            <div className="text-[10px] text-muted-foreground/70 px-1 py-1">
+   215→              {totalMult > 0
+   216→                ? '无加成来源——修炼速度仅由灵根决定。'
+   217→                : '凡人之躯，无灵根可引天地灵气，修为难进。'}
+   218→            </div>
+   219→          )}
+   220→
+   221→          {/* AI 生成的修炼心得文本（按句号/分号分段） */}
+   222→          {hasInsight && (
+   223→            <div
+   224→              className="rounded-md p-2.5 leading-relaxed text-[11px] font-serif-cn xianxia-scroll"
+   225→              style={{
+   226→                background: 'linear-gradient(135deg, rgba(200,69,60,0.04), rgba(60,80,90,0.04))',
+   227→                border: '1px solid rgba(200,69,60,0.12)',
+   228→                color: '#3a3530',
+   229→              }}
+   230→            >
+   231→              {insightText.split(/(?<=[。；])/).filter(s => s.trim()).map((seg, i) => (
+   232→                <p key={i} className="mb-0.5 last:mb-0">{seg.trim()}</p>
+   233→              ))}
+   234→            </div>
+   235→          )}
+   236→
+   237→          <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
+   238→            每岁修为 = 基础 × 倍率（×{totalMult.toFixed(2)}）{flatBonus > 0 ? ` + 加成（${flatBonus}）` : ''}。来源条目由引擎依灵根、功法、奇缘实时计算，稳定不消失。
+   239→          </p>
+   240→        </CardContent>
+   241→      </Card>
+   242→
+   243→      {/* ==================== 已装备（数组，无固定槽位） ==================== */}
+   244→      <Card className="paper-texture">
+   245→        <CardHeader className="pb-2">
+   246→          <CardTitle className="text-sm flex items-center justify-between">
+   247→            <span className="flex items-center gap-2">
+   248→              <Sparkles className="w-4 h-4 text-primary" />
+   249→              已装备
+   250→            </span>
+   251→            <Badge variant="secondary" className="text-[10px]">
+   252→              {equippedList.length} 件
+   253→            </Badge>
+   254→          </CardTitle>
+   255→        </CardHeader>
+   256→        <CardContent className="pt-0 space-y-1.5">
+   257→          {equippedList.length === 0 ? (
+   258→            <p className="text-xs text-muted-foreground text-center py-3">
+   259→              身无长物。获得装备后可在储物袋装备。
+   260→            </p>
+   261→          ) : (
+   262→            equippedList.map((item, i) => {
+   263→              const isBusy = busy === item.id;
+   264→              const color = RARITY_COLORS[item.rarity] || '#6b7280';
+   265→              return (
+   266→                <div
+   267→                  key={item.id || i}
+   268→                  className="rounded-md border p-2 flex items-center gap-2 transition-all cursor-pointer hover:bg-muted/30"
+   269→                  style={{
+   270→                    borderColor: `${color}40`,
+   271→                    background: `${color}08`,
+   272→                  }}
+   273→                  onClick={() => openDetail(item)}
+   274→                >
+   275→                  <div
+   276→                    className="shrink-0 w-7 h-7 rounded flex items-center justify-center"
+   277→                    style={{ background: `${color}15`, color }}
+   278→                  >
+   279→                    {TYPE_ICON[item.item_type] || <Package className="w-3.5 h-3.5" />}
+   280→                  </div>
+   281→                  <div className="flex-1 min-w-0">
+   282→                    <div className="flex items-center gap-1.5">
+   283→                      <span
+   284→                        className="text-xs font-semibold font-serif-cn truncate"
+   285→                        style={{ color }}
+   286→                      >
+   287→                        {item.name}
+   288→                      </span>
+   289→                      {item.equipNote && (
+   290→                        <span
+   291→                          className="text-[9px] px-1 py-0 rounded shrink-0"
+   292→                          style={{ background: `${color}20`, color: `${color}cc` }}
+   293→                        >
+   294→                          {item.equipNote}
+   295→                        </span>
+   296→                      )}
+   297→                    </div>
+   298→                    {item.effects && item.effects.length > 0 && (
+   299→                      <div className="flex flex-wrap gap-1 mt-0.5">
+   300→                        {item.effects.slice(0, 3).map((e: any, j: number) => (
+   301→                          <span
+   302→                            key={j}
+   303→                            className="text-[9px] px-1 py-0 rounded"
+   304→                            style={{
+   305→                              background: e.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
+   306→                              color: e.operation === 'multiply' ? '#c8453c' : '#3b82f6',
+   307→                            }}
+   308→                          >
+   309→                            {fmtEffectZh(e)}
+   310→                          </span>
+   311→                        ))}
+   312→                        {item.effects.length > 3 && (
+   313→                          <span className="text-[9px] text-muted-foreground">+{item.effects.length - 3}</span>
+   314→                        )}
+   315→                      </div>
+   316→                    )}
+   317→                  </div>
+   318→                  <button
+   319→                    onClick={(e) => { e.stopPropagation(); doAction('unequip', { itemId: item.id }); }}
+   320→                    disabled={isBusy}
+   321→                    className="shrink-0 w-6 h-6 rounded flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+   322→                    title="卸下"
+   323→                  >
+   324→                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+   325→                  </button>
+   326→                </div>
+   327→              );
+   328→            })
+   329→          )}
+   330→          <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-1 px-0.5">
+   331→            点击装备查看详情。装备数量无上限，由天道判断合理性。
+   332→          </p>
+   333→        </CardContent>
+   334→      </Card>
+   335→
+   336→      {/* ==================== 储物袋（含容量显示） ==================== */}
+   337→      <Collapsible open={bagOpen} onOpenChange={setBagOpen}>
+   338→        <Card className="paper-texture">
+   339→          <CollapsibleTrigger asChild>
+   340→            <CardHeader className="pb-2 cursor-pointer">
+   341→              <CardTitle className="text-sm flex items-center justify-between">
+   342→                <span className="flex items-center gap-2">
+   343→                  <Backpack className="w-4 h-4 text-accent" />
+   344→                  储物袋
+   345→                </span>
+   346→                <div className="flex items-center gap-2">
+   347→                  {/* 容量徽章 */}
+   348→                  <span
+   349→                    className={cn(
+   350→                      "text-[10px] px-1.5 py-0.5 rounded tabular-nums",
+   351→                      capacityWarn
+   352→                        ? "bg-destructive/15 text-destructive"
+   353→                        : capacityNearFull
+   354→                          ? "bg-amber-500/15 text-amber-700"
+   355→                          : "bg-muted/40 text-muted-foreground"
+   356→                    )}
+   357→                    title={hasBag ? '已有储物袋' : '无储物袋，上限仅 5 件'}
+   358→                  >
+   359→                    {invCount}/{storageCap}
+   360→                    {!hasBag && <span className="opacity-60"> · 无袋</span>}
+   361→                  </span>
+   362→                  <ChevronDown className={cn("w-4 h-4 transition-transform", bagOpen && "rotate-180")} />
+   363→                </div>
+   364→              </CardTitle>
+   365→            </CardHeader>
+   366→          </CollapsibleTrigger>
+   367→          <CollapsibleContent>
+   368→            <CardContent className="pt-0 space-y-3">
+   369→              {/* 容量警告条 */}
+   370→              {capacityWarn && (
+   371→                <div className="text-[10px] px-2 py-1.5 rounded bg-destructive/10 text-destructive border border-destructive/30">
+   372→                  储物袋已满，无法再装新物。需获更大的储物袋或消耗现有物品。
+   373→                </div>
+   374→              )}
+   375→              {capacityNearFull && (
+   376→                <div className="text-[10px] px-2 py-1.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/30">
+   377→                  储物袋将满，仅余 {storageCap - invCount} 格。
+   378→                </div>
+   379→              )}
+   380→
+   381→              {inventory.length === 0 ? (
+   382→                <p className="text-xs text-muted-foreground text-center py-4">储物袋空空如也</p>
+   383→              ) : (
+   384→                groupOrder.map(type => {
+   385→                  const items = grouped[type];
+   386→                  if (!items || items.length === 0) return null;
+   387→                  return (
+   388→                    <div key={type}>
+   389→                      <div className="text-[10px] text-muted-foreground mb-1 px-0.5 flex items-center gap-1">
+   390→                        <span className="font-serif-cn">{ITEM_TYPE_LABEL[type] || type}</span>
+   391→                        <span className="opacity-50">·</span>
+   392→                        <span>{items.length}</span>
+   393→                      </div>
+   394→                      <div className="space-y-1.5">
+   395→                        {items.map((item, i) => {
+   396→                          const slot = itemToSlot(item.item_type);
+   397→                          const canEquip = !!slot && !isStorageBag(item);
+   398→                          const canUse = item.item_type === 'consumable';
+   399→                          const isBusy = busy === item.id;
+   400→                          const color = RARITY_COLORS[item.rarity] || '#6b7280';
+   401→                          const bag = isStorageBag(item);
+   402→                          return (
+   403→                            <div
+   404→                              key={item.id || i}
+   405→                              className="rounded-md border p-2 cursor-pointer transition-all hover:bg-muted/30"
+   406→                              style={{
+   407→                                borderColor: `${color}40`,
+   408→                                background: `${color}08`,
+   409→                              }}
+   410→                              onClick={() => openDetail(item)}
+   411→                            >
+   412→                              <div className="flex items-center justify-between mb-0.5">
+   413→                                <span className="flex items-center gap-1.5 min-w-0">
+   414→                                  <span style={{ color }}>{TYPE_ICON[item.item_type] || <Package className="w-3.5 h-3.5" />}</span>
+   415→                                  <span className="text-xs font-semibold font-serif-cn truncate" style={{ color }}>
+   416→                                    {item.name}
+   417→                                  </span>
+   418→                                  {bag && (
+   419→                                    <span className="text-[9px] px-1 py-0 rounded shrink-0 bg-accent/20 text-accent">
+   420→                                      储物袋
+   421→                                    </span>
+   422→                                  )}
+   423→                                </span>
+   424→                                <span
+   425→                                  className="text-[9px] px-1 rounded shrink-0 ml-1"
+   426→                                  style={{ background: `${color}20`, color }}
+   427→                                >
+   428→                                  {RARITY_LABEL[item.rarity] || item.rarity}
+   429→                                </span>
+   430→                              </div>
+   431→                              <p className="text-[10px] text-muted-foreground leading-relaxed mb-1">{item.description}</p>
+   432→                              {item.effects && item.effects.length > 0 && (
+   433→                                <div className="flex flex-wrap gap-1 mb-1.5">
+   434→                                  {item.effects.map((e: any, j: number) => (
+   435→                                    <span
+   436→                                      key={j}
+   437→                                      className="text-[9px] px-1 py-0.5 rounded"
+   438→                                      style={{
+   439→                                        background: e.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
+   440→                                        color: e.operation === 'multiply' ? '#c8453c' : '#3b82f6',
+   441→                                      }}
+   442→                                    >
+   443→                                      {fmtEffectZh(e)}
+   444→                                    </span>
+   445→                                  ))}
+   446→                                </div>
+   447→                              )}
+   448→                              {(canEquip || canUse) && (
+   449→                                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+   450→                                  {canEquip && (
+   451→                                    <button
+   452→                                      onClick={() => doAction('equip', { itemId: item.id })}
+   453→                                      disabled={isBusy}
+   454→                                      className="text-[10px] px-2 py-0.5 rounded border border-primary/40 text-primary hover:bg-primary/10 transition-colors flex items-center gap-1 disabled:opacity-50"
+   455→                                    >
+   456→                                      {isBusy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Check className="w-2.5 h-2.5" />}
+   457→                                      装备
+   458→                                    </button>
+   459→                                  )}
+   460→                                  {canUse && (
+   461→                                    <button
+   462→                                      onClick={() => doAction('use', { itemId: item.id })}
+   463→                                      disabled={isBusy}
+   464→                                      className="text-[10px] px-2 py-0.5 rounded border border-accent/40 text-accent hover:bg-accent/10 transition-colors flex items-center gap-1 disabled:opacity-50"
+   465→                                    >
+   466→                                      {isBusy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Hand className="w-2.5 h-2.5" />}
+   467→                                      使用
+   468→                                    </button>
+   469→                                  )}
+   470→                                </div>
+   471→                              )}
+   472→                              {item.source && (
+   473→                                <div className="text-[9px] text-muted-foreground/70 mt-1">来源：{item.source}</div>
+   474→                              )}
+   475→                            </div>
+   476→                          );
+   477→                        })}
+   478→                      </div>
+   479→                    </div>
+   480→                  );
+   481→                })
+   482→              )}
+   483→            </CardContent>
+   484→          </CollapsibleContent>
+   485→        </Card>
+   486→      </Collapsible>
+   487→
+   488→      {/* 炼丹炉 */}
+   489→      <AlchemyFurnace />
+   490→
+   491→      {/* 奇缘异宝 */}
+   492→      <Collapsible open={specialOpen} onOpenChange={setSpecialOpen}>
+   493→        <Card className="paper-texture">
+   494→          <CollapsibleTrigger asChild>
+   495→            <CardHeader className="pb-2 cursor-pointer">
+   496→              <CardTitle className="text-sm flex items-center justify-between">
+   497→                <span className="flex items-center gap-2">
+   498→                  <Star className="w-4 h-4 text-primary" />
+   499→                  奇缘异宝
+   500→                </span>
+   501→                <div className="flex items-center gap-2">
+   502→                  <Badge variant="secondary" className="text-[10px]">{specialStatuses.length}</Badge>
+   503→                  <ChevronDown className={cn("w-4 h-4 transition-transform", specialOpen && "rotate-180")} />
+   504→                </div>
+   505→              </CardTitle>
+   506→            </CardHeader>
+   507→          </CollapsibleTrigger>
+   508→          <CollapsibleContent>
+   509→            <CardContent className="pt-0 space-y-1.5">
+   510→              {specialStatuses.length === 0 ? (
+   511→                <p className="text-xs text-muted-foreground text-center py-4">
+   512→                  尚无奇缘。修行途中或获灵宠、或得命格、或觉醒天赋，皆显示于此。
+   513→                </p>
+   514→              ) : (
+   515→                specialStatuses.map((s, i) => {
+   516→                  const color = RARITY_COLORS[s.rarity] || '#6b7280';
+   517→                  return (
+   518→                    <div
+   519→                      key={s.id || i}
+   520→                      className="rounded-md border p-2"
+   521→                      style={{
+   522→                        borderColor: `${color}40`,
+   523→                        background: `${color}08`,
+   524→                      }}
+   525→                    >
+   526→                      <div className="flex items-center justify-between mb-0.5">
+   527→                        <span className="flex items-center gap-1.5 text-xs font-semibold font-serif-cn truncate" style={{ color }}>
+   528→                          {specialIcon(s.name)}
+   529→                          {s.name}
+   530→                        </span>
+   531→                        <span className="text-[9px] px-1 rounded shrink-0 ml-1" style={{
+   532→                          background: `${color}20`, color,
+   533→                        }}>
+   534→                          {RARITY_LABEL[s.rarity] || s.rarity}
+   535→                        </span>
+   536→                      </div>
+   537→                      <p className="text-[10px] text-muted-foreground leading-relaxed mb-1">{s.description}</p>
+   538→                      {s.effects && s.effects.length > 0 && (
+   539→                        <div className="flex flex-wrap gap-1 mb-1">
+   540→                          {s.effects.map((e: any, j: number) => (
+   541→                            <span
+   542→                              key={j}
+   543→                              className="text-[9px] px-1 py-0.5 rounded"
+   544→                              style={{
+   545→                                background: e.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
+   546→                                color: e.operation === 'multiply' ? '#c8453c' : '#3b82f6',
+   547→                              }}
+   548→                            >
+   549→                              {fmtEffectZh(e)}
+   550→                            </span>
+   551→                          ))}
+   552→                        </div>
+   553→                      )}
+   554→                      <div className="flex items-center justify-between text-[9px] text-muted-foreground/70">
+   555→                        <span>来源：{s.source || '未知'}</span>
+   556→                        <span>{s.duration === -1 ? '永久' : `剩余 ${s.duration} 岁`}</span>
+   557→                      </div>
+   558→                    </div>
+   559→                  );
+   560→                })
+   561→              )}
+   562→            </CardContent>
+   563→          </CollapsibleContent>
+   564→        </Card>
+   565→      </Collapsible>
+   566→
+   567→      {/* 物品详情弹窗 */}
+   568→      <ItemDetailDialog
+   569→        item={detailItem}
+   570→        open={detailOpen}
+   571→        onOpenChange={setDetailOpen}
+   572→        equipped={equippedList.some(it => it.id === detailItem?.id)}
+   573→        onUnequip={() => detailItem && doAction('unequip', { itemId: detailItem.id })}
+   574→        canEquip={detailItem ? !!itemToSlot(detailItem.item_type) && !isStorageBag(detailItem) : false}
+   575→        onEquip={() => detailItem && doAction('equip', { itemId: detailItem.id })}
+   576→        canUse={detailItem?.item_type === 'consumable'}
+   577→        onUse={() => detailItem && doAction('use', { itemId: detailItem.id })}
+   578→      />
+   579→    </div>
+   580→  );
+   581→}
+   582→

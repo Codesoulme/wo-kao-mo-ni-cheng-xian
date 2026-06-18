@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough, pickEventBlueprint, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough, pickEventBlueprint, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tickFormations } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES } from '@/lib/xianxia/types';
 
@@ -45,6 +45,9 @@ export async function POST(req: NextRequest) {
     state.age += 1;
     // 持续状态 duration -1
     state = tickStatusDurations(state);
+    // Task 21: 阵法维持消耗灵石
+    const formationTick = tickFormations(state);
+    state = formationTick.state;
 
     // 检查是否触发命节点
     const fateNodeIdx = checkFateNode(state);
@@ -55,8 +58,52 @@ export async function POST(req: NextRequest) {
     const ctx = buildStateContext(state, recentEvents);
     ctx.blueprint = blueprint;
 
-    // 调用 LLM 生成事件
-    const aiOutput = await generateAgeEvent(ctx, isFateNode);
+    // 调用 LLM 生成事件（含重试 + 兜底 fallback）
+    let aiOutput;
+    try {
+      aiOutput = await generateAgeEvent(ctx, isFateNode);
+    } catch (llmErr: any) {
+      // Task 21: LLM 失败兜底——保证游戏不卡死，依然推进年龄并保存进度
+      console.error('LLM advance failed, using fallback:', llmErr?.message || llmErr);
+      const blueprintName = blueprint?.name || '岁月';
+      aiOutput = {
+        title: `${blueprintName}·流年`,
+        narrative: `${state.age}岁，${state.name}于${state.location || '此地'}度日。${blueprint ? `天道示现"${blueprint.name}"之象。` : ''}岁月流转，未有大事。`,
+        eventType: isFateNode ? 'fate_node' : 'normal',
+        changes: [],
+        newStatuses: [],
+        newItems: [],
+        removedItemIds: [],
+        newEquippedItems: [],
+        equipItemIds: [],
+        unequipItemIds: [],
+        memory: `${state.age}岁流年`,
+        cultivationInsight: ctx.cultivationInsight || '',
+        hasChoice: false,
+        choice: null,
+        triggeredBreakthrough: false,
+        causedDeath: false,
+        causedAscension: false,
+        newThreads: [],
+        advanceThreads: [],
+        completeThreadIds: [],
+        failThreadIds: [],
+        triggerCombat: null,
+      };
+      // 若是命节点，必须给选择
+      if (isFateNode && fateNode) {
+        aiOutput.eventType = 'fate_node';
+        aiOutput.hasChoice = true;
+        aiOutput.choice = {
+          prompt: `命节点「${fateNode.name}」：${fateNode.coreConflict}。请做出你的抉择。`,
+          options: [
+            { text: '顺应天命，稳健前行', hint: '风险低，收益正常' },
+            { text: '逆天而行，激进突破', hint: '风险高，收益丰厚' },
+            { text: '另辟蹊径，独行其道', hint: '触发特殊剧情' },
+          ],
+        };
+      }
+    }
     if (isFateNode && fateNode) {
       aiOutput.eventType = 'fate_node';
       // 命节点必须给选择
@@ -76,6 +123,20 @@ export async function POST(req: NextRequest) {
     // 引擎执行 AI 输出
     const result = executeAIEvent(state, aiOutput);
     let finalState = result.state;
+
+    // Task 21 引擎兜底：若本轮蓝图是 thread_resolve 但 AI 未推进任何 urgent 线索，引擎自动加 progressDelta
+    // 防止 urgent 线索"原地踏步"——AI 偶尔会忽略 advanceThreads 字段
+    if (blueprint.category === 'thread_resolve') {
+      const urgentThread = (finalState.pendingThreads || []).find(t => t.status === 'urgent' || (t.status === 'pending' && t.deadlineAge - finalState.age <= 1));
+      const aiDidAdvance = (aiOutput.advanceThreads && aiOutput.advanceThreads.length > 0) ||
+                            (aiOutput.completeThreadIds && aiOutput.completeThreadIds.length > 0) ||
+                            (aiOutput.failThreadIds && aiOutput.failThreadIds.length > 0);
+      if (urgentThread && !aiDidAdvance) {
+        // 引擎自动推进 +30%（让 urgent 线索不至于完全卡死）
+        finalState = advanceThread(finalState, urgentThread.id, 30, '引擎兜底推进（AI 未推进 urgent 线索）');
+        console.log(`[Task 21] Engine auto-advancing urgent thread: ${urgentThread.id} (${urgentThread.title}) +30%`);
+      }
+    }
 
     // 引擎兜底：若修为已达突破阈值且 AI 未显式触发，则自动突破
     // 这保证修真进度不会无限卡住，且境界会正确更新到顶部信息
@@ -115,6 +176,10 @@ export async function POST(req: NextRequest) {
       finalState = markFateNodeDone(finalState, fateNode.index);
     } else if (isFateNode && fateNode && aiOutput.hasChoice) {
       // 等待玩家选择，先标记为选择中
+      finalState.isAtChoice = true;
+    } else if (aiOutput.hasChoice) {
+      // Task 21 修复 bug：非命节点的普通选择节点也必须设置 isAtChoice=true
+      // 否则 choose route 会因 isAtChoice=false 返回 400，玩家点选项无效
       finalState.isAtChoice = true;
     }
 

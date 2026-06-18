@@ -121,6 +121,8 @@ interface GameState {
   selectedEventId: string | null;
   // 新增：突破仪式
   breakthroughCeremony: BreakthroughCeremony | null;
+  // Task 21-d-1：坊市弹窗开关（玩家可主动访问坊市购买/出售物品）
+  marketOpen: boolean;
 
   setCharacter: (c: CharacterState | null) => void;
   setEvents: (e: GameEvent[]) => void;
@@ -136,6 +138,8 @@ interface GameState {
   setLastInterfere: (i: any | null) => void;
   setSelectedEventId: (id: string | null) => void;
   setBreakthroughCeremony: (b: BreakthroughCeremony | null) => void;
+  // Task 21-d-1：坊市弹窗开关
+  setMarketOpen: (open: boolean) => void;
   reset: () => void;
 }
 
@@ -154,6 +158,7 @@ export const useGameStore = create<GameState>()(
       lastInterfere: null,
       selectedEventId: null,
       breakthroughCeremony: null,
+      marketOpen: false,
 
       setCharacter: (c) => set({ character: c }),
       setEvents: (e) => set({ events: e }),
@@ -169,10 +174,11 @@ export const useGameStore = create<GameState>()(
       setLastInterfere: (i) => set({ lastInterfere: i }),
       setSelectedEventId: (id) => set({ selectedEventId: id }),
       setBreakthroughCeremony: (b) => set({ breakthroughCeremony: b }),
+      setMarketOpen: (open) => set({ marketOpen: open }),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
         loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null,
-        selectedEventId: null, breakthroughCeremony: null,
+        selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
       }),
     }),
     {

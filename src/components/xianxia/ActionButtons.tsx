@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
-import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords } from 'lucide-react';
+import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { REALMS } from '@/lib/xianxia/types';
@@ -22,6 +22,7 @@ export function ActionButtons() {
     setCharacter, addEvent, setPendingChoice,
     setLastChange, setLastBreakthrough, setLoading, setError,
     setBreakthroughCeremony,
+    setMarketOpen,
     reset,
   } = useGameStore();
 
@@ -244,6 +245,24 @@ export function ActionButtons() {
           </Button>
         )}
       </div>
+
+      {/* Task 21-d-1：坊市入口——玩家可主动访问坊市购买/出售物品 */}
+      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && (
+        <Button
+          onClick={() => setMarketOpen(true)}
+          disabled={loading}
+          variant="outline"
+          className="w-full h-9 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60 font-serif-cn tracking-wider"
+        >
+          <Store className="w-3.5 h-3.5 mr-1.5" />
+          坊市淘宝
+          <span className="ml-1.5 text-[10px] text-amber-700/70 dark:text-amber-400/70 flex items-center gap-0.5">
+            <span className="opacity-70">·</span>
+            <span className="tabular-nums">{character.spiritStones || 0}</span>
+            <span className="opacity-70">灵石</span>
+          </span>
+        </Button>
+      )}
 
       {/* 连推进度条 */}
       {isAutoRunning && (

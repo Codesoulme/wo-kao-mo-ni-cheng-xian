@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const options: any[] | undefined = body?.options;
 
     if (!characterId || chosenIndex === undefined || !choicePrompt || !Array.isArray(options)) {
-      return NextResponse.json({ success: false, error: '参数缺失' }, { status: 400 });
+      return NextResponse.json({ success: false, error: `参数缺失: ${!characterId ? 'characterId' : ''} ${chosenIndex === undefined ? 'chosenIndex' : ''} ${!choicePrompt ? 'choicePrompt' : ''} ${!Array.isArray(options) ? 'options' : ''}` }, { status: 400 });
     }
 
     const char = await db.character.findUnique({ where: { id: characterId } });

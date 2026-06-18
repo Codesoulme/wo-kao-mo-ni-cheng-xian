@@ -16,6 +16,7 @@ import {
 } from '@/lib/xianxia/types';
 import { AlchemyFurnace } from './AlchemyFurnace';
 import { ItemDetailDialog } from './ItemDetailDialog';
+import { FormationPanel } from './FormationPanel';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -332,6 +333,9 @@ export function InventoryPanel() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Task 21: 阵法管理面板 */}
+      <FormationPanel />
 
       {/* ==================== 储物袋（含容量显示） ==================== */}
       <Collapsible open={bagOpen} onOpenChange={setBagOpen}>

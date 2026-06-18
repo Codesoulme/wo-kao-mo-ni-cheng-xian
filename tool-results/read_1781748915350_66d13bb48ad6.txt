@@ -1,0 +1,683 @@
+     1→// 修仙模拟器 - 核心引擎类型定义
+     2→// 基于"引擎权威 + AI 提议"混合架构
+     3→// Task 20: 事件蓝图 / 角色意图 / 未决线索 / 战斗系统
+     4→
+     5→// ==================== 境界系统 ====================
+     6→
+     7→export type Realm =
+     8→  | 'mortal'           // 凡人
+     9→  | 'qi_refining'      // 炼气
+    10→  | 'foundation'       // 筑基
+    11→  | 'golden_core'      // 金丹
+    12→  | 'nascent_soul'     // 元婴
+    13→  | 'spirit_severing'  // 化神
+    14→  | 'great_vehicle'    // 大乘
+    15→  | 'tribulation'      // 渡劫
+    16→  | 'ascension';       // 飞升
+    17→
+    18→export interface RealmInfo {
+    19→  id: Realm;
+    20→  name: string;
+    21→  shortName: string;
+    22→  levels: number;        // 小境界数量
+    23→  baseLifespan: number;  // 该境界基础寿元
+    24→  expPerLevel: number;   // 每级所需修为基础
+    25→  color: string;         // 境界代表色
+    26→  description: string;
+    27→}
+    28→
+    29→export const REALMS: RealmInfo[] = [
+    30→  {
+    31→    id: 'mortal',
+    32→    name: '凡人',
+    33→    shortName: '凡',
+    34→    levels: 0,
+    35→    baseLifespan: 80,
+    36→    expPerLevel: 100,
+    37→    color: '#6b7280',
+    38→    description: '尚未踏上修行之路的凡人，寿元有限。',
+    39→  },
+    40→  {
+    41→    id: 'qi_refining',
+    42→    name: '炼气期',
+    43→    shortName: '气',
+    44→    levels: 9,
+    45→    baseLifespan: 120,
+    46→    expPerLevel: 200,
+    47→    color: '#84cc16',
+    48→    description: '感应天地灵气，引气入体，洗筋伐髓。',
+    49→  },
+    50→  {
+    51→    id: 'foundation',
+    52→    name: '筑基期',
+    53→    shortName: '基',
+    54→    levels: 9,
+    55→    baseLifespan: 200,
+    56→    expPerLevel: 600,
+    57→    color: '#22c55e',
+    58→    description: '凝聚灵根，奠定道基，可御器飞行。',
+    59→  },
+    60→  {
+    61→    id: 'golden_core',
+    62→    name: '金丹期',
+    63→    shortName: '丹',
+    64→    levels: 9,
+    65→    baseLifespan: 500,
+    66→    expPerLevel: 1800,
+    67→    color: '#eab308',
+    68→    description: '金丹大成，寿元大增，神通初显。',
+    69→  },
+    70→  {
+    71→    id: 'nascent_soul',
+    72→    name: '元婴期',
+    73→    shortName: '婴',
+    74→    levels: 9,
+    75→    baseLifespan: 1000,
+    76→    expPerLevel: 5400,
+    77→    color: '#f97316',
+    78→    description: '元婴出窍，神通大成，移山填海。',
+    79→  },
+    80→  {
+    81→    id: 'spirit_severing',
+    82→    name: '化神期',
+    83→    shortName: '化',
+    84→    levels: 9,
+    85→    baseLifespan: 2000,
+    86→    expPerLevel: 16200,
+    87→    color: '#ef4444',
+    88→    description: '化神入道，可局部修改法则，寿元绵长。',
+    89→  },
+    90→  {
+    91→    id: 'great_vehicle',
+    92→    name: '大乘期',
+    93→    shortName: '乘',
+    94→    levels: 9,
+    95→    baseLifespan: 5000,
+    96→    expPerLevel: 48600,
+    97→    color: '#a855f7',
+    98→    description: '大乘圆满，可修改时间速率，俯瞰众生。',
+    99→  },
+   100→  {
+   101→    id: 'tribulation',
+   102→    name: '渡劫期',
+   103→    shortName: '劫',
+   104→    levels: 1,
+   105→    baseLifespan: 10000,
+   106→    expPerLevel: 100000,
+   107→    color: '#ec4899',
+   108→    description: '天劫降临，生死考验，过则飞升。',
+   109→  },
+   110→  {
+   111→    id: 'ascension',
+   112→    name: '飞升',
+   113→    shortName: '仙',
+   114→    levels: 0,
+   115→    baseLifespan: 99999,
+   116→    expPerLevel: 999999,
+   117→    color: '#fbbf24',
+   118→    description: '超脱凡俗，飞升仙界，与天地同寿。',
+   119→  },
+   120→];
+   121→
+   122→export function getRealmInfo(realm: Realm): RealmInfo {
+   123→  return REALMS.find(r => r.id === realm) || REALMS[0];
+   124→}
+   125→
+   126→export function getNextRealm(realm: Realm): Realm | null {
+   127→  const idx = REALMS.findIndex(r => r.id === realm);
+   128→  if (idx < 0 || idx >= REALMS.length - 1) return null;
+   129→  return REALMS[idx + 1].id;
+   130→}
+   131→
+   132→// ==================== 灵根系统 ====================
+   133→
+   134→export type SpiritualRoot =
+   135→  | 'none'         // 无灵根
+   136→  | 'mixed'        // 杂灵根（5种）
+   137→  | 'common'       // 普通灵根（2-3种）
+   138→  | 'pure'         // 单灵根
+   139→  | 'heavenly'     // 天灵根
+   140→  | 'chaos';       // 混沌灵根
+   141→
+   142→export interface SpiritualRootInfo {
+   143→  id: SpiritualRoot;
+   144→  name: string;
+   145→  multiplier: number;  // 修炼速度倍率
+   146→  rarity: number;      // 出现概率权重
+   147→  description: string;
+   148→}
+   149→
+   150→export const SPIRITUAL_ROOTS: Record<SpiritualRoot, SpiritualRootInfo> = {
+   151→  none:     { id: 'none',     name: '无灵根',     multiplier: 0,    rarity: 30, description: '与修行无缘，寿终正寝。' },
+   152→  mixed:    { id: 'mixed',    name: '杂灵根',     multiplier: 0.3,  rarity: 25, description: '五行皆有，修炼极慢。' },
+   153→  common:   { id: 'common',   name: '凡灵根',     multiplier: 0.8,  rarity: 20, description: '两三种属性，可入修行。' },
+   154→  pure:     { id: 'pure',     name: '真灵根',     multiplier: 1.5,  rarity: 15, description: '单属性灵根，修炼神速。' },
+   155→  heavenly: { id: 'heavenly', name: '天灵根',     multiplier: 3.0,  rarity: 8,  description: '天赐灵根，万中无一。' },
+   156→  chaos:    { id: 'chaos',    name: '混沌灵根',   multiplier: 5.0,  rarity: 2,  description: '混沌之体，亘古难寻。' },
+   157→};
+   158→
+   159→// ==================== 五行属性 ====================
+   160→
+   161→export type Element = 'metal' | 'wood' | 'water' | 'fire' | 'earth';
+   162→
+   163→export const ELEMENTS: Record<Element, { name: string; color: string; icon: string }> = {
+   164→  metal: { name: '金', color: '#d4af37', icon: '⚔' },
+   165→  wood:  { name: '木', color: '#22c55e', icon: '🌿' },
+   166→  water: { name: '水', color: '#3b82f6', icon: '🌊' },
+   167→  fire:  { name: '火', color: '#ef4444', icon: '🔥' },
+   168→  earth: { name: '土', color: '#a16207', icon: '⛰' },
+   169→};
+   170→
+   171→// ==================== 状态词条 ====================
+   172→
+   173→export type StatusCategory =
+   174→  | 'attribute' | 'skill' | 'buff' | 'debuff'
+   175→  | 'special' | 'identity' | 'quest' | 'environment';
+   176→
+   177→export interface StatusEntry {
+   178→  id: string;
+   179→  name: string;
+   180→  description: string;
+   181→  category: StatusCategory;
+   182→  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+   183→  duration: number;  // -1 = 永久, >0 = 剩余年龄数
+   184→  source: string;    // 来源描述
+   185→  effects: StatusEffect[];
+   186→}
+   187→
+   188→export type EffectOperation = 'add' | 'multiply' | 'override' | 'cap' | 'floor' | 'trigger';
+   189→
+   190→export interface StatusEffect {
+   191→  target_attribute: string;
+   192→  operation: EffectOperation;
+   193→  value: number;
+   194→  description: string;
+   195→}
+   196→
+   197→// ==================== 物品 ====================
+   198→
+   199→export type ItemType = 'weapon' | 'armor' | 'accessory' | 'artifact' | 'consumable' | 'material' | 'tool' | 'scripture';
+   200→
+   201→// 可装备的类型（用于判定 itemToSlot —— 仅用于「是否可装备」布尔判断；不再限制每种类型数量上限）
+   202→export type EquipSlot = 'weapon' | 'armor' | 'accessory' | 'artifact' | 'scripture';
+   203→
+   204→export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
+   205→  weapon: '兵器', armor: '防具', accessory: '饰物', artifact: '法宝',
+   206→  consumable: '丹药', material: '材料', tool: '器具', scripture: '功法',
+   207→};
+   208→
+   209→export const SLOT_LABEL: Record<EquipSlot, string> = {
+   210→  weapon: '兵器', armor: '防具', accessory: '饰物', artifact: '法宝', scripture: '功法',
+   211→};
+   212→
+   213→// 物品类型 → 是否可装备（不再返回固定槽位；装备数量上限由 AI 判断）
+   214→export function itemToSlot(type: ItemType): EquipSlot | null {
+   215→  if (type === 'weapon' || type === 'armor' || type === 'accessory' || type === 'artifact' || type === 'scripture') {
+   216→    return type;
+   217→  }
+   218→  return null;
+   219→}
+   220→
+   221→// 修炼速度来源结构化条目：AI 输出 + 前端按 rarity 上色显示来源名称与具体倍率数字
+   222→export interface CultivationFactor {
+   223→  name: string;                  // 来源名称（如「土天灵根」「《引气诀》」「聚灵佩」）
+   224→  value: number;                  // 数值（如 3.0、1.5、0.2）
+   225→  operation: 'multiply' | 'add';  // 倍率 or 加成
+   226→  rarity?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+   227→  note?: string;                  // 简短说明（如「修为流转加速」「灵气汇聚」）
+   228→}
+   229→
+   230→export interface ItemEntry {
+   231→  id: string;
+   232→  name: string;
+   233→  description: string;
+   234→  item_type: ItemType;
+   235→  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+   236→  effects: StatusEffect[];
+   237→  source: string;
+   238→  // 装备位置备注（自由文本，由 AI 给出或玩家装备时按类型默认生成）
+   239→  // 例：「左手」「右手中指」「项链·储物戒指×5」「腰悬」「头戴」
+   240→  // 不再限制每种类型装备数量上限——玩家可戴十个戒指、脖挂一串储物戒指等
+   241→  equipNote?: string;
+   242→}
+   243→
+   244→// ==================== 事件蓝图系统 (Task 20 - 解决事件单一化) ====================
+   245→
+   246→// 事件主题分类——每岁由引擎从蓝图池中按权重抽取一个主题，AI 必须围绕此主题生成事件
+   247→// 解决"除了修炼就是修炼"的问题：强制 AI 多样化事件类型
+   248→export type BlueprintCategory =
+   249→  | 'cultivation'    // 修炼类（基础修炼、突破前夜、功法参悟）
+   250→  | 'encounter'      // 奇遇类（秘境、传承、灵物现世）
+   251→  | 'social'         // 人际类（师门、同门、结识、争风）
+   252→  | 'combat'         // 争斗类（妖兽、邪修、夺宝、擂台）
+   253→  | 'trade'          // 商业类（坊市、淘宝、典当、交易）
+   254→  | 'exploration'    // 探索类（秘境、洞府、遗迹、地脉）
+   255→  | 'heritage'       // 传承类（前辈指点、玉简、心法传承）
+   256→  | 'trial'          // 试炼类（宗门任务、心魔试炼、雷劫前夕）
+   257→  | 'emotion'        // 情感类（尘缘、故人、恩怨、亲情）
+   258→  | 'inner_demon'    // 心魔类（心魔侵扰、道心动摇、执念）
+   259→  | 'thread_resolve' // 未决线索推进（必须触发，引擎专用）
+   260→  | 'daily';         // 凡俗日常（童年、家事、市井）
+   261→
+   262→export interface EventBlueprint {
+   263→  category: BlueprintCategory;
+   264→  name: string;           // 主题名称（如"坊市淘宝""妖兽搏杀""心魔试炼"）
+   265→  description: string;    // 主题描述（指导 AI 应围绕什么展开）
+   266→  weight: number;         // 抽取权重
+   267→  minRealm: number;       // 最低境界 idx（0=mortal, 1=qi_refining...）
+   268→  maxRealm: number;       // 最高境界 idx
+   269→  minAge: number;         // 最低年龄
+   270→  maxAge: number;         // 最高年龄
+   271→  requireFaction?: boolean; // 是否需要宗门
+   272→  examples: string[];     // 该主题下的事件灵感样例（AI 可参考但不可照抄）
+   273→}
+   274→
+   275→// 事件蓝图池——参考《凡人修仙传》修仙世界，覆盖各境界各阶段
+   276→export const EVENT_BLUEPRINTS: EventBlueprint[] = [
+   277→  // ===== 凡人阶段（0-12岁）=====
+   278→  { category: 'daily', name: '童年趣事', description: '凡人童年日常，家人互动、邻里趣事、初识世界', weight: 30, minRealm: 0, maxRealm: 1, minAge: 0, maxAge: 12, examples: ['与邻家孩童嬉闹', '帮父母做家务', '第一次见到行脚商', '夜里听爷爷讲修仙传说'] },
+   279→  { category: 'encounter', name: '灵气初触', description: '凡人阶段偶然感知天地灵气，为日后修仙埋下伏笔', weight: 15, minRealm: 0, maxRealm: 1, minAge: 4, maxAge: 14, examples: ['梦见云中仙人', '山间偶遇采药老者', '夜里听到奇怪声响', '触碰到祖传玉佩发热'] },
+   280→  { category: 'social', name: '家族变故', description: '家世相关变故，磨砺心性、影响性格', weight: 10, minRealm: 0, maxRealm: 2, minAge: 5, maxAge: 20, examples: ['父亲染病', '家中遭贼', '兄长离家闯荡', '母亲传授家传手艺'] },
+   281→  { category: 'inner_demon', name: '幼年执念', description: '童年时期埋下执念，影响日后道心', weight: 8, minRealm: 0, maxRealm: 1, minAge: 6, maxAge: 14, examples: ['目睹不公立誓强大', '亲人离世立志长生', '受人欺辱暗下决心'] },
+   282→
+   283→  // ===== 炼气期 =====
+   284→  { category: 'cultivation', name: '引气入体', description: '炼气期修炼日常，感知灵气、运转功法、洗筋伐髓', weight: 18, minRealm: 1, maxRealm: 2, minAge: 8, maxAge: 60, examples: ['首次引气入体成功', '打通某条经脉', '功法参悟有新得', '灵气汇聚丹田'] },
+   285→  { category: 'trade', name: '坊市淘宝', description: '前往坊市购买/出售物品，可能有意外收获', weight: 15, minRealm: 1, maxRealm: 6, minAge: 12, maxAge: 9999, examples: ['坊市捡漏得灵草', '典当旧物换灵石', '与商贩讨价还价', '黑市淘宝遇险'] },
+   286→  { category: 'social', name: '同门切磋', description: '与同门师兄弟切磋斗法、增进情谊或结怨', weight: 12, minRealm: 1, maxRealm: 5, minAge: 12, maxAge: 9999, requireFaction: true, examples: ['与师兄切磋法术', '与师妹论道', '与同门争夺资源', '帮师弟解惑'] },
+   287→  { category: 'exploration', name: '宗门历练', description: '宗门安排的历练任务，外出执行', weight: 12, minRealm: 1, maxRealm: 5, minAge: 12, maxAge: 9999, requireFaction: true, examples: ['清理山门附近妖兽', '采药任务', '护送商队', '巡查边境'] },
+   288→  { category: 'combat', name: '妖兽搏杀', description: '遭遇妖兽，进入战斗或巧妙避开', weight: 14, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['山林遇狼妖', '洞府惊现蛇妖', '溪边逢蟹怪', '高空遇鹰妖'] },
+   289→  { category: 'combat', name: '邪修截杀', description: '遭遇邪修、魔修，劫财或夺宝', weight: 10, minRealm: 1, maxRealm: 7, minAge: 14, maxAge: 9999, examples: ['夜行遇蒙面人', '林中遇血修', '客栈遇魔修', '路上遇劫匪'] },
+   290→
+   291→  // ===== 筑基-金丹 =====
+   292→  { category: 'encounter', name: '秘境现世', description: '秘境、洞府、遗迹开启，机缘与危险并存', weight: 12, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['古修洞府出世', '秘境百年一开', '海底遗迹浮现', '空中楼阁显形'] },
+   293→  { category: 'heritage', name: '前辈传承', description: '得到前辈高人指点或传承玉简', weight: 10, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['梦中得前辈传法', '洞府拾得玉简', '前辈残魂指点', '观壁画悟道'] },
+   294→  { category: 'trade', name: '拍卖大会', description: '大型拍卖会、交易会，珍品云集', weight: 8, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['宗门联合拍卖', '坊市年度大拍', '散修私下交易会'] },
+   295→  { category: 'combat', name: '擂台比武', description: '宗门擂台、修仙界比武大会', weight: 10, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['宗门年度比武', '跨宗门友谊赛', '修仙界新秀赛'] },
+   296→  { category: 'exploration', name: '采灵寻宝', description: '深入险地采集灵草、寻找灵矿', weight: 12, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['深入毒雾谷采药', '海底寻珊瑚', '火山口取火晶', '冰原采雪莲'] },
+   297→  { category: 'social', name: '尘缘纠葛', description: '情感纠葛、故人重逢、恩怨清算', weight: 8, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['故人来访', '旧爱重逢', '恩人求助', '仇人现身'] },
+   298→  { category: 'inner_demon', name: '道心试炼', description: '道心动摇、心魔侵扰、执念爆发', weight: 8, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['修炼走火入魔', '心魔幻境', '执念难破', '道心拷问'] },
+   299→
+   300→  // ===== 元婴以上 =====
+   301→  { category: 'combat', name: '夺宝大战', description: '高阶修士争夺天材地宝，混战爆发', weight: 10, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['灵宝出世群雄逐鹿', '秘境中争夺宝物', '拍卖会后遭截杀'] },
+   302→  { category: 'heritage', name: '大能遗府', description: '探索大能前辈留下的洞府，机缘与考验', weight: 8, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['元婴前辈遗府', '化神老怪坐化之地', '上古仙人遗迹'] },
+   303→  { category: 'trial', name: '雷劫前夕', description: '渡劫前的准备与天象异变', weight: 8, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['天象异变', '道友提醒渡劫', '闭关备战雷劫'] },
+   304→  { category: 'social', name: '收徒传道', description: '高境界收徒、传承道统', weight: 6, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['偶遇良材收为徒', '宗门委托授业', '点化有缘人'] },
+   305→
+   306→  // ===== 通用 =====
+   307→  { category: 'cultivation', name: '闭关参悟', description: '闭关参悟功法、磨砺境界', weight: 14, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['闭关参悟功法', '观天地悟道', '磨砺心境', '参悟阵法'] },
+   308→  { category: 'cultivation', name: '突破前夜', description: '修为将满，酝酿突破的关键时刻', weight: 10, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['修为圆满待破', '心魔试炼前夕', '突破前兆'] },
+   309→  { category: 'trade', name: '炼器寻材', description: '为炼器、炼丹寻找材料', weight: 8, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['寻炼器灵材', '求炼丹辅药', '找阵法材料'] },
+   310→  { category: 'social', name: '师门任务', description: '宗门指派的任务，完成可获贡献', weight: 10, minRealm: 1, maxRealm: 6, minAge: 12, maxAge: 9999, requireFaction: true, examples: ['宗门指派任务', '师门差遣', '代师传讯'] },
+   311→];
+   312→
+   313→// ==================== 角色主动意图系统 (Task 20 - 解决角色太蠢) ====================
+   314→
+   315→// 角色根据自身处境生成的"主动意图"——AI 必须在事件中体现这些意图的执行
+   316→// 例：即将宗门比赛 → "备战比赛"意图 → AI 应让角色主动准备武器、炼丹、请教
+   317→export interface CharacterIntent {
+   318→  id: string;
+   319→  type: 'prepare_combat' | 'gather_resources' | 'seek_mentor' | 'avoid_danger' | 'resolve_thread'
+   320→        | 'cultivate_diligently' | 'explore_opportunity' | 'socialize' | 'trade' | 'breakthrough';
+   321→  title: string;          // 意图标题（如"备战宗门比武"）
+   322→  description: string;    // 意图描述（指导 AI 如何在事件中体现）
+   323→  priority: number;       // 优先级 1-10（10 最高）
+   324→  relatedThreadId?: string; // 关联的未决线索 id（若有）
+   325→}
+   326→
+   327→// ==================== 未决线索系统 (Task 20 - 解决 AI 记忆丢失) ====================
+   328→
+   329→// 持久化的"未决线索"——重要剧情线索会被记录并在后续推进/到期触发
+   330→// 例："三个月后宗门比武"、"仇敌王某誓要报复"、"师门委托炼丹"
+   331→export interface PendingThread {
+   332→  id: string;
+   333→  title: string;             // 线索标题
+   334→  description: string;       // 线索描述（人/事/时/地/因）
+   335→  category: 'competition' | 'enemy' | 'quest' | 'promise' | 'mystery' | 'romance' | 'debt' | 'inheritance';
+   336→  startAge: number;          // 触发年龄
+   337→  deadlineAge: number;       // 截止年龄（到期必须触发对应事件）
+   338→  status: 'pending' | 'urgent' | 'resolved' | 'failed';
+   339→  progress: number;          // 0-100 进度
+   340→  relatedMemoryIds?: string[]; // 关联的长期记忆
+   341→  reward?: string;           // 完成奖励描述
+   342→  failureCost?: string;      // 失败代价描述
+   343→}
+   344→
+   345→// ==================== 战斗系统 (Task 20) ====================
+   346→
+   347→export interface CombatEnemy {
+   348→  id: string;
+   349→  name: string;             // 敌人名称
+   350→  description: string;       // 敌人描述
+   351→  hp: number; maxHp: number;
+   352→  attack: number; defense: number; speed: number;
+   353→  realm?: string;            // 敌人境界（用于战力参考）
+   354→  skills?: { name: string; description: string; cooldown: number; currentCooldown: number }[];
+   355→  // 敌人当前意图（AI 生成）：'attack' | 'skill' | 'defend' | 'flee'
+   356→  nextAction?: string;
+   357→  nextActionDesc?: string;
+   358→  drops?: { name: string; chance: number; rarity: string }[];
+   359→}
+   360→
+   361→export interface CombatRound {
+   362→  round: number;
+   363→  playerAction: string;       // 玩家行动描述
+   364→  playerActionType: 'attack' | 'skill' | 'item' | 'defend' | 'flee' | 'scripture';
+   365→  playerDamage?: number;      // 玩家造成的伤害
+   366→  playerHeal?: number;        // 玩家回复
+   367→  enemyAction?: string;       // 敌人行动描述（可能为空，如玩家逃跑成功）
+   368→  enemyActionType?: string;
+   369→  enemyDamage?: number;       // 敌人造成的伤害
+   370→  narrative: string;          // 本回合叙事
+   371→  playerHpAfter: number;
+   372→  enemyHpAfter: number;
+   373→  playerMpAfter?: number;
+   374→}
+   375→
+   376→export interface CombatSession {
+   377→  id: string;
+   378→  enemies: CombatEnemy[];     // 敌人列表（支持多敌）
+   379→  currentEnemyIdx: number;    // 当前攻击的敌人索引
+   380→  round: number;              // 当前回合数
+   381→  log: CombatRound[];         // 战斗日志
+   382→  status: 'ongoing' | 'victory' | 'defeat' | 'fled';
+   383→  startAge: number;           // 战斗开始时的年龄
+   384→  contextTitle?: string;      // 战斗背景标题
+   385→  contextNarrative?: string;  // 战斗背景叙事
+   386→  // 玩家战斗属性快照（含装备加成）
+   387→  playerHp: number; playerMaxHp: number;
+   388→  playerMp: number; playerMaxMp: number;
+   389→  playerAttack: number; playerDefense: number; playerSpeed: number;
+   390→  // 玩家可用的法术/法宝（从 equipped 提取）
+   391→  playerSkills?: { name: string; description: string; mpCost: number; power: number }[];
+   392→  // 玩家可用的丹药（从 inventory 的 consumable 提取）
+   393→  playerItems?: { itemId: string; name: string; description: string; effect: string }[];
+   394→  // 战斗胜利后掉落（由 AI 在结束叙事中给出，引擎在 endCombat 中应用）
+   395→  victoryDrops?: ItemEntry[];
+   396→}
+   397→
+   398→// ==================== AI 输出结构 (EngineCommand) ====================
+   399→
+   400→export type InputClass = 'action' | 'dialogue' | 'overreach' | 'rule_manipulation';
+   401→
+   402→// AI 生成的叙事事件
+   403→export interface AIEventOutput {
+   404→  // 叙事
+   405→  title: string;              // 事件标题（≤16字）
+   406→  narrative: string;          // 叙事正文（100-300字）
+   407→  eventType: 'normal' | 'fate_node' | 'choice' | 'combat' | 'breakthrough' | 'death' | 'ascension';
+   408→
+   409→  // 状态变更（AI 提议，引擎校验）
+   410→  changes: AttributeChange[];
+   411→
+   412→  // 新增状态词条
+   413→  newStatuses: StatusEntry[];
+   414→
+   415→  // 新增物品
+   416→  newItems: ItemEntry[];
+   417→
+   418→  // 移除/消耗的物品 id 列表（AI 联动：战斗中武器被破坏、丹药被消耗等）
+   419→  removedItemIds?: string[];
+   420→
+   421→  // AI 直接放入已装备的物品（含 equipNote 自由文本，如「项链·储物戒指串」）
+   422→  // 用于 AI 创造性装备场景：玩家说「把储物戒指串成项链戴脖子上」→ AI 用此字段放置
+   423→  newEquippedItems?: ItemEntry[];
+   424→
+   425→  // AI 想把背包里已有的物品装备上去的 id 列表（引擎自动移动 inventory→equipped）
+   426→  equipItemIds?: string[];
+   427→
+   428→  // AI 想卸下已装备物品的 id 列表（引擎自动移动 equipped→inventory）
+   429→  unequipItemIds?: string[];
+   430→
+   431→  // 长期记忆（写入长期记忆库）
+   432→  memory: string;
+   433→
+   434→  // 修炼心得：AI 根据当前角色全状态生成的修炼速度说明文本（影响修炼速度的种种因素）
+   435→  // 显示规则见 prompt：60-150字，修仙口吻，融入角色处境，末尾给出综合倍率数值
+   436→  // 注意：来源条目（cultivationFactors）由引擎权威计算，AI 不可输出；
+   437→  // AI 只需在 cultivationInsight 文本中引用 prompt 注入的准确数字即可
+   438→  cultivationInsight?: string;
+   439→
+   440→  // 是否触发选择节点
+   441→  hasChoice: boolean;
+   442→  choice?: ChoicePrompt;
+   443→
+   444→  // 是否触发突破
+   445→  triggeredBreakthrough?: boolean;
+   446→
+   447→  // 是否死亡
+   448→  causedDeath?: boolean;
+   449→  deathReason?: string;
+   450→
+   451→  // 是否飞升
+   452→  causedAscension?: boolean;
+   453→
+   454→  // ===== Task 20 新增 =====
+   455→  // AI 添加新的未决线索（如"三个月后宗门比武""仇敌誓要报复"）
+   456→  newThreads?: PendingThread[];
+   457→  // AI 推进现有线索的进度（id + 进度增量）
+   458→  advanceThreads?: { id: string; progressDelta: number; note?: string }[];
+   459→  // AI 标记完成的线索 id 列表
+   460→  completeThreadIds?: string[];
+   461→  // AI 标记失败的线索 id 列表（如错过 deadline）
+   462→  failThreadIds?: string[];
+   463→  // AI 触发战斗（eventType='combat' 时必须给出）
+   464→  triggerCombat?: {
+   465→    enemies: CombatEnemy[];
+   466→    contextTitle: string;
+   467→    contextNarrative: string;
+   468→    // 战斗胜利后 AI 给出的掉落物品（endCombat 时应用）
+   469→    victoryDrops?: ItemEntry[];
+   470→    // 战斗失败的代价（如死亡、重伤、被夺宝）
+   471→    defeatCost?: string;
+   472→  };
+   473→}
+   474→
+   475→export interface AttributeChange {
+   476→  attribute: string;     // 改变哪个属性
+   477→  delta: number;         // 变化量（正或负）
+   478→  reason: string;        // 变化原因
+   479→}
+   480→
+   481→export interface ChoicePrompt {
+   482→  prompt: string;         // 选择提示
+   483→  options: ChoiceOption[];
+   484→}
+   485→
+   486→export interface ChoiceOption {
+   487→  text: string;           // 选项文本
+   488→  hint?: string;          // 提示
+   489→  // 选择后由 AI 生成结果
+   490→}
+   491→
+   492→// 玩家选择结果
+   493→export interface ChoiceResultOutput {
+   494→  narrative: string;
+   495→  changes: AttributeChange[];
+   496→  newStatuses: StatusEntry[];
+   497→  newItems: ItemEntry[];
+   498→  removedItemIds?: string[];
+   499→  newEquippedItems?: ItemEntry[];
+   500→  equipItemIds?: string[];
+   501→  unequipItemIds?: string[];
+   502→  memory: string;
+   503→  // 修炼心得（同 AIEventOutput；引擎权威计算来源条目，AI 只输出文本）
+   504→  cultivationInsight?: string;
+   505→  causedDeath?: boolean;
+   506→  deathReason?: string;
+   507→  // ===== Task 20 新增 =====
+   508→  newThreads?: PendingThread[];
+   509→  advanceThreads?: { id: string; progressDelta: number; note?: string }[];
+   510→  completeThreadIds?: string[];
+   511→  failThreadIds?: string[];
+   512→  triggerCombat?: {
+   513→    enemies: CombatEnemy[];
+   514→    contextTitle: string;
+   515→    contextNarrative: string;
+   516→    victoryDrops?: ItemEntry[];
+   517→    defeatCost?: string;
+   518→  };
+   519→}
+   520→
+   521→// 干扰模拟输出
+   522→export interface InterfereOutput {
+   523→  classification: InputClass;     // 输入分类
+   524→  accepted: boolean;              // 是否接受（false=静默拒绝）
+   525→  narrative: string;              // 回应叙事
+   526→  changes: AttributeChange[];     // 状态变更
+   527→  newStatuses: StatusEntry[];
+   528→  newItems: ItemEntry[];
+   529→  removedItemIds?: string[];
+   530→  newEquippedItems?: ItemEntry[];
+   531→  equipItemIds?: string[];
+   532→  unequipItemIds?: string[];
+   533→  memory: string;
+   534→  // 修炼心得（同 AIEventOutput；accepted=false 时可留空，引擎将保留旧文本；引擎权威计算来源条目）
+   535→  cultivationInsight?: string;
+   536→  // 干扰可能延迟年龄推进
+   537→  ageAdvance?: number;            // 干扰消耗的时间（岁），默认 0
+   538→  // ===== Task 20 新增 =====
+   539→  newThreads?: PendingThread[];
+   540→  advanceThreads?: { id: string; progressDelta: number; note?: string }[];
+   541→  completeThreadIds?: string[];
+   542→  failThreadIds?: string[];
+   543→  // 干扰可能触发战斗（如玩家主动攻击某人、闯入妖兽领地）
+   544→  triggerCombat?: {
+   545→    enemies: CombatEnemy[];
+   546→    contextTitle: string;
+   547→    contextNarrative: string;
+   548→    victoryDrops?: ItemEntry[];
+   549→    defeatCost?: string;
+   550→  };
+   551→}
+   552→
+   553→// ==================== 引擎状态上下文 (注入给 AI) ====================
+   554→
+   555→export interface EngineStateContext {
+   556→  character: {
+   557→    name: string;
+   558→    age: number;
+   559→    lifespan: number;
+   560→    gender: string;
+   561→    spiritualRoot: string;
+   562→    rootDetail: string;
+   563→    realm: string;
+   564→    realmName: string;
+   565→    realmLevel: number;
+   566→    cultivationExp: number;
+   567→    expToBreak: number;
+   568→    elements: { metal: number; wood: number; water: number; fire: number; earth: number };
+   569→    hp: number; maxHp: number;
+   570→    mp: number; maxMp: number;
+   571→    attack: number; defense: number; speed: number;
+   572→    luck: number; comprehension: number;
+   573→    spiritStones: number; reputation: number;
+   574→    faction: string; master: string; location: string;
+   575→    alive: boolean; ascended: boolean;
+   576→  };
+   577→  // 修炼心得（当前已存的修炼速度说明文本，AI 可读取参考并决定是否更新）
+   578→  cultivationInsight: string;
+   579→  // 修炼速度来源结构化列表（AI 可读取上一轮的来源条目，本轮可调整）
+   580→  cultivationFactors: CultivationFactor[];
+   581→  activeStatuses: StatusEntry[];
+   582→  inventory: ItemEntry[];
+   583→  // 已装备物品数组（无槽位上限，AI 可创造性装备：项链·储物戒指串、十指皆戴戒指等）
+   584→  equipped: ItemEntry[];
+   585→  // 储物袋容量上限（无袋 5；获得储物袋后增加）
+   586→  storageCapacity: number;
+   587→  // 修炼速度倍率（灵根 × 功法 × 其他装备的乘法效果之和）
+   588→  cultivationMultiplier: number;
+   589→  recentEvents: { age: number; title: string; narrative: string; eventType: string }[];
+   590→  longTermMemory: string[];
+   591→  completedFateNodes: number[];
+   592→  // 引擎能力告知
+   593→  availableAttributes: string[];   // AI 可改的属性列表
+   594→  nextFateNode?: { index: number; name: string; realm: string };
+   595→  // ===== Task 20 新增 =====
+   596→  // 本轮事件蓝图主题（引擎抽取，AI 必须围绕此主题生成事件）
+   597→  blueprint?: EventBlueprint;
+   598→  // 未决线索列表（AI 必须保持连续性；deadlineAge 临近的标记为 urgent）
+   599→  pendingThreads: PendingThread[];
+   600→  // 角色主动意图（AI 应在事件中体现意图的执行）
+   601→  characterIntents: CharacterIntent[];
+   602→  // 最近 5 次事件类型（用于避免重复，AI 不得连续生成同类事件）
+   603→  recentEventTypes: string[];
+   604→  // 最近 3 次蓝图分类（避免连续同类主题）
+   605→  recentBlueprintCategories: string[];
+   606→}
+   607→
+   608→// ==================== 命节点 ====================
+   609→
+   610→export interface FateNode {
+   611→  index: number;
+   612→  name: string;
+   613→  realm: Realm;
+   614→  triggerAge: { min: number; max: number };
+   615→  theme: string;
+   616→  coreConflict: string;
+   617→  narrativeGoal: string;
+   618→}
+   619→
+   620→export const FATE_NODES: FateNode[] = [
+   621→  { index: 1, name: '灵根觉醒', realm: 'qi_refining',    triggerAge: { min: 6,  max: 16 },  theme: '天赋觉醒',    coreConflict: '凡人与修仙者的界限',         narrativeGoal: '确立主角修仙动机' },
+   622→  { index: 2, name: '初入宗门', realm: 'foundation',     triggerAge: { min: 14, max: 22 },  theme: '归属与认同',  coreConflict: '宗门选择与师承',             narrativeGoal: '确立主角的修仙路径' },
+   623→  { index: 3, name: '金丹大成', realm: 'golden_core',    triggerAge: { min: 50, max: 120 }, theme: '自我突破',    coreConflict: '内丹与外道的抉择',           narrativeGoal: '确立主角的道心' },
+   624→  { index: 4, name: '元婴出窍', realm: 'nascent_soul',   triggerAge: { min: 120,max: 300 }, theme: '神通与责任',  coreConflict: '力量使用的边界',             narrativeGoal: '确立主角的价值观' },
+   625→  { index: 5, name: '化神入道', realm: 'spirit_severing',triggerAge: { min: 300,max: 800 }, theme: '法则理解',    coreConflict: '个人与天道的关系',           narrativeGoal: '确立主角的世界观' },
+   626→  { index: 6, name: '大乘圆满', realm: 'great_vehicle',  triggerAge: { min: 800,max: 2000}, theme: '尘缘了断',    coreConflict: '情感与修行的冲突',           narrativeGoal: '确立主角的情感归属' },
+   627→  { index: 7, name: '渡劫考验', realm: 'tribulation',    triggerAge: { min: 2000,max:5000},theme: '生死考验',    coreConflict: '天劫与自我超越',             narrativeGoal: '确立主角的最终形态' },
+   628→  { index: 8, name: '飞升仙界', realm: 'ascension',      triggerAge: { min: 5000,max:9999},theme: '超脱与传承',  coreConflict: '留恋与放下的抉择',           narrativeGoal: '完成主角的修仙之路' },
+   629→];
+   630→
+   631→// ==================== 角色状态（运行时） ====================
+   632→
+   633→// 兼容旧存档：旧格式为 Partial<Record<EquipSlot, ItemEntry>>（slot-map），新格式为 ItemEntry[]（数组）
+   634→// dbToState 会在加载时把旧 slot-map 自动转换为数组
+   635→export type EquippedMap = Partial<Record<EquipSlot, ItemEntry>>;
+   636→
+   637→export interface CharacterState {
+   638→  id: string;
+   639→  name: string;
+   640→  age: number;
+   641→  lifespan: number;
+   642→  gender: string;
+   643→  spiritualRoot: SpiritualRoot;
+   644→  rootDetail: string;
+   645→  rootMultiplier: number;
+   646→  realm: Realm;
+   647→  realmLevel: number;
+   648→  cultivationExp: number;
+   649→  expToBreak: number;
+   650→  elements: { metal: number; wood: number; water: number; fire: number; earth: number };
+   651→  hp: number; maxHp: number;
+   652→  mp: number; maxMp: number;
+   653→  attack: number; defense: number; speed: number;
+   654→  luck: number; comprehension: number;
+   655→  spiritStones: number; reputation: number;
+   656→  alive: boolean; ascended: boolean;
+   657→  causeOfDeath: string;
+   658→  faction: string; master: string; location: string;
+   659→  fateNodes: number[];
+   660→  isAtChoice: boolean;
+   661→  lastEventAge: number;
+   662→  activeStatuses: StatusEntry[];
+   663→  inventory: ItemEntry[];
+   664→  // 已装备物品数组（不再有 5 槽位上限——AI 可创造性放置，玩家也可戴多枚戒指等）
+   665→  equipped: ItemEntry[];
+   666→  // 储物袋容量上限（无袋 5；获得储物袋物品后增加；储物袋物品本身不占容量）
+   667→  storageCapacity: number;
+   668→  // 修炼速度倍率（灵根倍率 × 所有已装备物品的 multiply cultivationExp 效果之积）
+   669→  cultivationMultiplier: number;
+   670→  // 修炼心得：AI 生成的修炼速度说明文本（描述当前影响修炼速度的因素）
+   671→  cultivationInsight: string;
+   672→  // 修炼速度来源结构化条目（前端按 rarity 给来源上色 + 显示具体倍率数字）
+   673→  cultivationFactors: CultivationFactor[];
+   674→  longTermMemory: string[];
+   675→  // ===== Task 20 新增 =====
+   676→  // 未决线索列表（重要剧情线索，会在后续推进/到期触发）
+   677→  pendingThreads: PendingThread[];
+   678→  // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）
+   679→  characterIntents: CharacterIntent[];
+   680→  // 进行中的战斗（若有；持久化以支持页面刷新恢复）
+   681→  combatSession: CombatSession | null;
+   682→}
+   683→

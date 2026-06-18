@@ -11,6 +11,7 @@ import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
 import { InterfereInput } from '@/components/xianxia/InterfereInput';
 import { ChoiceModal } from '@/components/xianxia/ChoiceModal';
 import { CombatModal } from '@/components/xianxia/CombatModal';
+import { MarketModal } from '@/components/xianxia/MarketModal';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
 import { GameMenu } from '@/components/xianxia/GameMenu';
 import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
@@ -205,6 +206,9 @@ export default function Home() {
 
       {/* 战斗弹窗（全屏，最上层；combatSession.status='ongoing' 时显示） */}
       <CombatModal />
+
+      {/* 坊市交易弹窗（z-[55]，介于 ChoiceModal 与 CombatModal 之间） */}
+      <MarketModal />
     </div>
   );
 }

@@ -30,6 +30,8 @@ import {
   CombatEnemy,
   CombatRound,
   CombatSession,
+  Formation,
+  FormationType,
 } from './types';
 
 // ==================== 角色状态序列化 ====================
@@ -932,10 +934,13 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
 
 // ==================== Task 20: 事件蓝图选择 ====================
 
-// 从蓝图池中按权重抽取一个主题，避开最近 3 次的同类分类，匹配角色境界/年龄/宗门
+// 从蓝图池中按权重抽取一个主题，避开最近的同类分类，匹配角色境界/年龄/宗门
+// Task 21 强化反重复：最近 3 次同类分类权重 ×0.1，最近 1 次同名蓝图权重 ×0（彻底跳过）
 export function pickEventBlueprint(state: CharacterState, recentBlueprintCategories: string[]): EventBlueprint {
   const realmIdx = REALMS.findIndex(r => r.id === state.realm);
-  const recentSet = new Set(recentBlueprintCategories.slice(-3));
+  const recentCats = recentBlueprintCategories.slice(-5);
+  const lastCat = recentBlueprintCategories[recentBlueprintCategories.length - 1];
+  const last2Cat = recentBlueprintCategories[recentBlueprintCategories.length - 2];
   // 1. 优先检查到期/紧急的 pendingThreads —— 若有，强制走 thread_resolve
   const urgentThreads = (state.pendingThreads || []).filter(t =>
     t.status === 'pending' && state.age >= t.deadlineAge - 1
@@ -960,11 +965,32 @@ export function pickEventBlueprint(state: CharacterState, recentBlueprintCategor
     // 兜底：返回一个普通修炼主题
     return EVENT_BLUEPRINTS[0];
   }
-  // 3. 加权抽取（最近 3 次的分类权重减半，避免连续同类）
-  const weighted = candidates.map(b => ({
-    blueprint: b,
-    weight: recentSet.has(b.category) ? b.weight * 0.3 : b.weight,
-  }));
+  // 3. 加权抽取（强反重复）
+  // - 最近 1 次同类蓝图：weight ×0（彻底跳过，避免连续两次同类）
+  // - 最近 2-3 次同类蓝图：weight ×0.1
+  // - 最近 4-5 次同类蓝图：weight ×0.4
+  const weighted = candidates.map(b => {
+    let w = b.weight;
+    if (b.category === lastCat) w = 0;  // 上次刚用过的分类，彻底跳过
+    else if (b.category === last2Cat) w *= 0.1;  // 上上次用过的，大幅降低
+    else if (recentCats.includes(b.category)) w *= 0.1;
+    return { blueprint: b, weight: w };
+  }).filter(w => w.weight > 0);  // 过滤掉 weight=0 的
+  // 若全部被过滤（极端情况：candidates 都属于 lastCat），fallback 用原 candidates
+  if (weighted.length === 0) {
+    // 退而求其次，只用 ×0.1 而不禁用 lastCat
+    const w2 = candidates.map(b => ({
+      blueprint: b,
+      weight: b.category === lastCat ? b.weight * 0.1 : b.weight,
+    }));
+    const total = w2.reduce((s, w) => s + w.weight, 0);
+    let r = Math.random() * total;
+    for (const w of w2) {
+      r -= w.weight;
+      if (r <= 0) return w.blueprint;
+    }
+    return w2[0].blueprint;
+  }
   const total = weighted.reduce((s, w) => s + w.weight, 0);
   let r = Math.random() * total;
   for (const w of weighted) {
@@ -1592,4 +1618,133 @@ export function ensureUniqueIds(statuses: StatusEntry[], items: ItemEntry[]): { 
     return { ...it, id };
   });
   return { statuses: fixStatuses, items: fixItems };
+}
+
+// ==================== Task 21: 阵法系统 ====================
+
+// 阵法激活：从阵盘物品创建 Formation 并作为 statusEntry 加入角色
+// 阵盘物品本身不消耗，但激活后每岁消耗灵石维持
+export function activateFormation(state: CharacterState, diskItemId: string): { state: CharacterState; ok: boolean; error?: string; formation?: Formation } {
+  const disk = state.inventory.find(it => it.id === diskItemId);
+  if (!disk) return { state, ok: false, error: '阵盘不在储物袋中' };
+  if (disk.item_type !== 'tool') return { state, ok: false, error: '该物品不是阵盘' };
+  // 解析阵盘 effects 中的 formationType 信息
+  const formTypeEff = (disk.effects || []).find(e => e.target_attribute === 'formationType');
+  if (!formTypeEff) return { state, ok: false, error: '该物品不是阵盘（无 formationType 效果）' };
+
+  // 根据阵盘稀有度生成阵法
+  const rarityToPower: Record<string, number> = { common: 1, uncommon: 1.5, rare: 2, epic: 3, legendary: 4, mythic: 5 };
+  const power = rarityToPower[disk.rarity] || 1;
+
+  // 根据阵盘名推断类型
+  const name = disk.name || '';
+  let formType: FormationType = 'spirit_gathering';
+  let effects: Formation['effects'] = [];
+  if (name.includes('聚灵')) {
+    formType = 'spirit_gathering';
+    effects = [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1 + 0.2 * power, description: `聚灵阵加持，修为×${(1 + 0.2 * power).toFixed(2)}` }];
+  } else if (name.includes('护体') || name.includes('防御')) {
+    formType = 'protection';
+    effects = [{ target_attribute: 'defense', operation: 'add', value: 5 * power, description: `护体阵+${5 * power}防` }];
+  } else if (name.includes('迷踪') || name.includes('隐匿')) {
+    formType = 'concealment';
+    effects = [{ target_attribute: 'luck', operation: 'add', value: 3 * power, description: `迷踪阵+${3 * power}气运` }];
+  } else if (name.includes('杀') || name.includes('攻伐')) {
+    formType = 'killing';
+    effects = [{ target_attribute: 'attack', operation: 'add', value: 5 * power, description: `杀阵+${5 * power}攻` }];
+  } else if (name.includes('火')) {
+    formType = 'fire';
+    effects = [{ target_attribute: 'elementFire', operation: 'add', value: 5 * power, description: `火阵+${5 * power}火` }];
+  } else if (name.includes('水')) {
+    formType = 'water';
+    effects = [{ target_attribute: 'elementWater', operation: 'add', value: 5 * power, description: `水阵+${5 * power}水` }];
+  } else if (name.includes('木')) {
+    formType = 'wood';
+    effects = [{ target_attribute: 'elementWood', operation: 'add', value: 5 * power, description: `木阵+${5 * power}木` }];
+  } else if (name.includes('金')) {
+    formType = 'metal';
+    effects = [{ target_attribute: 'elementMetal', operation: 'add', value: 5 * power, description: `金阵+${5 * power}金` }];
+  } else if (name.includes('土')) {
+    formType = 'earth';
+    effects = [{ target_attribute: 'elementEarth', operation: 'add', value: 5 * power, description: `土阵+${5 * power}土` }];
+  } else {
+    // 默认聚灵
+    effects = [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1 + 0.15 * power, description: `阵法加持×${(1 + 0.15 * power).toFixed(2)}` }];
+  }
+
+  const formation: Formation = {
+    id: `formation_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    name: name,
+    type: formType,
+    description: disk.description || `${name}阵法`,
+    rarity: disk.rarity as any,
+    effects,
+    requirements: {
+      minRealm: 'qi_refining',
+      minComprehension: 30,
+      spiritStoneCost: 2 * power,
+    },
+    formationDiskItemId: diskItemId,
+    active: true,
+  };
+
+  // 检查境界
+  const realmIdx = REALMS.findIndex(r => r.id === state.realm);
+  const minRealmIdx = REALMS.findIndex(r => r.id === 'qi_refining');
+  if (realmIdx < minRealmIdx) {
+    return { state, ok: false, error: '需达到炼气期方可激活阵法' };
+  }
+  // 检查悟性
+  if (state.comprehension < (formation.requirements.minComprehension || 30)) {
+    return { state, ok: false, error: `悟性不足，需 ${formation.requirements.minComprehension} 点` };
+  }
+  // 把阵法作为 statusEntry 加入角色
+  const statusEntry: StatusEntry = {
+    id: formation.id,
+    name: `[阵法]${formation.name}`,
+    description: formation.description + '（每岁消耗' + (formation.requirements.spiritStoneCost || 0) + '灵石）',
+    category: 'special',
+    rarity: formation.rarity,
+    duration: -1, // 永久，玩家可手动关闭
+    source: '阵盘激活',
+    effects: formation.effects.map(e => ({ ...e, operation: e.operation as any })),
+  };
+  let next = addStatuses(state, [statusEntry]);
+  // 应用即时 add 效果（multiply cultivationExp 不在这里应用，由 computeEffectiveCultivationRate 自动处理）
+  next = applyItemEffects(next, { ...statusEntry, effects: statusEntry.effects.filter(e => e.operation === 'add') } as any, 1);
+  next = recalcCultivationMultiplier(next);
+  return { state: next, ok: true, formation };
+}
+
+// 关闭阵法：移除对应的 statusEntry
+export function deactivateFormation(state: CharacterState, formationId: string): { state: CharacterState; ok: boolean; error?: string } {
+  const entry = state.activeStatuses.find(s => s.id === formationId);
+  if (!entry) return { state, ok: false, error: '阵法未激活' };
+  // 反向应用 add 效果
+  let next = applyItemEffects(state, { ...entry, effects: entry.effects.filter(e => e.operation === 'add') } as any, -1);
+  // 移除 statusEntry
+  next = { ...next, activeStatuses: next.activeStatuses.filter(s => s.id !== formationId) };
+  next = recalcCultivationMultiplier(next);
+  return { state: next, ok: true };
+}
+
+// 每岁阵法维持消耗灵石
+export function tickFormations(state: CharacterState): { state: CharacterState; consumed: number } {
+  const formations = state.activeStatuses.filter(s => s.name.startsWith('[阵法]'));
+  if (!formations.length) return { state, consumed: 0 };
+  let totalCost = 0;
+  for (const f of formations) {
+    // 估算消耗：根据 rarity
+    const rarityCost: Record<string, number> = { common: 2, uncommon: 3, rare: 5, epic: 10, legendary: 20, mythic: 50 };
+    totalCost += rarityCost[f.rarity] || 2;
+  }
+  if (state.spiritStones < totalCost) {
+    // 灵石不足，自动关闭所有阵法
+    let next = state;
+    for (const f of formations) {
+      next = deactivateFormation(next, f.id).state;
+    }
+    return { state: next, consumed: 0 };
+  }
+  return { state: { ...state, spiritStones: state.spiritStones - totalCost }, consumed: totalCost };
 }

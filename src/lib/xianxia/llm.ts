@@ -168,6 +168,9 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
   const recentEvts = ctx.recentEvents.length
     ? ctx.recentEvents.map(e => `${e.age}岁：${e.title}——${e.narrative.slice(0, 80)}`).join('\n')
     : '无';
+  // Task 21: 提取最近事件标题，明确禁止 AI 用相同/相似标题
+  const recentTitles = ctx.recentEvents.map(e => e.title).filter(Boolean);
+  const recentTitlesStr = recentTitles.length ? recentTitles.join(' / ') : '无';
   const memory = ctx.longTermMemory.length
     ? ctx.longTermMemory.map(m => `- ${m}`).join('\n')
     : '无';
@@ -223,10 +226,17 @@ ${ctx.characterIntents && ctx.characterIntents.length
 ${ctx.pendingThreads && ctx.pendingThreads.length
   ? ctx.pendingThreads.map(t => `- [id:${t.id}][${t.status}] ${t.title}（截止 ${t.deadlineAge} 岁，剩 ${t.deadlineAge - sc.age} 岁，进度 ${t.progress}%）：${t.description}${t.reward ? `；奖励：${t.reward}` : ''}${t.failureCost ? `；失败代价：${t.failureCost}` : ''}`).join('\n')
   : '（无未决线索）'}
+${ctx.pendingThreads && ctx.pendingThreads.some(t => t.status === 'urgent')
+  ? `\n【urgent 线索处理——必须行动！】\n本轮有 urgent 线索，你必须：\n- 在 advanceThreads 中推进该线索进度（progressDelta 20-50）\n- 或在 completeThreadIds 中标记完成（若剧情已到解决点）\n- 或在 failThreadIds 中标记失败（若剧情注定错过）\n- 严禁在 advanceThreads/completeThreadIds/failThreadIds 都为空的情况下生成 urgent 线索相关事件——这等于让线索"原地踏步"，违反剧情推进原则\n- 严禁重复使用上次相同的标题——若上轮已是"家道再陷困境"，本轮必须换标题（如"灵药现世""师徒同行"等）`
+  : ''}
 
-【反重复机制】
+【反重复机制——严格遵守！】
 最近事件类型（严禁连续 3 次同类）：${ctx.recentEventTypes && ctx.recentEventTypes.length ? ctx.recentEventTypes.join(' → ') : '无'}
 最近蓝图分类（避免连续同类）：${ctx.recentBlueprintCategories && ctx.recentBlueprintCategories.length ? ctx.recentBlueprintCategories.join(' → ') : '无'}
+最近事件标题（**严禁与本列表中任何标题相同或仅一字之差**）：${recentTitlesStr}
+- 若本轮蓝图主题与上轮相同，你必须从不同角度切入（如上轮"坊市寻兵"，本轮可"坊市拍卖"或"黑市淘宝"）
+- 严禁生成与最近标题仅修改数字的标题（如"家道中落"→"家道再陷"→"家道又变"，这种重复视为违规）
+- 若发现自己想用的标题与最近标题相似，换个完全不同的视角命名
 
 【记忆检索区】长期记忆：
 ${memory}
@@ -324,6 +334,13 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
   * consumable(丹药)：effects 用 add，target 为 hp/mp/cultivationExp/lifespan 等；服用后消失
   * scripture(功法)：effects 必含一条 multiply cultivationExp（修炼倍率，凡品×1.2~1.5、良品×1.5~2.0、稀有×2.0~3.0、史诗×3.0~4.0、传说×4.0~5.0、神话×5.0~6.0）；可附带 add cultivationExp 等被动
   * tool(器具)：可以是储物袋——effects 用 add，target 为 storageCapacity（如 +10 storageCapacity 表示增加 10 格容量）；储物袋获得即扩容，无需装备
+  * 阵盘（tool 类，特殊效果 target_attribute='formationType'）：可激活阵法的物品。例：
+    {id:"item_frm_xxxx",name:"小聚灵阵盘",item_type:"tool",rarity:"uncommon",
+     effects:[{target_attribute:"formationType",operation:"add",value:1,description:"阵盘类型标识"},
+              {target_attribute:"storageCapacity",operation:"add",value:0,description:"非储物袋"}],
+     source:"秘境拾得"}
+    阵盘名含"聚灵/护体/迷踪/杀/火/水/木/金/土"等关键词会决定阵法类型。
+    阵盘激活后作为 statusEntry 持久生效，每岁消耗灵石维持。
   * material：通常无 effects，仅作剧情道具或炼丹材料
 - id 格式：item_<类型缩写>_<4位随机>，如 item_wpn_a3f2、item_scr_b8c1、item_pil_d2e4、item_bag_f0a1。同一事件多个物品 id 不可重复。
 - name：符合修仙世界风格（如"青锋剑""玄铁甲""聚气丹""引气诀""紫金葫芦""初级储物袋"），≤8字
@@ -345,6 +362,9 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
 - 若 ${invCount} 已达或超过 ${storageCap}，本岁不可再给 newItems（除非先给一个储物袋扩容，或剧情中物品被消耗让出位置）
 - 储物袋本身是 tool 类物品，effects 含 storageCapacity add；获得后 capacity 增加，且储物袋不占容量
 - 高境界可给更高级储物袋（如"玄铁储物戒指"扩容 +30）
+
+【阵盘示例】
+- 阵盘示例：小聚灵阵盘（uncommon，激活后修为×1.3）、九宫护体阵盘（rare，激活后+10防）、迷踪阵盘（rare，激活后+6气运）
 
 【装备栏规则——不再限制数量上限】
 - 玩家「宝」页已装备栏不再是固定 5 槽位，而是数组——AI 知道玩家装备了什么就显示什么
@@ -539,7 +559,8 @@ async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: st
   }
 }
 
-// 从 LLM 输出中提取 JSON（兼容 ```json ``` 包装、未转义字符、尾随逗号等常见问题）
+// 从 LLM 输出中提取 JSON（兼容 ```json ``` 包装、未转义字符、尾随逗号、中文标点等常见问题）
+// 多层兜底：直接解析 → repairJSON → 字段抽取 → 最小可用 fallback
 function parseJSON(content: string): any {
   let s = content.trim();
   // 移除 markdown 代码块
@@ -553,13 +574,125 @@ function parseJSON(content: string): any {
   if (start >= 0 && end > start) {
     s = s.slice(start, end + 1);
   }
-  // 尝试直接解析
+
+  // 策略 1: 直接解析
   try {
     return JSON.parse(s);
   } catch {
-    // 失败则尝试修复常见问题
-    return JSON.parse(repairJSON(s));
+    /* 继续尝试 */
   }
+
+  // 策略 2: repairJSON 修复后解析
+  try {
+    return JSON.parse(repairJSON(s));
+  } catch {
+    /* 继续尝试 */
+  }
+
+  // 策略 3: 替换中文标点为 ASCII（中文引号 " " → "、中文冒号 ：→ :）
+  try {
+    const s2 = s
+      .replace(/\u201c/g, '"')  // "
+      .replace(/\u201d/g, '"')  // "
+      .replace(/\u2018/g, "'")  // '
+      .replace(/\u2019/g, "'")  // '
+      .replace(/\uff1a/g, ':')  // ：
+      .replace(/\uff0c/g, ',')  // ，
+      .replace(/\uff5b/g, '{')  // ｛
+      .replace(/\uff5d/g, '}')  // ｝
+      .replace(/\uff3b/g, '[')  // ［
+      .replace(/\uff3d/g, ']'); // ］
+    return JSON.parse(repairJSON(s2));
+  } catch {
+    /* 继续尝试 */
+  }
+
+  // 策略 4: 字段级抽取（最后兜底，至少保证 narrative/changes 等关键字段可用）
+  const fallback = extractFields(s);
+  if (fallback) return fallback;
+
+  // 策略 5: 全失败，抛出原错误让上层 fallback 处理
+  throw new Error(`JSON parse failed after all strategies: ${s.slice(0, 200)}`);
+}
+
+// 字段级抽取：从残缺 JSON 中提取关键字段，保证游戏不卡死
+// 适用场景：LLM 输出的 JSON 严重畸形但关键文本字段（narrative/title/memory 等）仍可识别
+function extractFields(s: string): any {
+  const result: any = {
+    title: '岁月流转',
+    narrative: '',
+    eventType: 'normal',
+    changes: [],
+    newStatuses: [],
+    newItems: [],
+    removedItemIds: [],
+    newEquippedItems: [],
+    equipItemIds: [],
+    unequipItemIds: [],
+    memory: '',
+    cultivationInsight: '',
+    hasChoice: false,
+    choice: null,
+    triggeredBreakthrough: false,
+    causedDeath: false,
+    causedAscension: false,
+    newThreads: [],
+    advanceThreads: [],
+    completeThreadIds: [],
+    failThreadIds: [],
+    triggerCombat: null,
+  };
+  let found = false;
+
+  // 提取字符串字段：抓取 "field": "value" 或 "field":"value" 模式
+  // value 可含中文标点、引号；用非贪婪 + 终止于 ", " 或 "\n  " 或 行尾
+  const strFields = ['title', 'narrative', 'memory', 'cultivationInsight', 'deathReason'];
+  for (const field of strFields) {
+    // 匹配 "field": "..."（value 内可能含 \" 转义）
+    const re = new RegExp(`"${field}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*?)"`, 's');
+    const m = s.match(re);
+    if (m && m[1]) {
+      // 反转义
+      const val = m[1].replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      (result as any)[field] = val;
+      found = true;
+    }
+  }
+
+  // 提取布尔字段
+  const boolFields = ['hasChoice', 'triggeredBreakthrough', 'causedDeath', 'causedAscension'];
+  for (const field of boolFields) {
+    const re = new RegExp(`"${field}"\\s*:\\s*(true|false)`, 'i');
+    const m = s.match(re);
+    if (m) {
+      (result as any)[field] = m[1] === 'true';
+      found = true;
+    }
+  }
+
+  // 提取 eventType
+  const evtMatch = s.match(/"eventType"\s*:\s*"(normal|fate_node|choice|combat|breakthrough|death|ascension)"/);
+  if (evtMatch) {
+    result.eventType = evtMatch[1];
+    found = true;
+  }
+
+  // 若连 narrative 都没提取到，整个原文当 narrative（保证事件至少有内容）
+  if (!result.narrative) {
+    // 抓取第一个看起来像 narrative 的长字符串
+    const narMatch = s.match(/"narrative"\s*:\s*"([\s\S]*?)(?:",\s*"|"\\n)/);
+    if (narMatch && narMatch[1]) {
+      result.narrative = narMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n').slice(0, 500);
+      found = true;
+    }
+  }
+
+  if (!found) return null;
+  // 若 narrative 仍为空，给个占位避免空白事件
+  if (!result.narrative) {
+    result.narrative = '岁月如流，未有大事。';
+  }
+  return result;
 }
 
 // 修复 LLM 输出 JSON 的常见问题：

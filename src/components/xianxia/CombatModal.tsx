@@ -214,7 +214,7 @@ export function CombatModal() {
                   <span className="text-destructive font-semibold">气血</span>
                   <span className="text-muted-foreground">{enemy.hp} / {enemy.maxHp}</span>
                 </div>
-                <Progress value={enemyHpPct} className="h-2.5 bg-destructive/10 [&>div]:bg-destructive" />
+                <Progress value={enemyHpPct} className="h-2.5 bg-destructive/10 [&>div]:bg-destructive [&>div]:transition-all [&>div]:duration-500 [&>div]:ease-out" />
               </div>
               {/* 多敌人预览 */}
               {session && session.enemies.length > 1 && (
@@ -271,7 +271,7 @@ export function CombatModal() {
                 </span>
                 <span className="text-muted-foreground">{session.playerHp} / {session.playerMaxHp}</span>
               </div>
-              <Progress value={playerHpPct} className="h-2.5 bg-green-500/10 [&>div]:bg-green-500" />
+              <Progress value={playerHpPct} className="h-2.5 bg-green-500/10 [&>div]:bg-green-500 [&>div]:transition-all [&>div]:duration-500 [&>div]:ease-out" />
             </div>
             <div>
               <div className="flex items-center justify-between text-[10px] mb-0.5">
@@ -280,7 +280,7 @@ export function CombatModal() {
                 </span>
                 <span className="text-muted-foreground">{session.playerMp} / {session.playerMaxMp}</span>
               </div>
-              <Progress value={playerMpPct} className="h-2.5 bg-amber-500/10 [&>div]:bg-amber-500" />
+              <Progress value={playerMpPct} className="h-2.5 bg-amber-500/10 [&>div]:bg-amber-500 [&>div]:transition-all [&>div]:duration-500 [&>div]:ease-out" />
             </div>
           </div>
           )}

@@ -680,3 +680,42 @@ export interface CharacterState {
   // 进行中的战斗（若有；持久化以支持页面刷新恢复）
   combatSession: CombatSession | null;
 }
+
+// ==================== Task 21: 阵法系统 ====================
+
+export type FormationType =
+  | 'spirit_gathering'  // 聚灵阵：增加修炼速度
+  | 'protection'        // 护体阵：增加防御
+  | 'concealment'       // 迷踪阵：增加气运/避敌
+  | 'killing'           // 杀阵：增加攻击（战斗中生效）
+  | 'illusion'          // 幻阵：影响敌人命中率
+  | 'fire'              // 火阵：火属性加成
+  | 'water'             // 水阵：水属性加成
+  | 'wood'              // 木阵：木属性加成
+  | 'metal'             // 金阵：金属性加成
+  | 'earth';            // 土阵：土属性加成
+
+export interface Formation {
+  id: string;
+  name: string;             // 阵法名（如"小聚灵阵""九宫护体阵"）
+  type: FormationType;
+  description: string;       // 阵法描述
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  // 阵法效果（激活后应用到角色）
+  effects: {
+    target_attribute: string;
+    operation: 'add' | 'multiply';
+    value: number;
+    description: string;
+  }[];
+  // 激活所需条件
+  requirements: {
+    minRealm?: string;       // 最低境界
+    minComprehension?: number; // 最低悟性
+    spiritStoneCost?: number;  // 每岁维持灵石消耗
+  };
+  // 阵盘物品 id（对应的 tool 类物品）
+  formationDiskItemId?: string;
+  // 是否已激活
+  active: boolean;
+}

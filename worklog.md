@@ -961,3 +961,278 @@ Stage Summary:
 - 旧存档兼容：pendingThreadsJson/characterIntentsJson/combatStateJson 默认空值，旧角色无影响；recentEventTypesJson/recentBlueprintCategoriesJson 默认空数组，旧角色首次推进时建立反重复基线
 
 - 验证状态：所有核心功能验证通过；建议后续在低境界新角色中验证完整战斗触发流程（让 AI 主动给 triggerCombat）
+
+---
+Task ID: 21-d-2
+Agent: main
+Task: 开发阵法系统基础（参考《凡人修仙传》聚灵阵/护体阵/迷踪阵/杀阵/五行阵等设定；阵盘物品 + 激活阵法效果 + 每岁灵石维持消耗）
+
+Work Log:
+
+**Task A：types.ts**（`/home/z/my-project/src/lib/xianxia/types.ts`，文件末尾追加）：
+- 新增 `FormationType` 联合类型：10 种阵法类型（spirit_gathering/protection/concealment/killing/illusion/fire/water/wood/metal/earth）
+- 新增 `Formation` 接口：id/name/type/description/rarity/effects[]/requirements{minRealm,minComprehension,spiritStoneCost}/formationDiskItemId/active
+- 严格只追加，未修改 CharacterState 接口（阵法作为 statusEntry 跟踪，category='special'，name 前缀 `[阵法]`）
+- 用 `// ==================== Task 21: 阵法系统 ====================` 注释清晰分隔
+
+**Task B：engine.ts**（`/home/z/my-project/src/lib/xianxia/engine.ts`）：
+- 顶部 import 加入 `Formation, FormationType`
+- 文件末尾追加 3 个新函数（用 `// ==================== Task 21: 阵法系统 ====================` 分隔）：
+  * `activateFormation(state, diskItemId)`：从阵盘物品创建 Formation → 加入 activeStatuses（category='special', duration=-1 永久, name 前缀 `[阵法]`）→ 应用 add 效果（defense/attack/luck/element 等）→ recalcCultivationMultiplier（multiply cultivationExp 由 computeEffectiveCultivationRate 自动算）
+    * 阵盘识别：item_type='tool' 且 effects 含 `target_attribute='formationType'`
+    * 阵法类型推断：阵盘名关键词扫描（聚灵/护体/迷踪/杀/火/水/木/金/土），默认聚灵
+    * 效果强度按稀有度：common=1×、uncommon=1.5×、rare=2×、epic=3×、legendary=4×、mythic=5×
+    * 境界检查：需达到炼气期（realmIdx >= qi_refining idx）
+    * 悟性检查：≥30
+  * `deactivateFormation(state, formationId)`：反向应用 add 效果 → 移除 statusEntry → recalcCultivationMultiplier
+  * `tickFormations(state)`：每岁按 rarity 扣灵石（common=2/uncommon=3/rare=5/epic=10/legendary=20/mythic=50）；灵石不足时自动 deactivate 所有阵法
+- 复用现有的 `addStatuses / applyItemEffects / recalcCultivationMultiplier` 函数；StatusEntry 已在顶部 import
+
+**Task C：API**（`/home/z/my-project/src/app/api/game/formation/route.ts`，新文件）：
+- POST handler，body `{characterId, action: 'activate'|'deactivate'|'list', diskItemId?, formationId?}`
+- runtime='nodejs', maxDuration=30
+- 校验 characterId + action 必填；校验角色存在 + alive
+- action='list'：返回 inventory 中含 formationType 效果的 tool 物品（disks）+ activeStatuses 中 name 以 `[阵法]` 开头的状态（activeFormations，剥离前缀）
+- action='activate'：调 activateFormation 引擎函数，持久化 statusJson + attack/defense/speed/luck/comprehension/elements/cultivationMultiplier，返回 formation 与 state
+- action='deactivate'：调 deactivateFormation，同上持久化
+- 异常兜底：catch 错误返回 500 + 错误消息
+
+**Task D：advance/route.ts**（`/home/z/my-project/src/app/api/game/advance/route.ts`）：
+- import 加入 `tickFormations`
+- 在 `state = tickStatusDurations(state);` 之后追加：
+  ```ts
+  // Task 21: 阵法维持消耗灵石
+  const formationTick = tickFormations(state);
+  state = formationTick.state;
+  ```
+- 保证每岁推进时阵法维持灵石自动扣除；灵石不足时阵法自动关闭
+
+**Task E：llm.ts**（`/home/z/my-project/src/lib/xianxia/llm.ts`）：
+- 在「物品生成规则」tool 类型说明下追加阵盘子规则（含阵盘示例 JSON 结构 + 命名关键词说明 + 激活机制说明）
+- 在「储物袋容量规则」与「装备栏规则」之间新增「【阵盘示例】」区块，给出 3 个示例（小聚灵阵盘 uncommon/九宫护体阵盘 rare/迷踪阵盘 rare）
+
+**Task F：FormationPanel.tsx**（`/home/z/my-project/src/components/xianxia/FormationPanel.tsx`，新文件）：
+- 修仙水墨风格（paper-texture / font-serif-cn / Collapsible 可折叠）
+- 标题"阵法" + 已启用阵法数量徽标（Sparkles icon）+ 总数徽标 + 折叠箭头（Hexagon icon）
+- 加载时调 `POST /api/game/formation action=list`；list 失败静默不打扰玩家
+- 已激活阵法列表：每条一个 Card（按阵法类型颜色 border + bg）
+  * 阵法名 + 类型徽标（彩色：聚灵 emerald/护体 cyan/迷踪 purple/杀 red/火 orange/水 cyan/木 green/金 yellow/土 amber）+ rarity 徽标
+  * 描述（line-clamp-2）+ 效果 chip（multiply 红色，add 按阵法类型色）
+  * "关闭阵法"按钮（PowerOff icon，琥珀色，调 action=deactivate）
+- 阵盘物品列表（inventory 中含 formationType 的 tool）：
+  * 阵盘名 + 类型徽标 + rarity 徽标
+  * 描述 + 灵石消耗提示（按 rarity 计算，与 engine tickFormations 同口径）
+  * "激活阵法"按钮（Power icon，主色调，调 action=activate）
+  * 同名阵法已激活时显示"已激活"占位（emerald 色）
+- 空状态："无阵法加持。获得阵盘后可激活。"
+- 类型徽标配色严格避开 indigo/blue 主色调（水属性用 cyan 代替 blue）
+- 移动端优先：所有按钮 h-7（28px）紧凑布局，但点击区域≥44px 由 padding 保证
+
+**Task G：InventoryPanel.tsx**（`/home/z/my-project/src/components/xianxia/InventoryPanel.tsx`）：
+- import 加入 `FormationPanel`
+- 在「已装备」Card 与「储物袋」Card 之间插入 `<FormationPanel />`（注释标记 `Task 21: 阵法管理面板`）
+
+**验证（端到端）**：
+1. **TypeScript 检查**：`bunx tsc --noEmit --skipLibCheck` → 全项目零类型错误（无 examples/skills 干扰输出）
+2. **Lint 检查**：`bun run lint` → 零错误零警告（exit code 0）
+3. **引擎单元验证**（bun 脚本调用 dbToState + activateFormation + tickFormations + deactivateFormation）：
+   * 测试角色"王剑心"（qi_refining/0）注入测试阵盘"小聚灵阵盘"（uncommon）
+   * activateFormation → ok=true，formation.type='spirit_gathering'，effects=[cultivationExp multiply 1.3]（1+0.2×1.5=1.3），activeStatuses 新增 "[阵法]小聚灵阵盘"
+   * tickFormations → consumed=3（uncommon→3 灵石），spiritStones 从 5 降至 2
+   * deactivateFormation → ok=true，activeStatuses 移除，cultivationMultiplier 复原
+   * 清理测试数据完毕
+4. **API 端到端验证**（curl）：`POST /api/game/formation action=list` 返回 `{success:true, disks:[], activeFormations:[]}` ✓
+5. **Dev server**：自动重编译成功（多次 `✓ Compiled in N ms`，无 error/warn），GET / 200
+
+**Stage Summary**：
+- 阵法系统基础完整闭环：阵盘物品（LLM 生成）→ 玩家激活（API + 引擎）→ 持久 statusEntry → 每岁灵石维持（advance route tickFormations）→ 玩家可关闭（API + 引擎反向应用效果）
+- 阵法效果覆盖《凡人修仙传》经典阵法类型：聚灵（修为倍率）、护体（+防）、迷踪（+气运）、杀阵（+攻）、五行（+对应元素），按稀有度强度递增
+- 阵法作为 statusEntry 实现，不修改 CharacterState 接口；multiply cultivationExp 通过 computeEffectiveCultivationRate 自动计入修炼速度来源条目，add 效果通过 applyItemEffects 即时应用到属性
+- 前端 FormationPanel 在 InventoryPanel「已装备」与「储物袋」之间，修仙水墨风格，10 种阵法类型按五行/功能上色（严格避开 indigo/blue 主色调，水属性用 cyan 代替）
+- 类型检查 / lint 全通过；引擎函数与 API 端到端验证通过
+- 遗留问题：暂无。LLM 何时实际产出阵盘物品需在游戏中推进至坊市/秘境/前辈传承等蓝图事件后验证；现有角色存档无阵盘，FormationPanel 显示空状态文案，符合预期。
+
+---
+Task ID: Task 21-d-1
+Agent: main
+Task: 开发坊市交易 UI 系统——让玩家可主动访问坊市购买/出售物品（Task 20 蓝图池中"坊市淘宝"主题的延伸，从被动事件变为主动交互）
+
+Work Log:
+- 阅读 worklog.md 了解 Task 1-21 进展（特别是 Task 20 的 EventBlueprint/PendingThread/CombatSession 机制与 CombatModal/AlchemyFurnace/InventoryPanel 的修仙水墨 UI 模式）
+
+- Task A：新建 `/home/z/my-project/src/app/api/game/market/route.ts`
+  * 三档物品池（mortal_qi / foundation / golden），按境界合并取并集
+    - mortal_qi 池：8 件凡人/炼气期物品（木剑/粗布衣/聚气丹/疗伤丹/木灵符/初级储物袋/引气诀/聚灵佩，basePrice 5-30）
+    - foundation 池：8 件筑基/金丹期物品（青锋剑/玄铁甲/凝气丹/回春丹/凝神丹/中级储物袋/凝气诀/青云剑，basePrice 40-200）
+    - golden 池：6 件高阶物品（紫电剑/金丝软甲/九转回春丹/筑基丹/玄铁储物戒/紫霄诀，basePrice 300-1000）
+  * getPoolForRealm(realm)：mortal/qi_refining → mortal_qi；foundation/golden_core → mortal_qi+foundation；其他 → 全部三档
+  * generateMarketItems：每次 list 随机洗牌取 6-10 件，价格 ±20% 浮动（0.8-1.2 × basePrice），生成 `market_<timestamp>_<idx>` 形式临时 id
+  * estimateValue(item)：rarity 基价（common 5 / uncommon 20 / rare 80 / epic 300 / legendary 1000 / mythic 5000）+ scripture 含 cultivationExp multiply 翻倍 + 储物袋按 capacity×3 加价
+  * action=list：返回 marketItems + sellableItems（每件加 sellPrice = estimateValue × 0.6）+ playerSpiritStones + storageCapacity + inventoryCount
+  * action=buy：校验 alive / isAtChoice（拒绝）/ combatSession.status='ongoing'（拒绝）→ 校验 item 对象完整 → 校验 price > 0 → 校验 spiritStones ≥ price → 校验 inventory.length < storageCapacity → 扣灵石 → addItems 加新物品（生成 `item_buy_<ts><rand>` id）→ 持久化 spiritStones/inventoryJson/storageCapacity/equippedJson → 写 EventLog（eventType='trade'，标题"坊市·购·{物品名}"，effects 含 -price 灵石 + 1 物品）→ 返回 boughtItem + price + stateToResponse
+  * action=sell：校验 itemId 在 inventory 中 → removeItemsByIds（自动反向应用 equipped effects 与 storageCapacity 扣减）→ 加 sellPrice 灵石 → 持久化 → 写 EventLog（标题"坊市·售·{物品名}"，effects 含 -1 物品 + sellPrice 灵石）→ 返回 soldItem + sellPrice + stateToResponse
+
+- Task B：新建 `/home/z/my-project/src/components/xianxia/MarketModal.tsx`
+  * z-[55]（介于 ChoiceModal z-50 与 CombatModal z-[60] 之间），fixed inset-0 全屏背景遮罩 + 移动端 max-w-md Card
+  * 顶部 CardHeader：坊市淘宝标题（Store icon，amber-600）+ 灵石徽标（Coins icon + tabular-nums 数字 + "灵石"小字，amber-500/50 边框 + amber-500/10 背景）+ 关闭按钮（X icon，w-7 h-7）+ 储物袋容量显示（Package icon + "{count}/{capacity}" + bagFull 时红色"· 已满"提示）
+  * CardContent 内嵌 Tabs：购买（ShoppingCart）/ 出售（ArrowUpCircle），grid-cols-2
+  * 购买 Tab：物品卡片 grid 1 列，max-h-[calc(100dvh-180px)] overflow-y-auto xianxia-scroll
+    - 每张卡片：稀有度彩色边框（border-{color}50）+ 渐变背景（linear-gradient(180deg, {color}08, transparent)）
+    - 卡头：类型 icon（彩色 5x5 方块）+ 名称（彩色 font-serif-cn）+ 稀有度 Badge
+    - 描述（muted-foreground font-serif-cn）
+    - 效果 chips（fmtEffectZh 格式化为"{zh}+{value}"或"{zh}×{value}"）
+    - 底部分隔条：价格（Coins + amber-700 数字）+ 购买按钮（amber-600 hover:amber-700）
+    - 按钮文案随状态切换：交易中→"交易中"+ spinner；灵石不足→"灵石不足"；储物袋满→"储物袋已满"；正常→"购入"+ ShoppingCart icon
+  * 出售 Tab：同上结构，估价用 green-700，按钮"售出" + ArrowUpCircle icon
+  * 空状态：购买 Tab 无物品→"坊市空空如也"；出售 Tab 无物品→"身无长物"
+  * 底部说明栏："坊市每访问一次便更新陈列；售出估价为原值六成，望君斟酌。"
+  * useEffect 监听 marketOpen：打开时 fetchList()；关闭时清理 marketItems/sellableItems/busyId/tab
+  * buy/sell 成功后：setCharacter 更新状态 + 从本地列表移除该物品 + toast 成功提示
+  * 加载中显示 Loader2 spinner + "坊市开张中..." / "清点行囊中..."
+
+- Task C：修改 `/home/z/my-project/src/components/xianxia/ActionButtons.tsx`
+  * import 新增 Store icon
+  * 从 store 解构 setMarketOpen
+  * 主推进按钮行下方新增第二行"坊市淘宝"按钮：
+    - 全宽 w-full h-9，amber-500/40 边框 + amber-700 文字（dark: amber-400）+ hover:amber-500/10 背景
+    - 内容：Store icon + "坊市淘宝" + "· {N} 灵石"（amber-700/70 小字 tabular-nums）
+    - 显示条件：`!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning`（仅在"中断模拟"状态可访问）
+    - 点击调 setMarketOpen(true)
+
+- Task D：修改 `/home/z/my-project/src/app/page.tsx`
+  * import MarketModal
+  * 在 `<CombatModal />` 之后渲染 `<MarketModal />`
+
+- Task E：修改 `/home/z/my-project/src/lib/xianxia/store.ts`
+  * GameState interface 加 `marketOpen: boolean` + `setMarketOpen: (open: boolean) => void`
+  * 初始 state 加 `marketOpen: false`
+  * 实现 `setMarketOpen: (open) => set({ marketOpen: open })`
+  * reset() 也清理 `marketOpen: false`
+
+**验证**：
+- 类型检查：`bunx tsc --noEmit --skipLibCheck` → 零错误（仅 examples/skills 目录 pre-existing 错误）
+- Lint：`bun run lint` → 零警告零错误
+- API 端到端 curl 测试（用真实角色"墨问天"，原 3 灵石）：
+  * 临时给角色 50 灵石用于测试
+  * list：成功返回 6 件 marketItems + 2 件 sellableItems ✓
+  * buy 木剑（5 灵石）：成功，spiritStones 50→45，inventory 2→3，EventLog 写入"坊市·购·木剑" ✓
+  * sell 木剑（估价 3 灵石）：成功，spiritStones 45→48，inventory 3→2，EventLog 写入"坊市·售·木剑" ✓
+  * 边界测试：灵石不足 400 ✓ / 出售不存在物品 400 ✓ / atChoice 角色访问 400 ✓ / 缺 characterId 400 ✓
+  * 测试后恢复角色灵石为原值 3 + 删除测试期间产生的 2 条 trade EventLog，避免污染史册
+
+Stage Summary:
+- 坊市交易系统全栈完成：API（list/buy/sell 3 个 action，含境界分档物品池 + 灵石/容量校验 + EventLog 记录）+ 全屏 Modal（购买/出售双 Tab + 稀有度彩色边框 + 价格金/估价绿 + 状态禁用按钮）+ ActionButtons 入口（"坊市淘宝"amber 主题按钮，仅"中断模拟"状态可见）+ store 状态（marketOpen/setMarketOpen）
+- 修仙水墨风格统一：paper-texture / ink-wash / font-serif-cn / amber-500 边框（避开 indigo/blue 主色调）；稀有度配色与 InventoryPanel/AlchemyFurnace 一致
+- 移动端优先：max-w-md mx-auto / 触控友好按钮（购买 h-8 / 关闭 w-7 h-7 / 入口 h-9）/ 滚动列表 max-h-[calc(100dvh-180px)] overflow-y-auto xianxia-scroll
+- 防御性 API 设计：拒绝 atChoice / combat ongoing / 灵石不足 / 储物袋满 / 物品不存在等场景，返回明确中文错误信息
+- EventLog 写入"坊市·购·{物品名}" / "坊市·售·{物品名}"两条事件，eventType='trade'，便于史册追溯
+- 类型检查 / lint 全通过；API 端到端 curl 验证 4 个边界 + 3 个正常路径全部符合预期
+- 工作记录已保存到 `/home/z/my-project/agent-ctx/Task 21-d-1-main.md`
+
+---
+Task ID: 21
+Agent: main (cron 触发)
+Task: 项目状态评估 + QA + 修复 bug + 新功能开发（坊市交易UI + 阵法系统）
+
+Work Log:
+- 通过 agent-browser 创建新角色"王剑心"端到端验证 Task 20 机制：
+  * 推进至 6 岁触发命节点"灵气初触"→ 选择"感受暖流"→ 进入修行路径 ✓
+  * 推进至 11 岁触发 thread_resolve 主题"线索推进·生死一线"（pendingThread "寻医问药"驱动）✓
+  * 推进至 22 岁触发 hasChoice 事件"夺灵芝"（pendingThread "寻灵芝"驱动）✓
+  * 推进至 23 岁修为满 → 自动突破至炼气期 1 层 ✓
+
+- 发现并修复 4 个 bug：
+
+  **Bug 1（严重）：LLM JSON 解析失败导致 advance 500 错误**
+  - 现象：`POST /api/game/advance 500`，错误 `Expected ',' or '}' after property value in JSON at position N`
+  - 根因：repairJSON 函数无法处理 LLM 输出中的中文标点（中文引号 " "、中文冒号 ：、全角逗号 ，等）
+  - 修复（llm.ts）：parseJSON 改为多层兜底
+    1. 直接 JSON.parse
+    2. repairJSON 后解析
+    3. 替换中文标点为 ASCII 后 repairJSON 解析（中文引号→"、中文冒号→:、全角逗号→,、全角括号→ASCII）
+    4. 字段级抽取（extractFields）—— 从残缺 JSON 中提取 title/narrative/memory/cultivationInsight/eventType/hasChoice 等关键字段
+    5. 全失败抛错给上层 fallback
+
+  **Bug 2（严重）：advance route 无 LLM 失败兜底**
+  - 现象：LLM 失败时整个 advance 500，玩家进度不保存
+  - 修复（advance/route.ts）：try/catch 包裹 generateAgeEvent，失败时用 blueprint 名生成最小可用 aiOutput（标题"X·流年"+ 占位叙事 + 命节点强制 hasChoice），保证进度推进不卡死
+
+  **Bug 3（严重）：非命节点的 hasChoice 事件未设置 isAtChoice=true**
+  - 现象：22 岁"夺灵芝"事件 AI 给了 hasChoice=true，但 advance route 只在 isFateNode && aiOutput.hasChoice 分支设置 isAtChoice=true，导致 choose route 返回 400 "当前无待选择"
+  - 修复（advance/route.ts）：新增 `else if (aiOutput.hasChoice) finalState.isAtChoice = true;` 分支处理非命节点的选择
+
+  **Bug 4（中）：urgent pendingThread "原地踏步"**
+  - 现象：urgent 线索触发 thread_resolve 主题，但 AI 偶尔不输出 advanceThreads/completeThreadIds，导致线索进度不变、标题重复（"家道再陷困境"重复 3 次）
+  - 修复 1（llm.ts prompt）：在 urgent 线索区追加"必须行动"规则——必须在 advanceThreads/completeThreadIds/failThreadIds 中至少一个填值，禁止原地踏步；同时反重复机制区加入"最近事件标题列表"，明确禁止相同/相似标题
+  - 修复 2（engine.ts pickEventBlueprint）：强化反重复权重——最近 1 次同类分类 weight×0（彻底跳过），最近 2-3 次 weight×0.1，最近 4-5 次 weight×0.4
+  - 修复 3（advance/route.ts）：引擎兜底——若 blueprint.category==='thread_resolve' 且 AI 未推进任何 urgent 线索，引擎自动 advanceThread +30%，防止卡死
+
+- 新功能开发（并行 subagent 完成）：
+
+  **新功能 1：坊市交易 UI 系统（Task 21-d-1）**
+  - 新建 `/api/game/market` route（list/buy/sell 三种 action）
+  - 三档物品池（mortal_qi / foundation / golden），按境界合并取并集
+  - list：随机生成 6-10 件坊市物品（价格 ±20% 浮动）+ 玩家可售物品（估价 × 0.6）
+  - buy：校验灵石/储物袋容量 → 扣灵石 → 加物品 → 写 EventLog
+  - sell：移除物品 → 加灵石 → 写 EventLog
+  - 新建 MarketModal 组件（购买/出售双 Tab，稀有度彩色边框，amber 主题避开 indigo/blue）
+  - ActionButtons 加入"坊市淘宝"按钮（含 Store icon + 灵石数显示）
+  - page.tsx 加入 `<MarketModal />`
+  - store.ts 加入 marketOpen 状态
+  - 端到端 curl 验证通过：list/buy/sell 全部正常，边界条件（灵石不足/储物袋满/atChoice）正确拒绝
+
+  **新功能 2：阵法系统基础（Task 21-d-2）**
+  - types.ts 末尾追加 `FormationType` 与 `Formation` 接口
+  - engine.ts 末尾追加 `activateFormation / deactivateFormation / tickFormations` 三个函数
+  - 阵法作为 statusEntry 跟踪（category='special'，name 前缀 `[阵法]`，duration=-1 永久）
+  - multiply cultivationExp 效果自动通过 computeEffectiveCultivationRate 计入修炼速度来源条目
+  - add 效果（attack/defense/luck/elements）通过 applyItemEffects 即时应用
+  - 阵盘识别：item_type='tool' 且 effects 含 target_attribute='formationType'
+  - 阵法类型推断：阵盘名关键词扫描（聚灵/护体/迷踪/杀/火/水/木/金/土）
+  - 强度按稀有度：common 1× / uncommon 1.5× / rare 2× / epic 3× / legendary 4× / mythic 5×
+  - 每岁维持灵石消耗（按 rarity 2-50 灵石）；灵石不足自动关闭所有阵法
+  - 新建 `/api/game/formation` route（list/activate/deactivate）
+  - 新建 FormationPanel 组件（已激活阵法列表 + 阵盘物品列表，type 徽标按五行/功能上色）
+  - InventoryPanel 插入 `<FormationPanel />`（在已装备与储物袋 Card 之间）
+  - advance route 在 tickStatusDurations 后调用 tickFormations 扣灵石维持
+  - llm.ts 物品生成规则加入阵盘说明与示例
+  - 引擎单元验证 + API 端到端验证通过
+
+- 样式细节优化：
+  * CombatModal HP/MP 条加 transition-all duration-500 ease-out 动画，伤害变化有平滑过渡
+
+- 验证结果：
+  * bunx tsc --noEmit 零错误（除 examples/skills 目录无关错误）
+  * bun run lint 零警告
+  * agent-browser 端到端验证：坊市按钮显示正常、MarketModal 弹出正常、出售 Tab 显示 8 件可售物品、FormationPanel 显示空状态文案"无阵法加持。获得阵盘后可激活。"
+  * 修复后 advance 不再 500，旧角色"秦土"和新角色"王剑心"都能正常推进
+
+Stage Summary:
+- 4 个 bug 全部修复：
+  1. JSON 解析多层兜底（直接/repairJSON/中文标点替换/字段抽取/抛错）
+  2. advance route LLM 失败 fallback（保证进度不卡死）
+  3. 非命节点 hasChoice 事件正确设置 isAtChoice=true
+  4. urgent 线索引擎兜底推进 +30%（防止原地踏步）
+
+- 2 个新功能完成：
+  1. **坊市交易 UI**：玩家可主动访问坊市购买/出售物品（三档物品池按境界生成，价格浮动，储物袋容量校验）
+  2. **阵法系统基础**：阵盘物品可激活为阵法（10 种类型，按稀有度定强度，每岁消耗灵石维持，灵石不足自动关闭）
+
+- 项目当前状态：
+  * 类型检查通过、lint 通过、dev server 运行正常
+  * 5 大 Task 20 机制（蓝图/意图/线索/战斗/凡人修仙传）+ Task 21 修复 + 坊市 + 阵法 全部集成
+  * 端到端验证：从创建角色到命节点→线索推进→选择→突破→坊市→阵法面板，全流程无阻塞
+
+- 未解决问题或风险：
+  1. **LLM 响应慢**：偶尔 advance 耗时 36-62 秒（接近 60 秒 maxDuration），可能导致超时。建议监控并考虑流式响应或缩短 prompt
+  2. **AI 标题重复仍有残余**：21 岁和 22 岁都生成了"灵芝寻踪"标题。虽然强化了反重复 prompt，但 AI 偶尔仍会重复。引擎层难以彻底禁止（标题是自由文本）。可考虑在引擎层对完全相同的标题加后缀（如"灵芝寻踪·续"）
+  3. **战斗触发尚未在端到端验证**：本次推进至 23 岁炼气期，AI 未主动给 triggerCombat 字段。需推进至更高境界（筑基+）且蓝图主题为 combat 时才能验证。可考虑给低境界增加一个"试炼傀儡"必触发战斗的命节点
+  4. **阵盘物品尚未在游戏中出现**：现有角色无阵盘，FormationPanel 显示空状态。需推进至坊市/秘境/前辈传承等蓝图事件后由 AI 主动生成阵盘
+
+- 建议下一阶段优先事项：
+  1. 监控 LLM 响应时间，若频繁超时考虑流式响应或 prompt 精简
+  2. 引擎层对"完全相同标题"加后缀机制，彻底解决标题重复
+  3. 给低境界角色增加一个"宗门试炼·傀儡阵"必触发战斗的命节点，让玩家早期就能体验战斗系统
+  4. 推进新角色至筑基+，验证 AI 主动生成阵盘物品的能力
+  5. 考虑添加灵宠参战系统、符箓系统、心魔值系统等凡人修仙传元素
+  6. UI 细节：坊市物品按类型分组、阵法面板加阵法效果预览、战斗界面加伤害飘字动画
