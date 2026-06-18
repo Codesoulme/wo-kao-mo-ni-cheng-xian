@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
@@ -9,6 +9,7 @@ import {
   ChevronDown, Hexagon, Loader2, Power, PowerOff, Sparkles, Coins,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatItemEffectLabel } from '@/lib/xianxia/display';
 import { toast } from 'sonner';
 import { FormationType } from '@/lib/xianxia/types';
 
@@ -52,16 +53,7 @@ function inferFormationType(name: string): FormationType {
 
 // 效果文本中文化
 function fmtEffectZh(eff: any): string {
-  if (!eff) return '';
-  const zh: Record<string, string> = {
-    cultivationExp: '修为', defense: '防', attack: '攻', speed: '速',
-    luck: '气运', comprehension: '悟性',
-    elementMetal: '金', elementWood: '木', elementWater: '水', elementFire: '火', elementEarth: '土',
-  };
-  const label = zh[eff.target_attribute] || eff.target_attribute;
-  if (eff.operation === 'add') return `${label}${eff.value > 0 ? '+' : ''}${eff.value}`;
-  if (eff.operation === 'multiply') return `${label}×${eff.value}`;
-  return `${label}${eff.operation}${eff.value}`;
+  return formatItemEffectLabel(eff);
 }
 
 interface DiskItem {
@@ -393,3 +385,4 @@ function rarityToStoneCost(rarity: string): number {
   const map: Record<string, number> = { common: 2, uncommon: 3, rare: 5, epic: 10, legendary: 20, mythic: 50 };
   return map[rarity] || 2;
 }
+

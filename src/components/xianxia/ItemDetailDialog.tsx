@@ -30,21 +30,8 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   tool: <Wrench className="w-3.5 h-3.5" />,
 };
 
-const ATTR_ZH: Record<string, string> = {
-  attack: '攻击', defense: '防御', speed: '速度', hp: '气血', maxHp: '气血上限',
-  mp: '灵力', maxMp: '灵力上限', luck: '气运', comprehension: '悟性',
-  cultivationExp: '修为', lifespan: '寿元', spiritStones: '灵石', reputation: '声望',
-  elementMetal: '金', elementWood: '木', elementWater: '水', elementFire: '火', elementEarth: '土',
-  storageCapacity: '储物袋容量',
-};
-function attrZh(attr: string): string {
-  return ATTR_ZH[attr] || attr;
-}
 function fmtEffectZh(eff: any): string {
-  const zh = attrZh(eff.target_attribute);
-  if (eff.operation === 'add') return `${zh}${eff.value > 0 ? '+' : ''}${eff.value}`;
-  if (eff.operation === 'multiply') return `${zh}×${eff.value}`;
-  return `${zh}${eff.operation}${eff.value}`;
+  return formatItemEffectLabel(eff);
 }
 
 interface Props {
@@ -127,7 +114,7 @@ export function ItemDetailDialog({
             <div>
               <div className="text-[10px] text-muted-foreground mb-1">效果</div>
               <div className="flex flex-wrap gap-1.5">
-                {item.effects.map((e: any, i: number) => (
+                {item.effects.map((e: any, i: number) => fmtEffectZh(e)).filter(Boolean).map((label: string, i: number) => (
                   <span
                     key={i}
                     className="text-[11px] px-2 py-0.5 rounded font-medium"
@@ -136,7 +123,7 @@ export function ItemDetailDialog({
                       color: e.operation === 'multiply' ? '#c8453c' : '#3b82f6',
                     }}
                   >
-                    {fmtEffectZh(e)}
+                    {label}
                   </span>
                 ))}
               </div>

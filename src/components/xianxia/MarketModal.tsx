@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { formatItemEffectLabel } from '@/lib/xianxia/display';
 
 // 稀有度配色（与 InventoryPanel 保持一致）
 const RARITY_COLORS: Record<string, string> = {
@@ -31,18 +32,8 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   material: <Package className="w-3 h-3" />,
   tool: <Wrench className="w-3 h-3" />,
 };
-const ATTR_ZH: Record<string, string> = {
-  attack: '攻', defense: '防', speed: '速', hp: '气血', maxHp: '气血上限',
-  mp: '灵力', maxMp: '灵力上限', luck: '气运', comprehension: '悟性',
-  cultivationExp: '修为', lifespan: '寿元', spiritStones: '灵石', reputation: '声望',
-  storageCapacity: '容量', elementMetal: '金', elementWood: '木',
-  elementWater: '水', elementFire: '火', elementEarth: '土',
-};
 function fmtEffectZh(eff: any): string {
-  const zh = ATTR_ZH[eff.target_attribute] || eff.target_attribute;
-  if (eff.operation === 'add') return `${zh}${eff.value > 0 ? '+' : ''}${eff.value}`;
-  if (eff.operation === 'multiply') return `${zh}×${eff.value}`;
-  return `${zh}${eff.operation}${eff.value}`;
+  return formatItemEffectLabel(eff);
 }
 
 interface MarketItem {
@@ -305,12 +296,12 @@ export function MarketModal() {
                         {/* 效果 chips */}
                         {item.effects && item.effects.length > 0 && (
                           <div className="px-3 pb-2 flex flex-wrap gap-1">
-                            {item.effects.map((eff: any, i: number) => (
+                            {item.effects.map((eff: any, i: number) => fmtEffectZh(eff)).filter(Boolean).map((label: string, i: number) => (
                               <span
                                 key={i}
                                 className="text-[9px] px-1.5 py-0.5 rounded border bg-muted/30 text-foreground/80 font-serif-cn"
                               >
-                                {fmtEffectZh(eff)}
+                                {label}
                               </span>
                             ))}
                           </div>
@@ -407,12 +398,12 @@ export function MarketModal() {
                         )}
                         {item.effects && item.effects.length > 0 && (
                           <div className="px-3 pb-2 flex flex-wrap gap-1">
-                            {item.effects.map((eff: any, i: number) => (
+                            {item.effects.map((eff: any, i: number) => fmtEffectZh(eff)).filter(Boolean).map((label: string, i: number) => (
                               <span
                                 key={i}
                                 className="text-[9px] px-1.5 py-0.5 rounded border bg-muted/30 text-foreground/80 font-serif-cn"
                               >
-                                {fmtEffectZh(eff)}
+                                {label}
                               </span>
                             ))}
                           </div>

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { REALMS } from '@/lib/xianxia/types';
+import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } from '@/lib/xianxia/display';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -358,22 +359,21 @@ function MilestoneItem({
       {expanded ? (
         <>
           <p className="text-[11px] leading-relaxed text-foreground/90 whitespace-pre-wrap">{narrative}</p>
-          {effects && effects.length > 0 && (
+          {effects && effects.filter(isVisibleNumericEventEffect).length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
-              {effects.map((eff: any, i: number) => (
+              {effects.filter(isVisibleNumericEventEffect).map((eff: any, i: number) => (
                 <span
                   key={i}
                   className={cn(
                     "text-[9px] px-1 py-0.5 rounded border",
-                    eff.delta > 0
+                    eventEffectTone(eff) === 'positive'
                       ? "bg-green-500/10 text-green-700 border-green-500/30"
-                      : eff.delta < 0
+                      : eventEffectTone(eff) === 'negative'
                       ? "bg-red-500/10 text-red-700 border-red-500/30"
                       : "bg-muted text-muted-foreground border-border"
                   )}
                 >
-                  {ATTR_LABEL[eff.attribute] || eff.attribute}
-                  {eff.delta > 0 ? '+' : ''}{eff.delta}
+                  {formatEventEffectLabel(eff)}
                 </span>
               ))}
             </div>

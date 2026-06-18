@@ -2,6 +2,7 @@
 
 import { GameEvent } from '@/lib/xianxia/store';
 import { cn } from '@/lib/utils';
+import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } from '@/lib/xianxia/display';
 import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 

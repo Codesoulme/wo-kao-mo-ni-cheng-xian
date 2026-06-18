@@ -278,11 +278,11 @@ export function ActionButtons() {
         )}
       </div>
 
-      {/* 坊市/秘境入口：只在最近 AI 事件明确触发相关场景时出现 */}
+      {/* 坊市/秘境入口：只在最近事件明确触发相关场景时出现 */}
       {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && (aiOpportunity.market || aiOpportunity.exploration) && (
         <div className="space-y-1.5 rounded-lg border border-primary/15 bg-primary/5 p-2">
           <div className="text-[10px] text-muted-foreground font-serif-cn truncate">
-            AI 事件触发：{aiOpportunity.sourceLabel}
+            事件触发：{aiOpportunity.sourceLabel}
           </div>
           <div className="grid gap-2" style={{ gridTemplateColumns: aiOpportunity.market && aiOpportunity.exploration ? '1fr 1fr' : '1fr' }}>
             {aiOpportunity.market && (
