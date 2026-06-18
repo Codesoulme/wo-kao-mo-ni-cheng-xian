@@ -18,6 +18,7 @@ export interface CharacterState {
   realmLevel: number;
   realmMaxLevel: number;
   realmProfile?: any;
+  realmPowerMultiplier?: number;
   cultivationExp: number;
   expToBreak: number;
   elements: { metal: number; wood: number; water: number; fire: number; earth: number };

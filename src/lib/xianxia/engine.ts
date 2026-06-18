@@ -213,6 +213,14 @@ function applyRealmProfilePatch(state: CharacterState, patch?: RealmProfile): Ch
   return { ...state, realmProfile: { ...current, ...profile } };
 }
 
+function realmPowerMultiplier(state: CharacterState): number {
+  return clampProfileNumber(getRealmProfile(state)?.powerMultiplier, 0.5, 9, 1);
+}
+
+function scaleByRealmPower(value: number, mult: number): number {
+  return Math.max(1, Math.floor(value * mult));
+}
+
 // ==================== 属性变更应用 (引擎权威) ====================
 
 // AI 可影响的属性白名单 + 钳制范围
@@ -1364,6 +1372,7 @@ export function checkThreadDeadlines(state: CharacterState): { state: CharacterS
 
 // 启动战斗：从 AI 触发的 triggerCombat 创建 CombatSession
 export function startCombat(state: CharacterState, trigger: NonNullable<AIEventOutput['triggerCombat']>): CharacterState {
+  const realmPower = realmPowerMultiplier(state);
   const session: CombatSession = {
     id: `combat_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     enemies: trigger.enemies.map(e => ({ ...e, maxHp: e.maxHp || e.hp, currentCooldown: 0 })),
@@ -1988,6 +1997,7 @@ export function stateToResponse(s: CharacterState) {
   const realmProfile = getRealmProfile(s);
   const rootInfo = SPIRITUAL_ROOTS[s.spiritualRoot];
   const rate = computeEffectiveCultivationRate(s);
+  const realmPower = realmPowerMultiplier(s);
   return {
     age: s.age,
     lifespan: s.lifespan,
@@ -1997,11 +2007,12 @@ export function stateToResponse(s: CharacterState) {
     realmLevel: s.realmLevel,
     realmMaxLevel: realmProfile?.maxLevel ?? realmInfo.levels,
     realmProfile,
+    realmPowerMultiplier: realmPower,
     cultivationExp: s.cultivationExp,
     expToBreak: s.expToBreak,
-    hp: s.hp, maxHp: s.maxHp,
-    mp: s.mp, maxMp: s.maxMp,
-    attack: s.attack, defense: s.defense, speed: s.speed,
+    hp: scaleByRealmPower(s.hp, realmPower), maxHp: scaleByRealmPower(s.maxHp, realmPower),
+    mp: scaleByRealmPower(s.mp, realmPower), maxMp: scaleByRealmPower(s.maxMp, realmPower),
+    attack: scaleByRealmPower(s.attack, realmPower), defense: scaleByRealmPower(s.defense, realmPower), speed: scaleByRealmPower(s.speed, Math.sqrt(realmPower)),
     luck: s.luck, comprehension: s.comprehension,
     spiritStones: s.spiritStones, reputation: s.reputation,
     alive: s.alive, ascended: s.ascended,
