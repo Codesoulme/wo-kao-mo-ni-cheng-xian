@@ -278,10 +278,9 @@ export interface AIEventOutput {
 
   // 修炼心得：AI 根据当前角色全状态生成的修炼速度说明文本（影响修炼速度的种种因素）
   // 显示规则见 prompt：60-150字，修仙口吻，融入角色处境，末尾给出综合倍率数值
+  // 注意：来源条目（cultivationFactors）由引擎权威计算，AI 不可输出；
+  // AI 只需在 cultivationInsight 文本中引用 prompt 注入的准确数字即可
   cultivationInsight?: string;
-
-  // 修炼速度来源结构化列表（前端按 rarity 给来源名称上色 + 显示具体倍率数字）
-  cultivationFactors?: CultivationFactor[];
 
   // 是否触发选择节点
   hasChoice: boolean;
@@ -326,9 +325,8 @@ export interface ChoiceResultOutput {
   equipItemIds?: string[];
   unequipItemIds?: string[];
   memory: string;
-  // 修炼心得（同 AIEventOutput）
+  // 修炼心得（同 AIEventOutput；引擎权威计算来源条目，AI 只输出文本）
   cultivationInsight?: string;
-  cultivationFactors?: CultivationFactor[];
   causedDeath?: boolean;
   deathReason?: string;
 }
@@ -346,9 +344,8 @@ export interface InterfereOutput {
   equipItemIds?: string[];
   unequipItemIds?: string[];
   memory: string;
-  // 修炼心得（同 AIEventOutput；accepted=false 时可留空，引擎将保留旧文本）
+  // 修炼心得（同 AIEventOutput；accepted=false 时可留空，引擎将保留旧文本；引擎权威计算来源条目）
   cultivationInsight?: string;
-  cultivationFactors?: CultivationFactor[];
   // 干扰可能延迟年龄推进
   ageAdvance?: number;            // 干扰消耗的时间（岁），默认 0
 }

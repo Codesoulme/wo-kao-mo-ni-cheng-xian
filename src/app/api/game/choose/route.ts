@@ -70,17 +70,9 @@ export async function POST(req: NextRequest) {
     if (result.cultivationInsight && result.cultivationInsight.trim()) {
       state.cultivationInsight = result.cultivationInsight.trim();
     }
-    // 引擎权威：cultivationFactors 由引擎从 state 计算（合并 AI 补充的额外因素）
-    if (result.cultivationFactors && Array.isArray(result.cultivationFactors) && result.cultivationFactors.length) {
-      const engineFactors = computeCultivationFactors(state);
-      const engineNames = new Set(engineFactors.map(f => f.name));
-      const aiExtras = result.cultivationFactors
-        .filter((f: any) => f && f.name && typeof f.value === 'number' && !engineNames.has(String(f.name)))
-        .slice(0, 6);
-      state.cultivationFactors = [...engineFactors, ...aiExtras];
-    } else {
-      state.cultivationFactors = computeCultivationFactors(state);
-    }
+    // 引擎权威：cultivationFactors 完全由引擎从 state 计算（灵根 + 功法 + 状态词条）
+    // 不再合并 AI 输出——AI 输出不稳定会导致条目忽隐忽现，且编造的数字与 multiplier 脱节
+    state.cultivationFactors = computeCultivationFactors(state);
 
     // 处理死亡
     let died = false;

@@ -62,8 +62,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });
     }
 
-    // 调用 LLM 生成动作叙事 + 更新 cultivationInsight + cultivationFactors
-    // 让 AI 知道玩家装备/使用/卸下了什么，并据此修改相关文本
+    // 调用 LLM 生成动作叙事 + 更新 cultivationInsight
+    // 让 AI 知道玩家装备/使用/卸下了什么，并据此修改修炼心得文本
+    // 来源条目（cultivationFactors）由引擎权威计算，AI 不输出
     let narrative = '';
     try {
       const recentEventsDb = await db.eventLog.findMany({
@@ -82,18 +83,12 @@ export async function POST(req: NextRequest) {
       if (r.cultivationInsight && r.cultivationInsight.trim()) {
         state.cultivationInsight = r.cultivationInsight.trim();
       }
-      // 引擎权威：cultivationFactors 由引擎计算（保证数值准确），AI 的额外因素合并
-      const engineFactors = computeCultivationFactors(state);
-      const engineNames = new Set(engineFactors.map(f => f.name));
-      const aiExtras = (r.cultivationFactors || [])
-        .filter(f => f && f.name && typeof f.value === 'number' && !engineNames.has(String(f.name)))
-        .slice(0, 6);
-      state.cultivationFactors = [...engineFactors, ...aiExtras];
     } catch (err: any) {
-      // LLM 失败不阻塞物品操作，仅无叙事；factors 仍由引擎计算
+      // LLM 失败不阻塞物品操作，仅无叙事
       console.error('item action narrative failed:', err?.message || err);
-      state.cultivationFactors = computeCultivationFactors(state);
     }
+    // 引擎权威：cultivationFactors 完全由引擎从 state 计算（保证数值准确且稳定不消失）
+    state.cultivationFactors = computeCultivationFactors(state);
 
     // 持久化
     await db.character.update({

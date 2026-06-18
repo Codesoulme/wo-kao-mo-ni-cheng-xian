@@ -37,8 +37,10 @@ export interface CharacterState {
   // 储物袋容量上限（无袋 5；获得储物袋后增加）
   storageCapacity: number;
   cultivationMultiplier: number;
+  // 每岁固定修为加成之和（来自 equipped + activeStatuses 的 add cultivationExp 效果，如聚灵佩 +5）
+  cultivationFlatBonus?: number;
   cultivationInsight?: string;
-  // 修炼速度来源条目（前端按 rarity 给来源名称上色 + 具体数字）
+  // 修炼速度来源条目（引擎权威计算：灵根 + 已装备功法 + 状态词条；前端按 rarity 给来源名称上色 + 具体数字）
   cultivationFactors?: { name: string; value: number; operation: 'multiply' | 'add'; rarity?: string; note?: string }[];
 }
 

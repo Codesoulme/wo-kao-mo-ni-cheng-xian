@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState } from '@/lib/xianxia/engine';
+import { dbToState, computeEffectiveCultivationRate } from '@/lib/xianxia/engine';
 import { REALMS, FATE_NODES, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
 
 export const runtime = 'nodejs';
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
     const state = dbToState(char as any);
     const realmInfo = REALMS.find(r => r.id === state.realm);
     const rootInfo = SPIRITUAL_ROOTS[state.spiritualRoot];
+    const rate = computeEffectiveCultivationRate(state);
 
     // 解析 pendingChoice（若有）：让前端页面刷新后能恢复 ChoiceModal
     let pendingChoice: any = null;
@@ -73,7 +74,8 @@ export async function GET(req: NextRequest) {
         inventory: state.inventory,
         equipped: state.equipped,
         storageCapacity: state.storageCapacity,
-        cultivationMultiplier: state.cultivationMultiplier,
+        cultivationMultiplier: rate.multiplier,
+        cultivationFlatBonus: rate.flatBonus,
         cultivationInsight: state.cultivationInsight || '',
         cultivationFactors: state.cultivationFactors || [],
       },

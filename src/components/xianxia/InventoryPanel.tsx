@@ -125,6 +125,7 @@ export function InventoryPanel() {
 
   // 修炼速度
   const totalMult = character.cultivationMultiplier ?? 0;
+  const flatBonus = character.cultivationFlatBonus ?? 0;
   const factors: any[] = character.cultivationFactors || [];
   const insightText: string = character.cultivationInsight || '';
   const hasInsight = insightText.trim().length > 0;
@@ -150,8 +151,15 @@ export function InventoryPanel() {
               <Zap className="w-4 h-4 text-primary" />
               修炼速度
             </span>
-            <span className="text-base font-bold tabular-nums" style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>
-              ×{totalMult.toFixed(2)}
+            <span className="text-base font-bold tabular-nums flex items-baseline gap-1">
+              <span style={{ color: totalMult > 0 ? '#c8453c' : '#6b7280' }}>
+                ×{totalMult.toFixed(2)}
+              </span>
+              {flatBonus > 0 && (
+                <span className="text-xs" style={{ color: '#3b82f6' }}>
+                  +{flatBonus}/岁
+                </span>
+              )}
             </span>
           </CardTitle>
         </CardHeader>
@@ -204,7 +212,9 @@ export function InventoryPanel() {
             </div>
           ) : (
             <div className="text-[10px] text-muted-foreground/70 px-1 py-1">
-              推进一岁后，AI 将根据灵根、功法、装备等综合生成来源条目。
+              {totalMult > 0
+                ? '无加成来源——修炼速度仅由灵根决定。'
+                : '凡人之躯，无灵根可引天地灵气，修为难进。'}
             </div>
           )}
 
@@ -225,7 +235,7 @@ export function InventoryPanel() {
           )}
 
           <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
-            每岁修为增量 = 基础修为 × 修炼速度（×{totalMult.toFixed(2)}）。心得由天道依当前境况评点，随境遇流转而变。
+            每岁修为 = 基础 × 倍率（×{totalMult.toFixed(2)}）{flatBonus > 0 ? ` + 加成（${flatBonus}）` : ''}。来源条目由引擎依灵根、功法、奇缘实时计算，稳定不消失。
           </p>
         </CardContent>
       </Card>

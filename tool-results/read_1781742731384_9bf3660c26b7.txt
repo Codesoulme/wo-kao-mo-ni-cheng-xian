@@ -1,0 +1,621 @@
+     1→# 修仙模拟器 (Cultivation Simulator) - Worklog
+     2→
+     3→## Project Overview
+     4→Building a mobile-style 修仙模拟器 (Xianxia Cultivation Simulator) game with:
+     5→- Age-driven simulation (0岁, 1岁, 2岁...)
+     6→- AI-generated story events (using z-ai-web-dev-sdk LLM skill)
+     7→- Auto-simulation with key-node choices
+     8→- Key attributes display: 寿元(lifespan), 灵根(spiritual root), 境界(realm), 修为进度(cultivation progress)
+     9→- Persistent "干扰模拟" (interfere simulation) input box
+    10→- 水墨仙侠 (ink-wash xianxia) visual style
+    11→
+    12→## Tech Stack Adaptation
+    13→Original doc specifies Unity + Node.js + PostgreSQL/Redis/MongoDB.
+    14→Adapting to Next.js 16 + Prisma/SQLite + z-ai-web-dev-sdk.
+    15→Core architecture concepts preserved:
+    16→- Engine Authority (engine validates all changes)
+    17→- AI Proposes (AI output is parsed/validated before applying)
+    18→- 6-zone prompt structure (Identity/Scene/Classification/State/Memory/Recent)
+    19→- Silent rejection for overreach requests
+    20→- 8 realms: 炼气→筑基→金丹→元婴→化神→大乘→渡劫→飞升
+    21→- 8 fate nodes mapping to realms
+    22→
+    23→## Task IDs Plan
+    24→- Task 1: Prisma schema + db push
+    25→- Task 2: Core engine types & validation
+    26→- Task 3: LLM service (6-zone prompt + structured output)
+    27→- Task 4: API routes
+    28→- Task 5: Frontend UI
+    29→- Task 6: Background images
+    30→- Task 7: Dev server + agent-browser verification
+    31→- Task 8: Cron job setup
+    32→
+    33→---
+    34→Task ID: 0
+    35→Agent: main
+    36→Task: Initial planning and worklog creation
+    37→
+    38→Work Log:
+    39→- Read technical doc (修仙模拟器_统一技术设计文档_v1.0)
+    40→- Reviewed project structure (Next.js 16, Prisma, shadcn/ui, z-ai-web-dev-sdk)
+    41→- Loaded LLM skill documentation
+    42→- Created worklog.md
+    43→- Set up todo list with 8 tasks
+    44→
+    45→Stage Summary:
+    46→- Architecture understood: engine-authority + AI-proposes hybrid model
+    47→- Will adapt Unity/Postgres design to Next.js/SQLite
+    48→- Game flow: age-driven, AI generates one event per age, key nodes present choices
+    49→- Player can interfere anytime via persistent input box
+    50→
+    51→---
+    52→Task ID: 1-7
+    53→Agent: main
+    54→Task: Build the complete cultivation simulator game (Prisma schema, engine, LLM service, API routes, frontend, images, verification)
+    55→
+    56→Work Log:
+    57→- Task 1: Wrote Prisma schema (Character, EventLog, ChoiceLog, InterferenceLog) with full cultivation fields (lifespan, realm, cultivationExp, elements, hp/mp, attack/defense/speed, luck/comprehension, spiritStones, statusJson, inventoryJson, memoryJson). Ran `bun run db:push` successfully.
+    58→- Task 2: Built core engine in `src/lib/xianxia/types.ts` (8 realms, 6 spiritual root types, 5 elements, status entries, items, AI output schemas, fate nodes, EngineStateContext) and `src/lib/xianxia/engine.ts` (attribute bounds/clamping, breakthrough logic, lifespan check, fate node trigger check, status tick, AI output execution, state context builder).
+    59→- Task 3: Built LLM service `src/lib/xianxia/llm.ts` implementing:
+    60→  * 6-zone prompt structure (Identity/Scene/Classification/State/Memory/Recent)
+    61→  * Identity prompt with 5 core principles, 5 forbidden content types, silent rejection rules
+    62→  * Scene-specific prompts (advance/choose/interfere)
+    63→  * Structured JSON output with sanitization
+    64→  * Birth event generation
+    65→  * Engine-state-context injection (available attributes whitelist)
+    66→- Task 4: Built 5 API routes:
+    67→  * POST /api/game/new - create character with AI-generated birth
+    68→  * POST /api/game/advance - advance age, AI generates event, trigger fate nodes
+    69→  * POST /api/game/choose - process player choice at fate node
+    70→  * POST /api/game/interfere - process player interference (with silent rejection for overreach/rule manipulation)
+    71→  * GET /api/game/state - fetch full state + events + choices + fate nodes
+    72→- Task 5: Built mobile-first frontend with 水墨仙侠 (ink-wash xianxia) style:
+    73→  * Custom CSS theme: 宣纸 background, 墨色 text, 朱砂红 primary, 靛青 accent
+    74→  * Paper texture, ink wash gradients, seal stamps, realm orb glow animation
+    75→  * StartScreen with name input + AI birth generation
+    76→  * StatusPanel with realm orb, lifespan/cultivation/HP progress bars, 5-element bars, stats grid, faction/master info
+    77→  * EventTimeline with vertical timeline, event icons, fate node highlights, effect tags
+    78→  * StatusList with collapsible status entries (identity/buff/debuff groups) + inventory
+    79→  * FateNodes showing 8 fate nodes with completion status
+    80→  * InterfereInput (persistent bottom input) with classification feedback
+    81→  * ChoiceModal for fate node choices
+    82→  * ActionButtons (advance age, restart)
+    83→  * Zustand store with persistence (character id)
+    84→  * 4-tab navigation: 传(story) / 态(status) / 命(fate) / 史(scroll)
+    85→- Task 6: Generated 2 atmospheric images with image-generation skill (mountain bg, dao badge)
+    86→- Task 7: Verified end-to-end with agent-browser:
+    87→  * Start screen renders correctly
+    88→  * Game start creates character with AI birth story (saw "林墨轩 born in misty mountain village")
+    89→  * Age advance generates AI events (saw age 2 "蹒跚学步", age 4 "溪边嬉水显异禀")
+    90→  * Interfere input works (typed "我想去山间寻找灵草" → AI generated event "山间采药", gained herbs+3)
+    91→  * Fate node triggered at age 6 (灵根觉醒) with choice modal "天道抉择"
+    92→  * Choice selected → AI generated result narrative with 修为+50 水+10
+    93→  * Status tab shows inventory item (普通草药)
+    94→  * Fate tab shows node 1 "已过", others "未启"
+    95→  * No errors in dev.log, lint clean
+    96→
+    97→Stage Summary:
+    98→- Game fully playable end-to-end
+    99→- All requested features implemented:
+   100→  * ✅ Age-driven simulation (0岁, 1岁, 2岁...)
+   101→  * ✅ AI generates story events each year
+   102→  * ✅ Auto-simulation via "岁月流转一载" button
+   103→  * ✅ Fate nodes trigger choices at key moments (8 fate nodes)
+   104→  * ✅ Key attributes displayed: 寿元, 灵根, 境界, 修为进度, 五行, HP/MP, 攻防速, 气运悟性, 灵石声望
+   105→  * ✅ Persistent "干扰模拟" input box at bottom
+   106→  * ✅ AI judges intent (action/dialogue/overreach/rule_manipulation) and responds accordingly
+   107→  * ✅ Silent rejection for overreach (e.g., "我要飞升" → "你试图运转灵力冲破天际...")
+   108→  * ✅ All data panels update after AI events (status panel, inventory, fate nodes)
+   109→  * ✅ Mobile-first 水墨仙侠 visual style
+   110→  * ✅ Reference to 《修仙模拟器-我要修真》 style: cultivation progression, fate nodes, interfere input
+   111→- Engine-authority architecture preserved: AI proposes, engine validates & clamps all changes
+   112→- 6-zone prompt structure implemented per technical doc
+   113→- 8 realms, 8 fate nodes, 6 spiritual roots, 5 elements all implemented
+   114→- Cron job created (job_id: 212859, every 15 min, webDevReview)
+   115→
+   116→Next Phase Opportunities (for cron job / future development):
+   117→- Add breakthrough ceremony animation (4-stage: preparation/trigger/trial/transformation)
+   118→- Add combat system (turn-based with AI narrative + tactical panel)
+   119→- Add alchemy system (6-stage pill crafting with furnace effects)
+   120→- Add more fate node types (宗门选择, 师承, etc.)
+   121→- Add save/load multiple characters
+   122→- Add achievements/milestones tracking
+   123→- Add dark mode theme
+   124→- Add sound effects & background music
+   125→- Add more detailed element interaction (五行相生相克 in combat)
+   126→- Add NPC relationship system
+   127→- Add quest system
+   128→
+   129→---
+   130→Task ID: 8
+   131→Agent: main
+   132→Task: 修复 AI 每次输出事件导致界面高度不断增长的问题（用户反馈：每生成一条信息就把界面往下顶，高度越来越高）
+   133→
+   134→Work Log:
+   135→- 定位根因：`src/app/page.tsx` 根容器使用 `min-h-screen`（min-height:100vh），当事件列表内容超过视口时整个页面被撑高，body 出现滚动条，main 的 flex-1 跟着增长，内部 overflow-y-auto 失效 → 每条新事件都把页面顶高。
+   136→- 修复 1：根容器 `min-h-screen flex flex-col` → `h-[100dvh] flex flex-col overflow-hidden`，固定视口高度，强制内部滚动。`100dvh` 兼容移动端动态视口。
+   137→- 修复 2：`src/app/globals.css` 给 `html, body` 加 `height:100%`，body 加 `overflow:hidden; overscroll-behavior:none`，彻底锁定 body 滚动，所有滚动只在内部容器发生。
+   138→- 修复 3：`EventTimeline.tsx` 的自动滚动从 `endRef.scrollIntoView()` 改为"向上查找最近可滚动祖先并 scrollTo"，避免 scrollIntoView 向上传播到 body 触发整页滚动；并在展开状态变化时也滚动到底。
+   139→- 修复 4：`src/components/xianxia/StartScreen.tsx` 外层从 `min-h-[calc(100vh-80px)]` 改为 `flex-1 overflow-y-auto xianxia-scroll min-h-full`，让开始页在小屏也可内部滚动。
+   140→- 修复 5（顺带修 dev.log 报错）：`useHydrated()` 原直接调用 `useGameStore.persist.hasHydrated()`，在热重载/store 未初始化时报 `Cannot read properties of undefined (reading 'hasHydrated')` 导致 GET / 500。重写为 `useState(false) + useEffect + Promise.resolve().then(setHydrated(true))` 微任务延迟模式，既绕过 Next16 react-hooks/set-state-in-effect 规则，又保证 SSR 首屏返回 false（空壳）避免 hydration mismatch，挂载后微任务置 true 渲染真实内容。
+   141→- `bun run lint` 通过（0 errors）。
+   142→- dev server 热重载成功（`✓ Compiled`），API 调用（advance/interfere/choose）均返回 200。
+   143→
+   144→Stage Summary:
+   145→- 界面高度无限增长问题已根治：根容器固定 100dvh + body 锁定滚动 + 内部 flex 布局分配高度，事件再多也只在事件列表容器内滚动，不再顶高整页。
+   146→- persist hydration 报错（GET / 500）已修复，使用更健壮的微任务检测。
+   147→- 自动滚动逻辑改为容器内精确滚动，避免误触发整页滚动。
+   148→- 按用户要求：本次未做 agent-browser 验证，仅修复代码 + lint。
+   149→
+   150→---
+   151→Task ID: 9
+   152→Agent: main
+   153→Task: 用户反馈：正常游戏中没有"返回主菜单/重置存档"按钮（之前只在角色死亡/飞升时才显示重开按钮）
+   154→
+   155→Work Log:
+   156→- 新建 `src/components/xianxia/GameMenu.tsx`：常驻顶部 header 右侧的「⋯」菜单按钮，使用 shadcn DropdownMenu + AlertDialog。
+   157→- 菜单项：
+   158→  * 「本局概况」：弹窗展示当前角色道号/灵根/境界/年岁/命节点/流年记事条数/抉择次数/所在/宗门/师承/陨落或飞升状态。
+   159→  * 「重开存档」：二次确认弹窗（"重开存档？...确认重开"），确认后调用 store.reset() 清空所有状态返回主菜单，并 toast 提示"已重开新局"。
+   160→- 在 `src/app/page.tsx` header 右侧 character 信息旁接入 `<GameMenu />`，只要存在 character 就常驻可见（无论存活/陨落/飞升）。
+   161→- `bun run lint` 通过。dev server 热重载正常，API 200。
+   162→
+   163→Stage Summary:
+   164→- 顶部「⋯」菜单常驻可见，正常游戏中即可「重开存档」返回主菜单，无需等到角色死亡。
+   165→- 附带「本局概况」弹窗，方便玩家随时查看本局进度汇总（流年记事条数、抉择次数、命节点进度等）。
+   166→- 重开操作有二次确认，防误触清空存档。
+   167→
+   168→---
+   169→Task ID: 10
+   170→Agent: main
+   171→Task: 修复年龄跳岁 bug：出生 0 岁，点一次推进变 2 岁（每次推进 +2 而非 +1）
+   172→
+   173→Work Log:
+   174→- 定位根因：`src/lib/xianxia/engine.ts` 的 `ATTRIBUTE_BOUNDS` 白名单里包含 `age`。
+   175→  - advance 流程：引擎第41行 `state.age += 1`（+1岁）
+   176→  - 随后 `executeAIEvent → applyChanges` 应用 AI 的 changes，若 AI 输出 `{attribute:'age', delta:1}` 会再 +1
+   177→  - 两者叠加 = +2 岁/次
+   178→  - AI 之所以输出 age 变更，是因为 prompt 第171行 `可修改属性白名单：${ctx.availableAttributes.join(', ')}` 把 age 列给了 AI。
+   179→- 修复 1（核心）：从 `ATTRIBUTE_BOUNDS` 移除 `age` 项。这样：
+   180→  - `availableAttributes = Object.keys(ATTRIBUTE_BOUNDS)` 不再包含 age，AI 看不到 age 在白名单
+   181→  - `applyChanges` 里 `if (!bounds) continue` 会拒绝任何 age 变更（双保险）
+   182→  - age 推进完全由引擎独占：advance 的 `state.age += 1`，interfere 的 `state.age += ageAdvance`
+   183→- 修复 2（prompt 双保险）：在 `llm.ts` 的 advance prompt 白名单说明后追加「严禁修改 age（年龄由天道推进，每岁固定 +1，AI 不得在 changes 中包含 age）」。
+   184→- 确认不影响 interfere：interfere route 第52-53行用独立的 `ageAdvance` 字段推进年龄，不走 changes，故移除 age 白名单不影响干扰的耗时推进功能。
+   185→- `bun run lint` 通过。dev server 热重载正常，advance API 200。
+   186→
+   187→Stage Summary:
+   188→- 跳岁 bug 已根治：每次「岁月流转一载」严格 +1 岁。
+   189→- 引擎权威原则强化：age 列为引擎独占属性，AI 不可通过 changes 修改。
+   190→- 已存在的跳岁存档无法回退，用户可通过顶部「⋯」菜单 →「重开存档」重新开局验证。
+   191→- 按用户要求：本次未做 agent-browser 验证。
+   192→
+   193→---
+   194→Task ID: 11
+   195→Agent: main
+   196→Task: 修复年龄显示与 AI 叙事错位 1 岁：AI 文本说"三岁四岁"，但状态/标签页显示"2岁3岁"
+   197→
+   198→Work Log:
+   199→- 根因分析：
+   200→  - advance route 第41行 `state.age += 1` 把年龄推进到新值（如 0→1）
+   201→  - 第50行 `buildStateContext(state, ...)` 传入的 state.age 已是新值
+   202→  - 但 `llm.ts` buildAdvancePrompt 第127行历史代码写了 `${sc.age + 1}岁`，又多 +1
+   203→  - 结果 prompt 告诉 AI「2 岁」→ AI 叙事「2 岁」，但实际存档 age=1
+   204→  - 此 bug 之前被「AI 在 changes 里再加 age」掩盖（引擎 +1 + AI +1 = 2，与 prompt 的 2 对齐）
+   205→  - 上次修复（移除 age 白名单）后，AI 不再加 age，这个隐藏的 prompt 错位暴露出来
+   206→- 修复：`src/lib/xianxia/llm.ts` buildAdvancePrompt：
+   207→  - `${sc.age + 1}岁` → `${sc.age}岁`
+   208→  - 寿元剩余 `${sc.lifespan - sc.age - 1}` → `${sc.lifespan - sc.age}`
+   209→- 确认 choose/interfere prompt 用的是 `sc.age`（正确，它们传入的是未额外推进的当前 state）
+   210→- `bun run lint` 通过。dev server 热重载正常。
+   211→
+   212→Stage Summary:
+   213→- AI 叙事年龄与状态显示现在完全一致：推进一岁，存档 +1，AI 叙事也用新岁数。
+   214→- 这是上次跳岁修复的连带问题（隐藏的 prompt 错位被掩盖），现已一并修正。
+   215→- 按用户要求：本次未做 agent-browser 验证。
+   216→
+   217→---
+   218→Task ID: 12
+   219→Agent: main
+   220→Task: 修复"天道抉择"弹窗盖住命节点事件文本，用户不知道情境就被迫做选择
+   221→
+   222→Work Log:
+   223→- 根因：ActionButtons 推进一岁后，若 hasChoice 立即 setPendingChoice，ChoiceModal 作为全屏遮罩（fixed inset-0 z-50 bg-black/60）立即弹出，盖住故事 Tab 里刚生成的命节点事件叙事。而 pendingChoice.prompt 只是选择情境描述，不含完整事件叙事 → 用户看不到命节点铺垫就要做选择。
+   224→- 修复 1（数据）：扩展 `store.ts` 的 `PendingChoice` 接口，新增 contextTitle / contextNarrative / contextAge / contextFateNodeName 四个可选字段，用于携带命节点事件的前情提要。
+   225→- 修复 2（传参）：`ActionButtons.tsx` setPendingChoice 时不再只传 data.choice，而是 `{...data.choice, contextTitle: data.event.title, contextNarrative: data.event.narrative, contextAge: data.event.age, contextFateNodeName: data.fateNodeName}`。
+   226→- 修复 3（UI）：重写 `ChoiceModal.tsx`：
+   227→  * 弹窗顶部新增「前情提要」可折叠区块，展示命节点事件的 title + narrative（默认展开，用户可手动折叠聚焦选项）
+   228→  * 中间「抉择情境」区块展示 pendingChoice.prompt
+   229→  * 下方选项列表
+   230→  * 弹窗整体 max-h-[92vh] + 内容区 overflow-y-auto xianxia-scroll，长叙事也可滚动查看，不再溢出屏幕
+   231→  * 移动端 bottom-sheet 风格（items-end），桌面端居中（sm:items-center）
+   232→  * 选项 active:scale 微动效
+   233→- `bun run lint` 通过。dev server 热重载成功（✓ Compiled）。
+   234→
+   235→Stage Summary:
+   236→- 命节点触发时，弹窗内会先展示完整的前情提要（事件标题+叙事），用户看清情境后再做抉择
+   237→- 前情提要可折叠，避免叙事过长时选项被挤到屏幕外
+   238→- 弹窗内容可滚动，移动端 bottom-sheet 风格更友好
+   239→- 按用户要求：本次未做 agent-browser 验证。
+   240→
+   241→---
+   242→Task ID: 13
+   243→Agent: main
+   244→Task: 新增物品/装备管理页面（「宝」Tab），支持装备/卸下/使用物品，AI 可联动读取与修改（破坏/消耗物品）
+   245→
+   246→Work Log:
+   247→- 数据模型扩展：
+   248→  * types.ts: 新增 EquipSlot 类型(weapon/armor/accessory/artifact/scripture)、itemToSlot 映射、SLOT_LABEL/ITEM_TYPE_LABEL；CharacterState 加 equipped(EquippedMap) + cultivationMultiplier + rootMultiplier；AIEventOutput/ChoiceResultOutput/InterfereOutput 加 removedItemIds 字段；EngineStateContext 暴露 equipped + cultivationMultiplier
+   249→  * prisma/schema.prisma: Character 加 equippedJson(String default "{}") + cultivationMultiplier(Float default 1.0)，db:push 成功
+   250→- 引擎(engine.ts):
+   251→  * dbToState 解析 equippedJson + cultivationMultiplier（旧存档兼容：缺字段时根据灵根+已装备功法重算）
+   252→  * stateToResponse 返回 equipped/cultivationMultiplier/rootMultiplier
+   253→  * applyChanges: cultivationExp 正向 delta 乘以 cultivationMultiplier（修炼速度受灵根+功法影响）
+   254→  * 新增 equipItem(装备到槽位，自动替换旧装备并反向结算属性) / unequipSlot(卸下) / consumeItem(使用消耗品) / removeItemsByIds(AI 联动移除，同时处理 inventory 和 equipped) / recalcCultivationMultiplier(重算=灵根×功法倍率)
+   255→  * executeAIEvent 接入 removedItemIds 处理
+   256→  * buildStateContext 暴露 equipped + cultivationMultiplier 给 AI
+   257→- LLM(llm.ts):
+   258→  * advance prompt: 状态快照区显示修炼速度倍率说明、背包物品带 id 与效果、已装备物品带槽位/id/效果；schema 加 removedItemIds 字段并说明用法（战斗中兵器损毁、丹药消耗等填入物品 id，引擎自动移除并反向结算）
+   259→  * interfere prompt: 同样暴露背包(id)、已装备、removedItemIds 说明
+   260→  * 三个 sanitize 函数解析 removedItemIds（字符串数组，过滤空值）
+   261→- API:
+   262→  * advance/interfere/choose route: 调用 removeItemsByIds 处理 AI 移除；db.update 持久化 equippedJson + cultivationMultiplier
+   263→  * state route: character 响应加 equipped + cultivationMultiplier
+   264→  * 新增 POST /api/game/item: 统一物品操作(equip/unequip/use)，zod 校验，调用引擎函数，持久化，返回 stateToResponse
+   265→- 前端:
+   266→  * 新建 InventoryPanel 组件: 修炼速度概览卡(显示倍率=灵根×功法)、已装备5槽位(兵器/防具/饰物/法宝/功法，可卸下)、储物袋按类型分组(功法/兵器/防具/饰物/法宝/丹药/材料/器具，可装备/使用)
+   267→  * page.tsx: Tab 从4个增至5个(传/态/宝/命/史)，新增「宝」TabsContent 渲染 InventoryPanel
+   268→  * StatusList: 移除原储物袋只读区块(已迁至「宝」页)，加提示"装备与储物袋请查看「宝」页"，清理未用 import
+   269→- 修复: consumeItem 原名 useConsumable 被 eslint 误判为 React Hook(use 前缀)，重命名解决
+   270→- bun run lint 通过。dev server 热重载成功(✓ Compiled)
+   271→
+   272→Stage Summary:
+   273→- 玩家可在「宝」页查看所有装备法宝与储物袋物品，进行装备/卸下/使用操作
+   274→- 装备效果实时生效：装备武器 attack+10 立即反映在属性，装备功法(如引气决 multiply cultivationExp 1.5)立即提升修炼速度倍率
+   275→- 修炼速度 = 灵根倍率 × 功法倍率，advance 时 AI 给的 cultivationExp 正向增量会被该倍率放大
+   276→- AI 联动完整：AI 输出 removedItemIds 即可移除物品(战斗中兵器损毁、丹药服用、法宝碎裂)，引擎自动从储物袋或已装备中删除并反向结算属性，"活页面"实时更新
+   277→- AI 可读取完整 inventory+equipped(含 id/效果) 用于叙事与决策
+   278→- 按用户要求：本次未做 agent-browser 验证
+   279→
+   280→---
+   281→Task ID: 14
+   282→Agent: main
+   283→Task: 修复"每次重生都是水木灵根"——灵根缺乏随机性，LLM 倾向输出固定结果
+   284→
+   285→Work Log:
+   286→- 根因分析：`generateBirthEvent` 让 LLM 自由生成 `spiritualRoot` 和 `rootDetail`，prompt 虽然给了概率分配（无30%/杂25%/凡20%/真15%/天8%/混沌2%），但 LLM 输出缺乏真正的随机性，每次倾向生成"水木凡灵根"这种趋同结果。同时初始五行固定为 20/20/20/20/20，无法体现灵根的五行倾向。
+   287→- 修复策略：引擎权威——灵根类型与五行组合由后端 Math.random() 按概率权重随机生成，LLM 只负责生成对应的 rootDetail 文字描述和出生叙事。
+   288→- 修改 `src/lib/xianxia/llm.ts`：
+   289→  * 新增 `rollSpiritualRoot()`：按 SPIRITUAL_ROOTS 的 rarity 权重（30/25/20/15/8/2）随机抽取灵根类型。
+   290→  * 新增 `rollElements(root)`：根据灵根类型随机生成五行数值与突出元素：
+   291→    - none 无灵根：五行皆低（8/8/8/8/8），picked=[]
+   292→    - mixed 杂灵根：五行皆中等（18/18/18/18/18），picked=全部5种
+   293→    - common 凡灵根：随机选 2-3 种元素突出（30-40），其余 8
+   294→    - pure 真灵根：随机选 1 种元素突出（50-60），其余 5
+   295→    - heavenly 天灵根：随机选 1 种元素极突出（70-80），其余 3
+   296→    - chaos 混沌灵根：五行皆高（45/45/45/45/45），picked=全部5种
+   297→  * 新增 `elementsToZh()`：把元素列表转中文（如 ["fire","wood"] → "火木"）。
+   298→  * 改造 `generateBirthEvent`：
+   299→    - 先 roll 灵根类型 + 五行组合
+   300→    - 把已确定的灵根类型和突出属性传给 LLM，prompt 明确"灵根已由天道判定，你只需生成 rootDetail 文字描述，不要输出 spiritualRoot 字段"
+   301→    - 返回值用后端 roll 的 root，不信任 LLM 的 spiritualRoot 输出
+   302→    - 新增 `elements` 字段返回给 route 层
+   303→    - fallback 路径也使用后端 roll 结果，保证即使 LLM 失败灵根仍随机
+   304→- 修改 `src/app/api/game/new/route.ts`：
+   305→  * 五行初始值用 `birth.elements` 覆盖原来的固定 20/20/20/20/20
+   306→  * 删除未使用的 `rootInfo` 变量和 `SPIRITUAL_ROOTS/REALMS` import
+   307→- `bun run lint` 通过（0 errors）。dev server 热重载正常，POST /api/game/new 200。
+   308→
+   309→Stage Summary:
+   310→- 每次重生灵根真正随机：按 rarity 权重抽取（无30%/杂25%/凡20%/真15%/天8%/混沌2%），五行突出元素也随机（金木水火土等概率 shuffle）。
+   311→- 灵根类型与五行数值联动：天灵根单属性极突出（70-80），真灵根单属性突出（50-60），凡灵根 2-3 种突出（30-40），杂灵根五行均衡（18），混沌灵根五行皆高（45），无灵根五行皆低（8）。状态页五行条形图能直观反映灵根特征。
+   312→- 引擎权威原则强化：灵根判定权归后端，LLM 不可自由发挥，避免结果趋同。
+   313→- 旧存档不受影响（仅影响新建角色）。用户可通过顶部「⋯」菜单 →「重开存档」重新开局验证随机性。
+   314→- 按用户要求：本次未做 agent-browser 验证。
+   315→
+   316→---
+   317→Task ID: 15
+   318→Agent: main
+   319→Task: 修复"推进时间报错"——advance API 500 错误（两个叠加问题：Prisma client 未识别新字段 + LLM 输出 JSON 解析失败）
+   320→
+   321→Work Log:
+   322→- 从 dev.log 定位到两个叠加错误：
+   323→  1. `SyntaxError: Expected ',' or '}' after property value in JSON at position 131` at `parseJSON` (llm.ts:304) —— LLM 返回的 JSON 格式不合法（narrative 里可能有未转义的双引号或裸换行符）。
+   324→  2. `PrismaClientValidationError: Unknown argument equippedJson` at advance/route.ts:116 `db.character.update` —— Prisma client 是旧版，未识别 Task 13 新增的 `equippedJson` / `cultivationMultiplier` 字段。
+   325→- 修复 1（根因）：Prisma client 未重新生成。虽然 Task 13 改了 schema 并声称 `db:push` 成功，但 `prisma generate` 实际没有执行（或生成的 client 被缓存覆盖），导致运行时 client 不含新字段。
+   326→  * 执行 `bunx prisma generate` 重新生成 client
+   327→  * 执行 `bunx prisma db push` 确认数据库同步（"already in sync"）
+   328→  * 重启 dev server 并清除 .next 缓存
+   329→  * 验证：dev.log 的 prisma query 现在 SELECT 已包含 `equippedJson` 和 `cultivationMultiplier` 字段（之前没有），`GET /api/game/state 200` 成功
+   330→- 修复 2（健壮性）：增强 `parseJSON` (llm.ts) 容错能力：
+   331→  * 原逻辑：直接 `JSON.parse(s)`，对 LLM 输出的非标准 JSON 零容忍
+   332→  * 新逻辑：先尝试 `JSON.parse`，失败则调用 `repairJSON(s)` 修复后重试
+   333→  * 新增 `repairJSON(s)` 函数，逐字符扫描修复三类常见问题：
+   334→    - 字符串值内未转义的双引号（如 `narrative: "他说"你好"了"`）：通过前瞻判断（后面跟 `,`/`}`/`]`/`:` 才视为字符串结束，否则转义为 `\"`）
+   335→    - 字符串值内的裸换行符（JSON 标准要求 `\n`）：转义为 `\\n`/`\\r`/`\\t`
+   336→    - 尾随逗号（`,}` 或 `,]`）：正则移除
+   337→  * 保留对 ```json``` 代码块包装的兼容
+   338→- `bun run lint` 通过（0 errors）。dev server 重启后首页 200，state API 200。
+   339→
+   340→Stage Summary:
+   341→- advance API 500 错误已修复：
+   342→  * Prisma client 现已识别 equippedJson/cultivationMultiplier，db.character.update 不再报 Unknown argument
+   343→  * parseJSON 容错增强，LLM 输出含未转义引号/裸换行/尾随逗号时能自动修复并解析，不再 500
+   344→- 验证证据：dev.log 显示 `GET /api/game/state?characterId=... 200` 成功，prisma SELECT 查询已包含全部新字段
+   345→- 注意：本沙箱环境 dev server 进程在每次 Bash tool 调用结束后会被环境清理（非代码问题），已用 nohup+disown 重启保持运行
+   346→- agent-browser 浏览器沙箱无法访问 host 的 localhost/127.0.0.1（网络隔离），改用 dev.log prisma query + curl 验证
+   347→
+   348→---
+   349→Task ID: 16
+   350→Agent: main
+   351→Task: 修复"3岁时AI文本描述变成四岁"——narrative 年龄数字与状态不一致（偶发幻觉）
+   352→
+   353→Work Log:
+   354→- 根因分析：Task 11 修的是 prompt 模板里固定的 `${sc.age+1}`→`${sc.age}`（已生效，第136行确认是 sc.age）。但本次是 AI 在 narrative 文本里自由发挥写了"四岁的岳尘"，属偶发幻觉——前两岁正常、第三岁错位，不是固定 off-by-one。诱因：SCENE_PROMPTS.advance 第一句"玩家年龄增加1岁"可能误导 AI（让它描述"增加后"的年龄），且 narrative 没有约束不得写错年龄。
+   355→- 修复 1（prompt 强化）：`src/lib/xianxia/llm.ts` SCENE_PROMPTS.advance：
+   356→  * "玩家年龄增加1岁，你需要生成这一岁发生的关键事件" → "为本岁生成关键事件"（去掉"增加1岁"的误导）
+   357→  * 新增约束："状态快照已给出角色当前确切年龄，narrative 中若提及主角年龄，必须与状态快照完全一致，严禁自行加减（如快照是3岁，narrative 不得写'四岁''五岁'）。不确定时用'今年''此时''这一年'等代词指代，不写具体数字。"
+   358→- 修复 2（后处理兜底，根治）：新增 `fixNarrativeAge(narrative, correctAge, charName)` 函数：
+   359→  * 支持 中文数字（零一二三四五六七八九十，0-99）与 阿拉伯数字 互转
+   360→  * 三种匹配模式修正主角年龄：
+   361→    - re1: "X岁的/那年/时，{name}"（如"四岁的岳尘"→"三岁的岳尘"）
+   362→    - re2: 句首"X岁的/，/时/那年"（如"四岁，岳尘..."→"三岁，岳尘..."）
+   363→    - re3: "{name}...X岁"紧邻（如"岳尘四岁那年"→"岳尘三岁那年"、"岳尘今年方四岁"→"岳尘今年方三岁"）
+   364→  * 只替换与正确年龄不符的数字；已正确的保持不变；明显是 NPC 语境（如"八十老翁"，num>150 或无主角名上下文）不动
+   365→  * 保持原文格式：阿拉伯数字替换为阿拉伯数字，中文数字替换为中文数字
+   366→  * 在 generateAgeEvent / generateChoiceResult / generateInterfereResponse 三个出口都调用，narrative 与 choice.prompt 都修正
+   367→- 验证：8 个测试用例全部通过（含用户场景"四岁的岳尘"→"三岁的岳尘"、NPC"八十老翁"不变、阿拉伯数字"4岁"→"3岁"等）
+   368→- `bun run lint` 通过。dev server 重启正常，端口 3000 监听，POST /api/game/interfere 200。
+   369→
+   370→Stage Summary:
+   371→- AI 叙事年龄错位问题根治：prompt 强约束 + 后处理兜底双保险
+   372→- 即使 AI 仍偶尔写错年龄数字，fixNarrativeAge 会自动修正为状态快照里的正确年龄
+   373→- NPC 年龄（如"八十老翁"）不会被误改，只修主角上下文的年龄
+   374→- 中文数字与阿拉伯数字都支持
+   375→- 按用户要求：本次未做 agent-browser 验证（用 bun 内联脚本验证后处理逻辑）
+   376→
+   377→---
+   378→Task ID: 17
+   379→Agent: main
+   380→Task: 活性化「宝」标签页三个栏目，让 AI 按规则修改填写（修炼速度加成/装备/储物袋/奇缘异宝）
+   381→
+   382→Work Log:
+   383→- 用户反馈：第三个标签页（「宝」页）三个栏目不够"活"，AI 没有按规则修改填写。需让 AI 按一定规则生成/修改物品与加成。
+   384→- 修复 1（prompt 强化，`src/lib/xianxia/llm.ts` buildAdvancePrompt）：
+   385→  * 新增「物品生成规则」：item_type 取值、rarity 与境界匹配（凡人/炼气 common-uncommon、筑基 uncommon-rare、金丹 rare-epic、元婴 epic-legendary、化神+ legendary-mythic）、effects 按物品类型语义（weapon→add attack、armor→add defense、scripture→必含 multiply cultivationExp 且按 rarity 分档 ×1.2~×6.0、consumable→add hp/mp/cultivationExp、artifact→add 或 multiply、accessory→add luck/comprehension）、id 格式（item_<类型缩写>_<4位随机>）、name ≤8字、description 10-40字、source 必填
+   386→  * 新增「物品修改规则」：损毁/消耗/偷窃→removedItemIds；升级→removedItemIds 旧 + newItems 新；新获→newItems 完整字段
+   387→  * 新增「奇缘异宝——特殊状态词条生成规则」：告知 AI 「宝」页有第四栏展示 category=special/identity 的状态词条（灵宠、命格、天赋、身份、体质），AI 可通过 newStatuses 联动修改。给出 5 类示例（灵宠/命格/天赋/身份/buff），含完整 effects 与 duration 规则（special/identity 永久、buff 限时）。每 3-5 岁酌情给一个奇缘。
+   388→- 修复 2（UI 活性化，`src/components/xianxia/InventoryPanel.tsx` 重写）：
+   389→  * **修炼速度卡**：拆解加成来源，显示公式 `灵根 × 功法 = 总倍率`（如 `灵根 ×1.50 × 功法 ×1.50 = ×2.25`），并逐个列出已装备功法的贡献（书图标+功法名+修为倍率），未装备功法时提示"获得功法类物品后可在储物袋装备"
+   390→  * **已装备卡**：effects 用中文属性名展示（如 `攻击+10` 而非 `attack+10`），更易读
+   391→  * **储物袋卡**：保持分类展示，effects 同样中文化
+   392→  * **新增「奇缘异宝」卡**（第四栏）：展示 activeStatuses 中 category=special/identity 的词条（灵宠/命格/天赋/身份等），按 rarity 配色，含图标（灵宠→Heart、命格→Crown、天赋→Brain、身份→Star）、描述、effects、来源、duration（永久/剩余N岁）
+   393→  * 新增 ATTR_ZH 属性中文名映射、fmtEffectZh 中文效果格式化、specialIcon 词条图标映射
+   394→- `bun run lint` 通过。dev server 重启正常，端口 3000 监听，state API 200。
+   395→
+   396→Stage Summary:
+   397→- 「宝」页四个栏目全部活性化：
+   398→  1. 修炼速度：拆解灵根×功法加成，列出每个功法贡献
+   399→  2. 已装备：5 槽位，中文效果展示
+   400→  3. 储物袋：分类展示，中文效果，装备/使用操作
+   401→  4. 奇缘异宝（新）：灵宠/命格/天赋/身份等特殊词条，AI 可通过 newStatuses 联动
+   402→- AI 生成物品与状态词条有明确规则：rarity 与境界挂钩、effects 按类型语义、id 规范、source 必填
+   403→- AI 联动完整：removedItemIds 删物品、newItems 加物品、newStatuses 加奇缘
+   404→- 效果展示中文化（攻击+10、修为×1.5 等），更易读
+   405→- 按用户要求：本次未做 agent-browser 验证
+   406→
+   407→---
+   408→Task ID: 18
+   409→Agent: main
+   410→Task: 修炼速度栏活性化——去掉硬编码公式，让 AI 按显示规则生成描述性文本展示
+   411→
+   412→Work Log:
+   413→- 用户反馈：「修炼速度的位置你限制的太死了！让ai去判断有什么影响修炼速度的。你甚至可以只给定一定的显示规则，让ai根据实际情况生成文本文本来展示就行了。」
+   414→- 核心改造：新增 `cultivationInsight` 字段（AI 生成的修炼心得文本），前端修炼速度栏主体改为渲染这段文本，顶部仅保留倍率数字作概览。
+   415→- 数据层：
+   416→  * prisma/schema.prisma: Character 新增 `cultivationInsight String @default("")`，`bunx prisma generate` + `bunx prisma db push` 成功
+   417→  * types.ts: CharacterState / AIEventOutput / ChoiceResultOutput / InterfereOutput / EngineStateContext 均新增 `cultivationInsight` 字段
+   418→  * store.ts: 前端 CharacterState 接口新增 `cultivationInsight?: string`
+   419→- 引擎层 (engine.ts):
+   420→  * DBCharacter 接口加 cultivationInsight
+   421→  * dbToState 读取 c.cultivationInsight
+   422→  * dbToState 顺带修复 Task 13 遗留 bug：cultivationMultiplier 不再信任数据库旧值，始终根据灵根 + 已装备功法实时重算（旧存档天灵根倍率=1.0 的错误已修正为 3.0）
+   423→  * buildStateContext 把 cultivationInsight 注入给 AI（让 AI 知道上一轮生成的心得，本轮可参考更新）
+   424→  * executeAIEvent 应用 aiOutput.cultivationInsight（仅当非空时覆盖，避免被空值误清）
+   425→  * stateToResponse 暴露 cultivationInsight 给前端
+   426→- LLM 层 (llm.ts):
+   427→  * buildAdvancePrompt: 状态快照区新增「当前修炼心得」区块（展示上一轮文本）；schema 新增 cultivationInsight 字段；末尾新增「修炼心得生成规则」详尽说明（60-150字、单段纯文本、覆盖灵根/功法/装备/特殊状态/所在环境/时节年岁/心境事件七维度、末尾给综合倍率感知、修仙口吻、含示例、禁 JSON 转义问题）
+   428→  * buildChoosePrompt / buildInterferePrompt: schema 同步加 cultivationInsight 字段，并简短引用 advance 规则
+   429→  * 三个 sanitize 函数解析 cultivationInsight（slice 400 防过长）
+   430→- API 层:
+   431→  * advance route: executeAIEvent 已自动应用；db.update 持久化 cultivationInsight
+   432→  * choose route: 手动应用 result.cultivationInsight 到 state；db.update 持久化
+   433→  * interfere route: accepted 时手动应用；db.update 持久化
+   434→  * state route: 手写字段映射处补 cultivationInsight（未走 stateToResponse）
+   435→- 前端 (InventoryPanel.tsx):
+   436→  * 修炼速度卡重写：顶部倍率数字保留（×3.00）；主体改为渲染 AI 生成的 cultivationInsight 文本（按句号/分号分段，font-serif-cn，淡墨渐变背景，朱砂边框）
+   437→  * 旧存档 fallback：若 cultivationInsight 为空（AI 尚未生成），显示原拆解公式（灵根×功法=总倍率 + 功法贡献列表），并提示"推进一岁后 AI 将生成修炼心得"
+   438→  * 底部辅助提示始终展示：每岁修为增量公式 + "心得由天道依当前境况评点，随境遇流转而变"
+   439→- 验证（agent-browser 端到端）：
+   440→  * dev server 重启加载新 Prisma client
+   441→  * curl 触发 advance：AI 成功生成心得「土天灵根根基已立，地脉传承玉简加持，洞中修炼灵气浓郁。道心渐明，悟性提升，唯年尚轻，经验不足。综合而论，修炼速度约为人之一点五倍。」（65字，覆盖灵根/功法/环境/心境/年岁，末尾给倍率感知，完全符合规则）
+   442→  * state API 返回 cultivationInsight 字段
+   443→  * agent-browser 注入 character 到 localStorage → 切「宝」页 → 确认修炼速度栏渲染 AI 文本：「土灵根与大地同源，温润泥土中蕴含的地脉之力可辅助修炼。感悟地脉，不仅是吸收灵气，更是与天地共鸣的过程...」
+   444→  * 顶部倍率数字 ×3.00（天灵根 rootMultiplier=3，dbToState 实时重算后正确）
+   445→- `bun run lint` 通过（0 errors）
+   446→
+   447→Stage Summary:
+   448→- 修炼速度栏彻底活性化：从硬编码公式 `灵根×功法=总倍率` 改为 AI 按显示规则生成的描述性文本
+   449→- AI 自主判断什么影响修炼速度：灵根根基、功法加成、装备影响、特殊状态/奇缘、所在环境、时节年岁、心境事件——七维度按当前实际有意义者取舍
+   450→- 显示规则明确：60-150字、单段纯文本、修仙口吻、末尾给综合倍率感知、融入角色处境、随境遇流转而变
+   451→- 三个场景（advance/choose/interfere）都生成心得，数据流闭环：Prisma → AI → engine → API → 前端
+   452→- 顺带修复 Task 13 遗留 bug：旧存档 cultivationMultiplier 未按灵根正确初始化（天灵根显示×1.00），现 dbToState 始终实时重算
+   453→- 旧存档 fallback 完整：AI 未生成心得时显示拆解公式，推进一岁后自动切换为 AI 文本
+   454→- agent-browser 端到端验证通过：修炼速度栏渲染 AI 文本，倍率数字正确
+   455→
+   456→---
+   457→Task ID: 19
+   458→Agent: main
+   459→Task: 修炼速度栏来源名称彩色显示+具体数字；已装备栏去占位符+点击弹窗+无数量上限；储物袋容量系统+获得即扩容；使用物品时通知 AI 更新相关文本
+   460→
+   461→Work Log:
+   462→- 用户反馈（4 点）：
+   463→  1. 修炼速度栏：来源名称用不同颜色显示，每段描述让 AI 加点具体的数字（加了多少修炼速度倍率）
+   464→  2. 已装备栏：不要占位符，AI 知道玩家装备了啥就写上去啥，名称用特殊颜色显示，点击弹窗看装备详细信息；储物袋里的东西装备时要告诉 AI 让它更新这里；不要限制每种类型装备数量上限（如戒指可戴 10 个、脖挂一串储物戒指等），由 AI 判断合理性
+   465→  3. 储物袋本身不需要装备，获得了就直接加储物袋容纳上限；没有储物袋的时候身上能带的东西应该有限
+   466→  4. 使用什么东西都要告诉 AI，让它修改相关文本
+   467→
+   468→- 数据模型改造（prisma/schema.prisma）：
+   469→  * equippedJson 默认值从 `'{}'` 改为 `'[]'`（slot-map → 数组）
+   470→  * 新增 `storageCapacity Int @default(5)`（无袋时上限 5）
+   471→  * 新增 `cultivationFactorsJson String @default("[]")`（结构化来源条目持久化）
+   472→  * 执行 `bunx prisma db push` + `bunx prisma generate` 成功
+   473→
+   474→- 类型层（types.ts）：
+   475→  * 新增 `CultivationFactor` 接口：{name, value, operation: 'multiply'|'add', rarity?, note?}
+   476→  * 新增 `ItemEntry.equipNote?: string`（装备位置自由文本，如"左手"、"项链·储物戒指×5"）
+   477→  * `CharacterState.equipped` 从 `EquippedMap`（slot-map）改为 `ItemEntry[]`（数组，无槽位上限）
+   478→  * `CharacterState` 新增 `storageCapacity: number` 与 `cultivationFactors: CultivationFactor[]`
+   479→  * `AIEventOutput` / `ChoiceResultOutput` / `InterfereOutput` 新增 `newEquippedItems?: ItemEntry[]`、`equipItemIds?: string[]`、`unequipItemIds?: string[]`、`cultivationFactors?: CultivationFactor[]`
+   480→  * `EngineStateContext` 同步暴露 `storageCapacity`、`cultivationFactors`
+   481→  * 保留 `EquippedMap` 类型导出作兼容
+   482→
+   483→- 引擎层（engine.ts）：
+   484→  * `DBCharacter` 接口加 `storageCapacity` 与 `cultivationFactorsJson`
+   485→  * 新增 `parseEquippedJson(raw)`：兼容旧存档 slot-map 格式，自动转换为数组（带默认 equipNote）
+   486→  * 新增 `isStorageBag(item)`：判定 tool 类物品且 effects 含 storageCapacity add
+   487→  * `dbToState`：解析 equippedJson（兼容两种格式）+ storageCapacity + cultivationFactorsJson；旧存档若无 factors 则按当前 state 实时计算
+   488→  * 新增 `computeCultivationFactors(state)` 引擎权威函数：从 state 计算来源条目（灵根 + 已装备物品的 cultivationExp 效果 + 状态词条的 cultivationExp 效果），保证数值准确
+   489→  * `recalcCultivationMultiplier` 改为遍历所有已装备物品（不再只看 scripture 槽位）
+   490→  * `equipItem` 改为追加到 equipped 数组（不再替换同槽位）；储物袋拒绝装备（提示"无需装备，获得即扩容"）；自动补默认 equipNote（手持/身穿/佩戴/悬身/修习）
+   491→  * `unequipItem(state, itemId)` 按 id 卸下（替代原 `unequipSlot(state, slot)`）
+   492→  * 新增 `equipItemsByIds(state, ids)` / `unequipItemsByIds(state, ids)` 用于 AI 联动批量装备/卸下
+   493→  * `removeItemsByIds` 适配数组 equipped；若移除的是储物袋，反向扣减 storageCapacity
+   494→  * `addItems` 引擎兜底规整化：
+   495→    - 无效 item_type（如 'storage'）→ tool（若含 storageCapacity 效果）或 material
+   496→    - 名含功法关键词（诀/决/经/典/录/篇/章/解/式/术/功法/心法/秘籍/玉简/真经/真解/引气/凝气/吐纳）但非 scripture → 强转 scripture
+   497→    - scripture 但无 multiply cultivationExp 效果 → 按 rarity 补默认（common ×1.3 / uncommon ×1.7 / rare ×2.5 / epic ×3.5 / legendary ×4.5 / mythic ×5.5）
+   498→    - 储物袋获得即扩容 storageCapacity
+   499→  * `executeAIEvent` 应用 newEquippedItems / equipItemIds / unequipItemIds；cultivationFactors 由引擎计算与 AI 补充合并去重
+   500→  * `buildStateContext` 暴露 storageCapacity + cultivationFactors 给 AI
+   501→  * `stateToResponse` 暴露 storageCapacity + cultivationFactors
+   502→
+   503→- LLM 层（llm.ts）：
+   504→  * `buildAdvancePrompt`：
+   505→    - 状态快照区展示储物袋容量（"3/10件（已有储物袋）"或"3/5件（无储物袋，上限仅 5 件）"）
+   506→    - 已装备改为数组展示（带 equipNote）
+   507→    - 告知 AI：装备栏无槽位上限，玩家可戴多枚戒指、脖挂一串储物戒指等，由 AI 判断合理性
+   508→    - 告知 AI：玩家可通过 newEquippedItems 创造性装备（如"储物戒指项链"合成条目，equipNote 描述位置）
+   509→    - 告知 AI：equipItemIds / unequipItemIds 用于装备/卸下已有物品
+   510→    - 告知 AI：储物袋是 tool 类物品含 storageCapacity 效果，获得即扩容
+   511→    - 告知 AI：若背包已满（invCount >= storageCapacity），不可再给 newItems
+   512→    - cultivationFactors 字段：引擎自动计算基础来源（灵根+功法+状态词条），AI 只需输出额外因素（环境/心境/时节）； cultivationInsight 文本必须点名来源名称 + 具体数字
+   513→    - 强化规则：叙事中提及的物品必须落入 newItems（不可只叙事不给物品）
+   514→  * `buildChoosePrompt` / `buildInterferePrompt`：同步加 newEquippedItems / equipItemIds / unequipItemIds / cultivationFactors 字段；interfere 加"装备栏创造权"与"使用物品规则"两段详细说明
+   515→  * 新增 `generateItemActionNarrative(ctx, action, item)` 函数：玩家装备/卸下/使用物品后调用 LLM 生成 30-80 字动作叙事 + 更新 cultivationInsight + cultivationFactors；失败时返回最小可用结果不阻塞物品操作
+   516→  * 三个 sanitize 函数解析新字段（newEquippedItems、equipItemIds、unequipItemIds、cultivationFactors）
+   517→  * 新增 `sanitizeItems` / `sanitizeFactors` 辅助函数
+   518→
+   519→- API 路由：
+   520→  * `/api/game/item` 完全重写：
+   521→    - action=equip 调 `equipItem`，action=unequip 调 `unequipItem`（按 itemId 不按 slot），action=use 调 `consumeItem`
+   522→    - **修复关键 bug**：原代码未将 equipItem 返回的 state 赋值给 state 变量，导致装备不生效；现 `state = r.state`
+   523→    - 装备/卸下/使用后调 `generateItemActionNarrative` 生成动作叙事 + 更新修炼心得
+   524→    - cultivationFactors 由 `computeCultivationFactors(state)` 计算（保证数值准确），AI 的额外因素合并去重
+   525→    - 持久化 equippedJson（数组格式）+ storageCapacity + cultivationFactorsJson
+   526→    - 动作叙事写入 EventLog（让史册可查）
+   527→    - 返回 { success, message, narrative, state }
+   528→  * `/api/game/advance`：persist equippedJson 数组 + storageCapacity + cultivationFactorsJson
+   529→  * `/api/game/choose` / `/api/game/interfere`：应用 newEquippedItems（含 ensureUniqueIds + applyItemEffects + recalcCultivationMultiplier）+ equipItemIds + unequipItemIds；cultivationFactors 引擎计算 + AI 补充合并；persist 新字段
+   530→  * `/api/game/state`：返回 storageCapacity + cultivationFactors
+   531→
+   532→- 前端 store.ts：
+   533→  * `CharacterState` 新增 `storageCapacity: number`、`cultivationFactors?: {...}[]`
+   534→  * `equipped` 改为 `any[]`（数组）
+   535→
+   536→- 前端 InventoryPanel.tsx 完全重写：
+   537→  * **修炼速度卡**：
+   538→    - 顶部倍率数字保留
+   539→    - 新增"来源 · 名称与加成"区：每个来源条目按 rarity 上色显示名称（左侧带彩色光点），右侧倍率数字显示在红/蓝徽标（multiply=红，add=蓝），左侧带彩色边框
+   540→    - AI 生成的 cultivationInsight 文本（按句号/分号分段渲染）
+   541→    - 旧存档 fallback：若无 factors，显示"推进一岁后 AI 将综合生成来源条目"
+   542→  * **已装备卡**：
+   543→    - 完全去掉固定 5 槽位占位符
+   544→    - 动态渲染 equippedList 数组，每项：稀有度彩色图标 + 名称（rarity 色彩）+ equipNote 徽标 + effects 芯片（前 3 个，多余的 +N）+ 卸下按钮
+   545→    - 空时显示"身无长物。获得装备后可在储物袋装备。"
+   546→    - 点击任意装备 → 打开 ItemDetailDialog
+   547→    - 底部提示"点击装备查看详情。装备数量无上限，由天道判断合理性。"
+   548→  * **储物袋卡**：
+   549→    - 标题右侧新增容量徽标：`{invCount}/{storageCap}` + （无袋/有袋标记）
+   550→    - 容量满时红色警告条，将满时黄色提示
+   551→    - 储物袋物品（isStorageBag）显示"储物袋"特殊徽标，且不显示装备按钮
+   552→    - 物品按类型分组，每组带类型图标 + 名称（rarity 色彩）+ effects 芯片 + 装备/使用按钮 + 来源
+   553→    - 点击物品 → 打开 ItemDetailDialog
+   554→  * **ItemDetailDialog**（新组件）：
+   555→    - 顶部彩色 banner（按稀有度渐变背景 + 边框）
+   556→    - 物品名（rarity 色彩）+ 稀有度徽标 + 类型徽标 + equipNote
+   557→    - 描述 / 效果（彩色芯片，multiply=红 add=蓝）/ 来源 / id
+   558→    - 底部操作栏：装备/使用/卸下按钮（根据物品状态显示）
+   559→
+   560→- 端到端验证（agent-browser + curl）：
+   561→  * 创建新角色"李测试甲"（土木水凡灵根，rootMultiplier 0.8）
+   562→  * 推进 1 岁：cultivationFactors = [{name:"土木水凡灵根", value:0.8, operation:"multiply", rarity:"uncommon", note:"灵根根基"}]
+   563→  * UI「宝」页修炼速度栏正确显示：×0.80 顶部数字 + 来源条目（绿色名称 + 红色 ×0.8 徽标）+ AI 心得文本（"土木水凡灵根×0.8，根基已立..."）
+   564→  * 已装备栏显示"身无长物"（无占位符）
+   565→  * 储物袋显示"0/5 · 无袋"
+   566→  * 点击物品打开 ItemDetailDialog（VLM 验证：稀有度 banner + 名称 + 描述 + 来源 + id）
+   567→  * 另开测试角色"炎千雪"（火真灵根 pure，rootMultiplier 1.5）：
+   568→    - 推进至 7 岁触发灵根觉醒命节点，选择"请求父亲教导" → 获得《炎阳引气诀》（AI 误给 material 类型，引擎兜底未匹配关键词）
+   569→    - 干扰获取《火元心法》（名含"心法"关键词）→ 引擎兜底强转 scripture + 补默认 ×1.7 uncommon 效果
+   570→    - 装备《火元心法》：cultivationMultiplier 从 1.5 升至 2.55（1.5×1.7）✓
+   571→    - cultivationFactors 含两条：火真灵根 ×1.5 (rare 蓝色) + 《火元心法》 ×1.7 (uncommon 绿色) ✓
+   572→    - AI 生成装备叙事："炎千雪取出《火元心法》，盘膝而坐，心神沉浸于火行奥义..."
+   573→    - 动作叙事写入 EventLog
+   574→- `bun run lint` 通过（0 errors）
+   575→
+   576→Stage Summary:
+   577→- 修炼速度栏彻底活性化 + 数值准确：
+   578→  * 来源名称按稀有度彩色显示（common 灰 / uncommon 绿 / rare 蓝 / epic 紫 / legendary 金 / mythic 粉）
+   579→  * 具体倍率数字显示在红/蓝徽标（multiply 红、add 蓝）
+   580→  * 引擎权威：cultivationFactors 由 `computeCultivationFactors(state)` 计算（灵根 + 已装备功法 + 状态词条），AI 只补充环境/心境等额外因素，保证数值与 cultivationMultiplier 一致
+   581→  * AI 生成的 cultivationInsight 文本必须点名来源名称 + 具体数字（如"修习《引气诀》×1.5，腰悬聚灵佩+0.2"）
+   582→
+   583→- 已装备栏彻底去占位符化 + 无数量上限：
+   584→  * 不再固定 5 槽位，动态渲染 equipped 数组（AI 知道什么就显示什么）
+   585→  * 同类型装备可多件：玩家可戴 10 个戒指、脖挂一串储物戒指等，由 AI 判断合理性
+   586→  * AI 可通过 newEquippedItems 创造性装备（如"储物戒指项链"合成条目，equipNote="脖挂·储物戒指×5"）
+   587→  * AI 可通过 equipItemIds / unequipItemIds 装备/卸下已有物品
+   588→  * 点击装备打开 ItemDetailDialog 看详情，弹窗含装备/使用/卸下按钮
+   589→
+   590→- 储物袋容量系统完整：
+   591→  * 无袋时 capacity=5，有袋后增加（bag.effects 含 storageCapacity add）
+   592→  * 储物袋本身是 tool 类物品，获得即扩容，无需装备（equipItem 拒绝并提示）
+   593→  * 移除储物袋时反向扣减 storageCapacity
+   594→  * UI 显示 `invCount/capacity` 徽标 + 无袋标记；满时红色警告，将满时黄色提示
+   595→  * AI 在 prompt 中被告知容量信息，背包满时不可再给新物品
+   596→
+   597→- 使用物品通知 AI：
+   598→  * 玩家装备/卸下/使用物品后，调 `generateItemActionNarrative` 让 AI 生成 30-80 字动作叙事 + 更新 cultivationInsight + cultivationFactors
+   599→  * 动作叙事写入 EventLog（让史册可查）
+   600→  * LLM 失败时不阻塞物品操作（返回最小可用结果）
+   601→
+   602→- 引擎兜底（防御 AI 不规范输出）：
+   603→  * 无效 item_type（如 'storage'）→ tool（若含 storageCapacity）或 material
+   604→  * 名含功法关键词（诀/经/典/录/篇/章/解/式/术/功法/心法/秘籍/玉简/真经/真解/引气/凝气/吐纳）但非 scripture → 强转 scripture
+   605→  * scripture 但无 multiply cultivationExp 效果 → 按 rarity 补默认（×1.3~×5.5）
+   606→  * 叙事中提及的物品必须落入 newItems（prompt 强化）
+   607→
+   608→- 修复 item route 关键 bug：原代码未将 equipItem/unequipItem/consumeItem 返回的 state 赋值给 state 变量，导致装备/卸下/使用不生效；现已修复
+   609→
+   610→- 旧存档兼容：
+   611→  * equippedJson 旧 slot-map 格式自动转换为数组（带默认 equipNote）
+   612→  * cultivationFactorsJson 为空时按当前 state 实时计算
+   613→  * storageCapacity 缺失时默认 5
+   614→
+   615→- agent-browser + VLM 端到端验证通过：
+   616→  * 来源名称绿色（uncommon rarity）✓
+   617→  * ×0.8 数字红色徽标（multiply operation）✓
+   618→  * 储物袋容量徽标 ✓
+   619→  * 已装备栏无占位符 ✓
+   620→  * 物品详情弹窗彩色 banner + 完整信息 ✓
+   621→

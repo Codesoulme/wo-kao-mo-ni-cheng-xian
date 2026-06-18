@@ -76,17 +76,6 @@ export function dbToState(c: DBCharacter): CharacterState {
   const equipped = parseEquippedJson(c.equippedJson || '[]');
   const inventory = safeParse<ItemEntry[]>(c.inventoryJson, []);
   const storageCapacity = c.storageCapacity ?? 5;
-  // cultivationMultiplier 始终根据灵根 + 已装备物品（所有 multiply cultivationExp 效果之积）实时重算
-  // 这样无论数据库里存的是什么，加载到内存后的倍率都是当前正确的
-  let mult = rootInfo?.multiplier ?? 0;
-  for (const it of equipped) {
-    for (const eff of it.effects || []) {
-      if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply' && eff.value > 0) {
-        mult *= eff.value;
-      }
-    }
-  }
-  const cultivationFactors = safeParse<CultivationFactor[]>(c.cultivationFactorsJson || '[]', []);
   const state: CharacterState = {
     id: c.id, name: c.name, age: c.age, lifespan: c.lifespan, gender: c.gender,
     spiritualRoot: c.spiritualRoot as SpiritualRoot,
@@ -107,15 +96,16 @@ export function dbToState(c: DBCharacter): CharacterState {
     inventory,
     equipped,
     storageCapacity,
-    cultivationMultiplier: mult,
+    // cultivationMultiplier 与 cultivationFactors 始终根据灵根 + 已装备 + 状态词条实时重算
+    // 不信任数据库旧值（旧存档可能含已被移除的 AI 补充因素，会导致顶部倍率与来源条目不一致）
+    cultivationMultiplier: 0,
     cultivationInsight: c.cultivationInsight || '',
-    cultivationFactors,
+    cultivationFactors: [],
     longTermMemory: safeParse<string[]>(c.memoryJson, []),
   };
-  // 兜底：若旧存档无 cultivationFactors 或 factors 为空，按当前 state 实时计算
-  if (!cultivationFactors.length) {
-    state.cultivationFactors = computeCultivationFactors(state);
-  }
+  const rate = computeEffectiveCultivationRate(state);
+  state.cultivationMultiplier = rate.multiplier;
+  state.cultivationFactors = computeCultivationFactors(state);
   return state;
 }
 
@@ -207,18 +197,11 @@ export function applyItemEffects(state: CharacterState, item: ItemEntry, sign: 1
   return next;
 }
 
-// 重算修炼倍率 = 灵根倍率 × 所有已装备物品的 multiply cultivationExp 效果之积
+// 重算修炼倍率 = 灵根倍率 × 所有已装备物品与状态词条的 multiply cultivationExp 效果之积
+// 统一委托给 computeEffectiveCultivationRate（同时算 flatBonus，保持口径一致）
 export function recalcCultivationMultiplier(state: CharacterState): CharacterState {
-  const rootInfo = SPIRITUAL_ROOTS[state.spiritualRoot];
-  let mult = rootInfo?.multiplier ?? 0;
-  for (const it of state.equipped || []) {
-    for (const eff of it.effects || []) {
-      if (eff.target_attribute === 'cultivationExp' && eff.operation === 'multiply' && eff.value > 0) {
-        mult *= eff.value;
-      }
-    }
-  }
-  return { ...state, cultivationMultiplier: mult };
+  const { multiplier } = computeEffectiveCultivationRate(state);
+  return { ...state, cultivationMultiplier: multiplier };
 }
 
 // 灵根稀有度映射（用于 cultivationFactors 的 rarity 着色）
@@ -290,6 +273,32 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
     }
   }
   return factors;
+}
+
+// 引擎权威：从 state 计算有效修炼速率
+// multiplier = 灵根倍率 × 所有 multiply cultivationExp 效果之积（即 cultivationMultiplier）
+// flatBonus  = 所有 add cultivationExp 效果之和（每岁固定修为加成，不受倍率影响）
+// 前端顶部展示「×{multiplier} +{flatBonus}/岁」让玩家看清倍率与加成各自贡献
+// 每岁修为增量公式：baseGain × multiplier + flatBonus（baseGain 由 AI 在 changes 里给）
+export function computeEffectiveCultivationRate(state: CharacterState): { multiplier: number; flatBonus: number } {
+  const rootInfo = SPIRITUAL_ROOTS[state.spiritualRoot];
+  let multiplier = rootInfo?.multiplier ?? 0;
+  let flatBonus = 0;
+  for (const it of state.equipped || []) {
+    for (const eff of it.effects || []) {
+      if (eff.target_attribute !== 'cultivationExp') continue;
+      if (eff.operation === 'multiply' && eff.value > 0) multiplier *= eff.value;
+      else if (eff.operation === 'add') flatBonus += eff.value;
+    }
+  }
+  for (const s of state.activeStatuses || []) {
+    for (const eff of s.effects || []) {
+      if (eff.target_attribute !== 'cultivationExp') continue;
+      if (eff.operation === 'multiply' && eff.value > 0) multiplier *= eff.value;
+      else if (eff.operation === 'add') flatBonus += eff.value;
+    }
+  }
+  return { multiplier, flatBonus };
 }
 
 // 默认 equipNote（玩家点装备时若物品无 equipNote 则按类型生成）
@@ -946,27 +955,11 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   if (aiOutput.cultivationInsight && aiOutput.cultivationInsight.trim()) {
     next.cultivationInsight = aiOutput.cultivationInsight.trim();
   }
-  // 引擎权威：cultivationFactors 由引擎从 state 计算（保证数值准确）
-  // AI 输出的 cultivationFactors 仅作为补充（环境/心境等引擎不跟踪的因素），
-  // 与引擎计算的基础来源去重后合并
-  if (aiOutput.cultivationFactors && Array.isArray(aiOutput.cultivationFactors) && aiOutput.cultivationFactors.length) {
-    const engineFactors = computeCultivationFactors(next);
-    const engineNames = new Set(engineFactors.map(f => f.name));
-    const aiExtras = aiOutput.cultivationFactors
-      .filter(f => f && f.name && typeof f.value === 'number' && !engineNames.has(String(f.name)))
-      .slice(0, 6)
-      .map(f => ({
-        name: String(f.name).slice(0, 24),
-        value: Number(f.value) || 0,
-        operation: f.operation === 'add' ? 'add' : 'multiply',
-        rarity: ['common','uncommon','rare','epic','legendary','mythic'].includes(f.rarity as any) ? f.rarity as any : undefined,
-        note: f.note ? String(f.note).slice(0, 40) : undefined,
-      }));
-    next.cultivationFactors = [...engineFactors, ...aiExtras];
-  } else {
-    // AI 没输出 factors，纯用引擎计算
-    next.cultivationFactors = computeCultivationFactors(next);
-  }
+  // 引擎权威：cultivationFactors 完全由引擎从 state 计算（灵根 + 已装备功法 + 状态词条）
+  // 不再合并 AI 输出的额外因素——AI 输出不稳定会导致条目忽隐忽现，且 AI 编造的数字
+  // 与 cultivationMultiplier 脱节会让"顶部倍率"与"来源条目数字之积"不一致。
+  // AI 若想体现环境/心境等动态因素，可在 cultivationInsight 文本中描述，但不得影响数值。
+  next.cultivationFactors = computeCultivationFactors(next);
 
   // 5. 处理突破
   let breakthroughHappened = false;
@@ -1018,6 +1011,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 export function stateToResponse(s: CharacterState) {
   const realmInfo = getRealmInfo(s.realm);
   const rootInfo = SPIRITUAL_ROOTS[s.spiritualRoot];
+  const rate = computeEffectiveCultivationRate(s);
   return {
     age: s.age,
     lifespan: s.lifespan,
@@ -1042,7 +1036,8 @@ export function stateToResponse(s: CharacterState) {
     spiritualRoot: s.spiritualRoot,
     rootDetail: s.rootDetail,
     rootMultiplier: rootInfo?.multiplier ?? 0,
-    cultivationMultiplier: s.cultivationMultiplier,
+    cultivationMultiplier: rate.multiplier,
+    cultivationFlatBonus: rate.flatBonus,
     cultivationInsight: s.cultivationInsight,
     cultivationFactors: s.cultivationFactors,
     storageCapacity: s.storageCapacity,
