@@ -1,9 +1,9 @@
 // POST /api/game/choose
-// 玩家在命节点/重要事件中做出选择
+// 玩家在重要事件中做出选择
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, markFateNodeDone, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 
@@ -137,18 +137,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 检查命节点是否完成（如果之前是命节点）
-    // 简化：每次选择后尝试标记当前年龄对应的命节点
-    const fateNodeAge = state.age;
-    // 尝试标记最近的命节点
-    const FATE_NODES = (await import('@/lib/xianxia/types')).FATE_NODES;
-    for (const node of FATE_NODES) {
-      if (state.fateNodes.includes(node.index)) continue;
-      if (fateNodeAge >= node.triggerAge.min && fateNodeAge <= node.triggerAge.max) {
-        state = markFateNodeDone(state, node.index);
-        break;
-      }
-    }
 
     // 选择后退出选择态
     state.isAtChoice = false;

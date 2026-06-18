@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough, pickEventBlueprint, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tickFormations, tickHeartDemon, tryHeartDemonTrial, tickPets } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, tickNaturalRecovery, checkFateNode, applyChanges, stateToResponse, tryBreakthrough, pickEventBlueprint, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tickFormations, tickHeartDemon, tryHeartDemonTrial, tickPets } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES } from '@/lib/xianxia/types';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
@@ -55,6 +55,8 @@ export async function POST(req: NextRequest) {
     state.age += 1;
     // 持续状态 duration -1
     state = tickStatusDurations(state);
+    // 每岁自然恢复少量气血/灵力；严重伤势仍交由 AI 叙事处理调息、疗伤、求药等。
+    state = tickNaturalRecovery(state);
     // Task 21: 阵法维持消耗灵石
     const formationTick = tickFormations(state);
     state = formationTick.state;
@@ -63,10 +65,11 @@ export async function POST(req: NextRequest) {
     // Task 23: 灵宠每岁状态变化（饱食度 -10、忠诚度 -2、HP 回复、低忠诚可能逃离）
     state = tickPets(state);
 
-    // 检查是否触发命节点
+    // 命节点只作为 AI 的长期参考锚点，不再强制触发或定性角色命运。
     const fateNodeIdx = checkFateNode(state);
-    const isFateNode = fateNodeIdx !== null;
-    const fateNode = isFateNode ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
+    const referenceFateNode = fateNodeIdx !== null ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
+    const isFateNode = false;
+    const fateNode = referenceFateNode;
 
     // Task 20: 把蓝图注入 ctx
     const ctx = buildStateContext(state, recentEvents);
@@ -104,34 +107,6 @@ export async function POST(req: NextRequest) {
         failThreadIds: [],
         triggerCombat: null,
       };
-      // 若是命节点，必须给选择
-      if (isFateNode && fateNode) {
-        aiOutput.eventType = 'fate_node';
-        aiOutput.hasChoice = true;
-        aiOutput.choice = {
-          prompt: `命节点「${fateNode.name}」：${fateNode.coreConflict}。请做出你的抉择。`,
-          options: [
-            { text: '顺应天命，稳健前行', hint: '风险低，收益正常' },
-            { text: '逆天而行，激进突破', hint: '风险高，收益丰厚' },
-            { text: '另辟蹊径，独行其道', hint: '触发特殊剧情' },
-          ],
-        };
-      }
-    }
-    if (isFateNode && fateNode) {
-      aiOutput.eventType = 'fate_node';
-      // 命节点必须给选择
-      if (!aiOutput.hasChoice) {
-        aiOutput.hasChoice = true;
-        aiOutput.choice = {
-          prompt: `命节点「${fateNode.name}」：${fateNode.coreConflict}。${fateNode.narrativeGoal}。请做出你的抉择。`,
-          options: [
-            { text: '顺应天命，稳健前行', hint: '风险低，收益正常' },
-            { text: '逆天而行，激进突破', hint: '风险高，收益丰厚' },
-            { text: '另辟蹊径，独行其道', hint: '触发特殊剧情' },
-          ],
-        };
-      }
     }
 
     // 引擎执行 AI 输出
@@ -217,15 +192,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 命节点完成标记（若事件含 hasChoice，等玩家选完再标记；若不含选择直接标记）
-    if (isFateNode && fateNode && !aiOutput.hasChoice) {
-      finalState = markFateNodeDone(finalState, fateNode.index);
-    } else if (isFateNode && fateNode && aiOutput.hasChoice) {
-      // 等待玩家选择，先标记为选择中
-      finalState.isAtChoice = true;
-    } else if (aiOutput.hasChoice) {
-      // Task 21 修复 bug：非命节点的普通选择节点也必须设置 isAtChoice=true
-      // 否则 choose route 会因 isAtChoice=false 返回 400，玩家点选项无效
+
+    // 普通重要事件如 AI 给出选择，进入选择状态；命节点只作 AI 参考，不自动完成或强制标记。
+    if (aiOutput.hasChoice) {
       finalState.isAtChoice = true;
     }
 
@@ -238,7 +207,7 @@ export async function POST(req: NextRequest) {
           contextTitle: aiOutput.title,
           contextNarrative: aiOutput.narrative,
           contextAge: finalState.age,
-          contextFateNodeName: fateNode?.name,
+          contextFateNodeName: isFateNode ? fateNode?.name : undefined,
           deferredCombat: (finalState as any)._deferredCombat || null,
         })
       : '';
@@ -368,8 +337,8 @@ export async function POST(req: NextRequest) {
         title: created.title,
         narrative: created.narrative,
         eventType: created.eventType,
-        isFateNode: idx === 0 ? isFateNode : false,
-        fateNodeName: idx === 0 ? fateNode?.name : undefined,
+        isFateNode: false,
+        fateNodeName: undefined,
         blueprint: idx === 0 ? { category: blueprint.category, name: blueprint.name } : undefined,
         effects: draft.effects,
         createdAt: created.createdAt,

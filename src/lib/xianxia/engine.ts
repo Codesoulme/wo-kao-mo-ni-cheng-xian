@@ -292,7 +292,7 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
             value: eff.value,
             operation: 'add',
             rarity: it.rarity as any,
-            note: '修为加成',
+            note: '额外修为/岁',
           });
         }
       }
@@ -899,6 +899,21 @@ export function tickStatusDurations(state: CharacterState): CharacterState {
   }));
   const alive = ticked.filter(s => s.duration === -1 || s.duration > 0);
   return { ...state, activeStatuses: alive };
+}
+
+// 每岁自然恢复：身体与灵息会自行回转，但只恢复少量。
+// 大型事件/战斗/伤势叙事仍由 AI 处理，AI 可额外生成调息、疗伤、求药等事件。
+export function tickNaturalRecovery(state: CharacterState): CharacterState {
+  if (!state.alive) return state;
+  const hpMissing = Math.max(0, state.maxHp - state.hp);
+  const mpMissing = Math.max(0, state.maxMp - state.mp);
+  const hpRegen = hpMissing > 0 ? Math.max(1, Math.floor(state.maxHp * 0.08)) : 0;
+  const mpRegen = mpMissing > 0 ? Math.max(1, Math.floor(state.maxMp * 0.12)) : 0;
+  return {
+    ...state,
+    hp: Math.min(state.maxHp, state.hp + hpRegen),
+    mp: Math.min(state.maxMp, state.mp + mpRegen),
+  };
 }
 
 // ==================== 物品管理 ====================
@@ -1919,7 +1934,7 @@ export function stateToResponse(s: CharacterState) {
     cultivationMultiplier: rate.multiplier,
     cultivationFlatBonus: rate.flatBonus,
     cultivationInsight: s.cultivationInsight,
-    cultivationFactors: s.cultivationFactors,
+    cultivationFactors: computeCultivationFactors(s),
     storageCapacity: s.storageCapacity,
     activeStatuses: s.activeStatuses,
     inventory: s.inventory,

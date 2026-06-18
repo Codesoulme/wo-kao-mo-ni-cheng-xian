@@ -39,7 +39,7 @@ const TYPE_ICON: Record<string, React.ReactNode> = {
   tool: <Wrench className="w-3.5 h-3.5" />,
 };
 
-// 特殊状态词条的图标映射（灵宠/命格/天赋/身份等）
+// 特殊状态的图标映射（灵宠/命格/天赋/身份等）
 function specialIcon(name: string): React.ReactNode {
   if (/灵宠|坐骑|妖兽|灵禽/.test(name)) return <Heart className="w-3.5 h-3.5" />;
   if (/命格|命途|气运|天命/.test(name)) return <Crown className="w-3.5 h-3.5" />;
@@ -127,7 +127,7 @@ export function InventoryPanel() {
   const capacityWarn = capacityRatio >= 1;
   const capacityNearFull = capacityRatio >= 0.8 && !capacityWarn;
 
-  // 特殊状态词条
+  // 特殊状态
   const specialStatuses = activeStatuses.filter(s => s.category === 'special' || s.category === 'identity');
 
   return (
@@ -193,7 +193,7 @@ export function InventoryPanel() {
                         color: f.operation === 'multiply' ? '#c8453c' : '#3b82f6',
                       }}
                     >
-                      {f.operation === 'multiply' ? '×' : '+'}{f.value}
+                      {f.operation === 'multiply' ? '×' : '+'}{f.value}{f.operation === 'add' ? '/岁' : ''}
                     </span>
                   </div>
                 );
@@ -224,7 +224,7 @@ export function InventoryPanel() {
           )}
 
           <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
-            每岁修为 = 基础 × 倍率（×{totalMult.toFixed(2)}）{flatBonus > 0 ? ` + 加成（${flatBonus}）` : ''}。来源条目由引擎依灵根、功法、奇缘实时计算，稳定不消失。
+            每岁修为 = 基础 × 倍率（×{totalMult.toFixed(2)}）{flatBonus > 0 ? ` + 额外修为（${flatBonus}/岁）` : ''}。来源条目由引擎依灵根、功法、奇缘实时计算，稳定不消失。
           </p>
         </CardContent>
       </Card>
@@ -317,7 +317,7 @@ export function InventoryPanel() {
             })
           )}
           <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-1 px-0.5">
-            点击装备查看详情。装备数量无上限，由天道判断合理性。
+            点击装备查看详情。
           </p>
         </CardContent>
       </Card>
@@ -509,7 +509,7 @@ export function InventoryPanel() {
             <CardContent className="pt-0 space-y-1.5">
               {specialStatuses.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  尚无奇缘。修行途中或获灵宠、或得命格、或觉醒天赋，皆显示于此。
+                  尚无奇缘异宝。灵根、伤势、心境等常规状态请看「状态」页；此处只收录灵宠、命格、身份、特殊体质等长期奇缘。
                 </p>
               ) : (
                 specialStatuses.map((s, i) => {

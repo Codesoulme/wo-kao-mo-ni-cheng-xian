@@ -52,16 +52,7 @@ export function StatusList() {
 
   return (
     <div className="space-y-3">
-      {/* 心之所向——角色主动意图 */}
-      <CharacterIntentsCard />
-
-      {/* Task 22: 心魔值卡片 */}
-      <HeartDemonCard />
-
-      {/* 未决线索 */}
-      <PendingThreadsCard />
-
-      {/* 状态词条 */}
+      {/* 状态 */}
       <Collapsible open={open} onOpenChange={setOpen}>
         <Card className="paper-texture">
           <CollapsibleTrigger asChild>
@@ -69,7 +60,7 @@ export function StatusList() {
               <CardTitle className="text-sm flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Star className="w-4 h-4 text-primary" />
-                  状态词条
+                  状态
                 </span>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-[10px]">
@@ -83,7 +74,7 @@ export function StatusList() {
           <CollapsibleContent>
             <CardContent className="pt-0 space-y-3 max-h-[60vh] overflow-y-auto xianxia-scroll">
               {character.activeStatuses.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">尚无状态词条</p>
+                <p className="text-xs text-muted-foreground text-center py-4">尚无状态</p>
               ) : (
                 <>
                   {coreStatuses.length > 0 && (
@@ -101,6 +92,15 @@ export function StatusList() {
           </CollapsibleContent>
         </Card>
       </Collapsible>
+
+      {/* 心之所向——角色主动意图 */}
+      <CharacterIntentsCard />
+
+      {/* Task 22: 心魔值卡片 */}
+      <HeartDemonCard />
+
+      {/* 未决线索 */}
+      <PendingThreadsCard />
 
       <p className="text-[10px] text-muted-foreground text-center pt-1">
         装备与储物袋请查看「宝」页

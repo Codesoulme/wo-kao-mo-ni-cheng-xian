@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { CharacterState } from '@/lib/xianxia/store';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
-import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle } from 'lucide-react';
+import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle, Coins } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface StatusPanelProps {
@@ -88,9 +88,14 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 <span className="opacity-50">·</span>
                 <span>{character.age}岁</span>
                 <span className="opacity-50">·</span>
-                <span className="flex items-center gap-0.5 truncate max-w-[100px]">
+                <span className="flex items-center gap-0.5 truncate max-w-[92px]">
                   <MapPin className="w-2.5 h-2.5" />
                   {character.location}
+                </span>
+                <span className="opacity-50">·</span>
+                <span className="flex items-center gap-0.5 text-amber-600 tabular-nums">
+                  <Coins className="w-2.5 h-2.5" />
+                  {character.spiritStones}
                 </span>
               </div>
 
