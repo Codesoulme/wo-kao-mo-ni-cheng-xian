@@ -93,7 +93,9 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 <span className="opacity-50">·</span>
                 <span>{character.age}岁</span>
                 <span className="opacity-50">·</span>
-                <span className="flex items-center gap-0.5 truncate max-w-[92px]">
+                <span className="text-amber-700/90">寿余 {lifespanLeft} 年</span>
+                <span className="opacity-50">·</span>
+                <span className="flex items-center gap-0.5 truncate max-w-[82px]">
                   <MapPin className="w-2.5 h-2.5" />
                   {character.location}
                 </span>
