@@ -141,11 +141,6 @@ export function ItemDetailDialog({
               <p className="text-[11px] text-muted-foreground/90 leading-relaxed">{item.source}</p>
             </div>
           )}
-
-          {/* id（小字角标，便于调试） */}
-          <div className="text-[9px] text-muted-foreground/40 font-mono pt-1 border-t border-dashed">
-            id: {item.id}
-          </div>
         </div>
 
         {/* 底部操作栏 */}
