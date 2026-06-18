@@ -126,7 +126,7 @@ export function dbToState(c: DBCharacter): CharacterState {
     faction: c.faction, master: c.master, location: c.location,
     fateNodes: c.fateNodes ? c.fateNodes.split(',').filter(Boolean).map(Number) : [],
     isAtChoice: c.isAtChoice, lastEventAge: c.lastEventAge,
-    activeStatuses: safeParse<StatusEntry[]>(c.statusJson, []),
+    activeStatuses: filterMeaningfulStatuses(safeParse<StatusEntry[]>(c.statusJson, [])),
     inventory,
     equipped,
     storageCapacity,
@@ -882,12 +882,38 @@ export function checkFateNode(state: CharacterState): number | null {
   return null;
 }
 
-// ==================== 状态词条管理 ====================
+// ==================== 状态管理 ====================
+
+export function isMeaningfulStatus(status: Partial<StatusEntry> | null | undefined): boolean {
+  if (!status || !status.name) return false;
+  const effects = Array.isArray(status.effects) ? status.effects.filter((e: any) =>
+    e && e.target_attribute && e.operation && e.value !== undefined && e.value !== 0
+  ) : [];
+  if (effects.length > 0) return true;
+
+  // 少数标志性状态允许无数值效果：身份、命格、线索、重大奇缘等，供 AI 后续判断使用。
+  const category = status.category;
+  const text = `${status.name || ''} ${status.description || ''} ${status.source || ''}`;
+  if (category === 'identity' || category === 'quest') return true;
+  if (category === 'special' && /身份|师承|宗门|命格|命途|奇缘|传承|血脉|体质|誓约|因果|线索|印记|称号|灵宠|契约/.test(text)) return true;
+  return false;
+}
+
+export function filterMeaningfulStatuses(statuses: StatusEntry[]): StatusEntry[] {
+  return (statuses || []).filter(isMeaningfulStatus).map(s => ({
+    ...s,
+    effects: Array.isArray(s.effects) ? s.effects.filter((e: any) =>
+      e && e.target_attribute && e.operation && e.value !== undefined && e.value !== 0
+    ) : [],
+  }));
+}
 
 export function addStatuses(state: CharacterState, statuses: StatusEntry[]): CharacterState {
-  if (!statuses.length) return state;
+  const meaningful = filterMeaningfulStatuses(statuses || []);
+  if (!meaningful.length) return state;
   const existingIds = new Set(state.activeStatuses.map(s => s.id));
-  const newStatuses = statuses.filter(s => !existingIds.has(s.id));
+  const existingNames = new Set(state.activeStatuses.map(s => s.name));
+  const newStatuses = meaningful.filter(s => !existingIds.has(s.id) && !existingNames.has(s.name));
   return { ...state, activeStatuses: [...state.activeStatuses, ...newStatuses] };
 }
 
@@ -898,7 +924,7 @@ export function tickStatusDurations(state: CharacterState): CharacterState {
     duration: s.duration === -1 ? -1 : s.duration - 1,
   }));
   const alive = ticked.filter(s => s.duration === -1 || s.duration > 0);
-  return { ...state, activeStatuses: alive };
+  return { ...state, activeStatuses: filterMeaningfulStatuses(alive) };
 }
 
 // 每岁自然恢复：身体与灵息会自行回转，但只恢复少量。

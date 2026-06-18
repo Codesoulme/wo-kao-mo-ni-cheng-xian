@@ -19,6 +19,7 @@ import { ItemDetailDialog } from './ItemDetailDialog';
 import { FormationPanel } from './FormationPanel';
 import { PetPanel } from './PetPanel';
 import { formatItemEffectLabel } from '@/lib/xianxia/display';
+import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -70,7 +71,7 @@ export function InventoryPanel() {
 
   const equippedList: any[] = Array.isArray(character.equipped) ? character.equipped : [];
   const inventory: any[] = character.inventory || [];
-  const activeStatuses: StatusEntry[] = character.activeStatuses || [];
+  const activeStatuses: StatusEntry[] = filterMeaningfulStatuses(character.activeStatuses || []) as StatusEntry[];
 
   const doAction = async (action: 'equip' | 'unequip' | 'use', payload: { itemId?: string }) => {
     if (!character) return;

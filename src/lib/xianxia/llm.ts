@@ -26,7 +26,7 @@ import {
   CombatSession,
   EventBlueprint,
 } from './types';
-import { ensureUniqueIds } from './engine';
+import { ensureUniqueIds, filterMeaningfulStatuses } from './engine';
 
 let zaiInstance: any = null;
 let zaiModelName = 'ark-code-latest';
@@ -347,7 +347,9 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
 - 临时增益：category="buff"，duration 1-5，如「寒潭润脉」「灵息渐稳」「木气养身」。
 - 临时负面：category="debuff"，duration 1-5，如「旧伤隐痛」「气血亏虚」「心神惊悸」。
 - 特殊体质/命格/身份：category="special" 或 "identity"，duration -1，必须是重大事件才给。
-- effects 可以为空数组；若有真实数值影响，target_attribute 必须用白名单里的内部字段，但 description 必须是中文。
+- 普通 buff/debuff/attribute/environment/skill 状态必须有真实 effects 才会显示；不要生成纯装饰状态。
+- 只有 identity、quest，或具有身份/命格/奇缘/传承/血脉/体质/誓约/因果/线索/印记/称号/灵宠/契约等长期叙事意义的 special 状态，才允许 effects 为空，用作后续 AI 判断标志。
+- 若有真实数值影响，target_attribute 必须用白名单里的内部字段，但 description 必须是中文。
 - 不要滥发状态；每轮 0-2 个即可，必须与叙事因果一致。
 - 如果生命或灵力明显不满，应在事件中考虑角色伤势/灵力枯竭；可生成调息修养、寻药疗伤、闭关恢复等叙事与 hp/mp 变化，但不要每次都强行恢复满。
 严禁修改 age（年龄由天道推进，每岁固定 +1，AI 不得在 changes 中包含 age）。
@@ -1318,7 +1320,7 @@ function sanitizeEventOutput(raw: any): AIEventOutput {
     narrative: String(raw?.narrative || '岁月如流，无事发生。'),
     eventType: ['normal','fate_node','choice','combat','breakthrough','death','ascension'].includes(raw?.eventType) ? raw.eventType : 'normal',
     changes,
-    newStatuses: statuses,
+    newStatuses: filterMeaningfulStatuses(statuses as any),
     newItems: items,
     removedItemIds: Array.isArray(raw?.removedItemIds) ? raw.removedItemIds.map((x: any) => String(x)).filter(Boolean) : [],
     newEquippedItems: sanitizeItems(raw?.newEquippedItems),
@@ -1459,7 +1461,7 @@ function sanitizeChoiceOutput(raw: any): ChoiceResultOutput {
   return {
     narrative: String(raw?.narrative || '选择已定，前路已开。'),
     changes,
-    newStatuses: statuses,
+    newStatuses: filterMeaningfulStatuses(statuses as any),
     newItems: items,
     removedItemIds: Array.isArray(raw?.removedItemIds) ? raw.removedItemIds.map((x: any) => String(x)).filter(Boolean) : [],
     newEquippedItems: sanitizeItems(raw?.newEquippedItems),
@@ -1501,7 +1503,7 @@ function sanitizeInterfereOutput(raw: any): InterfereOutput {
     accepted,
     narrative: String(raw?.narrative || (accepted ? '天道如是。' : '世界自按其轨运行。')),
     changes,
-    newStatuses: statuses,
+    newStatuses: filterMeaningfulStatuses(statuses as any),
     newItems: items,
     removedItemIds: accepted && Array.isArray(raw?.removedItemIds) ? raw.removedItemIds.map((x: any) => String(x)).filter(Boolean) : [],
     newEquippedItems: accepted ? sanitizeItems(raw?.newEquippedItems) : [],

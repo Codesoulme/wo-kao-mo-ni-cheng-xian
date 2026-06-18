@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
 import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
+import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280',
@@ -40,13 +41,14 @@ export function StatusList() {
 
   if (!character) return null;
 
-  const coreStatuses = character.activeStatuses.filter(s =>
+  const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
+  const coreStatuses = visibleStatuses.filter(s =>
     s.category === 'identity' || s.category === 'special'
   );
-  const buffStatuses = character.activeStatuses.filter(s =>
+  const buffStatuses = visibleStatuses.filter(s =>
     s.category === 'buff' || s.category === 'attribute' || s.category === 'skill'
   );
-  const debuffStatuses = character.activeStatuses.filter(s =>
+  const debuffStatuses = visibleStatuses.filter(s =>
     s.category === 'debuff' || s.category === 'environment' || s.category === 'quest'
   );
 
@@ -64,7 +66,7 @@ export function StatusList() {
                 </span>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-[10px]">
-                    {character.activeStatuses.length}
+                    {visibleStatuses.length}
                   </Badge>
                   <ChevronDown className={cn("w-4 h-4 transition-transform", open && "rotate-180")} />
                 </div>
@@ -73,7 +75,7 @@ export function StatusList() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="pt-0 space-y-3 max-h-[60vh] overflow-y-auto xianxia-scroll">
-              {character.activeStatuses.length === 0 ? (
+              {visibleStatuses.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-4">尚无状态</p>
               ) : (
                 <>

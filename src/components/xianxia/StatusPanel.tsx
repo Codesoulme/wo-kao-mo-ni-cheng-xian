@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CharacterState } from '@/lib/xianxia/store';
+import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
 import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle, Coins } from 'lucide-react';
@@ -29,7 +30,8 @@ export function StatusPanel({ character }: StatusPanelProps) {
     { label: '运', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
     { label: '悟', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
   ];
-  const topStatuses = (character.activeStatuses || [])
+  const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
+  const topStatuses = visibleStatuses
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
     .slice(0, 4);
 
@@ -167,8 +169,8 @@ export function StatusPanel({ character }: StatusPanelProps) {
                       </Popover>
                     );
                   })}
-                  {(character.activeStatuses || []).length > topStatuses.length && (
-                    <span className="text-[9px] text-muted-foreground px-1 py-0.5">+{(character.activeStatuses || []).length - topStatuses.length}</span>
+                  {visibleStatuses.length > topStatuses.length && (
+                    <span className="text-[9px] text-muted-foreground px-1 py-0.5">+{visibleStatuses.length - topStatuses.length}</span>
                   )}
                 </div>
               )}

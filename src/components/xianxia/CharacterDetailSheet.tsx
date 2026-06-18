@@ -4,6 +4,7 @@ import { CharacterState, useGameStore } from '@/lib/xianxia/store';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Heart, Sparkles, Sword, Shield, Zap, Clover, Brain, Coins, Star, MapPin, Users, GraduationCap, Flame } from 'lucide-react';
 import { REALMS, ELEMENTS, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
+import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 
 interface CharacterDetailSheetProps {
   open: boolean;
@@ -18,6 +19,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
   const rootInfo = SPIRITUAL_ROOTS[current.spiritualRoot as keyof typeof SPIRITUAL_ROOTS];
   const lifespanLeft = current.lifespan - current.age;
   const genderLabel = current.gender === 'male' ? '男' : current.gender === 'female' ? '女' : current.gender || '未知';
+  const visibleStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -192,13 +194,13 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
 
           {/* 状态摘要 */}
           <section>
-            <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title={`状态 (${current.activeStatuses.length})`} />
+            <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title={`状态 (${visibleStatuses.length})`} />
             <div className="rounded-lg border border-border/60 p-2 mt-1.5 bg-card/40">
-              {current.activeStatuses.length === 0 ? (
+              {visibleStatuses.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-2">尚无状态</p>
               ) : (
                 <div className="flex flex-wrap gap-1">
-                  {current.activeStatuses.map((s: any, i: number) => (
+                  {visibleStatuses.map((s: any, i: number) => (
                     <span
                       key={i}
                       className="text-[10px] px-1.5 py-0.5 rounded border"
