@@ -13,7 +13,7 @@ interface CharacterDetailSheetProps {
 
 export function CharacterDetailSheet({ open, onOpenChange, character }: CharacterDetailSheetProps) {
   const liveCharacter = useGameStore(s => s.character);
-  const current = liveCharacter?.id === current.id ? liveCharacter : character;
+  const current = liveCharacter?.id === character.id ? liveCharacter : character;
   const realmInfo = REALMS.find(r => r.id === current.realm);
   const rootInfo = SPIRITUAL_ROOTS[current.spiritualRoot as keyof typeof SPIRITUAL_ROOTS];
   const lifespanLeft = current.lifespan - current.age;
