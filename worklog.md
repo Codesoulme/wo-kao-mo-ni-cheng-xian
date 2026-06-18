@@ -1562,3 +1562,107 @@ Stage Summary:
 - 决策：项目稳定，无需修 bug，进入新功能开发阶段
 - 本轮新功能：秘境探索地图系统（Secret Realm Exploration Map）—— 参考凡人修仙传秘境设定，玩家可主动选择秘境探索，触发独特事件链
 
+
+---
+Task ID: 25
+Agent: main (cron 触发)
+Task: 项目状态评估 + QA + 修复 Prisma 缓存 bug + 完成 Task 24 秘境探索系统全栈
+
+Work Log:
+
+**项目状态评估**：
+- 阅读 worklog.md：Task 22（心魔值）+ Task 23（灵宠+符箓）+ Task 23-QA（状态评估）已完成
+- Task 23-QA 末尾提到「本轮新功能：秘境探索地图系统」，但实际只完成了 schema/types/engine，**API + UI 缺失**
+- 检查 dev.log 发现关键 bug：SQL 查询中**缺少 `exploredRealmsJson` 字段**——Prisma client 缓存陈旧（schema 已有该字段但 client 未重新生成）
+
+**Bug 修复**：
+1. **Prisma client 缓存陈旧**（critical）：
+   - 现象：`SELECT/INSERT Character` SQL 中无 `exploredRealmsJson` 列，导致该字段永远为默认值
+   - 修复：`bun run db:push`（regenerate Prisma client）+ 提升 `db.ts` 中 `PRISMA_CACHE_VERSION` 从 `v24-secretRealms` → `v25-secretRealms-complete`，强制 globalThis.prisma 重建
+   - 验证：修复后 SQL 包含 `exploredRealmsJson` ✅
+
+2. **advance/choose/interfere/combat:end 路由未持久化 exploredRealmsJson**：
+   - 修复：4 个路由的 db.character.update 中添加 `exploredRealmsJson: JSON.stringify(finalState.exploredRealms || [])`
+
+3. **state API 未返回 pets / exploredRealms**：
+   - 修复：`/api/game/state` 路由的 character 响应对象添加 `pets: state.pets || []` 和 `exploredRealms: state.exploredRealms || []`
+
+**Task 24 秘境探索系统全栈完成**：
+
+1. **API 路由** (`src/app/api/game/exploration/route.ts`)：
+   - `POST /api/game/exploration` action='start'
+   - 流程：canExploreRealm 校验 → startExploration 扣灵石+标记 _currentExploration → buildStateContext → generateAgeEvent（LLM 生成秘境事件，不推进年龄）→ executeAIEvent → recordExploration 写入探索记录+清除 _currentExploration → 持久化 + 写 EventLog (eventType='exploration')
+   - 校验项：境界/年龄/灵石/冷却/战斗中/选择中
+   - 寿元检查：探索中可能因陷阱/强敌扣血致死
+   - 最佳奖励提取：从 newItems/changes 中提取描述写入 ExplorationRecord.bestReward
+
+2. **LLM Prompt** (`src/lib/xianxia/llm.ts`)：
+   - `buildAdvancePrompt` 新增「Task 24 秘境探索——本轮主线」段（仅当 ctx.currentExploration 存在时注入）
+   - 注入秘境元数据：名称/品级/描述/危险度/奖励倍率/主题标签/五行亲和/灵感参考
+   - 8 条探索事件生成规则：eventType 限定、narrative 长度、奖励按 rewardMultiplier 分级、危险度规则（1-3 低/4-6 中/7-8 高/9-10 极高）、triggerCombat 触发、主题标签指导（beast/inheritance/illusion/lightning/blood/undead/dragon/ancient）
+
+3. **UI 组件** (`src/components/xianxia/SecretRealmPanel.tsx`)：
+   - 秘境探索弹窗（z-[55]）+ 探索结果弹窗（z-[60]）
+   - 可探索秘境列表：每张卡片含图标/名称/品级徽标/五行徽标/描述/主题标签/危险度骷髅计/奖励倍率/历史探索记录/灵石路费/探索按钮
+   - 锁定秘境列表（境界/年龄不足）：灰显 + 解锁条件
+   - 冷却遮罩：grayscale + 中央「冷却中」徽标
+   - 高危险度（≥7）二次确认：confirm 弹窗警告可能陨落
+   - 探索结果弹窗：秘境图标旋转动画 + 卷轴展开动画 + 翠绿光晕脉动 + 叙事区左侧色条
+   - 主题标签图标映射（18 种）：beast/combat/material/herb/inheritance/trap/treasure/ghost/undead/blood/murderous/dragon/spiritual_energy/illusion/heart_demon/lightning/trial/ancient
+
+4. **Store 扩展** (`src/lib/xianxia/store.ts`)：
+   - CharacterState 新增 `exploredRealms?: any[]`
+   - GameState 新增 `explorationOpen: boolean` + `lastExploration` 探索结果
+   - 新增 setter：setExplorationOpen / setLastExploration
+   - reset() 清理新字段
+
+5. **ActionButtons 集成** (`src/components/xianxia/ActionButtons.tsx`)：
+   - 坊市 + 秘境双按钮（grid-cols-2）：坊市 amber 色、秘境 emerald 色
+   - 死亡/飞升/战斗中/选择中/连推时隐藏
+
+6. **EventTimeline 增强** (`src/components/xianxia/EventTimeline.tsx`)：
+   - 新增 exploration 事件类型：图标 Compass、标签「秘境」、翠绿色节点圆点 + 光晕、卡片 emerald 边框
+
+7. **CSS 动画** (`src/app/globals.css`)：
+   - `realm-scroll-unroll`：卷轴展开（scaleY 0.3→1.02→1，0.5s cubic-bezier 弹性）
+   - `realm-glow-pulse`：翠绿光晕脉动（2.5s infinite）
+   - `realm-icon-spin`：秘境图标旋转庆祝（1.2s，rotate 0→360 + scale 1→1.15→1）
+   - `realm-card-shimmer`：秘境卡片微光流（3s shimmer）
+
+**QA 验证**（curl + agent-browser）：
+- ✅ Prisma client 重新生成，SQL 包含 exploredRealmsJson
+- ✅ POST /api/game/new 成功创建角色（秘境QA2）
+- ✅ GET /api/game/state 返回 exploredRealms/pets/heartDemon 全部新字段
+- ✅ POST /api/game/advance ×3 成功推进年龄，exploredRealmsJson 正确持久化
+- ✅ POST /api/game/exploration 正确拒绝 mortal 境界角色（"境界不足，需炼气期以上"）
+- ✅ tsc --noEmit 零错误
+- ✅ bun run lint 零警告
+- ✅ dev server 运行稳定（agent-browser chrome 启动时偶发不稳定，但 API 调用稳定——与 Task 23-QA 记录一致）
+
+Stage Summary:
+
+- 项目当前状态：**稳定，Task 24 秘境探索系统全栈完成**
+  * 修复 1 个 critical bug（Prisma client 缓存陈旧）
+  * 修复 3 个持久化/响应字段遗漏 bug（advance/choose/interfere/combat:end/state 路由）
+  * Task 24 全栈完成：API + LLM prompt + UI + store + animations
+  * 10 → 11 个 API 路由（新增 /api/game/exploration）
+  * 22 → 23 个 xianxia UI 组件（新增 SecretRealmPanel）
+  * 9 个秘境（凡境/灵境/玄境/仙境/圣境/混沌 6 品级），参考《凡人修仙传》地理设定
+  * 探索不推进年龄，独立事件流，冷却机制防重复
+
+- 未解决问题或风险：
+  1. **dev server 在 agent-browser chrome 启动时偶发不稳定**（疑似内存压力）——与 Task 23-QA 记录一致，curl API 调用稳定
+  2. **探索事件 LLM 调用偶发超时风险**：maxDuration=60s，若 LLM 响应慢可能超时；已有 fallback 兜底
+  3. **高危险度秘境可能让玩家陨落**：dangerLevel≥7 有 confirm 二次确认，但玩家仍可能因战力不足殒落；这是设计意图（参考凡人修仙传秘境杀机）
+  4. **秘境探索事件未写入 pendingThreads**：探索中若遇到重要 NPC/线索，AI 可通过 newThreads 添加，但当前 prompt 未明确引导
+  5. **探索冷却期 UI 反馈可加强**：当前用灰显+遮罩，可考虑加倒计时动画
+
+- 建议下一阶段优先事项：
+  1. **低境界角色端到端探索验证**：创建有灵根角色 → 推进到炼气期 → 实际触发探索 → 验证 LLM 生成的秘境事件质量
+  2. **阵法系统**（worklog 提到但未实现）：阵旗物品 + 阵法布置 + 阵法加成
+  3. **傀儡系统**：参考凡人修仙传傀儡术，可装备傀儡参战
+  4. **坊市拍卖会事件蓝图**：高稀有度物品获取渠道
+  5. **秘境探索事件链**：同一秘境多次探索可触发连续剧情（当前每次探索独立）
+  6. **心魔值变化写入 EventLog**：让史册可查心魔变化轨迹
+  7. **灵宠参战回写**：战斗结束后 petCombatant HP 回写到 state.pets
+  8. **UI 细节**：秘境探索倒计时动画、心魔值变化时 HeartDemonCard 抖动、突破仪式强化

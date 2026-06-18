@@ -2,7 +2,7 @@
 
 import { GameEvent } from '@/lib/xianxia/store';
 import { cn } from '@/lib/utils';
-import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2 } from 'lucide-react';
+import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 interface EventTimelineProps {
@@ -22,6 +22,7 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
   death: <Skull className="w-3.5 h-3.5" />,
   ascension: <Crown className="w-3.5 h-3.5" />,
   interference: <Zap className="w-3.5 h-3.5" />,
+  exploration: <Compass className="w-3.5 h-3.5" />,
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -33,6 +34,7 @@ const EVENT_LABELS: Record<string, string> = {
   death: '陨落',
   ascension: '飞升',
   interference: '干扰',
+  exploration: '秘境',
 };
 
 // Task 20: 事件蓝图 category → 配色（避免 indigo/blue 主色调）
@@ -181,6 +183,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
           const isDeath = event.eventType === 'death';
           const isAscension = event.eventType === 'ascension';
           const isBreakthrough = event.eventType === 'breakthrough';
+          const isExploration = event.eventType === 'exploration';
 
           return (
             <div
@@ -198,9 +201,10 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                   isBreakthrough ? "bg-yellow-400 border-yellow-400 text-white" :
                   isDeath ? "bg-destructive border-destructive text-white" :
                   isAscension ? "bg-yellow-400 border-yellow-400 text-white" :
+                  isExploration ? "bg-emerald-500 border-emerald-500 text-white" :
                   "bg-card border-border text-muted-foreground"
                 )}
-                style={isFate ? { boxShadow: '0 0 12px var(--primary)' } : isBreakthrough || isAscension ? { boxShadow: '0 0 12px #fbbf24' } : undefined}
+                style={isFate ? { boxShadow: '0 0 12px var(--primary)' } : isBreakthrough || isAscension ? { boxShadow: '0 0 12px #fbbf24' } : isExploration ? { boxShadow: '0 0 10px #10b981' } : undefined}
               >
                 <span className="scale-75">{EVENT_ICONS[event.eventType] || EVENT_ICONS.normal}</span>
               </div>
@@ -213,6 +217,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                   isBreakthrough ? "border-yellow-400/40 bg-yellow-400/5" :
                   isDeath ? "border-destructive/40 bg-destructive/5" :
                   isAscension ? "border-yellow-400/40 bg-yellow-400/5" :
+                  isExploration ? "border-emerald-500/40 bg-emerald-500/5" :
                   "border-border/60 bg-card/80",
                   "hover:shadow-md hover:border-primary/40",
                   !isExpanded && "py-2"

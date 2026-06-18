@@ -130,6 +130,8 @@ export async function POST(req: NextRequest) {
         heartDemon: state.heartDemon ?? 0,
         // Task 23: 灵宠（战斗结束后灵宠 HP 需要持久化——但当前灵宠快照存在 combatSession.petCombatant，未来可考虑回写到 state.pets）
         petsJson: JSON.stringify(state.pets || []),
+        // Task 24: 秘境探索记录
+        exploredRealmsJson: JSON.stringify(state.exploredRealms || []),
       },
     });
 

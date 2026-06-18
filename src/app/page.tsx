@@ -12,6 +12,7 @@ import { InterfereInput } from '@/components/xianxia/InterfereInput';
 import { ChoiceModal } from '@/components/xianxia/ChoiceModal';
 import { CombatModal } from '@/components/xianxia/CombatModal';
 import { MarketModal } from '@/components/xianxia/MarketModal';
+import { SecretRealmPanel } from '@/components/xianxia/SecretRealmPanel';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
 import { GameMenu } from '@/components/xianxia/GameMenu';
 import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
@@ -209,6 +210,9 @@ export default function Home() {
 
       {/* 坊市交易弹窗（z-[55]，介于 ChoiceModal 与 CombatModal 之间） */}
       <MarketModal />
+
+      {/* 秘境探索弹窗（z-[55]，与坊市同层；探索结果 z-[60]） */}
+      <SecretRealmPanel />
     </div>
   );
 }

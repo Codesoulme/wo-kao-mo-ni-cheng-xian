@@ -147,6 +147,8 @@ export async function POST(req: NextRequest) {
         heartDemon: state.heartDemon ?? 0,
         // Task 23: 灵宠
         petsJson: JSON.stringify(state.pets || []),
+        // Task 24: 秘境探索记录
+        exploredRealmsJson: JSON.stringify(state.exploredRealms || []),
       },
     });
 

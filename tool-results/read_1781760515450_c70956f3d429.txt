@@ -1237,3 +1237,329 @@
   1237→  5. 考虑添加灵宠参战系统、符箓系统、心魔值系统等凡人修仙传元素
   1238→  6. UI 细节：坊市物品按类型分组、阵法面板加阵法效果预览、战斗界面加伤害飘字动画
   1239→
+  1240→---
+  1241→Task ID: 22-a
+  1242→Agent: main
+  1243→Task: QA + 3 个关键 bug 修复（choice+combat 冲突 / 储物袋容量未强制 / 物品 ID 重复）
+  1244→
+  1245→Work Log:
+  1246→
+  1247→**QA 发现**（agent-browser 端到端测试 王剑心 25岁）：
+  1248→1. CombatModal 与 ChoiceModal 同时弹出（z-[60] 战斗 + z-50 选择叠加）
+  1249→2. inventory 12 件物品 > storageCapacity 5（容量限制未强制）
+  1250→3. 玻璃珠 x2 / 疗伤草药 x2 同 ID 重复（AI 生成重复 ID 未去重）
+  1251→4. 战斗系统本身工作正常（attack API 测试通过：玩家攻击 11 伤害，狼妖反击 14 伤害）
+  1252→
+  1253→**Bug 1 修复：Choice + Combat 冲突**（engine.ts + advance/route.ts + choose/route.ts）：
+  1254→- executeAIEvent：若 aiOutput.hasChoice && aiOutput.triggerCombat，把 triggerCombat 存到 `(state as any)._deferredCombat`，不立即 startCombat
+  1255→- advance/route.ts：pendingChoiceJson 新增 `deferredCombat: (finalState as any)._deferredCombat || null`
+  1256→- choose/route.ts：先读 char.pendingChoiceJson 中的 deferredCombat → 选择结果若 triggerCombat 用结果，否则用 deferredCombat 作为 fallback 启动战斗
+  1257→- 效果：选择通常决定战斗策略（奋力搏杀/灵活周旋/抛物安抚），选项后才进入战斗，避免双弹窗
+  1258→
+  1259→**Bug 2 修复：储物袋容量限制**（engine.ts addItems）：
+  1260→- 重写 addItems：先算本批储物袋扩容 bagBoost → projectedCapacity = state.storageCapacity + bagBoost
+  1261→- 储物袋优先放入（因扩容），其余按顺序填满 availableSlots
+  1262→- 超出 projectedCapacity 的非储物袋物品被丢弃 + console.warn
+  1263→- 储物袋物品永远保留（避免容量陷阱：丢了自己的储物袋永远进不去）
+  1264→
+  1265→**Bug 3 修复：物品 ID 去重**（engine.ts executeAIEvent）：
+  1266→- 新物品加入前先收集 next.inventory + next.equipped 所有现有 ID 到 Set
+  1267→- 对 aiOutput.newItems 每件：若 id 冲突，追加 `_rand4` 后缀直到唯一
+  1268→- 兜底无 id 物品：`i_${Date.now()}_${rand6}`
+  1269→
+  1270→Stage Summary:
+  1271→- 3 个 bug 全部修复；tsc + lint 全通过
+  1272→- 战斗系统本身正常工作（attack API 端到端通过）
+  1273→- 心魔值系统将在 Task 22-b 实现
+  1274→
+  1275→---
+  1276→Task ID: 22-b
+  1277→Agent: main
+  1278→Task: 心魔值系统（Heart Demon System）——参考《凡人修仙传》走火入魔设定
+  1279→
+  1280→Work Log:
+  1281→
+  1282→**Schema + Types**：
+  1283→- prisma/schema.prisma：Character 表新增 `heartDemon Int @default(0)`
+  1284→- types.ts CharacterState 接口新增 `heartDemon: number`（0-100）
+  1285→- types.ts CombatSession 接口新增 `victoryHeartDemonDelta?` / `defeatHeartDemonDelta?` / `isHeartDemonTrial?`
+  1286→- types.ts AIEventOutput.triggerCombat 同步新增上述字段
+  1287→- types.ts EngineStateContext.character 新增 `heartDemon: number`（让 AI 可见）
+  1288→- `bun run db:push` 同步 schema
+  1289→
+  1290→**Engine（engine.ts）**：
+  1291→- dbToState：解析 heartDemon（`(c as any).heartDemon ?? 0`，兼容旧 client）
+  1292→- stateToResponse：返回 heartDemon
+  1293→- ATTRIBUTE_BOUNDS：新增 `heartDemon: { min: 0, max: 100 }`（让 AI 可通过 changes 调整）
+  1294→- computeEffectiveCultivationRate：心魔值 30+ 修炼倍率惩罚（30→-10%，每 10 点额外 -10%，最高 -70%）
+  1295→- computeCultivationFactors：心魔 >= 30 时新增「心魔侵扰」来源条目（rarity 按 tier：epic/legendary/mythic）
+  1296→- buildStateContext：character 字段新增 heartDemon
+  1297→- startCombat：透传 victoryHeartDemonDelta/defeatHeartDemonDelta/isHeartDemonTrial 到 CombatSession
+  1298→- 新增 `adjustHeartDemon(state, delta, reason)`：钳制 0-100，日志记录变化
+  1299→- 新增 `tickHeartDemon(state)`：每岁自然变化
+  1300→  * 静修净化：境界 >= 炼气期 -1，筑基 -2，金丹 -3...（境界越高净化越快）
+  1301→  * 未解 urgent 线索：每条 +2（执念缠心）
+  1302→  * 高心魔反噬：>= 60 时额外 +3（自循环恶化）
+  1303→- 新增 `tryHeartDemonTrial(state)`：心魔 >= 60 时每岁概率触发心魔试炼战斗
+  1304→  * 触发概率：心魔 60→10%，70→20%，80→30%，90→40%
+  1305→  * 敌人 = 心魔投影（属性随境界 + 心魔值缩放）
+  1306→  * 三种敌人：心魔幻影(60-74) / 执念魔影(75-89) / 心魔真身(90+)
+  1307→  * 胜则心魔 -25，败则心魔 +15 + 扣 20% maxHp（走火入魔征兆，不致死）
+  1308→- 新增 `resolveHeartDemonTrial(state, victory)`：战斗后结算
+  1309→
+  1310→**API**：
+  1311→- advance/route.ts：
+  1312→  * tickFormations 后调 tickHeartDemon
+  1313→  * 寿元检查后尝试 tryHeartDemonTrial（仅当无战斗/无选择/存活时）
+  1314→  * 持久化 heartDemon
+  1315→  * 新增战斗中拒绝推进年龄校验（`combatStateJson.status === 'ongoing'` → 400）
+  1316→- combat/end/route.ts：
+  1317→  * endCombat 后判断 wasHeartDemonTrial → resolveHeartDemonTrial
+  1318→  * 普通战斗胜利 +3 heartDemon（杀生扰动道心）
+  1319→  * 持久化 heartDemon
+  1320→- choose/route.ts：持久化 heartDemon；放宽 choicePrompt 校验（允许空字符串，fallback 到 contextTitle）
+  1321→- interfere/route.ts：持久化 heartDemon
+  1322→- state/route.ts：返回 heartDemon
+  1323→
+  1324→**db.ts 缓存 bust 修复**：
+  1325→- 问题：dev server 长期运行时 globalThis.prisma 持有旧 schema 的 PrismaClient 实例，新字段（heartDemon）会报 `Unknown argument` 错误
+  1326→- 修复：用 `PRISMA_CACHE_VERSION = 'v22-heartDemon'` 版本号 bust 缓存——版本不匹配时清除 globalThis.prisma，强制新建实例
+  1327→- 后续 schema 变更只需更新版本号即可
+  1328→
+  1329→**LLM Prompt（llm.ts）**：
+  1330→- advance prompt：新增「Task 22 心魔值机制」段——当前心魔值 + 4 级分级说明 + 增减场景（杀生/邪功/执念 vs 静修/指点/丹药/了却执念）
+  1331→- choose prompt：选择可能影响心魔（血战到底 +5~10 / 忍辱退让 +3~8 / 高人化解 -10~20）
+  1332→- interfere prompt：玩家行动可能影响心魔（屠杀 +20~40 / 打坐 -3~8 / 清心丹 -15~30）
+  1333→
+  1334→**UI**：
+  1335→- 新建 `HeartDemonCard.tsx`：
+  1336→  * 心魔值 0 时折叠简短显示「道心澄明」
+  1337→  * 心魔 > 0 时完整卡片：标题行（icon + tier label + 心魔值）+ 进度条（按 tier 渐变色 + 30/60/90 刻度线）+ 惩罚提示（修炼 -X% + 风险预警）+ 折叠分级说明
+  1338→  * 4 级 tier：🍃 道心微动(lime) / ⚡ 心魔初起(amber) / 👹 心魔炽盛(orange) / 🔥 走火入魔(red)
+  1339→  * 颜色全部用 inline style（避免 Tailwind JIT 动态 class purge 问题）
+  1340→  * 进度条动画 transition-all duration-700 ease-out
+  1341→- StatusList.tsx：在 CharacterIntentsCard 与 PendingThreadsCard 之间插入 HeartDemonCard
+  1342→- CharacterDetailSheet.tsx：属性 StatCard 新增「心魔」字段（颜色按 tier 动态）
+  1343→- CombatModal.tsx：
+  1344→  * contextTitle 旁加「👹 心魔试炼」徽标（isHeartDemonTrial=true 时显示）
+  1345→  * 新增伤害飘字 FloatNumbersOverlay：玩家/敌人 HP 区域右上角飘字
+  1346→    - 红色：普通伤害（-N）
+  1347→    - 金色：暴击（-N 暴击，>=30 伤害判定为暴击）
+  1348→    - 绿色：治疗（+N）
+  1349→    - 灰色：闪避（闪）
+  1350→    - 动画 combat-float-up 1.2s：从下往上飘 32px + 缩放 0.6→1.2→1→0.85 + 透明度 0→1→0
+  1351→  * globals.css 新增 @keyframes combat-float-up
+  1352→
+  1353→**端到端验证（agent-browser + curl）**：
+  1354→1. ✅ heartDemon=45 时 HeartDemonCard 显示「⚡ 心魔初起 44/100 ⚠ 修炼效率 -20%」
+  1355→2. ✅ heartDemon=65 时 advance 触发心魔试炼战斗（心魔幻影 HP 224，isHeartDemonTrial=true）
+  1356→3. ✅ 心魔试炼战斗结束后 heartDemon 变化（败/遁 +15，胜 -25）+ HP 扣 20%
+  1357→4. ✅ 心魔值每岁自然变化（qi_refining -1/岁，urgent +2/条，高心魔 +3/岁）
+  1358→5. ✅ AI 可通过 changes 中 attribute='heartDemon' 调整（验证：reset=0 后 advance → heartDemon=1，AI 加了 +2 然后 tick -1）
+  1359→6. ✅ 心魔值 >= 30 时 cultivationFactors 新增「心魔侵扰」来源条目（multiply 0.8 epic rarity）
+  1360→7. ✅ 战斗中 advance 返回 400「战斗进行中，请先结束战斗」
+  1361→8. ✅ 旧存档兼容：heartDemon 默认 0，无影响
+  1362→
+  1363→Stage Summary:
+  1364→- 心魔值系统全栈完成：schema + engine + API + UI + LLM prompt
+  1365→- 参考《凡人修仙传》走火入魔设定：杀生/邪修/执念增心魔，静修/净化/了却减心魔
+  1366→- 4 级分级机制：道心澄明(0-29) / 心魔初起(30-59) / 心魔炽盛(60-89) / 走火入魔(90-100)
+  1367→- 心魔试炼战斗：心魔 >= 60 概率触发，胜则 -25 败则 +15+扣血，独立敌人「心魔投影」
+  1368→- 心魔惩罚自动计入修炼速度倍率（computeEffectiveCultivationRate）+ 来源条目（computeCultivationFactors）
+  1369→- AI 可读心魔值 + 可通过 changes 调整（advance/choose/interfere 三场景 prompt 都已更新）
+  1370→- 修复 Prisma client 缓存问题（globalThis.prisma 持有旧 schema）——版本号 bust 机制
+  1371→- 修复 choose 路由空 choicePrompt 400 bug（pendingChoice.prompt 可能为空字符串）
+  1372→- 修复 advance 路由未拒绝战斗中推进年龄 bug
+  1373→- UI 心魔卡片完整：进度条 + 分级色 + 惩罚提示 + 折叠说明
+  1374→- UI 战斗伤害飘字：暴击/治疗/伤害/闪避 4 种，1.2s 飘字动画
+  1375→- tsc + lint 全通过
+  1376→
+  1377→---
+  1378→Task ID: 22
+  1379→Agent: main (cron 触发)
+  1380→Task: 项目状态评估 + QA + 3 bug 修复 + 心魔值系统 + UI 飘字
+  1381→
+  1382→Work Log:
+  1383→- 通过 agent-browser 端到端测试 王剑心 25岁，发现 3 个关键 bug：
+  1384→  1. ChoiceModal + CombatModal 同时弹出（AI 给了 hasChoice + triggerCombat）
+  1385→  2. inventory 12 件 > storageCapacity 5（容量未强制）
+  1386→  3. 玻璃珠 x2 / 疗伤草药 x2 同 ID 重复（AI 生成重复 ID 未去重）
+  1387→  4. choose 路由空 choicePrompt 400（pendingChoice.prompt 可能为空）
+  1388→  5. advance 路由未拒绝战斗中推进年龄
+  1389→  6. dev server globalThis.prisma 持有旧 schema 缓存（schema 变更后新字段报 unknown argument）
+  1390→
+  1391→- 3 个关键 bug 全部修复（Task 22-a）：
+  1392→  1. hasChoice + triggerCombat 时延迟战斗——存到 _deferredCombat，choose route 用作 fallback
+  1393→  2. addItems 容量强制——超 storageCapacity 丢弃多余非储物袋物品 + console.warn
+  1394→  3. executeAIEvent 新物品 ID 去重——冲突时追加 _rand4 后缀
+  1395→
+  1396→- 新功能：心魔值系统（Task 22-b）——参考《凡人修仙传》走火入魔
+  1397→  * schema + types + engine + API + UI + LLM prompt 全栈
+  1398→  * 4 级分级：道心澄明/心魔初起/心魔炽盛/走火入魔
+  1399→  * 每岁自然变化（静修净化 -1~-5，urgent +2/条，高心魔 +3）
+  1400→  * 心魔试炼战斗（>= 60 概率触发，胜 -25 败 +15+扣血）
+  1401→  * 修炼效率惩罚（30+ 开始 -10%，最高 -70%）
+  1402→  * AI 可读 + 可通过 changes 调整
+  1403→  * HeartDemonCard UI + CharacterDetailSheet + CombatModal 心魔试炼徽标
+  1404→
+  1405→- UI 飘字（Task 22-b）：
+  1406→  * CombatModal 伤害飘字 4 种（伤害红/暴击金/治疗绿/闪避灰）
+  1407→  * combat-float-up 1.2s 动画（飘 32px + 缩放 + 透明度）
+  1408→  * globals.css 新增 keyframes
+  1409→
+  1410→- 附带修复：
+  1411→  * db.ts Prisma 缓存 bust（版本号机制）
+  1412→  * choose 路由空 choicePrompt 校验放宽
+  1413→  * advance 路由战斗中拒绝推进年龄
+  1414→
+  1415→- 清理：王剑心存档 inventory 从 12 件去重 + 按稀有度保留前 5 件（修复 bug 前的脏数据）
+  1416→
+  1417→Stage Summary:
+  1418→- 项目当前状态：
+  1419→  * 5 个关键 bug 全部修复（3 用户反馈 + 2 附带发现）
+  1420→  * 心魔值系统全栈完成（schema + engine + API + UI + prompt）
+  1421→  * 战斗伤害飘字 UI 完成
+  1422→  * tsc + lint 全通过
+  1423→  * 端到端验证：heartDemonCard 显示、心魔试炼触发、伤害飘字、容量限制、ID 去重 全部通过
+  1424→  * dev server 运行正常
+  1425→
+  1426→- 未解决问题或风险：
+  1427→  1. **AI 重复 ID 仍有残余风险**：executeAIEvent 已去重新物品，但 AI 在同一次输出中给多个相同 ID 物品时，ensureUniqueIds 仅处理 newEquippedItems。已在 executeAIEvent 内联去重，但建议后续把 ensureUniqueIds 改造为接受 existing IDs 参数的通用版本
+  1428→  2. **心魔试炼战斗胜率平衡**：当前心魔投影 HP = 玩家 maxHp × 0.8 × scale，对低境界角色可能过强。建议后续根据测试反馈调整 scale 公式
+  1429→  3. **心魔值变化日志仅 console.log**：未写入 EventLog，玩家无法在史册中心魔变化轨迹。建议后续在 EventLog effects 中记录 heartDemon 变化
+  1430→  4. **心魔试炼触发后玩家若不结束战斗直接关闭页面**：combatSession 持久化在 DB，下次进游戏会恢复战斗 UI。已通过 advance 路由战斗中拒绝推进年龄保证状态一致
+  1431→  5. **LLM 偶尔不按 prompt 调整 heartDemon**：AI 可能忽略 prompt 中的心魔值调整指引。当前引擎 tickHeartDemon 兜底每岁自然变化，保证心魔不会完全静止
+  1432→
+  1433→- 建议下一阶段优先事项：
+  1434→  1. 监控心魔值在长局游戏中的平衡（是否会无限增长 / 是否会过快归零）
+  1435→  2. 心魔试炼战斗胜率平衡调整
+  1436→  3. 心魔值变化写入 EventLog（史册可查）
+  1437→  4. 灵宠参战系统（凡人修仙传元素，可作为心魔试炼的盟友）
+  1438→  5. 符箓系统（consumable+trigger 类型物品的扩展使用）
+  1439→  6. 拍卖会事件蓝图（高稀有度物品获取渠道）
+  1440→  7. UI 细节：心魔试炼战斗专用背景色（red tint）、心魔值变化时 HeartDemonCard 抖动动画
+  1441→
+  1442→---
+  1443→Task ID: 23
+  1444→Agent: main (previous session, retroactively logged)
+  1445→Task: 灵宠参战系统 + 符箓系统（Pet Combat + Talisman System）——参考《凡人修仙传》
+  1446→
+  1447→Work Log:
+  1448→
+  1449→**Schema**:
+  1450→- prisma/schema.prisma：Character 表新增 `petsJson String @default("[]")`
+  1451→- bun run db:push 同步 schema
+  1452→
+  1453→**Types (types.ts)**:
+  1454→- 新增 PetSpecies 类型（12 种）：fox/wolf/snake/turtle/eagle/ape/spider/butterfly/fish/tiger/phoenix/dragon
+  1455→- 新增 Pet 接口：id/name/species/description/rarity/realm/hp/maxHp/attack/defense/speed/element/loyalty/satiety/level/exp/expToLevel/sourceAcquired/acquiredAge/skill
+  1456→- 新增 PET_SPECIES_TEMPLATES 常量（12 种物种的默认属性、技能、五行）
+  1457→- 新增 TalismanType 类型（5 种）：talisman_attack/defense/heal/escape/stun
+  1458→- 新增 TALISMAN_TYPE_LABEL 常量
+  1459→
+  1460→**Engine (engine.ts)**:
+  1461→- 新增 PET_RARITY_MULTIPLIER（common→mythic 1.0→2.8）
+  1462→- 新增 createPet(species, rarity, realm, ...)：按物种+稀有度+境界生成完整属性
+  1463→- 新增 addPet(state, pet)：上限 5 只 + ID 去重
+  1464→- 新增 dismissPet(state, petId)：放生
+  1465→- 新增 feedPet(state, petId, itemId)：消耗材料/丹药/工具类物品 → 回复饱食度+忠诚度+经验，升级提升属性
+  1466→- 新增 tickPets(state)：每岁饱食-10、忠诚-2(饥饿-5)、HP自然回复、忠诚<30 时 5% 概率逃离
+  1467→- 新增 computePetPassiveBonus(state)：按物种提供被动加成（龟加防、鹰加速、虎加攻、狐加气运、龙凤全属性）+ 修炼速度倍率
+  1468→- computeCultivationFactors：新增「灵宠陪伴」来源条目
+  1469→- computeEffectiveCultivationRate：灵宠陪伴效应乘入修炼倍率
+  1470→- 新增 getTalismanType(item)：识别符箓类型
+  1471→- 新增 isPillItem(item)：判断非符箓的丹药
+  1472→- 新增 getAvailableTalismans(state)：获取战斗可用符箓
+  1473→- dbToState：解析 petsJson
+  1474→- stateToResponse：返回 pets
+  1475→- buildStateContext：character 字段新增 pets
+  1476→- executeAIEvent：应用 aiOutput.newPets
+  1477→- startCombat：选择忠诚≥30 且饱食≥20 的灵宠参战（心魔试炼除外），生成 petCombatant
+  1478→- executeCombatAction：新增 'talisman' action，处理 5 种符箓效果
+  1479→  * talisman_attack：直接伤害（无视 30% 防御）
+  1480→  * talisman_defense：本回合减伤
+  1481→  * talisman_heal：回复 HP
+  1482→  * talisman_escape：高概率逃跑（value 越大概率越高）
+  1483→  * talisman_stun：敌人本回合无法行动
+  1484→  * 灵宠参战追加攻击（在玩家攻击后、敌人反击前）
+  1485→  * talismanDefenseActive 本回合临时状态，回合末清除
+  1486→
+  1487→**API (pet/route.ts)**:
+  1488→- 新建 /api/game/pet 路由
+  1489→- action='feed'：消耗物品喂养灵宠 → 更新 inventory + pets → 写 EventLog
+  1490→- action='dismiss'：放生灵宠 → 写 EventLog
+  1491→- action='summon'：QA/调试用，直接召唤测试灵宠
+  1492→- 战斗中/选择中拒绝操作
+  1493→
+  1494→**API (advance/route.ts)**:
+  1495→- tickFormations 后调 tickPets
+  1496→- 持久化 petsJson
+  1497→
+  1498→**API (combat/end/route.ts)**:
+  1499→- 持久化 petsJson
+  1500→
+  1501→**API (state/route.ts)**:
+  1502→- 返回 pets
+  1503→
+  1504→**LLM Prompt (llm.ts)**:
+  1505→- advance prompt：新增「Task 23 灵宠系统」段——当前灵宠列表 + 参战规则 + 每岁消耗 + 逃离规则 + newPets 授予场景（命节点/前辈传承/秘境奇遇/收服剧情/灵宠店购买/拾得灵兽蛋）
+  1506→- advance prompt：新增「Task 23 符箓系统」段——5 种符箓类型 + 物品示例 + 生成场景（前辈传授/秘境拾得/自制）
+  1507→- AIEventOutput 新增 newPets 字段
+  1508→- 5 类符箓稀有度威力参考：common 10-20 / uncommon 20-40 / rare 40-70 / epic 70-100 / legendary 100-150 / mythic 150-200
+  1509→
+  1510→**UI (PetPanel.tsx)**:
+  1511→- 新建 PetPanel 组件（在 InventoryPanel 内渲染）
+  1512→- 灵宠列表卡片：稀有度彩色边框 + 物种图标 + 五行徽标 + Lv + 稀有度 label
+  1513→- 状态条：忠诚度（5 级 tier 色）+ 饱食度（4 级 tier 色）+ HP 进度条
+  1514→- 简要属性：attack/defense/speed（lucide 图标）
+  1515→- 展开详情：主动技能（名/描述/威力/冷却）+ 描述 + 来源 + 经验
+  1516→- 喂养 DropdownMenu：选择物品喂养（消耗该物品）
+  1517→- 放生按钮 + confirm 二次确认
+  1518→- 忠诚度过低警告（< 30）+ 饱食度过低警告（< 30）
+  1519→- 空状态文案：「尚无灵宠。修仙途中可收服妖兽幼崽、前辈相赠、灵宠店购买等途径获得」
+  1520→- 底部提示：灵宠自动参战规则
+  1521→
+  1522→**UI (CombatModal.tsx)**:
+  1523→- CombatAction 类型新增 'talisman'
+  1524→- 战斗中可用符箓从 inventory 提取（通过 effects 中的 target_attribute 判定）
+  1525→- 普通丹药与符箓分离（非符箓的 consumable 才显示在丹药 dropdown）
+  1526→- 符箓 Dropdown：显示数量徽标 + 5 种类型分类
+  1527→- 战斗中灵宠参战显示（petCombatant HP/attack/技能）
+  1528→
+  1529→**InventoryPanel.tsx**:
+  1530→- 插入 <PetPanel />（在已装备与储物袋 Card 之间）
+  1531→
+  1532→Stage Summary:
+  1533→- 灵宠参战系统全栈完成：schema + types + engine + API + UI + LLM prompt
+  1534→- 符箓系统全栈完成：5 种类型 + 战斗中即时使用 + UI 分离丹药/符箓
+  1535→- 参考《凡人修仙传》灵宠设定（灵狐幻术/灵狼群战/灵蛇毒术/灵龟护主/灵鹰俯冲/灵猿巨力/灵蛛织网/灵蝶迷幻/灵鱼水刃/灵虎威压/火凤涅槃/幼龙龙息）
+  1536→- 灵宠生命周期完整：获得（AI 授予/QA 召唤）→ 喂养（消耗材料）→ 升级（属性提升）→ 参战（自动追加攻击 + 被动加成）→ 衰老（每岁饱食-10、忠诚-2）→ 逃离（忠诚<30 5% 概率）→ 放生
+  1537→- 灵宠被动加成计入修炼速度倍率（computeEffectiveCultivationRate）
+  1538→- 符箓战斗效果：攻符无视30%防御、防符本回合减伤、疗符回复HP、遁符高概率逃跑、镇符眩晕
+  1539→- tsc + lint 全通过
+  1540→
+  1541→---
+  1542→Task ID: 23-QA
+  1543→Agent: main (cron 触发)
+  1544→Task: 项目状态评估 + QA + 决策下一步开发重点
+  1545→
+  1546→Work Log:
+  1547→- 阅读 worklog.md：Task 22（心魔值系统）+ Task 23（灵宠+符箓系统）已完成
+  1548→- 检查代码：Task 23 实际已完成但 worklog 缺失记录，已补录（见上）
+  1549→- 验证：bunx tsc --noEmit 零错误（除 examples/skills 目录无关错误）
+  1550→- 验证：bun run lint 零警告
+  1551→- 验证：dev server 运行正常（端口 3000 监听中）
+  1552→- agent-browser 测试：dev server 在 chrome 启动时偶发不稳定（疑似内存压力），但 API 调用稳定
+  1553→- curl 验证：POST /api/game/new 成功创建角色"秦测试员"，返回完整 birth/event 数据
+  1554→- 项目当前状态判断：**稳定，可继续推进新功能**
+  1555→
+  1556→Stage Summary:
+  1557→- 项目当前状态：稳定
+  1558→  * Task 20-23 全部完成（事件蓝图/角色意图/未决线索/战斗/凡人修仙传/坊市/阵法/心魔值/灵宠/符箓）
+  1559→  * 类型检查通过、lint 通过、dev server 运行正常
+  1560→  * 10 个 API 路由全部就绪：new/state/advance/choose/interfere/item/market/formation/alchemy/pet + combat/action + combat/end
+  1561→  * 22 个 xianxia UI 组件全部就绪
+  1562→- 决策：项目稳定，无需修 bug，进入新功能开发阶段
+  1563→- 本轮新功能：秘境探索地图系统（Secret Realm Exploration Map）—— 参考凡人修仙传秘境设定，玩家可主动选择秘境探索，触发独特事件链
+  1564→
+  1565→

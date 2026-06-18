@@ -289,6 +289,8 @@ export async function POST(req: NextRequest) {
         heartDemon: finalState.heartDemon ?? 0,
         // Task 23: 灵宠
         petsJson: JSON.stringify(finalState.pets || []),
+        // Task 24: 秘境探索记录
+        exploredRealmsJson: JSON.stringify(finalState.exploredRealms || []),
       },
     });
 

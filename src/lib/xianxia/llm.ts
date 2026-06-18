@@ -217,6 +217,43 @@ ${engineFactors}
 ${ctx.blueprint ? `描述：${ctx.blueprint.description}` : ''}
 ${ctx.blueprint?.examples?.length ? `灵感参考（不可照抄，需融入角色处境）：${ctx.blueprint.examples.join('；')}` : ''}
 
+${ctx.currentExploration ? `【Task 24 秘境探索——本轮主线！必须围绕此秘境生成事件】
+玩家已主动前往秘境「${ctx.currentExploration.name}」探索（不推进年龄，本岁内发生）！
+秘境品级：${ctx.currentExploration.tier}（${{common:'凡境',uncommon:'灵境',rare:'玄境',epic:'仙境',legendary:'圣境',mythic:'混沌'}[ctx.currentExploration.tier] || ctx.currentExploration.tier}）
+秘境描述：${ctx.currentExploration.description}
+危险度：${ctx.currentExploration.dangerLevel}/10（影响战斗触发率与伤害）
+奖励倍率：${ctx.currentExploration.rewardMultiplier}×（影响物品稀有度与数量）
+主题标签：${ctx.currentExploration.themeTags.join('、')}
+${ctx.currentExploration.elementAffinity ? `五行亲和：${{metal:'金',wood:'木',water:'水',fire:'火',earth:'土'}[ctx.currentExploration.elementAffinity]}（奖励物品倾向此五行）` : ''}
+灵感参考（不可照抄，需融入角色处境）：${ctx.currentExploration.encounterHints.join('；')}
+
+【秘境探索事件生成规则——严格遵守】
+1. eventType 必须为 "normal" 或 "combat"（若触发战斗）或 "choice"（若遇抉择）
+2. narrative 必须体现秘境特色（场景、氛围、遭遇），150-350字
+3. 奖励规则（按 rewardMultiplier 调整 newItems 与 newStatuses）：
+   - rewardMultiplier 1.0-1.5：1-2 件 common/uncommon 物品
+   - rewardMultiplier 1.6-2.0：1-3 件 uncommon/rare 物品 + 少量灵石
+   - rewardMultiplier 2.1-3.0：1-2 件 rare/epic 物品 + 中量灵石
+   - rewardMultiplier 3.1-4.0：1-3 件 epic/legendary 物品 + 大量灵石
+4. 危险度规则（dangerLevel 越高，战斗/扣血/心魔增加概率越高）：
+   - dangerLevel 1-3：低风险，最多扣 10-20 HP
+   - dangerLevel 4-6：中风险，可能触发战斗或扣 20-40 HP，心魔可能 +3-8
+   - dangerLevel 7-8：高风险，大概率触发战斗，扣 30-60 HP，心魔可能 +5-15
+   - dangerLevel 9-10：极高风险，必触发战斗或重大损失，心魔可能 +10-25
+5. triggerCombat：若秘境危险度高或主题含 'combat'/'beast'/'undead'/'blood'，可设置 triggerCombat 触发战斗
+6. 主题标签指导：
+   - beast：遭遇妖兽（可战斗、可收服为灵宠 newPets、可拾得妖丹）
+   - inheritance：发现前辈传承（newItems 给玉简/法宝，newStatuses 给临时增益）
+   - illusion：幻境试炼（心魔 +5-15，悟性 +5-10，可能给心法）
+   - lightning：雷电淬体（HP -20-50，attack/defense +3-8）
+   - blood：血气入体（心魔 +10-20，attack +5-15，可能给 blood 属性物品）
+   - undead：鬼修遭遇（可战斗，可拾得阴属性功法）
+   - dragon：龙族遗宝（极高奖励，极高危险）
+   - ancient：上古遗物（legendary/mythic 物品）
+7. 探索结束后玩家会自动返回原地（不需要在 narrative 中描述返程）
+8. 严禁每岁重复探索同一秘境（引擎有冷却机制，AI 无需处理）
+` : ''}
+
 【角色主动意图区】（角色当前会主动做这些事——你必须在 narrative 中体现）
 ${ctx.characterIntents && ctx.characterIntents.length
   ? ctx.characterIntents.map(i => `- [优先级${i.priority}] ${i.title}：${i.description}`).join('\n')

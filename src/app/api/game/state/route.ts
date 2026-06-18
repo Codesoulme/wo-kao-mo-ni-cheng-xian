@@ -84,6 +84,10 @@ export async function GET(req: NextRequest) {
         combatSession: state.combatSession || null,
         // Task 22: 心魔值
         heartDemon: state.heartDemon ?? 0,
+        // Task 23: 灵宠
+        pets: state.pets || [],
+        // Task 24: 已探秘境记录
+        exploredRealms: state.exploredRealms || [],
       },
       pendingChoice,
       events: events.map(e => ({

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
-import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Store } from 'lucide-react';
+import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Store, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { REALMS } from '@/lib/xianxia/types';
@@ -23,6 +23,7 @@ export function ActionButtons() {
     setLastChange, setLastBreakthrough, setLoading, setError,
     setBreakthroughCeremony,
     setMarketOpen,
+    setExplorationOpen,
     reset,
   } = useGameStore();
 
@@ -246,22 +247,34 @@ export function ActionButtons() {
         )}
       </div>
 
-      {/* Task 21-d-1：坊市入口——玩家可主动访问坊市购买/出售物品 */}
+      {/* Task 21-d-1：坊市入口 + Task 24 秘境入口——玩家可主动访问 */}
       {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && (
-        <Button
-          onClick={() => setMarketOpen(true)}
-          disabled={loading}
-          variant="outline"
-          className="w-full h-9 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60 font-serif-cn tracking-wider"
-        >
-          <Store className="w-3.5 h-3.5 mr-1.5" />
-          坊市淘宝
-          <span className="ml-1.5 text-[10px] text-amber-700/70 dark:text-amber-400/70 flex items-center gap-0.5">
-            <span className="opacity-70">·</span>
-            <span className="tabular-nums">{character.spiritStones || 0}</span>
-            <span className="opacity-70">灵石</span>
-          </span>
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            onClick={() => setMarketOpen(true)}
+            disabled={loading}
+            variant="outline"
+            className="h-9 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60 font-serif-cn tracking-wider"
+          >
+            <Store className="w-3.5 h-3.5 mr-1.5" />
+            坊市
+            <span className="ml-1 text-[10px] text-amber-700/70 dark:text-amber-400/70 tabular-nums">
+              {character.spiritStones || 0}
+            </span>
+          </Button>
+          <Button
+            onClick={() => setExplorationOpen(true)}
+            disabled={loading}
+            variant="outline"
+            className="h-9 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/60 font-serif-cn tracking-wider"
+          >
+            <Compass className="w-3.5 h-3.5 mr-1.5" />
+            秘境
+            <span className="ml-1 text-[10px] text-emerald-700/70 dark:text-emerald-400/70">
+              探索
+            </span>
+          </Button>
+        </div>
       )}
 
       {/* 连推进度条 */}

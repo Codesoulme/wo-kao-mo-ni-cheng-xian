@@ -55,6 +55,9 @@ export interface CharacterState {
   // ===== Task 23 新增 =====
   // 灵宠列表
   pets?: any[];
+  // ===== Task 24 新增 =====
+  // 已探秘境记录（ExplorationRecord[]）—— 用于秘境面板显示冷却状态
+  exploredRealms?: any[];
 }
 
 export interface GameEvent {
@@ -129,6 +132,10 @@ interface GameState {
   breakthroughCeremony: BreakthroughCeremony | null;
   // Task 21-d-1：坊市弹窗开关（玩家可主动访问坊市购买/出售物品）
   marketOpen: boolean;
+  // Task 24：秘境探索弹窗开关（玩家可主动前往秘境探索）
+  explorationOpen: boolean;
+  // Task 24：最近一次探索结果（用于探索结果弹窗展示）
+  lastExploration: { realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string } | null;
 
   setCharacter: (c: CharacterState | null) => void;
   setEvents: (e: GameEvent[]) => void;
@@ -146,6 +153,10 @@ interface GameState {
   setBreakthroughCeremony: (b: BreakthroughCeremony | null) => void;
   // Task 21-d-1：坊市弹窗开关
   setMarketOpen: (open: boolean) => void;
+  // Task 24：秘境弹窗开关
+  setExplorationOpen: (open: boolean) => void;
+  // Task 24：设置最近一次探索结果
+  setLastExploration: (e: { realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string } | null) => void;
   reset: () => void;
 }
 
@@ -165,6 +176,8 @@ export const useGameStore = create<GameState>()(
       selectedEventId: null,
       breakthroughCeremony: null,
       marketOpen: false,
+      explorationOpen: false,
+      lastExploration: null,
 
       setCharacter: (c) => set({ character: c }),
       setEvents: (e) => set({ events: e }),
@@ -181,10 +194,13 @@ export const useGameStore = create<GameState>()(
       setSelectedEventId: (id) => set({ selectedEventId: id }),
       setBreakthroughCeremony: (b) => set({ breakthroughCeremony: b }),
       setMarketOpen: (open) => set({ marketOpen: open }),
+      setExplorationOpen: (open) => set({ explorationOpen: open }),
+      setLastExploration: (e) => set({ lastExploration: e }),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
         loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null,
         selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
+        explorationOpen: false, lastExploration: null,
       }),
     }),
     {
