@@ -71,8 +71,13 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // 用 Set 记录展开的事件 index（按 events 数组顺序）
-  // 默认展开最后 defaultExpandedCount 条
-  const [expandedSet, setExpandedSet] = useState<Set<number>>(new Set());
+  // 首次渲染也默认展开最后 defaultExpandedCount 条，避免 0 岁开局叙事被折叠
+  const [expandedSet, setExpandedSet] = useState<Set<number>>(() => {
+    const initial = new Set<number>();
+    const start = Math.max(0, events.length - defaultExpandedCount);
+    for (let i = start; i < events.length; i++) initial.add(i);
+    return initial;
+  });
   const [allExpanded, setAllExpanded] = useState(false);
   // 跟踪上次 events 长度，用于在事件数量变化时重置展开状态
   const [prevEventsLen, setPrevEventsLen] = useState(events.length);

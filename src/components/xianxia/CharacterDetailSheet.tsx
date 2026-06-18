@@ -15,16 +15,17 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
   const realmInfo = REALMS.find(r => r.id === character.realm);
   const rootInfo = SPIRITUAL_ROOTS[character.spiritualRoot as keyof typeof SPIRITUAL_ROOTS];
   const lifespanLeft = character.lifespan - character.age;
+  const genderLabel = character.gender === 'male' ? '男' : character.gender === 'female' ? '女' : character.gender || '未知';
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto xianxia-scroll p-0">
-        <SheetHeader className="px-4 pt-4 pb-2 border-b border-border/40 bg-gradient-to-b from-secondary/40 to-transparent">
-          <SheetTitle className="font-serif-cn flex items-center gap-2">
-            <span className="seal">道</span>
-            <span>{character.name}</span>
-            <span className="text-xs font-normal text-muted-foreground ml-auto">
-              {character.gender === 'male' ? '男' : '女'} · {character.age}岁
+        <SheetHeader className="px-4 pt-4 pb-2 pr-12 border-b border-border/40 bg-gradient-to-b from-secondary/40 to-transparent">
+          <SheetTitle className="font-serif-cn flex items-center gap-2 min-w-0">
+            <span className="seal shrink-0">道</span>
+            <span className="truncate">{character.name}</span>
+            <span className="shrink-0 text-[10px] font-normal text-muted-foreground rounded-full border border-border/60 bg-background/60 px-1.5 py-0.5">
+              {genderLabel} · {character.age}岁
             </span>
           </SheetTitle>
         </SheetHeader>

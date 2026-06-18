@@ -1,12 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useGameStore, CharacterState } from '@/lib/xianxia/store';
+import { CharacterState } from '@/lib/xianxia/store';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
-import { Heart, Sparkles, MapPin, ChevronRight } from 'lucide-react';
-import { REALMS, ELEMENTS, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
-import { cn } from '@/lib/utils';
+import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain } from 'lucide-react';
 
 interface StatusPanelProps {
   character: CharacterState;
@@ -22,6 +20,14 @@ export function StatusPanel({ character }: StatusPanelProps) {
   const expPct = character.expToBreak > 0
     ? Math.max(0, Math.min(100, (character.cultivationExp / character.expToBreak) * 100))
     : 0;
+  const genderLabel = character.gender === 'male' ? '男' : character.gender === 'female' ? '女' : character.gender || '未知';
+  const quickStats = [
+    { label: '攻', value: character.attack, icon: <Sword className="w-2.5 h-2.5" />, color: '#c8453c' },
+    { label: '防', value: character.defense, icon: <Shield className="w-2.5 h-2.5" />, color: '#2e5c8a' },
+    { label: '速', value: character.speed, icon: <Zap className="w-2.5 h-2.5" />, color: '#d4af37' },
+    { label: '运', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
+    { label: '悟', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
+  ];
 
   return (
     <>
@@ -66,12 +72,32 @@ export function StatusPanel({ character }: StatusPanelProps) {
                   {character.realmName}{character.realmMaxLevel > 0 ? ` ${character.realmLevel + 1}层` : ''}
                 </span>
                 <span className="opacity-50">·</span>
+                <span>{genderLabel}</span>
+                <span className="opacity-50">·</span>
                 <span>{character.age}岁</span>
                 <span className="opacity-50">·</span>
                 <span className="flex items-center gap-0.5 truncate max-w-[100px]">
                   <MapPin className="w-2.5 h-2.5" />
                   {character.location}
                 </span>
+              </div>
+
+              <div className="mt-1.5 grid grid-cols-5 gap-1">
+                {quickStats.map(stat => (
+                  <div
+                    key={stat.label}
+                    className="rounded-md border border-border/50 bg-background/45 px-1.5 py-1 text-center shadow-sm"
+                    title={`${stat.label}：${stat.value}`}
+                  >
+                    <div className="flex items-center justify-center gap-0.5 text-[9px] text-muted-foreground">
+                      <span style={{ color: stat.color }}>{stat.icon}</span>
+                      {stat.label}
+                    </div>
+                    <div className="text-[11px] leading-none mt-0.5 font-semibold tabular-nums" style={{ color: stat.color }}>
+                      {stat.value}
+                    </div>
+                  </div>
+                ))}
               </div>
 
               {/* 寿元 + 修为 双进度条（紧凑） */}
