@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   MapPin, X, Coins, Loader2, Skull, Sparkles, Clock, Zap, AlertTriangle,
-  Compass, ChevronRight, Trophy, Shield, Ghost, CloudLightning, Droplet,
+  Compass, ChevronRight, Trophy, Shield, Ghost, CloudLightning, Droplet, ScrollText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -256,7 +256,7 @@ function RealmCard({
 
 // 探索结果展示
 function ExplorationResult() {
-  const { lastExploration, setLastExploration } = useGameStore();
+  const { lastExploration, setLastExploration, setSelectedEventId } = useGameStore();
   if (!lastExploration) return null;
 
   const tierColor = TIER_COLOR[lastExploration.realmTier as SecretRealmTier] || '#84cc16';
@@ -302,7 +302,26 @@ function ExplorationResult() {
           >
             {lastExploration.narrative}
           </div>
-          <div className="mt-3 pt-3 border-t border-border/40 flex justify-end">
+          {lastExploration.effects && lastExploration.effects.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1">
+              {lastExploration.effects.slice(0, 4).map((eff: any, idx: number) => (
+                <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200 font-serif-cn">
+                  {eff.label || eff.name || eff.reason || '有所变化'}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 pt-3 border-t border-border/40 flex justify-between gap-2">
+            {lastExploration.eventId ? (
+              <Button
+                variant="outline"
+                onClick={() => { setSelectedEventId(lastExploration.eventId!); setLastExploration(null); }}
+                className="h-8"
+              >
+                <ScrollText className="w-3.5 h-3.5 mr-1" />
+                <span className="text-xs font-serif-cn">收入史册</span>
+              </Button>
+            ) : <span />}
             <Button
               onClick={() => setLastExploration(null)}
               className="bg-primary text-primary-foreground hover:bg-primary/90 h-8"
@@ -406,7 +425,7 @@ export function SecretRealmPanel() {
         title: data.event.title,
         narrative: data.event.narrative,
         eventType: 'exploration',
-        effects: data.changes || [],
+        effects: data.event.effects || [],
         isFateNode: false,
         blueprint: { category: 'exploration', name: `秘境·${data.event.realmName}` },
         createdAt: new Date().toISOString(),
@@ -414,11 +433,14 @@ export function SecretRealmPanel() {
 
       // 设置探索结果弹窗
       setLastExploration({
+        eventId: data.event.id,
+        age: data.event.age,
         realmName: data.event.realmName,
         realmTier: data.event.realmTier,
         realmIcon: data.event.realmIcon,
         title: data.event.title,
         narrative: data.event.narrative,
+        effects: data.event.effects || data.changes || [],
       });
 
       // 关闭秘境面板（让结果弹窗独占）
@@ -490,6 +512,9 @@ export function SecretRealmPanel() {
               <span className="opacity-50">·</span>
               <span>共 {availableRealms.length + lockedRealms.length} 处</span>
             </div>
+            <p className="mt-2 text-[10.5px] leading-relaxed text-muted-foreground font-serif-cn">
+              秘境不是独立副本，而是本年内的一次主动入世：入境所得会写入史册，影响状态、线索、战斗与后续天道推演。
+            </p>
           </CardHeader>
 
           <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">

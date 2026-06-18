@@ -185,7 +185,7 @@ interface GameState {
   // Task 24：秘境探索弹窗开关（玩家可主动前往秘境探索）
   explorationOpen: boolean;
   // Task 24：最近一次探索结果（用于探索结果弹窗展示）
-  lastExploration: { realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string } | null;
+  lastExploration: { eventId?: string; age?: number; realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string; effects?: any[] } | null;
 
   heritageVault: HeritageItem[];
   selectedHeritage: SelectedHeritage;
@@ -211,7 +211,7 @@ interface GameState {
   // Task 24：秘境弹窗开关
   setExplorationOpen: (open: boolean) => void;
   // Task 24：设置最近一次探索结果
-  setLastExploration: (e: { realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string } | null) => void;
+  setLastExploration: (e: { eventId?: string; age?: number; realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string; effects?: any[] } | null) => void;
   setHeritageVault: (items: HeritageItem[]) => void;
   addHeritageItems: (items: HeritageItem[]) => void;
   setSelectedHeritage: (selected: SelectedHeritage) => void;

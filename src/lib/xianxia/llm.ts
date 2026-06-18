@@ -2,7 +2,6 @@
 // 6-zone prompt: Identity / Scene / Classification / State / Memory / Recent
 // 强制 JSON 输出，引擎校验后应用
 
-import ZAI from 'z-ai-web-dev-sdk';
 import { promises as fs } from 'fs';
 import path from 'path';
 import {
@@ -28,33 +27,44 @@ import {
 } from './types';
 import { ensureUniqueIds, filterMeaningfulStatuses } from './engine';
 
-let zaiInstance: any = null;
-let zaiModelName = 'ark-code-latest';
+type RuntimeAIConfig = {
+  baseUrl: string;
+  apiKey: string;
+  chatId?: string;
+  userId?: string;
+  model: string;
+};
+
+let cachedAIConfig: RuntimeAIConfig | null = null;
 
 export function resetZAI() {
-  zaiInstance = null;
+  cachedAIConfig = null;
 }
 
-async function loadZAIModelName() {
-  try {
-    const raw = await fs.readFile(path.join(process.cwd(), '.z-ai-config'), 'utf-8');
-    const cfg = JSON.parse(raw);
-    zaiModelName = String(cfg?.model || cfg?.modelName || 'ark-code-latest').trim() || 'ark-code-latest';
-  } catch {
-    zaiModelName = 'ark-code-latest';
+async function loadAIConfig(): Promise<RuntimeAIConfig> {
+  if (cachedAIConfig) return cachedAIConfig;
+  const raw = await fs.readFile(path.join(process.cwd(), '.z-ai-config'), 'utf-8');
+  const cfg = JSON.parse(raw);
+  const baseUrl = String(cfg?.baseUrl || '').trim().replace(/\/+$/, '');
+  const apiKey = String(cfg?.apiKey || '').trim();
+  const model = String(cfg?.model || cfg?.modelName || 'ark-code-latest').trim() || 'ark-code-latest';
+  if (!baseUrl || !apiKey) {
+    throw new Error('AI 配置不完整，请在设置中填写 Base URL 和 API Key');
   }
+  cachedAIConfig = {
+    baseUrl,
+    apiKey,
+    model,
+    chatId: cfg?.chatId ? String(cfg.chatId) : undefined,
+    userId: cfg?.userId ? String(cfg.userId) : undefined,
+  };
+  return cachedAIConfig;
 }
 
-async function getZAI() {
-  if (!zaiInstance) {
-    await loadZAIModelName();
-    zaiInstance = await ZAI.create();
-  }
-  return zaiInstance;
-}
-
-function withModel<T extends Record<string, any>>(payload: T): T & { model: string } {
-  return { model: zaiModelName, ...payload };
+function aiErrorMessage(body: any, status: number) {
+  const message = body?.error?.message || body?.message || body?.error || `HTTP ${status}`;
+  const code = body?.error?.code || body?.code;
+  return code ? `${code}: ${message}` : String(message);
 }
 
 // ==================== 系统设定区 (Identity Zone) ====================
@@ -704,15 +714,34 @@ removedItemIds：若玩家行动导致物品消耗/损坏（如服用丹药、�
 async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: string): Promise<any> {
   const fullSystem = `${systemPrompt}\n\n${scenePrompt}`;
   try {
-    const zai = await getZAI();
-    const completion = await zai.chat.completions.create(withModel({
-      messages: [
-        { role: 'system', content: fullSystem },
-        { role: 'user', content: userPrompt },
-      ],
-      thinking: { type: 'disabled' },
-    }));
-    const content = completion.choices[0]?.message?.content || '';
+    const cfg = await loadAIConfig();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${cfg.apiKey}`,
+    };
+    if (cfg.chatId) headers['X-Chat-Id'] = cfg.chatId;
+    if (cfg.userId) headers['X-User-Id'] = cfg.userId;
+
+    const res = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: 'system', content: fullSystem },
+          { role: 'user', content: userPrompt },
+        ],
+        thinking: { type: 'disabled' },
+      }),
+    });
+    const text = await res.text();
+    let data: any = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+    if (!res.ok) {
+      throw new Error(`AI 接口请求失败：${aiErrorMessage(data || text, res.status)}`);
+    }
+    const content = data?.choices?.[0]?.message?.content || '';
+    if (!content) throw new Error('AI 接口返回为空');
     return parseJSON(content);
   } catch (err: any) {
     console.error('LLM call failed:', err?.message || err);

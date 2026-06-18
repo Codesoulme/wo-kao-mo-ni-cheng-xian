@@ -23,9 +23,59 @@ import {
 } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import type { SecretRealm } from '@/lib/xianxia/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+function buildFallbackExplorationEvent(state: any, realm: SecretRealm, ctx: any, error?: any) {
+  const hints = realm.encounterHints || [];
+  const hint = hints[(state.age + realm.id.length) % Math.max(1, hints.length)] || '秘境气机变化';
+  const danger = realm.dangerLevel >= 7;
+  const gain = Math.max(6, Math.round(10 * realm.rewardMultiplier + state.comprehension * 0.12));
+  const mpCost = Math.min(state.mp || 0, danger ? 10 : 5);
+  const luckGain = realm.themeTags?.some((t: string) => ['treasure', 'inheritance', 'spiritual_energy'].includes(t)) ? 1 : 0;
+  const title = danger ? `秘境险归·${realm.name}` : `秘境探幽·${realm.name}`;
+  const warning = error?.message ? '天机紊乱，秘境中诸象难以尽录；' : '';
+  return {
+    title,
+    narrative: `${state.name}备好符箓与干粮，循着地脉裂隙入了「${realm.name}」。${realm.description}\n\n${warning}行至深处，${hint}忽然应在眼前。${state.name}不敢贪功，借地势遮掩气息，或采灵机，或避杀阵，终在天色将明时折返。此行虽未惊动大势，却也让经脉多了一分磨砺，对此地的虚实记下几处关窍。`,
+    eventType: danger ? 'danger' : 'exploration',
+    changes: [
+      { attribute: 'cultivationExp', delta: gain, reason: `${realm.name}探幽所得` },
+      ...(mpCost ? [{ attribute: 'mp', delta: -mpCost, reason: '入境探路消耗灵力' }] : []),
+      ...(luckGain ? [{ attribute: 'luck', delta: luckGain, reason: '窥得秘境灵机' }] : []),
+    ],
+    newStatuses: danger ? [{
+      id: `realm-wary-${realm.id}-${Date.now()}`,
+      name: '秘境余悸',
+      type: 'debuff',
+      description: `刚从${realm.name}险地归来，心神尚未完全平复。`,
+      duration: 1,
+      effects: [{ attribute: 'heartDemon', operation: 'add', value: 1 }],
+      source: realm.name,
+    }] : [],
+    newItems: [],
+    removedItemIds: [],
+    newEquippedItems: [],
+    equipItemIds: [],
+    unequipItemIds: [],
+    memory: `${state.age}岁探索${realm.name}，记下${hint}`,
+    cultivationInsight: ctx.cultivationInsight || `${realm.name}地脉复杂，行走其间亦是一场修行。`,
+    hasChoice: false,
+    choice: null,
+    triggeredBreakthrough: false,
+    causedDeath: false,
+    causedAscension: false,
+    newThreads: [],
+    advanceThreads: [],
+    completeThreadIds: [],
+    failThreadIds: [],
+    triggerCombat: null,
+    newPets: [],
+  };
+}
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -102,31 +152,7 @@ export async function POST(req: NextRequest) {
       aiOutput = await generateAgeEvent(ctx, false);
     } catch (llmErr: any) {
       console.error('LLM exploration failed, using fallback:', llmErr?.message || llmErr);
-      aiOutput = {
-        title: `秘境探索·${realm.name}`,
-        narrative: `${state.name}前往${realm.name}探索。${realm.description}一番波折后，${state.name}带着些许收获归来。`,
-        eventType: 'normal',
-        changes: [],
-        newStatuses: [],
-        newItems: [],
-        removedItemIds: [],
-        newEquippedItems: [],
-        equipItemIds: [],
-        unequipItemIds: [],
-        memory: `${state.age}岁探索${realm.name}`,
-        cultivationInsight: ctx.cultivationInsight || '',
-        hasChoice: false,
-        choice: null,
-        triggeredBreakthrough: false,
-        causedDeath: false,
-        causedAscension: false,
-        newThreads: [],
-        advanceThreads: [],
-        completeThreadIds: [],
-        failThreadIds: [],
-        triggerCombat: null,
-        newPets: [],
-      };
+      aiOutput = buildFallbackExplorationEvent(state, realm, ctx, llmErr);
     }
 
     // 引擎执行 AI 输出
@@ -192,7 +218,7 @@ export async function POST(req: NextRequest) {
     const displayEffects = buildEventDisplayEffects({
       before: stateBeforeExploration,
       after: finalState,
-      changes: result.appliedChanges,
+      changes: displayEffects,
       newStatuses: aiOutput.newStatuses,
       newItems: aiOutput.newItems,
       newEquippedItems: aiOutput.newEquippedItems,
