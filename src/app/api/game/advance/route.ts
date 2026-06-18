@@ -454,7 +454,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const createdEvents = [];
+    const createdEvents: any[] = [];
     for (const [idx, draft] of eventDrafts.entries()) {
       const created = await db.eventLog.create({
         data: {

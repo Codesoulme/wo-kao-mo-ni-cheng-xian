@@ -115,18 +115,21 @@ export function ItemDetailDialog({
             <div>
               <div className="text-[10px] text-muted-foreground mb-1">效果</div>
               <div className="flex flex-wrap gap-1.5">
-                {item.effects.map((e: any, i: number) => fmtEffectZh(e)).filter(Boolean).map((label: string, i: number) => (
-                  <span
-                    key={i}
-                    className="text-[11px] px-2 py-0.5 rounded font-medium"
-                    style={{
-                      background: e.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
-                      color: e.operation === 'multiply' ? '#c8453c' : '#3b82f6',
-                    }}
-                  >
-                    {label}
-                  </span>
-                ))}
+                {item.effects
+                  .map((e: any, i: number) => ({ effect: e, label: fmtEffectZh(e), index: i }))
+                  .filter((entry: { label: string }) => Boolean(entry.label))
+                  .map((entry: { effect: any; label: string; index: number }) => (
+                    <span
+                      key={entry.index}
+                      className="text-[11px] px-2 py-0.5 rounded font-medium"
+                      style={{
+                        background: entry.effect.operation === 'multiply' ? '#c8453c15' : '#3b82f615',
+                        color: entry.effect.operation === 'multiply' ? '#c8453c' : '#3b82f6',
+                      }}
+                    >
+                      {entry.label}
+                    </span>
+                  ))}
               </div>
             </div>
           )}

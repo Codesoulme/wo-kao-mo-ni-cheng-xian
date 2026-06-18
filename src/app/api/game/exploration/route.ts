@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
     const displayEffects = buildEventDisplayEffects({
       before: stateBeforeExploration,
       after: finalState,
-      changes: displayEffects,
+      changes: result.appliedChanges,
       newStatuses: aiOutput.newStatuses,
       newItems: aiOutput.newItems,
       newEquippedItems: aiOutput.newEquippedItems,
