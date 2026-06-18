@@ -12,50 +12,71 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 function buildFallbackAgeEvent(state: any, blueprint: any, ctx: any, isFateNode: boolean) {
+  const place = state.location || '暂居之地';
+  const age = state.age;
   const rate = Number(ctx?.cultivationRate?.finalRate || state.cultivationMultiplier || 1) || 1;
-  const baseGain = Math.max(6, Math.round(10 * rate));
+  const baseGain = Math.max(5, Math.round(8 * rate));
+  const seed = Math.abs((age * 37) + String(state.id || state.name || '').split('').reduce((n, ch) => n + ch.charCodeAt(0), 0));
   const actions = [
     {
-      title: '闭关温养',
-      narrative: `${state.age}岁，${state.name}没有等天命垂青，而是在${state.location || '暂居之地'}寻了一处清静角落，按旧法吐纳运气。晨昏之间，灵息虽薄，却也一点点沉入丹田；偶有滞涩，便以行走、采水、静坐调匀身心。`,
-      changes: [{ attribute: 'cultivationExp', delta: baseGain, reason: '一岁勤修不辍' }],
+      title: '静室温功',
+      narrative: `${age}岁，${state.name}没有贸然远行，而是在${place}择一处清静屋舍温养气脉。晨起搬运周天，午后校正吐纳，夜里复盘旧日所学；日子看似平稳，丹田里的灵气却比往年凝实了几分。`,
+      changes: [
+        { attribute: 'cultivationExp', delta: baseGain, reason: '静修温功' },
+        { attribute: 'mp', delta: Math.max(1, Math.round(baseGain / 2)), reason: '吐纳回气' },
+      ],
       insight: `这一年以稳固根基为主，按当前修炼速度约积累${baseGain}点修行进境。`,
     },
     {
-      title: '溪畔寻药',
-      narrative: `${state.age}岁，${state.name}沿${state.location || '居所'}附近山水寻找可用草木，白日辨药，夜里温习吐纳。虽未撞见惊天机缘，却学会分辨几味养气小草，也借奔走磨了心性。`,
+      title: '溪畔采药',
+      narrative: `${age}岁，${state.name}沿${place}附近山水辨认草木。白日采药、问路、避开蛇虫瘴气，夜里借月色温习吐纳。此行没有惊动大势，却认得几味养气小草，也把脚下山川记熟了些。`,
       changes: [
-        { attribute: 'cultivationExp', delta: Math.max(4, Math.round(baseGain * 0.75)), reason: '采药间隙修行' },
+        { attribute: 'cultivationExp', delta: Math.max(4, Math.round(baseGain * 0.75)), reason: '采药间体悟灵气流转' },
         { attribute: 'luck', delta: 1, reason: '熟悉附近山水草木' },
       ],
       insight: `采药与吐纳并行，修行进境约${Math.max(4, Math.round(baseGain * 0.75))}点。`,
     },
     {
-      title: '人间历练',
-      narrative: `${state.age}岁，${state.name}没有久坐空耗，而是帮村人修桥、护送商队一程，又在夜深时独自运转周天。凡尘琐事不显赫，却让她更明白人心冷暖，也让气息在劳作后更易沉稳。`,
+      title: '尘中磨性',
+      narrative: `${age}岁，${state.name}在${place}处理凡尘琐事：替人送信，帮老农驱兽，也听茶棚散修谈起远方风声。忙碌不似闭关，却磨去了几分浮躁，使修行心性更稳。`,
       changes: [
-        { attribute: 'cultivationExp', delta: Math.max(5, Math.round(baseGain * 0.65)), reason: '劳作之后静修' },
-        { attribute: 'reputation', delta: 1, reason: '凡尘中积下一点口碑' },
+        { attribute: 'cultivationExp', delta: Math.max(3, Math.round(baseGain * 0.65)), reason: '尘事磨心' },
+        { attribute: 'reputation', delta: 1, reason: '乡里略有善名' },
       ],
-      insight: `凡事磨心，劳作后静修，仍得${Math.max(5, Math.round(baseGain * 0.65))}点修行进境。`,
+      insight: `凡事磨心，劳作后静修，仍得${Math.max(3, Math.round(baseGain * 0.65))}点修行进境。`,
     },
     {
-      title: '夜读残篇',
-      narrative: `${state.age}岁，${state.name}从旧书摊换来几页残破修行札记。文字残缺，未必尽真，她便一边辨伪，一边以自身气感印证。数月下来，没有一步登天，却少走了几分岔路。`,
+      title: '残篇夜读',
+      narrative: `${age}岁，${state.name}从旧摊上换得几页残破修行札记。纸上多是前人错漏与旁注，真正可用的不多；但逐句辨伪、对照自身经脉之后，仍悟出一两处可改的吐纳细节。`,
       changes: [
-        { attribute: 'cultivationExp', delta: Math.max(5, Math.round(baseGain * 0.8)), reason: '参读残篇后修行' },
-        { attribute: 'comprehension', delta: 1, reason: '辨读修行札记' },
+        { attribute: 'cultivationExp', delta: Math.max(4, Math.round(baseGain * 0.8)), reason: '残篇印证修行' },
+        { attribute: 'comprehension', delta: 1, reason: '辨伪旧札' },
       ],
-      insight: `残篇不足成法，却能校正吐纳，约得${Math.max(5, Math.round(baseGain * 0.8))}点修行进境。`,
+      insight: `残篇不足成法，却能校正吐纳，约得${Math.max(4, Math.round(baseGain * 0.8))}点修行进境。`,
+    },
+    {
+      title: '照料旧缘',
+      narrative: `${age}岁，${state.name}没有急着追逐机缘，而是整理旧物、照料身边因缘，并把近年经历逐条记下。修行有时不在山崩海啸之间，也在这些不肯放松的细处。`,
+      changes: [
+        { attribute: 'cultivationExp', delta: Math.max(3, Math.round(baseGain * 0.55)), reason: '整理旧缘后心绪渐明' },
+        { attribute: 'heartDemon', delta: -1, reason: '心绪稍安' },
+      ],
+      insight: `整理旧缘使心神稍定，修行虽慢，却少了些杂念。`,
+    },
+    {
+      title: '山路听风',
+      narrative: `${age}岁，${state.name}背着简囊在${place}外走了几日山路。途中没有遇见仙人遗府，只见溪石、樵夫与远处云影；可正是在这些寻常景象里，她把呼吸、步伐和灵力运转调得更顺。`,
+      changes: [
+        { attribute: 'cultivationExp', delta: Math.max(4, Math.round(baseGain * 0.7)), reason: '行路调息' },
+        { attribute: 'speed', delta: 1, reason: '山路磨脚力' },
+      ],
+      insight: `行走山路亦是调息，身法与气脉略有长进。`,
     },
   ];
-  const picked = actions[Math.abs((state.age || 0) + String(blueprint?.category || '').length) % actions.length];
-  const hint = blueprint?.name ? `这一年原本隐有「${blueprint.name}」的因果影子，但天机晦暗，最终只落在日常选择与细碎积累里。` : '';
+  const picked = actions[seed % actions.length];
   return {
     title: picked.title,
-    narrative: `${picked.narrative}${hint ? `
-
-${hint}` : ''}`,
+    narrative: picked.narrative,
     eventType: isFateNode ? 'fate_node' : 'normal',
     changes: picked.changes,
     newStatuses: [],
@@ -64,7 +85,7 @@ ${hint}` : ''}`,
     newEquippedItems: [],
     equipItemIds: [],
     unequipItemIds: [],
-    memory: `${state.age}岁，${picked.title}。`,
+    memory: `${age}岁，${picked.title}。`,
     cultivationInsight: picked.insight,
     hasChoice: false,
     choice: null,

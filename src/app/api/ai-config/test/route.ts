@@ -65,8 +65,9 @@ export async function POST(req: NextRequest) {
           { role: 'system', content: '你是一个接口连通性测试助手，只返回 OK。' },
           { role: 'user', content: '请只回复 OK' },
         ],
-        max_tokens: 8,
+        max_tokens: 128,
         temperature: 0,
+        thinking: { type: 'disabled' },
       }),
     });
     const elapsedMs = Date.now() - started;
