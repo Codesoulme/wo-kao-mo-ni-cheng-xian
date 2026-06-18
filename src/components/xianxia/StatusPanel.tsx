@@ -16,8 +16,11 @@ interface StatusPanelProps {
 export function StatusPanel({ character }: StatusPanelProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const lifespanLeft = character.lifespan - character.age;
-  const lifePct = character.lifespan > 0
-    ? Math.max(0, Math.min(100, (character.age / character.lifespan) * 100))
+  const hpPct = character.maxHp > 0
+    ? Math.max(0, Math.min(100, (character.hp / character.maxHp) * 100))
+    : 0;
+  const mpPct = character.maxMp > 0
+    ? Math.max(0, Math.min(100, (character.mp / character.maxMp) * 100))
     : 0;
   const expPct = character.expToBreak > 0
     ? Math.max(0, Math.min(100, (character.cultivationExp / character.expToBreak) * 100))
@@ -193,16 +196,22 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 ))}
               </div>
 
-              {/* 寿元 + 修为 双进度条（紧凑） */}
+              {/* 生命、灵力、修为 三进度条（寿元仅保留文字显示） */}
               <div className="mt-1.5 space-y-1">
                 <MiniBar
                   icon={<Heart className="w-2.5 h-2.5" />}
                   color="#c8453c"
-                  pct={lifePct}
-                  label={`寿余 ${lifespanLeft} 年`}
+                  pct={hpPct}
+                  label={`${character.hp}/${character.maxHp}`}
                 />
                 <MiniBar
                   icon={<Sparkles className="w-2.5 h-2.5" />}
+                  color="#2e8f8a"
+                  pct={mpPct}
+                  label={`${character.mp}/${character.maxMp}`}
+                />
+                <MiniBar
+                  icon={<Zap className="w-2.5 h-2.5" />}
                   color={character.realmColor}
                   pct={expPct}
                   label={`${character.cultivationExp}/${character.expToBreak}`}
