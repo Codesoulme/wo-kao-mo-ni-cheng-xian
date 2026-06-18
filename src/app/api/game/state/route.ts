@@ -3,8 +3,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, computeEffectiveCultivationRate } from '@/lib/xianxia/engine';
-import { REALMS, FATE_NODES, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
+import { dbToState, computeEffectiveCultivationRate, stateToResponse } from '@/lib/xianxia/engine';
+import { FATE_NODES, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
 
 export const runtime = 'nodejs';
 
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     });
 
     const state = dbToState(char as any);
-    const realmInfo = REALMS.find(r => r.id === state.realm);
+    const responseState = stateToResponse(state);
     const rootInfo = SPIRITUAL_ROOTS[state.spiritualRoot];
     const rate = computeEffectiveCultivationRate(state);
 
@@ -52,13 +52,14 @@ export async function GET(req: NextRequest) {
         spiritualRoot: char.spiritualRoot,
         rootDetail: char.rootDetail,
         rootMultiplier: rootInfo?.multiplier ?? 0,
-        realm: char.realm,
-        realmName: realmInfo?.name ?? '凡人',
-        realmColor: realmInfo?.color ?? '#6b7280',
-        realmLevel: char.realmLevel,
-        realmMaxLevel: realmInfo?.levels ?? 0,
-        cultivationExp: char.cultivationExp,
-        expToBreak: char.expToBreak,
+        realm: responseState.realm,
+        realmName: responseState.realmName,
+        realmColor: responseState.realmColor,
+        realmLevel: responseState.realmLevel,
+        realmMaxLevel: responseState.realmMaxLevel,
+        realmProfile: responseState.realmProfile,
+        cultivationExp: responseState.cultivationExp,
+        expToBreak: responseState.expToBreak,
         elements: state.elements,
         hp: char.hp, maxHp: char.maxHp,
         mp: char.mp, maxMp: char.maxMp,

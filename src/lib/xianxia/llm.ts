@@ -108,7 +108,9 @@ const SCENE_PROMPTS: Record<string, string> = {
 - 修为自然增长：每岁根据境界与灵根给 cultivationExp 增量（凡人0，炼气10-30，筑基30-80，金丹80-200，更高境界更多）。
 - 修为增量受灵根倍率影响：杂灵根×0.3、凡灵根×0.8、真灵根×1.5、天灵根×3、混沌灵根×5。
 - 当 cultivationExp 达到 expToBreak 时，可设置 triggeredBreakthrough=true 请求突破；普通突破通常只升一小层。若要连破多层或跨大境界，必须提供 breakthroughReason（明确奇遇/丹药/传承/顿悟/灌顶等由头）与目标，否则引擎会按普通突破处理。
+- 默认境界只是常规修仙框架，不是唯一真理。若有强因果，可通过 realmProfilePatch 或 newStatuses 的特殊境界状态提议「练气999层」「完美筑基」「九转金丹」等变体；必须合情合理，不能无缘无故改境界强度。
 - 若本轮数值会突破，narrative 或 extraEvents 必须明确写出冲关/破境过程，不能只写交易、赶路、准备，然后数值状态已经到了下一境界。
+- realmProfilePatch 结构：{name,shortName,color,maxLevel,powerMultiplier,expMultiplier,reason}；maxLevel 可表达练气叠层，powerMultiplier/expMultiplier 必须克制且有叙事原因。也可用 newStatuses 输出 category=special 的长期境界状态，effects 里用 realmMaxLevel、realmPower、realmExp。
 - 玩家寿元将尽时（age 接近 lifespan），应描写衰老、坐化等情节。
 
 【角色主动性——重要！】
@@ -328,6 +330,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
   "breakthroughReason": "若连破/跨境，写清楚由头；普通突破留空",
   "breakthroughTargetRealm": null,
   "breakthroughTargetLevel": null,
+  "realmProfilePatch": null,
   "extraEvents": [],
   "causedDeath": false,
   "causedAscension": false,
@@ -1334,6 +1337,7 @@ function sanitizeEventOutput(raw: any): AIEventOutput {
     breakthroughReason: raw?.breakthroughReason ? String(raw.breakthroughReason).slice(0, 240) : '',
     breakthroughTargetLevel: raw?.breakthroughTargetLevel ? Number(raw.breakthroughTargetLevel) : undefined,
     breakthroughTargetRealm: ['mortal','qi_refining','foundation','golden_core','nascent_soul','spirit_severing','great_vehicle','tribulation','ascension'].includes(raw?.breakthroughTargetRealm) ? raw.breakthroughTargetRealm : undefined,
+    realmProfilePatch: sanitizeRealmProfilePatch(raw?.realmProfilePatch),
     extraEvents: Array.isArray(raw?.extraEvents) ? raw.extraEvents.map((e: any) => ({
       title: String(e?.title || '余波').slice(0, 32),
       narrative: String(e?.narrative || '').slice(0, 600),

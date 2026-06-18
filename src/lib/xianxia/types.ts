@@ -26,6 +26,18 @@ export interface RealmInfo {
   description: string;
 }
 
+// 境界画像：默认境界体系之上的显示/强度覆盖层。
+// 底层 realm 仍用于系统兼容；AI 可在重大因果下通过特殊状态或突破输出改写此画像。
+export interface RealmProfile {
+  name?: string;         // 显示名称，如「练气四十二层」「九转金丹」「完美筑基」
+  shortName?: string;    // 境界球单字/短名
+  color?: string;
+  maxLevel?: number;     // 当前境界的显示层数上限，允许如练气999层
+  powerMultiplier?: number; // 强度倍率，仅在合理范围内影响战斗/属性展示
+  expMultiplier?: number;   // 突破/升层修为需求倍率
+  reason?: string;       // 叙事因果
+}
+
 export const REALMS: RealmInfo[] = [
   {
     id: 'mortal',
@@ -476,6 +488,8 @@ export interface AIEventOutput {
   breakthroughTargetLevel?: number;
   // AI 希望突破到的目标大境界；没有充分由头时引擎会拒绝跨大境界。
   breakthroughTargetRealm?: Realm;
+  // 合理特殊突破时，AI 可提议境界画像覆盖；引擎会校验并限制倍率/层数。
+  realmProfilePatch?: RealmProfile;
 
   // 同一岁内的补充事件文本，用于把复杂年份拆成多段史册记录，避免一段叙事过长或漏写关键过程。
   extraEvents?: { title: string; narrative: string; eventType?: AIEventOutput['eventType'] }[];
@@ -728,6 +742,8 @@ export interface CharacterState {
   cultivationInsight: string;
   // 修炼速度来源结构化条目（前端按 rarity 给来源上色 + 显示具体倍率数字）
   cultivationFactors: CultivationFactor[];
+  // 境界画像：默认境界体系基础上的 AI/奇遇覆盖显示与强度信息
+  realmProfile?: RealmProfile;
   longTermMemory: string[];
   // ===== Task 20 新增 =====
   // 未决线索列表（重要剧情线索，会在后续推进/到期触发）

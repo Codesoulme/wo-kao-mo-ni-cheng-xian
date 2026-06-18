@@ -8,6 +8,7 @@ import {
   StatusEntry,
   ItemEntry,
   Realm,
+  RealmProfile,
   REALMS,
   getRealmInfo,
   getNextRealm,
@@ -154,12 +155,62 @@ export function dbToState(c: DBCharacter): CharacterState {
   const rate = computeEffectiveCultivationRate(state);
   state.cultivationMultiplier = rate.multiplier;
   state.cultivationFactors = computeCultivationFactors(state);
+  state.realmProfile = getRealmProfile(state);
   return state;
 }
 
 function safeParse<T>(s: string, fallback: T): T {
   if (!s) return fallback;
   try { return JSON.parse(s) as T; } catch { return fallback; }
+}
+
+
+function clampProfileNumber(n: any, min: number, max: number, fallback: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.max(min, Math.min(max, v));
+}
+
+function sanitizeRealmProfile(raw: any): RealmProfile | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const profile: RealmProfile = {};
+  if (raw.name) profile.name = String(raw.name).slice(0, 16);
+  if (raw.shortName) profile.shortName = String(raw.shortName).slice(0, 3);
+  if (/^#[0-9a-fA-F]{6}$/.test(String(raw.color || ''))) profile.color = String(raw.color);
+  if (raw.maxLevel !== undefined) profile.maxLevel = Math.round(clampProfileNumber(raw.maxLevel, 0, 999, 9));
+  if (raw.powerMultiplier !== undefined) profile.powerMultiplier = clampProfileNumber(raw.powerMultiplier, 0.5, 9, 1);
+  if (raw.expMultiplier !== undefined) profile.expMultiplier = clampProfileNumber(raw.expMultiplier, 0.2, 20, 1);
+  if (raw.reason) profile.reason = String(raw.reason).slice(0, 120);
+  return Object.keys(profile).length ? profile : undefined;
+}
+
+export function getRealmProfile(state: CharacterState): RealmProfile | undefined {
+  const explicit = sanitizeRealmProfile((state as any).realmProfile);
+  if (explicit) return explicit;
+
+  const status = (state.activeStatuses || []).find(st =>
+    (st.category === 'special' || st.category === 'identity') &&
+    /境界|道基|金丹|筑基|炼气|練氣|元婴|元嬰|化神|大乘|渡劫|飞升|飛升|九转|完美|叠层|道果/.test(`${st.name} ${st.description}`)
+  );
+  if (!status) return undefined;
+
+  const profile: RealmProfile = {
+    name: status.name?.slice(0, 16),
+    reason: status.description?.slice(0, 120),
+  };
+  for (const eff of status.effects || []) {
+    if (eff.target_attribute === 'realmMaxLevel') profile.maxLevel = Math.round(clampProfileNumber(eff.value, 0, 999, 9));
+    if (eff.target_attribute === 'realmPower') profile.powerMultiplier = clampProfileNumber(eff.value, 0.5, 9, 1);
+    if (eff.target_attribute === 'realmExp') profile.expMultiplier = clampProfileNumber(eff.value, 0.2, 20, 1);
+  }
+  return sanitizeRealmProfile(profile);
+}
+
+function applyRealmProfilePatch(state: CharacterState, patch?: RealmProfile): CharacterState {
+  const profile = sanitizeRealmProfile(patch);
+  if (!profile) return state;
+  const current = getRealmProfile(state) || {};
+  return { ...state, realmProfile: { ...current, ...profile } };
 }
 
 // ==================== 属性变更应用 (引擎权威) ====================
@@ -798,7 +849,7 @@ export function tryBreakthrough(
         realm: nextRealm,
         realmLevel: 0,
         cultivationExp: remainingExp,
-        expToBreak: nextInfo.expPerLevel,
+        expToBreak: Math.floor(nextInfo.expPerLevel * (getRealmProfile(next)?.expMultiplier || 1)),
         lifespan: Math.max(next.lifespan, nextInfo.baseLifespan),
         maxHp: Math.floor(next.maxHp * boost),
         maxMp: Math.floor(next.maxMp * boost),
@@ -1832,6 +1883,9 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
       breakthroughMajor = Boolean(br.major);
       breakthroughSteps = br.steps || 1;
       breakthroughReasonAccepted = Boolean(br.reasonAccepted);
+      if (br.reasonAccepted && aiOutput.realmProfilePatch) {
+        next = applyRealmProfilePatch(next, aiOutput.realmProfilePatch);
+      }
     }
   }
 
@@ -1931,16 +1985,18 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 // 这样前端 setCharacter({...character, ...data.state}) 时这些字段会被正确更新
 export function stateToResponse(s: CharacterState) {
   const realmInfo = getRealmInfo(s.realm);
+  const realmProfile = getRealmProfile(s);
   const rootInfo = SPIRITUAL_ROOTS[s.spiritualRoot];
   const rate = computeEffectiveCultivationRate(s);
   return {
     age: s.age,
     lifespan: s.lifespan,
     realm: s.realm,
-    realmName: realmInfo.name,
-    realmColor: realmInfo.color,
+    realmName: realmProfile?.name || realmInfo.name,
+    realmColor: realmProfile?.color || realmInfo.color,
     realmLevel: s.realmLevel,
-    realmMaxLevel: realmInfo.levels,
+    realmMaxLevel: realmProfile?.maxLevel ?? realmInfo.levels,
+    realmProfile,
     cultivationExp: s.cultivationExp,
     expToBreak: s.expToBreak,
     hp: s.hp, maxHp: s.maxHp,
