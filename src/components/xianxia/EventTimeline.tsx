@@ -290,7 +290,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                             )}
                           >
                             {ATTR_LABEL[eff.attribute] || eff.attribute}
-                            {eff.delta > 0 ? '+' : ''}{eff.delta}
+                            <span className="ml-0.5 tabular-nums">{eff.delta > 0 ? '+' : ''}{eff.delta}</span>
                           </span>
                         ))}
                       </div>
@@ -314,7 +314,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                         )}
                       >
                         {ATTR_LABEL[eff.attribute] || eff.attribute}
-                        {eff.delta > 0 ? '+' : ''}{eff.delta}
+                        <span className="ml-0.5 tabular-nums">{eff.delta > 0 ? '+' : ''}{eff.delta}</span>
                       </span>
                     ))}
                     {event.effects.length > 4 && (
@@ -350,5 +350,7 @@ const ATTR_LABEL: Record<string, string> = {
   attack: '攻击', defense: '防御', speed: '速度',
   luck: '气运', comprehension: '悟性',
   spiritStones: '灵石', reputation: '声望',
-  elementMetal: '金', elementWood: '木', elementWater: '水', elementFire: '火', elementEarth: '土',
+  heartDemon: '心魔',
+  storageCapacity: '储物容量', cultivationMultiplier: '修炼倍率',
+  elementMetal: '金灵性', elementWood: '木灵性', elementWater: '水灵性', elementFire: '火灵性', elementEarth: '土灵性',
 };
