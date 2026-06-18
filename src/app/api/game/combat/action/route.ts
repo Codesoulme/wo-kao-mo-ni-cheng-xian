@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import {
   dbToState, executeCombatRound, stateToResponse, buildStateContext,
 } from '@/lib/xianxia/engine';
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
     const { characterId, action, payload } = parsed.data;
 
     const char = await db.character.findUnique({ where: { id: characterId } });
+    await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: '角色不存在' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
 

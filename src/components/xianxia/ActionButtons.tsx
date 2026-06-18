@@ -64,6 +64,14 @@ export function ActionButtons() {
   const [autoTotal, setAutoTotal] = useState(0);
   const autoCancelRef = useRef(false);
 
+  const prepareNextTurn = (characterId: string) => {
+    fetch('/api/game/preload-advance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ characterId }),
+    }).catch(() => undefined);
+  };
+
   if (!character) return null;
 
   const isDead = !character.alive;
@@ -169,6 +177,9 @@ export function ActionButtons() {
       if (data.ascended) {
         toast.success('飞升仙界！', { description: '超脱凡俗，与天地同寿' });
         autoCancelRef.current = true;
+      }
+      if (!data.hasChoice && !data.triggeredCombat && !data.died && !data.ascended) {
+        prepareNextTurn(character.id);
       }
     } catch (err: any) {
       setError(err.message);

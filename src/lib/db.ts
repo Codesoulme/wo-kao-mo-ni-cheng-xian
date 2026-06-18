@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client'
 
 // Task 22: 用版本号 bust globalThis 缓存——schema 变更后强制新建 PrismaClient 实例
 // 否则 dev server 长期运行时 globalThis.prisma 会持有旧 schema 的 client，新字段会报 unknown argument
-const PRISMA_CACHE_VERSION = 'v25-secretRealms-complete';
+const PRISMA_CACHE_VERSION = 'v26-advance-preload';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
@@ -21,6 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const char = await db.character.findUnique({ where: { id: characterId } });
+    await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
 

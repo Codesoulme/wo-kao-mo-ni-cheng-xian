@@ -112,6 +112,7 @@ model Character {
   events          EventLog[]
   choices         ChoiceLog[]
   interferences   InterferenceLog[]
+  advancePreload  AdvancePreload?
 }
 
 // 事件日志
@@ -155,4 +156,21 @@ model InterferenceLog {
   effects      String   @default("[]")      // JSON: 状态变更
   accepted     Boolean  @default(true)      // 是否被接受（false=静默拒绝）
   createdAt    DateTime @default(now())
+}
+
+
+// 幕后流年候选：只保存下一岁候选事件，角色状态改变即作废；不直接落地为史册
+model AdvancePreload {
+  id                String   @id @default(cuid())
+  characterId       String   @unique
+  character         Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  baseAge           Int
+  baseStateHash     String
+  preparedStateJson String
+  blueprintJson     String
+  aiOutputJson      String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([characterId, baseAge])
 }

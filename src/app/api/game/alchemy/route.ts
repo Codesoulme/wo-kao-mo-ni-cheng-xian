@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import { dbToState, alchemy, stateToResponse } from '@/lib/xianxia/engine';
 
 export const runtime = 'nodejs';
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest) {
     }
 
     const char = await db.character.findUnique({ where: { id: characterId } });
+    await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
     if (char.isAtChoice) return NextResponse.json({ success: false, error: '当前有待选择，请先完成命节点抉择' }, { status: 400 });

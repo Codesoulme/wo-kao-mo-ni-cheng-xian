@@ -2,6 +2,7 @@
 // body: { characterId, action: 'activate' | 'deactivate' | 'list', diskItemId?, formationId? }
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import { dbToState, activateFormation, deactivateFormation, stateToResponse } from '@/lib/xianxia/engine';
 
 export const runtime = 'nodejs';
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const char = await db.character.findUnique({ where: { id: characterId } });
+    await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
 
