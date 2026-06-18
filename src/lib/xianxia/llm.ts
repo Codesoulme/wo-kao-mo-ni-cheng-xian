@@ -107,7 +107,7 @@ const SCENE_PROMPTS: Record<string, string> = {
 - 属性变化要合理：修炼获修为、战斗有损耗、奇遇有增益、丹药有效果。
 - 修为自然增长：每岁根据境界与灵根给 cultivationExp 增量（凡人0，炼气10-30，筑基30-80，金丹80-200，更高境界更多）。
 - 修为增量受灵根倍率影响：杂灵根×0.3、凡灵根×0.8、真灵根×1.5、天灵根×3、混沌灵根×5。
-- 当 cultivationExp 达到 expToBreak 时，可设置 triggeredBreakthrough=true 触发大境界突破。
+- 当 cultivationExp 达到 expToBreak 时，可设置 triggeredBreakthrough=true 请求突破；具体是小境界提升还是大境界突破，必须由引擎根据当前层数判定。
 - 玩家寿元将尽时（age 接近 lifespan），应描写衰老、坐化等情节。
 
 【角色主动性——重要！】

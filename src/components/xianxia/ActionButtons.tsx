@@ -152,9 +152,13 @@ export function ActionButtons() {
       }
 
       if (data.breakthrough) {
-        toast.success('境界突破！', { description: `踏入新境界` });
-        // 触发突破仪式
-        triggerBreakthroughCeremony(data.state, character);
+        if (data.breakthrough.major) {
+          toast.success('大境界突破！', { description: `踏入新境界` });
+          // 触发突破仪式
+          triggerBreakthroughCeremony(data.state, character);
+        } else {
+          toast.success('小境界突破！', { description: `晋至${data.state.realmLevel + 1}层` });
+        }
       }
       if (data.died) {
         toast.error('角色陨落', { description: data.deathReason });

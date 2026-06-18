@@ -167,8 +167,14 @@ export async function POST(req: NextRequest) {
         finalState = br.state;
         result.breakthroughHappened = true;
         result.newRealm = br.newRealm;
+        result.breakthroughMajor = Boolean(br.major);
         // 突破后追加叙事提示（附加到原 narrative 后）
-        aiOutput.narrative = aiOutput.narrative + `\n\n【天道感应】修为圆满，水到渠成，你突破了境界，踏入新境域。`;
+        const breakthroughText = br.major
+          ? `修为圆满，水到渠成，你破开大关，踏入新境域。`
+          : `修为圆满，水到渠成，你气脉更进一步，晋至${finalState.realmLevel + 1}层。`;
+        aiOutput.narrative = aiOutput.narrative + `
+
+【天道感应】${breakthroughText}`;
         aiOutput.triggeredBreakthrough = true;
       }
     }
@@ -338,7 +344,7 @@ export async function POST(req: NextRequest) {
       },
       changes: result.appliedChanges,
       rejectedChanges: result.rejectedChanges,
-      breakthrough: result.breakthroughHappened ? { newRealm: result.newRealm } : null,
+      breakthrough: result.breakthroughHappened ? { newRealm: result.newRealm, major: Boolean(result.breakthroughMajor) } : null,
       hasChoice: aiOutput.hasChoice,
       choice: aiOutput.choice,
       died: result.died,

@@ -754,10 +754,19 @@ export function alchemy(
 
 // ==================== 突破处理 ====================
 
-export function tryBreakthrough(state: CharacterState): { state: CharacterState; success: boolean; newRealm?: Realm } {
+export function tryBreakthrough(state: CharacterState): { state: CharacterState; success: boolean; newRealm?: Realm; major?: boolean } {
   if (state.cultivationExp < state.expToBreak) {
     return { state, success: false };
   }
+
+  const info = getRealmInfo(state.realm);
+  // 引擎权威：普通突破优先提升小境界；只有当前大境界已满层，才晋入下一大境界。
+  // realmLevel 为 0 基索引，显示层会显示 realmLevel + 1 层。
+  if (info.levels > 0 && state.realmLevel < info.levels - 1) {
+    const minor = tryMinorBreakthrough(state);
+    if (minor.advanced) return { state: minor.state, success: true, newRealm: state.realm, major: false };
+  }
+
   const nextRealm = getNextRealm(state.realm);
   if (!nextRealm) {
     // 已达最高境界（渡劫→飞升由特殊事件处理）
@@ -765,18 +774,19 @@ export function tryBreakthrough(state: CharacterState): { state: CharacterState;
   }
 
   const nextInfo = getRealmInfo(nextRealm);
+  const remainingExp = Math.max(0, state.cultivationExp - state.expToBreak);
   const newState: CharacterState = {
     ...state,
     realm: nextRealm,
     realmLevel: 0,
-    cultivationExp: 0,
+    cultivationExp: remainingExp,
     expToBreak: nextInfo.expPerLevel,
     lifespan: Math.max(state.lifespan, nextInfo.baseLifespan),
   };
 
-  // 突破提升基础属性
-  const realmIdx = REALMS.findIndex(r => r.id === nextRealm);
-  const boost = 1 + realmIdx * 0.5;
+  // 大境界突破提升基础属性；倍率基于新大境界，但避免早期境界数值爆炸
+  const realmIdx = Math.max(1, REALMS.findIndex(r => r.id === nextRealm));
+  const boost = 1.15 + realmIdx * 0.12;
   newState.maxHp = Math.floor(state.maxHp * boost);
   newState.hp = newState.maxHp;
   newState.maxMp = Math.floor(state.maxMp * boost);
@@ -785,7 +795,7 @@ export function tryBreakthrough(state: CharacterState): { state: CharacterState;
   newState.defense = Math.floor(state.defense * boost);
   newState.speed = Math.floor(state.speed * boost);
 
-  return { state: newState, success: true, newRealm: nextRealm };
+  return { state: newState, success: true, newRealm: nextRealm, major: true };
 }
 
 // ==================== 小境界提升 ====================
@@ -1647,6 +1657,7 @@ export interface EngineExecutionResult {
   rejectedChanges: AttributeChange[];
   breakthroughHappened: boolean;
   newRealm?: Realm;
+  breakthroughMajor?: boolean;
   died: boolean;
   deathReason?: string;
 }
@@ -1732,12 +1743,14 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   // 5. 处理突破
   let breakthroughHappened = false;
   let newRealm: Realm | undefined;
+  let breakthroughMajor = false;
   if (aiOutput.triggeredBreakthrough) {
     const br = tryBreakthrough(next);
     if (br.success) {
       next = br.state;
       breakthroughHappened = true;
       newRealm = br.newRealm;
+      breakthroughMajor = Boolean(br.major);
     }
   }
 
@@ -1822,6 +1835,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     rejectedChanges: rejected,
     breakthroughHappened,
     newRealm,
+    breakthroughMajor,
     died,
     deathReason,
   };
