@@ -8,6 +8,7 @@ type ZAIConfig = {
   apiKey: string;
   chatId?: string;
   userId?: string;
+  model?: string;
 };
 
 const CONFIG_PATH = path.join(process.cwd(), '.z-ai-config');
@@ -28,6 +29,7 @@ async function readConfig(): Promise<ZAIConfig | null> {
       apiKey: String(cfg.apiKey),
       chatId: cfg.chatId ? String(cfg.chatId) : undefined,
       userId: cfg.userId ? String(cfg.userId) : undefined,
+      model: cfg.model ? String(cfg.model) : undefined,
     };
   } catch {
     return null;
@@ -44,6 +46,7 @@ export async function GET() {
           apiKeyMasked: maskKey(cfg.apiKey),
           hasChatId: !!cfg.chatId,
           hasUserId: !!cfg.userId,
+          model: cfg.model || 'ark-code-latest',
         }
       : null,
   });
@@ -53,9 +56,12 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const baseUrl = String(body?.baseUrl || '').trim().replace(/\/+$/, '');
-    const apiKey = String(body?.apiKey || '').trim();
+    const existing = await readConfig();
+    const inputApiKey = String(body?.apiKey || '').trim();
+    const apiKey = inputApiKey || existing?.apiKey || '';
     const chatId = String(body?.chatId || '').trim();
     const userId = String(body?.userId || '').trim();
+    const model = String(body?.model || 'ark-code-latest').trim();
 
     if (!baseUrl) {
       return NextResponse.json({ success: false, error: '请填写 API Base URL' }, { status: 400 });
@@ -67,7 +73,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '请填写 API Key' }, { status: 400 });
     }
 
-    const config: ZAIConfig = { baseUrl, apiKey };
+    const config: ZAIConfig = { baseUrl, apiKey, model: model || 'ark-code-latest' };
     if (chatId) config.chatId = chatId;
     if (userId) config.userId = userId;
 
@@ -82,6 +88,7 @@ export async function POST(req: NextRequest) {
         apiKeyMasked: maskKey(apiKey),
         hasChatId: !!chatId,
         hasUserId: !!userId,
+        model: config.model,
       },
     });
   } catch (err: any) {

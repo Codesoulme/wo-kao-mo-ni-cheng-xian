@@ -15,6 +15,7 @@ type AIConfigStatus = {
     apiKeyMasked: string;
     hasChatId: boolean;
     hasUserId: boolean;
+    model?: string;
   } | null;
 };
 
@@ -27,6 +28,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   const [status, setStatus] = useState<AIConfigStatus>({ configured: false, config: null });
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [model, setModel] = useState('ark-code-latest');
   const [chatId, setChatId] = useState('');
   const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -39,6 +41,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       const data = await res.json();
       setStatus(data);
       if (data.config?.baseUrl) setBaseUrl(data.config.baseUrl);
+      if (data.config?.model) setModel(data.config.model);
     } catch {
       setStatus({ configured: false, config: null });
     } finally {
@@ -61,7 +64,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       const res = await fetch('/api/ai-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl, apiKey, chatId, userId }),
+        body: JSON.stringify({ baseUrl, apiKey, model, chatId, userId }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '保存失败');
@@ -116,6 +119,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
               <div className="font-medium">{status.configured ? '当前已配置 AI 接口' : '当前未配置 AI 接口'}</div>
               {status.config?.baseUrl && <div className="truncate text-muted-foreground">Base URL：{status.config.baseUrl}</div>}
               {status.config?.apiKeyMasked && <div className="text-muted-foreground">API Key：{status.config.apiKeyMasked}</div>}
+              {status.config?.model && <div className="text-muted-foreground">模型：{status.config.model}</div>}
             </div>
           </div>
 
@@ -141,6 +145,17 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
             />
           </div>
 
+          <div className="space-y-2">
+            <label className="text-xs font-medium">模型名</label>
+            <Input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder="例如：ark-code-latest"
+              autoComplete="off"
+            />
+            <p className="text-[10px] text-muted-foreground">火山 Ark 接口必须传 model；当前月卡配置可先用 ark-code-latest。</p>
+          </div>
+
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-2">
               <label className="text-xs font-medium">chatId（可选）</label>
@@ -154,7 +169,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
 
           <div className="flex gap-2 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setOpen(false)} disabled={loading}>取消</Button>
-            <Button className="flex-1" onClick={save} disabled={loading || !baseUrl.trim() || !apiKey.trim()}>
+            <Button className="flex-1" onClick={save} disabled={loading || !baseUrl.trim() || (!status.configured && !apiKey.trim()) || !model.trim()}>
               {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中</> : '保存配置'}
             </Button>
           </div>
