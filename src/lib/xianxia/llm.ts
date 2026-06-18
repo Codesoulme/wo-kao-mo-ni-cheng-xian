@@ -959,10 +959,29 @@ export async function generateChoiceResult(
   chosenText: string
 ): Promise<ChoiceResultOutput> {
   const userPrompt = buildChoosePrompt(ctx, choicePrompt, chosenText);
-  const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.choose);
-  const sanitized = sanitizeChoiceOutput(raw);
-  sanitized.narrative = fixNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
-  return sanitized;
+  try {
+    const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.choose);
+    const sanitized = sanitizeChoiceOutput(raw);
+    sanitized.narrative = fixNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
+    return sanitized;
+  } catch (err: any) {
+    console.error('Choice generation failed, using fallback:', err?.message || err);
+    return sanitizeChoiceOutput({
+      narrative: `${ctx.character.name}选择「${chosenText}」，顺势应下这一段因果。局势暂且平稳，后续变化仍待天机显现。`,
+      changes: [],
+      newStatuses: [],
+      newItems: [],
+      removedItemIds: [],
+      equipItemIds: [],
+      unequipItemIds: [],
+      newEquippedItems: [],
+      newThreads: [],
+      advanceThreads: [],
+      completeThreadIds: [],
+      failThreadIds: [],
+      triggerCombat: null,
+    });
+  }
 }
 
 export async function generateInterfereResponse(
@@ -970,10 +989,31 @@ export async function generateInterfereResponse(
   playerInput: string
 ): Promise<InterfereOutput> {
   const userPrompt = buildInterferePrompt(ctx, playerInput);
-  const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.interfere);
-  const sanitized = sanitizeInterfereOutput(raw);
-  sanitized.narrative = fixNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
-  return sanitized;
+  try {
+    const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.interfere);
+    const sanitized = sanitizeInterfereOutput(raw);
+    sanitized.narrative = fixNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
+    return sanitized;
+  } catch (err: any) {
+    console.error('Interfere generation failed, using fallback:', err?.message || err);
+    return sanitizeInterfereOutput({
+      accepted: false,
+      classification: 'dialogue',
+      narrative: `天机沉寂，${ctx.character.name}心中闪过「${playerInput}」之念，却暂未掀起可见波澜。`,
+      changes: [],
+      newStatuses: [],
+      newItems: [],
+      removedItemIds: [],
+      equipItemIds: [],
+      unequipItemIds: [],
+      newEquippedItems: [],
+      newThreads: [],
+      advanceThreads: [],
+      completeThreadIds: [],
+      failThreadIds: [],
+      triggerCombat: null,
+    });
+  }
 }
 
 // ==================== 物品操作叙事生成（玩家装备/卸下/使用后调用） ====================

@@ -7,6 +7,34 @@ import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Sto
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { REALMS } from '@/lib/xianxia/types';
+import type { GameEvent } from '@/lib/xianxia/store';
+
+type AiOpportunity = {
+  market: boolean;
+  exploration: boolean;
+  sourceLabel: string;
+};
+
+const MARKET_TRIGGER_RE = /(坊市|市集|集市|黑市|商铺|店铺|摊位|商会|拍卖|交易|买卖|商人|货郎|丹药铺|法器铺|灵材铺)/;
+const EXPLORATION_TRIGGER_RE = /(秘境|遗迹|遗址|洞府|古洞|古墓|禁地|洞天|遗府|试炼之地|裂隙|古阵|灵脉|荒谷|山谷深处)/;
+
+function getAiOpportunity(events: GameEvent[]): AiOpportunity {
+  const latest = events[events.length - 1];
+  if (!latest) return { market: false, exploration: false, sourceLabel: '' };
+
+  const category = latest.blueprint?.category;
+  const text = `${latest.title || ''}
+${latest.narrative || ''}
+${latest.blueprint?.name || ''}`;
+  const market = latest.eventType === 'trade' || category === 'trade' || MARKET_TRIGGER_RE.test(text);
+  const exploration = latest.eventType === 'exploration' || category === 'exploration' || EXPLORATION_TRIGGER_RE.test(text);
+
+  return {
+    market,
+    exploration,
+    sourceLabel: latest.title || latest.blueprint?.name || '近期事件',
+  };
+}
 
 const ATTR_LABEL: Record<string, string> = {
   age: '年龄', lifespan: '寿元', cultivationExp: '修为',
@@ -18,7 +46,7 @@ const ATTR_LABEL: Record<string, string> = {
 
 export function ActionButtons() {
   const {
-    character, pendingChoice, loading,
+    character, events, pendingChoice, loading,
     setCharacter, addEvent, setPendingChoice,
     setLastChange, setLastBreakthrough, setLoading, setError,
     setBreakthroughCeremony,
@@ -40,6 +68,7 @@ export function ActionButtons() {
   const atChoice = !!pendingChoice;
   // Task 20: 战斗进行中时禁用推进
   const inCombat = !!(character.combatSession && character.combatSession.status === 'ongoing');
+  const aiOpportunity = getAiOpportunity(events);
 
   // 触发突破仪式
   const triggerBreakthroughCeremony = (newState: any, oldChar: typeof character) => {
@@ -247,33 +276,39 @@ export function ActionButtons() {
         )}
       </div>
 
-      {/* Task 21-d-1：坊市入口 + Task 24 秘境入口——玩家可主动访问 */}
-      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && (
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            onClick={() => setMarketOpen(true)}
-            disabled={loading}
-            variant="outline"
-            className="h-9 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60 font-serif-cn tracking-wider"
-          >
-            <Store className="w-3.5 h-3.5 mr-1.5" />
-            坊市
-            <span className="ml-1 text-[10px] text-amber-700/70 dark:text-amber-400/70 tabular-nums">
-              {character.spiritStones || 0}
-            </span>
-          </Button>
-          <Button
-            onClick={() => setExplorationOpen(true)}
-            disabled={loading}
-            variant="outline"
-            className="h-9 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/60 font-serif-cn tracking-wider"
-          >
-            <Compass className="w-3.5 h-3.5 mr-1.5" />
-            秘境
-            <span className="ml-1 text-[10px] text-emerald-700/70 dark:text-emerald-400/70">
-              探索
-            </span>
-          </Button>
+      {/* 坊市/秘境入口：只在最近 AI 事件明确触发相关场景时出现 */}
+      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && (aiOpportunity.market || aiOpportunity.exploration) && (
+        <div className="space-y-1.5 rounded-lg border border-primary/15 bg-primary/5 p-2">
+          <div className="text-[10px] text-muted-foreground font-serif-cn truncate">
+            AI 事件触发：{aiOpportunity.sourceLabel}
+          </div>
+          <div className="grid gap-2" style={{ gridTemplateColumns: aiOpportunity.market && aiOpportunity.exploration ? '1fr 1fr' : '1fr' }}>
+            {aiOpportunity.market && (
+              <Button
+                onClick={() => setMarketOpen(true)}
+                disabled={loading}
+                variant="outline"
+                className="h-9 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60 font-serif-cn tracking-wider"
+              >
+                <Store className="w-3.5 h-3.5 mr-1.5" />
+                前往坊市
+                <span className="ml-1 text-[10px] text-amber-700/70 dark:text-amber-400/70 tabular-nums">
+                  {character.spiritStones || 0}
+                </span>
+              </Button>
+            )}
+            {aiOpportunity.exploration && (
+              <Button
+                onClick={() => setExplorationOpen(true)}
+                disabled={loading}
+                variant="outline"
+                className="h-9 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/60 font-serif-cn tracking-wider"
+              >
+                <Compass className="w-3.5 h-3.5 mr-1.5" />
+                探入秘境
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
