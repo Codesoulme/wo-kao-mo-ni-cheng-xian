@@ -344,7 +344,7 @@ export interface PendingThread {
   id: string;
   title: string;             // 线索标题
   description: string;       // 线索描述（人/事/时/地/因）
-  category: 'competition' | 'enemy' | 'quest' | 'promise' | 'mystery' | 'romance' | 'debt' | 'inheritance';
+  category: 'competition' | 'enemy' | 'quest' | 'promise' | 'mystery' | 'romance' | 'debt' | 'inheritance' | 'exploration';
   startAge: number;          // 触发年龄
   deadlineAge: number;       // 截止年龄（到期必须触发对应事件）
   status: 'pending' | 'urgent' | 'resolved' | 'failed';
@@ -352,6 +352,10 @@ export interface PendingThread {
   relatedMemoryIds?: string[]; // 关联的长期记忆
   reward?: string;           // 完成奖励描述
   failureCost?: string;      // 失败代价描述
+  dueInSameYear?: boolean;   // 同年内后续：如“三月后”“不久后”“今年比试”，advance 后应追加同岁续写
+  followUpHint?: string;     // 后续应如何承接，例如“入仙门比试”“持潮湿玉片再探潮隙浮阁”
+  sourceEventTitle?: string; // 来源事件标题，帮助 AI/引擎保持因果
+  realmId?: string;          // 若该线索指向秘境，填秘境 id
 }
 
 // ==================== 战斗系统 (Task 20) ====================
@@ -677,6 +681,7 @@ export interface EngineStateContext {
   exploredRealms: ExplorationRecord[];
   // 当前正在探索的秘境（仅 explore route 调用时设置，让 AI 围绕此秘境生成探索事件）
   currentExploration?: SecretRealm;
+  discoveredRealms?: SecretRealm[];
 }
 
 // ==================== 命节点 ====================
@@ -765,6 +770,7 @@ export interface CharacterState {
   // ===== Task 24 新增 =====
   // 秘境探索记录（ExplorationRecord[]）—— 玩家探索过的秘境 + 冷却追踪
   exploredRealms: ExplorationRecord[];
+  discoveredRealms?: SecretRealm[]; // 从未决线索/物品/事件中解析出的剧情秘境
 }
 
 // ==================== Task 21: 阵法系统 ====================
@@ -922,7 +928,11 @@ export interface SecretRealm {
   // 进入条件
   minRealm: number;            // 最低境界 idx（0=mortal, 1=qi_refining...）
   minAge: number;              // 最低年龄
-  spiritStoneCost: number;     // 进入所需灵石（用作"路费+护身符")
+  spiritStoneCost: number;     // 进入所需灵石；剧情秘境通常为 0，普通游历可作路费/护身符
+  discoveredByThreadId?: string; // 剧情秘境来源线索；有值时只在对应线索/物品存在时显示
+  entryRequirement?: string;     // 入境前置，如“潮湿玉片”“水禁钥纹”“宗门令牌”
+  entryAlternatives?: string[];  // 其他可行入境方式，避免只有买钥匙一条路
+  isStoryRealm?: boolean;        // 是否为剧情中发现的秘境
   // 探索特性
   dangerLevel: number;         // 危险度 1-10（影响战斗触发率/伤害）
   rewardMultiplier: number;    // 奖励倍率（影响物品稀有度/数量）

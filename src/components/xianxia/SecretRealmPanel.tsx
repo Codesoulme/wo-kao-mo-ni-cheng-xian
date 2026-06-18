@@ -346,10 +346,12 @@ export function SecretRealmPanel() {
 
   if (!character || !explorationOpen) return null;
 
-  // 计算每个秘境的状态
+  // 计算每个秘境的状态：因果中显露的秘境优先。若有“潮隙浮阁”这类线索，不再混入无关收费秘境。
   const realmIdx = REALMS.findIndex(r => r.id === character.realm);
   const records = character.exploredRealms || [];
-  const availableRealms = SECRET_REALMS
+  const storyRealms = (character.discoveredRealms || []) as SecretRealm[];
+  const realmPool = storyRealms.length > 0 ? storyRealms : SECRET_REALMS;
+  const availableRealms = realmPool
     .filter(r => realmIdx >= r.minRealm && character.age >= r.minAge)
     .map(r => {
       const rec = records.find((rec: any) => rec.realmId === r.id);
@@ -357,9 +359,15 @@ export function SecretRealmPanel() {
       const elapsed = character.age - lastAge;
       const onCooldown = elapsed < r.cooldownYears;
       const cooldownRemaining = onCooldown ? (r.cooldownYears - elapsed) : 0;
-      const canExplore = character.spiritStones >= r.spiritStoneCost && !onCooldown;
+      const cost = r.isStoryRealm ? 0 : r.spiritStoneCost;
+      const requirement = r.entryRequirement;
+      const bagText = [...(character.inventory || []), ...(character.equipped || []), ...(character.activeStatuses || [])]
+        .map((it: any) => `${it.name || ''}${it.description || ''}${it.source || ''}`).join(' ');
+      const hasRequirement = !requirement || bagText.includes(requirement);
+      const canExplore = character.spiritStones >= cost && !onCooldown && hasRequirement;
       let cannotExploreReason: string | undefined;
-      if (character.spiritStones < r.spiritStoneCost) cannotExploreReason = '灵石不足';
+      if (!hasRequirement) cannotExploreReason = `缺${requirement}`;
+      else if (character.spiritStones < cost) cannotExploreReason = '灵石不足';
       else if (onCooldown) cannotExploreReason = `冷却中（剩 ${cooldownRemaining} 载）`;
       return {
         realm: r,
@@ -373,7 +381,7 @@ export function SecretRealmPanel() {
       };
     });
 
-  const lockedRealms = SECRET_REALMS
+  const lockedRealms = storyRealms.length > 0 ? [] : SECRET_REALMS
     .filter(r => realmIdx < r.minRealm || character.age < r.minAge)
     .map(r => ({
       realm: r,
@@ -389,8 +397,16 @@ export function SecretRealmPanel() {
 
   const explore = async (realm: SecretRealm) => {
     if (busyRealmId || !character) return;
-    if (character.spiritStones < realm.spiritStoneCost) {
-      toast.error('灵石不足', { description: `需 ${realm.spiritStoneCost} 灵石作路费` });
+    const cost = realm.isStoryRealm ? 0 : realm.spiritStoneCost;
+    const requirement = realm.entryRequirement;
+    const bagText = [...(character.inventory || []), ...(character.equipped || []), ...(character.activeStatuses || [])]
+      .map((it: any) => `${it.name || ''}${it.description || ''}${it.source || ''}`).join(' ');
+    if (requirement && !bagText.includes(requirement)) {
+      toast.error('关窍未明', { description: `尚缺${requirement}，也可另寻破禁之法。` });
+      return;
+    }
+    if (character.spiritStones < cost) {
+      toast.error('灵石不足', { description: `需 ${cost} 灵石作路费` });
       return;
     }
     // 二次确认（高危险度秘境）
@@ -512,10 +528,12 @@ export function SecretRealmPanel() {
               <MapPin className="w-3 h-3" />
               <span>{character.realmName} · {character.age}载</span>
               <span className="opacity-50">·</span>
-              <span>共 {availableRealms.length + lockedRealms.length} 处</span>
+              <span>{storyRealms.length > 0 ? `已现 ${availableRealms.length} 处` : `共 ${availableRealms.length + lockedRealms.length} 处`}</span>
             </div>
             <p className="mt-2 text-[10.5px] leading-relaxed text-muted-foreground font-serif-cn">
-              秘境不是独立副本，而是本年内的一次主动入世：入境所得会写入史册，影响状态、线索、战斗与后续天道推演。
+              {storyRealms.length > 0
+                ? '此处只列当前当前因果中显露的秘境入口；入境需承接前文线索、信物与禁制关窍。'
+                : '未有明确秘境线索时，此处只作外出游历；真正的秘境会从事件因果中显露。'}
             </p>
           </CardHeader>
 
@@ -525,8 +543,8 @@ export function SecretRealmPanel() {
               {availableRealms.length === 0 && lockedRealms.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Compass className="w-8 h-8 mb-2 opacity-40" />
-                  <p className="text-xs font-serif-cn">天地虽大，无处可探</p>
-                  <p className="text-[10px] opacity-70 mt-1 font-serif-cn">提升境界与年岁，方有秘境可入</p>
+                    <p className="text-xs font-serif-cn">暂无秘境因缘</p>
+                  <p className="text-[10px] opacity-70 mt-1 font-serif-cn">等待史册中出现秘境线索，或提升境界后外出游历</p>
                 </div>
               ) : (
                 <>
@@ -600,7 +618,7 @@ export function SecretRealmPanel() {
             <div className="shrink-0 px-3 py-2 border-t border-amber-500/20 bg-amber-500/5 text-[10px] text-muted-foreground font-serif-cn leading-relaxed">
               <p className="flex items-center gap-1">
                 <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
-                秘境探索不推进年龄；危险度高者可能陨落；冷却期内不可重复探索。
+                因缘秘境不收莫名其妙的门票；若缺信物，可另寻破禁之法后再入。
               </p>
             </div>
           </CardContent>

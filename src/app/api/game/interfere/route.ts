@@ -96,6 +96,37 @@ export async function POST(req: NextRequest) {
           contextNarrative: result.narrative || result.triggerCombat.contextNarrative,
         });
       }
+      // 干扰连续性兜底：只要玩家干扰被接受且不是纯数值小动作，写入一条余波线索，
+      // 让下一次正常流年必须承接本次因果，而不是自顾自换方向。
+      const hasThreadMutation = Boolean(
+        (result.newThreads && result.newThreads.length) ||
+        (result.advanceThreads && result.advanceThreads.length) ||
+        (result.completeThreadIds && result.completeThreadIds.length) ||
+        (result.failThreadIds && result.failThreadIds.length)
+      );
+      const shouldCreateInterfereEcho = result.accepted && !hasThreadMutation && (
+        result.classification === 'action' ||
+        Boolean(result.memory) ||
+        Boolean(result.triggerCombat) ||
+        (result.newItems && result.newItems.length > 0) ||
+        (result.newStatuses && result.newStatuses.length > 0)
+      );
+      if (shouldCreateInterfereEcho) {
+        const titleBase = input.trim().replace(/[，。！？\s]/g, '').slice(0, 8) || '干扰余波';
+        state = addThreads(state, [{
+          id: `thread_interfere_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+          title: `${titleBase}余波`,
+          description: `此前天道干预使${state.name}经历了：${String(result.narrative || input).slice(0, 90)}。后续流年需承接此因果，不可无故转向。`,
+          category: 'quest',
+          startAge: state.age,
+          deadlineAge: state.age + 1,
+          status: 'pending',
+          progress: 20,
+          followUpHint: '下一次正常流年优先承接这次干扰造成的目标、地点、承诺或关系变化。',
+          sourceEventTitle: '天道干扰',
+        } as any]);
+      }
+
       // Task 23: 应用 AI 授予的灵宠
       if ((result as any).newPets && (result as any).newPets.length) {
         for (const pet of (result as any).newPets) {

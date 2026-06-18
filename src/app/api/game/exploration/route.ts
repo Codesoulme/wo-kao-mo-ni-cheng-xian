@@ -143,9 +143,9 @@ export async function POST(req: NextRequest) {
     ctx.blueprint = {
       category: 'exploration',
       name: `秘境探索·${realm.name}`,
-      description: `玩家主动探索秘境「${realm.name}」，按秘境主题标签生成事件`,
+      description: `玩家主动探索剧情秘境「${realm.name}」。必须承接该秘境的 description、entryRequirement、entryAlternatives 与前文线索，不得改成其他秘境或收费副本。`,
       weight: 0, minRealm: 0, maxRealm: 99, minAge: 0, maxAge: 99999,
-      examples: realm.encounterHints,
+      examples: [realm.description, ...(realm.entryRequirement ? [`入境关窍：${realm.entryRequirement}`] : []), ...(realm.entryAlternatives || []), ...realm.encounterHints],
     };
 
     // 调用 LLM 生成探索事件（不推进年龄）

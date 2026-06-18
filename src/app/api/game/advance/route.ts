@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { executeAIEvent, checkLifespan, applyChanges, stateToResponse, tryBreakthrough, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tryHeartDemonTrial } from '@/lib/xianxia/engine';
+import { executeAIEvent, checkLifespan, applyChanges, stateToResponse, tryBreakthrough, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tryHeartDemonTrial, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 
@@ -146,6 +146,34 @@ export async function POST(req: NextRequest) {
       finalState.isAtChoice = true;
     }
 
+    // 同岁续写：若本轮产生/保留了“今年内、不久后、三月后”等必须承接的线索，
+    // 自动追加一段同岁史册，避免“准备进仙门，下一年却跑路”这类断裂。
+    const sameYearContinuationDrafts: { title: string; narrative: string; eventType: string; effects: any[] }[] = [];
+    if (!finalState.isAtChoice && !finalState.combatSession && finalState.alive && !finalState.ascended) {
+      const sameYearThreads = getSameYearThreads(finalState);
+      for (const thread of sameYearThreads) {
+        const beforeContinuation = { ...finalState };
+        const continuationOutput = buildThreadContinuationEvent(finalState, thread);
+        const continuationResult = executeAIEvent(finalState, continuationOutput);
+        finalState = continuationResult.state;
+        const continuationEffects = buildEventDisplayEffects({
+          before: beforeContinuation,
+          after: finalState,
+          changes: continuationResult.appliedChanges,
+          newStatuses: continuationOutput.newStatuses,
+          newItems: continuationOutput.newItems,
+          newEquippedItems: continuationOutput.newEquippedItems,
+          removedItemIds: continuationOutput.removedItemIds,
+        });
+        sameYearContinuationDrafts.push({
+          title: continuationOutput.title,
+          narrative: continuationOutput.narrative,
+          eventType: continuationOutput.eventType || 'normal',
+          effects: continuationEffects,
+        });
+      }
+    }
+
     // 持久化 pendingChoice（让页面刷新后可恢复，避免 ChoiceModal 丢失导致卡死）
     // Task 22: 同时保存 deferredCombat——若 hasChoice 与 triggerCombat 同时出现，战斗延迟到选择后触发
     const pendingChoiceJson = (aiOutput.hasChoice && aiOutput.choice)
@@ -258,6 +286,9 @@ ${narrative || ''}`);
         eventType: visibleEventType(extra.eventType || 'normal', extra.title, extra.narrative),
         effects: [],
       });
+    }
+    for (const continuation of sameYearContinuationDrafts) {
+      eventDrafts.push(continuation);
     }
 
     // 若引擎最终确认已经突破，单独追加一条破境成功记载。

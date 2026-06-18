@@ -1321,6 +1321,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     // Task 24 新字段
     exploredRealms: Array.isArray(state.exploredRealms) ? state.exploredRealms : [],
     currentExploration: (state as any)._currentExploration,
+    discoveredRealms: getDiscoveredStoryRealms(state),
   };
 }
 
@@ -2205,6 +2206,7 @@ export function stateToResponse(s: CharacterState) {
     pets: s.pets || [],
     // Task 24 新字段
     exploredRealms: s.exploredRealms || [],
+    discoveredRealms: getDiscoveredStoryRealms(s),
   };
 }
 
@@ -2657,6 +2659,135 @@ export function getAvailableTalismans(state: CharacterState): ItemEntry[] {
   return (state.inventory || []).filter(it => getTalismanType(it) !== null);
 }
 
+
+function slugifyRealmName(name: string): string {
+  const raw = String(name || 'story_realm').trim() || 'story_realm';
+  const ascii = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (ascii) return ascii.slice(0, 48);
+  let hash = 0;
+  for (const ch of raw) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `story_${hash.toString(36)}`;
+}
+
+function inferStoryRealmName(text: string): string | null {
+  const source = String(text || '');
+  const quoted = source.match(/[「『“\"]([^」』”\"]{2,12}(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|楼|谷|府|墟|宫|殿))[^」』”\"]*[」』”\"]/);
+  if (quoted?.[1]) return quoted[1];
+  const named = source.match(/([\u4e00-\u9fa5]{2,12}(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|楼|谷|府|墟|宫|殿))/);
+  if (named?.[1]) return named[1];
+  return null;
+}
+
+function inferRealmRequirement(text: string): string | undefined {
+  const source = String(text || '');
+  if (/潮湿玉片|玉片/.test(source)) return '潮湿玉片';
+  if (/钥|钥匙|钥纹|禁制|破禁|残图|令牌|符令/.test(source)) {
+    const m = source.match(/([\u4e00-\u9fa5]{2,10}(?:玉片|钥匙|钥纹|残图|令牌|符令|禁制手法|破禁法))/);
+    return m?.[1] || '入境信物';
+  }
+  return undefined;
+}
+
+function buildStoryRealmFromText(name: string, text: string, state: CharacterState, thread?: PendingThread): SecretRealm {
+  const water = /江|水|潮|雨|雾|渡|溪|河|禁/.test(`${name}${text}`);
+  const ancient = /古|旧|昔年|残图|壁刻|禁制|遗/.test(`${name}${text}`);
+  const tier: SecretRealm['tier'] = ancient ? 'uncommon' : 'common';
+  const realmIdx = Math.max(0, REALMS.findIndex(r => r.id === state.realm));
+  const req = inferRealmRequirement(text);
+  return {
+    id: thread?.realmId || `story_${slugifyRealmName(name)}`,
+    name,
+    description: String(text || `因缘牵引而显露的${name}。`).slice(0, 180),
+    tier,
+    minRealm: Math.max(0, Math.min(realmIdx, realmIdx || 1)),
+    minAge: Math.max(0, state.age - 1),
+    spiritStoneCost: 0,
+    discoveredByThreadId: thread?.id,
+    entryRequirement: req,
+    entryAlternatives: req ? ['参悟信物中的禁制手法', '循原先残图与地势另觅侧径', '等待潮汐/地脉再次开合'] : ['循旧迹探入', '等待地脉气机再显'],
+    isStoryRealm: true,
+    dangerLevel: /内禁|杀机|禁地|强闯|不敢/.test(text) ? 6 : 3,
+    rewardMultiplier: ancient ? 1.4 : 1.1,
+    cooldownYears: 3,
+    themeTags: [water ? 'water' : 'mystery', ancient ? 'inheritance' : 'treasure', 'story'],
+    elementAffinity: water ? 'water' : undefined,
+    encounterHints: req
+      ? [`凭${req}试探门户`, '沿旧日痕迹复探外围', '另寻破禁之法', '避开内禁杀机']
+      : ['循线索探路', '辨认地脉气机', '避开未知禁制'],
+    color: water ? '#0ea5e9' : '#a855f7',
+    icon: water ? '🌊' : '🏛',
+  };
+}
+
+export function getDiscoveredStoryRealms(state: CharacterState): SecretRealm[] {
+  const realms = new Map<string, SecretRealm>();
+  const threads = (state.pendingThreads || []).filter(t => t.status !== 'failed' && t.status !== 'resolved');
+  for (const t of threads) {
+    const text = `${t.title} ${t.description} ${t.reward || ''} ${t.followUpHint || ''}`;
+    const looksRealm = t.category === 'exploration' || /秘境|浮阁|洞府|遗迹|禁地|水府|古阁|江心|残图|禁制|破禁/.test(text);
+    if (!looksRealm) continue;
+    const name = inferStoryRealmName(text) || (t.title && /秘境|浮阁|洞府|遗迹|禁地|水府|古阁|楼|谷|府|墟|宫|殿/.test(t.title) ? t.title : null);
+    if (!name) continue;
+    const realm = buildStoryRealmFromText(name, text, state, t);
+    realms.set(realm.id, realm);
+  }
+  const inventoryText = [...(state.inventory || []), ...(state.equipped || [])]
+    .map(it => `${it.name} ${it.description || ''} ${it.source || ''}`).join('\n');
+  const invName = inferStoryRealmName(inventoryText);
+  if (invName) {
+    const realm = buildStoryRealmFromText(invName, inventoryText, state);
+    realms.set(realm.id, realm);
+  }
+  return [...realms.values()].slice(0, 5);
+}
+
+export function getSameYearThreads(state: CharacterState): PendingThread[] {
+  const age = state.age;
+  return (state.pendingThreads || []).filter(t =>
+    (t.status === 'pending' || t.status === 'urgent') &&
+    (t.dueInSameYear || t.deadlineAge <= age) &&
+    t.progress < 100
+  ).slice(0, 2);
+}
+
+export function buildThreadContinuationEvent(state: CharacterState, thread: PendingThread): any {
+  const realmName = inferStoryRealmName(`${thread.title} ${thread.description} ${thread.followUpHint || ''}`);
+  const isRealm = thread.category === 'exploration' || !!realmName || /秘境|浮阁|洞府|遗迹|禁地|禁制|破禁/.test(`${thread.title}${thread.description}`);
+  const isCompetition = thread.category === 'competition' || /比试|考核|入门|仙门|擂台/.test(`${thread.title}${thread.description}`);
+  const title = isRealm ? `余波再起·${realmName || thread.title}` : isCompetition ? `约期已至·${thread.title}` : `因果续起·${thread.title}`;
+  const narrative = isRealm
+    ? `${thread.description}此事并未随上一段经历散去。${state.name}收拢所得线索，反复揣摩${thread.followUpHint || '其中关窍'}；若要真正深入，还需凭信物、地势或另一条破禁之法再寻入口。`
+    : isCompetition
+      ? `${thread.description}约期已近，${state.name}没有把此事抛在脑后。她整备衣装与随身法器，按约前去应试；这一场比试不只是胜负，更关系到能否接上前文所开的仙途。`
+      : `${thread.description}前事余波在这一日重新牵动。${state.name}循着旧约与旧迹继续追索，使这段因果没有半途断线。`;
+  return {
+    title,
+    narrative,
+    eventType: isCompetition ? 'normal' : isRealm ? 'exploration' : 'normal',
+    changes: isCompetition ? [{ attribute: 'reputation', delta: 1, reason: '守约赴试' }] : [],
+    newStatuses: isRealm ? [{
+      id: `status_thread_${thread.id}_${Date.now().toString(36)}`,
+      name: realmName ? `${realmName}线索` : '秘境线索',
+      description: thread.followUpHint || '这段线索仍可引向后续探索。',
+      category: 'quest',
+      rarity: 'uncommon',
+      duration: -1,
+      source: thread.title,
+      effects: [],
+    }] : [],
+    newItems: [], removedItemIds: [], newEquippedItems: [], equipItemIds: [], unequipItemIds: [],
+    memory: `${state.age}岁续写线索：${thread.title}`,
+    cultivationInsight: '',
+    hasChoice: false, choice: null, triggeredBreakthrough: false, causedDeath: false, causedAscension: false,
+    newThreads: [],
+    advanceThreads: [{ id: thread.id, progressDelta: isRealm ? 35 : 50, note: '同年后续已展开' }],
+    completeThreadIds: isCompetition ? [thread.id] : [],
+    failThreadIds: [],
+    triggerCombat: null,
+    newPets: [],
+  };
+}
+
 // ==================== Task 24: 秘境探索系统 ====================
 
 // 获取当前角色可探索的秘境列表（含冷却状态）
@@ -2668,7 +2799,9 @@ export function getAvailableRealms(state: CharacterState): Array<SecretRealm & {
 }> {
   const realmIdx = REALMS.findIndex(r => r.id === state.realm);
   const records = state.exploredRealms || [];
-  return SECRET_REALMS
+  const storyRealms = getDiscoveredStoryRealms(state);
+  const pool = storyRealms.length ? storyRealms : SECRET_REALMS;
+  return pool
     .filter(r => realmIdx >= r.minRealm && state.age >= r.minAge)
     .map(r => {
       const rec = records.find(rec => rec.realmId === r.id);
@@ -2687,7 +2820,7 @@ export function getAvailableRealms(state: CharacterState): Array<SecretRealm & {
 
 // 探索秘境前置校验：返回 { ok, error? }
 export function canExploreRealm(state: CharacterState, realmId: string): { ok: boolean; error?: string; realm?: SecretRealm } {
-  const realm = SECRET_REALMS.find(r => r.id === realmId);
+  const realm = [...getDiscoveredStoryRealms(state), ...SECRET_REALMS].find(r => r.id === realmId);
   if (!realm) return { ok: false, error: '秘境不存在' };
   if (!state.alive) return { ok: false, error: '角色已陨落' };
   if (state.combatSession && state.combatSession.status === 'ongoing') {
@@ -2697,8 +2830,16 @@ export function canExploreRealm(state: CharacterState, realmId: string): { ok: b
   const realmIdx = REALMS.findIndex(r => r.id === state.realm);
   if (realmIdx < realm.minRealm) return { ok: false, error: `境界不足，需${REALMS[realm.minRealm].name}以上` };
   if (state.age < realm.minAge) return { ok: false, error: `年龄不足，需${realm.minAge}岁以上` };
-  if (state.spiritStones < realm.spiritStoneCost) {
-    return { ok: false, error: `灵石不足，需${realm.spiritStoneCost}灵石（路费+护身符）` };
+  const cost = realm.isStoryRealm ? 0 : realm.spiritStoneCost;
+  if (realm.entryRequirement) {
+    const hasRequirement = [...(state.inventory || []), ...(state.equipped || []), ...(state.activeStatuses || [])]
+      .some((it: any) => `${it.name || ''}${it.description || ''}${it.source || ''}`.includes(realm.entryRequirement!));
+    if (!hasRequirement) {
+      return { ok: false, error: `尚未掌握入境关窍：需${realm.entryRequirement}，或另寻${(realm.entryAlternatives || ['破禁之法']).join('、')}` };
+    }
+  }
+  if (state.spiritStones < cost) {
+    return { ok: false, error: `灵石不足，需${cost}灵石（路费+护身符）` };
   }
   // 冷却检查
   const rec = (state.exploredRealms || []).find(rec => rec.realmId === realmId);
@@ -2715,7 +2856,7 @@ export function canExploreRealm(state: CharacterState, realmId: string): { ok: b
 export function startExploration(state: CharacterState, realm: SecretRealm): CharacterState {
   const newState: CharacterState = {
     ...state,
-    spiritStones: Math.max(0, state.spiritStones - realm.spiritStoneCost),
+    spiritStones: Math.max(0, state.spiritStones - (realm.isStoryRealm ? 0 : realm.spiritStoneCost)),
   };
   // 标记当前探索的秘境（让 buildStateContext 透传给 AI）
   (newState as any)._currentExploration = realm;

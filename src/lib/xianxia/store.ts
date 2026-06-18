@@ -108,6 +108,8 @@ export interface CharacterState {
   // ===== Task 24 新增 =====
   // 已探秘境记录（ExplorationRecord[]）—— 用于秘境面板显示冷却状态
   exploredRealms?: any[];
+  // 当前剧情中发现的秘境入口（从未决线索/信物/状态推导）
+  discoveredRealms?: any[];
 }
 
 export interface GameEvent {
