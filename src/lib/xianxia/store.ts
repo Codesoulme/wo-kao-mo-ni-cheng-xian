@@ -3,6 +3,54 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+
+export type HeritageCategory = 'scripture' | 'fate' | 'pet' | 'artifact' | 'constitution' | 'treasure';
+export type HeritageRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+
+export interface HeritageItem {
+  id: string;
+  category: HeritageCategory;
+  name: string;
+  description: string;
+  rarity: HeritageRarity;
+  source: string;
+  payload?: any;
+}
+
+export type SelectedHeritage = Partial<Record<HeritageCategory, HeritageItem[]>>;
+
+export interface SettlementOption extends HeritageItem {
+  reason: string;
+}
+
+export interface SimulationHallRecord {
+  id: string;
+  characterName: string;
+  gender: string;
+  age: number;
+  highestRealm: string;
+  realmLevel: number;
+  ending: 'death' | 'ascension';
+  evaluationTitle: string;
+  score: number;
+  notableDeeds: string[];
+  carriedOut: HeritageItem[];
+  createdAt: string;
+}
+
+export interface SettlementResult {
+  id: string;
+  characterId: string;
+  ending: 'death' | 'ascension';
+  title: string;
+  summary: string;
+  score: number;
+  rank: string;
+  options: SettlementOption[];
+  hallRecord: SimulationHallRecord;
+  createdAt: string;
+}
+
 export interface CharacterState {
   id: string;
   name: string;
@@ -139,6 +187,11 @@ interface GameState {
   // Task 24：最近一次探索结果（用于探索结果弹窗展示）
   lastExploration: { realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string } | null;
 
+  heritageVault: HeritageItem[];
+  selectedHeritage: SelectedHeritage;
+  hallOfSimulations: SimulationHallRecord[];
+  settlementResult: SettlementResult | null;
+
   setCharacter: (c: CharacterState | null) => void;
   setEvents: (e: GameEvent[]) => void;
   addEvent: (e: GameEvent) => void;
@@ -159,6 +212,13 @@ interface GameState {
   setExplorationOpen: (open: boolean) => void;
   // Task 24：设置最近一次探索结果
   setLastExploration: (e: { realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string } | null) => void;
+  setHeritageVault: (items: HeritageItem[]) => void;
+  addHeritageItems: (items: HeritageItem[]) => void;
+  setSelectedHeritage: (selected: SelectedHeritage) => void;
+  toggleSelectedHeritage: (item: HeritageItem) => void;
+  clearSelectedHeritage: () => void;
+  setSettlementResult: (result: SettlementResult | null) => void;
+  addHallRecord: (record: SimulationHallRecord) => void;
   reset: () => void;
 }
 
@@ -180,6 +240,10 @@ export const useGameStore = create<GameState>()(
       marketOpen: false,
       explorationOpen: false,
       lastExploration: null,
+      heritageVault: [],
+      selectedHeritage: {},
+      hallOfSimulations: [],
+      settlementResult: null,
 
       setCharacter: (c) => set({ character: c }),
       setEvents: (e) => set({ events: e }),
@@ -198,16 +262,46 @@ export const useGameStore = create<GameState>()(
       setMarketOpen: (open) => set({ marketOpen: open }),
       setExplorationOpen: (open) => set({ explorationOpen: open }),
       setLastExploration: (e) => set({ lastExploration: e }),
+      setHeritageVault: (items) => set({ heritageVault: items }),
+      addHeritageItems: (items) => set((s) => {
+        const known = new Set(s.heritageVault.map((item) => item.id));
+        const fresh = items.filter((item) => !known.has(item.id));
+        return { heritageVault: [...s.heritageVault, ...fresh] };
+      }),
+      setSelectedHeritage: (selected) => set({ selectedHeritage: selected }),
+      toggleSelectedHeritage: (item) => set((s) => {
+        const current = s.selectedHeritage[item.category] || [];
+        const exists = current.some((it) => it.id === item.id);
+        return {
+          selectedHeritage: {
+            ...s.selectedHeritage,
+            [item.category]: exists
+              ? current.filter((it) => it.id !== item.id)
+              : [...current, item],
+          },
+        };
+      }),
+      clearSelectedHeritage: () => set({ selectedHeritage: {} }),
+      setSettlementResult: (result) => set({ settlementResult: result }),
+      addHallRecord: (record) => set((s) => ({
+        hallOfSimulations: [record, ...s.hallOfSimulations.filter((it) => it.id !== record.id)].slice(0, 50),
+      })),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
         loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null,
         selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
-        explorationOpen: false, lastExploration: null,
+        explorationOpen: false, lastExploration: null, settlementResult: null,
       }),
     }),
     {
       name: 'xianxia-game',
-      partialize: (s) => ({ character: s.character }),
+      partialize: (s) => ({
+        character: s.character,
+        heritageVault: s.heritageVault,
+        selectedHeritage: s.selectedHeritage,
+        hallOfSimulations: s.hallOfSimulations,
+        settlementResult: s.settlementResult,
+      }),
     }
   )
 );

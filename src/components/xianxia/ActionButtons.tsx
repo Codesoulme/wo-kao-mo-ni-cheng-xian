@@ -7,8 +7,9 @@ import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Sto
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { REALMS } from '@/lib/xianxia/types';
-import type { GameEvent } from '@/lib/xianxia/store';
+import type { CharacterState, GameEvent } from '@/lib/xianxia/store';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
+import { generateSettlementResult } from '@/lib/xianxia/settlement';
 
 type AiOpportunity = {
   market: boolean;
@@ -51,6 +52,7 @@ export function ActionButtons() {
     setCharacter, addEvent, setPendingChoice,
     setLastChange, setLastBreakthrough, setLoading, setError,
     setBreakthroughCeremony,
+    setSettlementResult,
     setMarketOpen,
     setExplorationOpen,
     reset,

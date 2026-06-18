@@ -9,10 +9,12 @@ import { Sparkles, Mountain, Feather } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
+import { CustomSimulationDialog } from '@/components/xianxia/CustomSimulationDialog';
+import { SimulationHallDialog } from '@/components/xianxia/SimulationHallDialog';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 
 export function StartScreen() {
-  const { setCharacter, setEvents, setChoices, setFateNodes, setLoading } = useGameStore();
+  const { setCharacter, setEvents, setChoices, setFateNodes, setLoading, selectedHeritage } = useGameStore();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -23,10 +25,11 @@ export function StartScreen() {
     try {
       await ensureAIConfigured();
 
+      const heritage = Object.values(selectedHeritage).flat();
       const res = await fetch('/api/game/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() || undefined }),
+        body: JSON.stringify({ name: name.trim() || undefined, heritage }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '开启失败');
@@ -105,6 +108,10 @@ export function StartScreen() {
           </Button>
           <div className="text-[10px] text-muted-foreground text-center leading-relaxed">
             灵根随机 · 命运无常 · 天道不佑
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <CustomSimulationDialog />
+            <SimulationHallDialog />
           </div>
           <AIConfigDialog variant="start" />
         </CardContent>

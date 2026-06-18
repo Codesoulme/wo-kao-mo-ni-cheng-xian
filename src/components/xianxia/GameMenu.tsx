@@ -20,24 +20,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, RotateCcw, Home, ScrollText, Info } from 'lucide-react';
+import { RotateCcw, ScrollText, Info, Settings } from 'lucide-react';
 import { toast } from 'sonner';
-import { REALMS } from '@/lib/xianxia/types';
+import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
 
 export function GameMenu() {
   const { character, events, choices, reset } = useGameStore();
   const [resetOpen, setResetOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
-  if (!character) return null;
 
   const handleReset = () => {
     reset();
     setResetOpen(false);
-    toast('已重开新局', { description: '前尘尽散，再入轮回' });
+    toast('已放弃模拟', { description: '主动放弃不会获得本次模拟结算奖励。' });
   };
 
-  const realmInfo = REALMS.find(r => r.id === character.realm);
   const totalEvents = events.length;
   const totalChoices = choices.length;
 
@@ -47,41 +45,42 @@ export function GameMenu() {
         <DropdownMenuTrigger asChild>
           <button
             className="shrink-0 w-7 h-7 flex items-center justify-center rounded-md border border-border/50 bg-card/60 hover:bg-accent/10 hover:border-accent/40 transition-colors text-foreground/80"
-            aria-label="游戏菜单"
+            aria-label="设置"
           >
-            <MoreVertical className="w-3.5 h-3.5" />
+            <Settings className="w-3.5 h-3.5" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-44">
-          <div className="px-2 py-1.5 text-[10px] text-muted-foreground font-serif-cn">
-            {character.name} · {character.age}岁
-          </div>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setAboutOpen(true)}
-            className="text-xs cursor-pointer"
-          >
-            <Info className="w-3.5 h-3.5 mr-2" />
-            <span>本局概况</span>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setResetOpen(true)}
-            className="text-xs cursor-pointer text-destructive focus:text-destructive"
-          >
-            <RotateCcw className="w-3.5 h-3.5 mr-2" />
-            <span>重开存档</span>
-          </DropdownMenuItem>
+          {character && (
+            <DropdownMenuItem
+              onClick={() => setAboutOpen(true)}
+              className="text-xs cursor-pointer"
+            >
+              <Info className="w-3.5 h-3.5 mr-2" />
+              <span>本局概况</span>
+            </DropdownMenuItem>
+          )}
+          <AIConfigDialog variant="menu" />
+          {character && <DropdownMenuSeparator />}
+          {character && (
+            <DropdownMenuItem
+              onClick={() => setResetOpen(true)}
+              className="text-xs cursor-pointer text-destructive focus:text-destructive"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-2" />
+              <span>放弃模拟</span>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* 重开确认 */}
+      {/* 放弃模拟确认 */}
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
         <AlertDialogContent className="max-w-[300px]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-serif-cn text-base">重开存档？</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs">
-              当前角色的修真历程将被清除，无法恢复。确定要重返主菜单、另启新局吗？
+            <AlertDialogTitle className="font-serif-cn text-base">放弃模拟？</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs leading-relaxed">
+              放弃后会回到首页，本次模拟不会进入结算，也不会获得可带入下一世的选项。确定要舍弃此世因果吗？
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -91,14 +90,14 @@ export function GameMenu() {
               className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               <RotateCcw className="w-3 h-3 mr-1.5" />
-              确认重开
+              确认放弃
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* 本局概况 */}
-      <AlertDialog open={aboutOpen} onOpenChange={setAboutOpen}>
+      {character && <AlertDialog open={aboutOpen} onOpenChange={setAboutOpen}>
         <AlertDialogContent className="max-w-[320px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif-cn text-base flex items-center gap-2">
@@ -171,7 +170,7 @@ export function GameMenu() {
             <AlertDialogAction className="h-8 text-xs">了悟</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
-      </AlertDialog>
+      </AlertDialog>}
     </>
   );
 }

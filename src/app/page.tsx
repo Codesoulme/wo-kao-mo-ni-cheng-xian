@@ -12,12 +12,13 @@ import { ChoiceModal } from '@/components/xianxia/ChoiceModal';
 import { CombatModal } from '@/components/xianxia/CombatModal';
 import { MarketModal } from '@/components/xianxia/MarketModal';
 import { SecretRealmPanel } from '@/components/xianxia/SecretRealmPanel';
+import { SettlementModal } from '@/components/xianxia/SettlementModal';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
 import { GameMenu } from '@/components/xianxia/GameMenu';
-import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
 import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Scroll, Sparkles, Package } from 'lucide-react';
+import { generateSettlementResult } from '@/lib/xianxia/settlement';
 
 // 客户端 hydration 检测：避免 SSR/CSR mismatch
 // 用微任务延迟 setState，避免在 effect body 同步调用触发 react-hooks 规则
@@ -36,8 +37,8 @@ function useHydrated() {
 
 export default function Home() {
   const {
-    character, events, pendingChoice,
-    setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice,
+    character, events, pendingChoice, settlementResult, hallOfSimulations,
+    setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice, setSettlementResult,
   } = useGameStore();
   // 当有 pendingChoice 时自动聚焦到故事 Tab
   const [tab, setTab] = useState('story');
@@ -71,6 +72,15 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [hydrated, character?.id, events.length, setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice]);
 
+  useEffect(() => {
+    if (!hydrated || !character) return;
+    if (character.alive && !character.ascended) return;
+    if (settlementResult?.characterId === character.id) return;
+    const result = generateSettlementResult(character, events);
+    if (hallOfSimulations.some((record) => record.id === result.hallRecord.id)) return;
+    setSettlementResult(result);
+  }, [hydrated, character, events, settlementResult?.characterId, hallOfSimulations, setSettlementResult]);
+
   // 防止 hydration mismatch：在客户端 hydration 完成前不渲染 character 相关 UI
   if (!hydrated) {
     return (
@@ -90,24 +100,8 @@ export default function Home() {
             <span className="font-serif-cn text-sm font-bold tracking-wider">我靠模拟成仙</span>
           </div>
           <div className="flex items-center gap-2">
-            {!character && <AIConfigDialog />}
+            <GameMenu />
           </div>
-          {character && (
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                <span className="font-serif-cn">{character.name}</span>
-                <span>·</span>
-                <span>{character.age}岁</span>
-                {character.alive ? (
-                  character.ascended ? <span className="text-yellow-500">已飞升</span> : null
-                ) : (
-                  <span className="text-destructive">已陨落</span>
-                )}
-              </div>
-              <AIConfigDialog />
-              <GameMenu />
-            </div>
-          )}
         </div>
       </header>
 
@@ -206,6 +200,9 @@ export default function Home() {
 
       {/* 秘境探索弹窗（z-[55]，与坊市同层；探索结果 z-[60]） */}
       <SecretRealmPanel />
+
+      {/* 轮回结算 */}
+      <SettlementModal />
     </div>
   );
 }

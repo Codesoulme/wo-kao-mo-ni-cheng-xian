@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
 type AIConfigStatus = {
@@ -20,7 +21,7 @@ type AIConfigStatus = {
 };
 
 type AIConfigDialogProps = {
-  variant?: 'icon' | 'start';
+  variant?: 'icon' | 'start' | 'menu';
 };
 
 export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
@@ -101,7 +102,12 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     }
   };
 
-  const trigger = variant === 'start' ? (
+  const trigger = variant === 'menu' ? (
+    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); }} className="text-xs cursor-pointer">
+      <Settings className="w-3.5 h-3.5 mr-2" />
+      <span>AI 配置</span>
+    </DropdownMenuItem>
+  ) : variant === 'start' ? (
     <Button variant={status.configured ? 'outline' : 'default'} className="w-full font-serif-cn gap-2">
       {status.configured ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <KeyRound className="w-4 h-4" />}
       {status.configured ? 'AI 接口已配置' : '配置 AI 接口'}
