@@ -49,6 +49,12 @@ export interface CharacterState {
   characterIntents?: any[];
   // 进行中的战斗（若有；combatSession.status='ongoing' 时 CombatModal 全屏显示）
   combatSession?: any | null;
+  // ===== Task 22 新增 =====
+  // 心魔值 0-100
+  heartDemon?: number;
+  // ===== Task 23 新增 =====
+  // 灵宠列表
+  pets?: any[];
 }
 
 export interface GameEvent {

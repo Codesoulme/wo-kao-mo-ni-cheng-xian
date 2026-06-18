@@ -94,6 +94,20 @@ model Character {
   recentEventTypesJson String @default("[]")
   // 最近蓝图分类列表（用于反重复机制）
   recentBlueprintCategoriesJson String @default("[]")
+  // ===== Task 22 新增 =====
+  // 心魔值 0-100：杀生/邪修/未解执念会增加；静修/净化物品/岁月流逝会减少
+  // 高心魔值会触发心魔试炼战斗事件，严重影响修炼效率，90+ 有走火入魔风险
+  heartDemon     Int      @default(0)
+
+  // ===== Task 23 新增 =====
+  // 灵宠 JSON（Pet[]）—— 玩家收服的灵宠，参战、护院、增加修炼效率
+  // 灵宠有独立 hp/attack/loyalty/satiety，每岁需要喂养（消耗材料类物品）
+  petsJson       String   @default("[]")
+
+  // ===== Task 24 新增 =====
+  // 秘境探索记录 JSON（ExplorationRecord[]）—— 玩家已探秘境 + 冷却追踪
+  // 每条记录：{ realmId, lastExploredAge, timesExplored, bestReward? }
+  exploredRealmsJson String @default("[]")
 
   events          EventLog[]
   choices         ChoiceLog[]

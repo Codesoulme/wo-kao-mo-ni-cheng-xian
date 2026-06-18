@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough, pickEventBlueprint, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tickFormations } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, executeAIEvent, checkLifespan, tickStatusDurations, checkFateNode, markFateNodeDone, applyChanges, stateToResponse, tryBreakthrough, pickEventBlueprint, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tickFormations, tickHeartDemon, tryHeartDemonTrial, tickPets } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES } from '@/lib/xianxia/types';
 
@@ -23,6 +23,15 @@ export async function POST(req: NextRequest) {
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落，无法继续' }, { status: 400 });
     if (char.ascended) return NextResponse.json({ success: false, error: '角色已飞升，无需继续' }, { status: 400 });
     if (char.isAtChoice) return NextResponse.json({ success: false, error: '当前有待选择，请先完成选择' }, { status: 400 });
+    // Task 22: 战斗中不可推进年龄——必须先结束战斗
+    if (char.combatStateJson) {
+      try {
+        const cs = JSON.parse(char.combatStateJson);
+        if (cs && cs.status === 'ongoing') {
+          return NextResponse.json({ success: false, error: '战斗进行中，请先结束战斗' }, { status: 400 });
+        }
+      } catch { /* ignore */ }
+    }
 
     // 取最近事件用于上下文
     const recentEventsDb = await db.eventLog.findMany({
@@ -48,6 +57,10 @@ export async function POST(req: NextRequest) {
     // Task 21: 阵法维持消耗灵石
     const formationTick = tickFormations(state);
     state = formationTick.state;
+    // Task 22: 心魔值每岁自然变化（静修净化 / urgent 线索缠心 / 高心魔反噬）
+    state = tickHeartDemon(state);
+    // Task 23: 灵宠每岁状态变化（饱食度 -10、忠诚度 -2、HP 回复、低忠诚可能逃离）
+    state = tickPets(state);
 
     // 检查是否触发命节点
     const fateNodeIdx = checkFateNode(state);
@@ -171,6 +184,27 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Task 22: 心魔试炼触发判定——心魔值 >= 60 时每岁有概率触发独立战斗
+    // 注意：只在没有任何战斗（即时或延迟）/选择/死亡的情况下触发，避免叠加
+    const hasImmediateOrDeferredCombat = !!finalState.combatSession ||
+      !!((finalState as any)._deferredCombat);
+    const hasChoiceThisEvent = !!aiOutput.hasChoice;
+    if (
+      !result.died &&
+      !finalState.ascended &&
+      finalState.alive &&
+      !hasImmediateOrDeferredCombat &&
+      !hasChoiceThisEvent
+    ) {
+      const trial = tryHeartDemonTrial(finalState);
+      if (trial.triggered && trial.trigger) {
+        finalState = startCombat(finalState, trial.trigger);
+        // 追加叙事提示
+        aiOutput.narrative = aiOutput.narrative + `\n\n【心魔试炼】${trial.trigger.contextNarrative}`;
+        console.log(`[Task 22] Heart demon trial triggered at age ${finalState.age} (heartDemon=${finalState.heartDemon})`);
+      }
+    }
+
     // 命节点完成标记（若事件含 hasChoice，等玩家选完再标记；若不含选择直接标记）
     if (isFateNode && fateNode && !aiOutput.hasChoice) {
       finalState = markFateNodeDone(finalState, fateNode.index);
@@ -184,6 +218,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 持久化 pendingChoice（让页面刷新后可恢复，避免 ChoiceModal 丢失导致卡死）
+    // Task 22: 同时保存 deferredCombat——若 hasChoice 与 triggerCombat 同时出现，战斗延迟到选择后触发
     const pendingChoiceJson = (aiOutput.hasChoice && aiOutput.choice)
       ? JSON.stringify({
           prompt: aiOutput.choice.prompt,
@@ -192,6 +227,7 @@ export async function POST(req: NextRequest) {
           contextNarrative: aiOutput.narrative,
           contextAge: finalState.age,
           contextFateNodeName: fateNode?.name,
+          deferredCombat: (finalState as any)._deferredCombat || null,
         })
       : '';
 
@@ -249,6 +285,10 @@ export async function POST(req: NextRequest) {
         combatStateJson: finalState.combatSession ? JSON.stringify(finalState.combatSession) : '',
         recentEventTypesJson: JSON.stringify(recentEventTypes),
         recentBlueprintCategoriesJson: JSON.stringify(newRecentBlueprintCategories),
+        // Task 22: 心魔值
+        heartDemon: finalState.heartDemon ?? 0,
+        // Task 23: 灵宠
+        petsJson: JSON.stringify(finalState.pets || []),
       },
     });
 

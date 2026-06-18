@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 
 export const runtime = 'nodejs';
@@ -88,6 +88,12 @@ export async function POST(req: NextRequest) {
       if (result.triggerCombat && result.triggerCombat.enemies?.length) {
         state = startCombat(state, result.triggerCombat);
       }
+      // Task 23: 应用 AI 授予的灵宠
+      if ((result as any).newPets && (result as any).newPets.length) {
+        for (const pet of (result as any).newPets) {
+          state = addPet(state, pet);
+        }
+      }
 
       // 干扰可能消耗时间
       if (result.ageAdvance && result.ageAdvance > 0) {
@@ -137,6 +143,10 @@ export async function POST(req: NextRequest) {
         pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
         characterIntentsJson: JSON.stringify(state.characterIntents || []),
         combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : '',
+        // Task 22: 心魔值
+        heartDemon: state.heartDemon ?? 0,
+        // Task 23: 灵宠
+        petsJson: JSON.stringify(state.pets || []),
       },
     });
 

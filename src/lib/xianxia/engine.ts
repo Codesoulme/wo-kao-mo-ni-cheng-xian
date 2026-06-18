@@ -32,6 +32,14 @@ import {
   CombatSession,
   Formation,
   FormationType,
+  Pet,
+  PetSpecies,
+  PET_SPECIES_TEMPLATES,
+  TalismanType,
+  // Task 24: 秘境探索系统
+  SecretRealm,
+  SECRET_REALMS,
+  ExplorationRecord,
 } from './types';
 
 // ==================== 角色状态序列化 ====================
@@ -58,6 +66,10 @@ export interface DBCharacter {
   combatStateJson: string;
   recentEventTypesJson: string;
   recentBlueprintCategoriesJson: string;
+  // ===== Task 23 新增 =====
+  petsJson?: string;
+  // ===== Task 24 新增 =====
+  exploredRealmsJson?: string;
 }
 
 // 旧存档 equippedJson 可能是 slot-map（{weapon: {...}}）或已是数组（[{...}]）
@@ -128,6 +140,12 @@ export function dbToState(c: DBCharacter): CharacterState {
     pendingThreads,
     characterIntents,
     combatSession,
+    // Task 22 新字段
+    heartDemon: (c as any).heartDemon ?? 0,
+    // Task 23 新字段
+    pets: safeParse<Pet[]>((c as any).petsJson || '[]', []),
+    // Task 24 新字段
+    exploredRealms: safeParse<ExplorationRecord[]>((c as any).exploredRealmsJson || '[]', []),
   };
   // 持久化的 recentEventTypes / recentBlueprintCategories 不进 state（仅 ctx 用），但需要保留
   // 这里通过闭包变量传给 buildStateContext（在 advance route 中调用）
@@ -170,6 +188,8 @@ const ATTRIBUTE_BOUNDS: Record<string, { min: number; max: number }> = {
   elementWater:    { min: 0,    max: 100 },
   elementFire:     { min: 0,    max: 100 },
   elementEarth:    { min: 0,    max: 100 },
+  // Task 22: 心魔值（0-100）
+  heartDemon:      { min: 0,    max: 100 },
 };
 
 export function applyChanges(state: CharacterState, changes: AttributeChange[]): CharacterState {
@@ -302,6 +322,36 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
       }
     }
   }
+  // 4. Task 22: 心魔值惩罚（仅当 >= 30 显示）
+  const hd = state.heartDemon ?? 0;
+  if (hd >= 30) {
+    const penalty = Math.min(0.7, Math.floor((hd - 20) / 10) * 0.1);
+    factors.push({
+      name: '心魔侵扰',
+      value: 1 - penalty, // 显示为 ×0.9 / ×0.8 / ...
+      operation: 'multiply',
+      rarity: hd >= 90 ? 'mythic' : hd >= 60 ? 'legendary' : 'epic',
+      note: `心魔值 ${hd}/100，道心不稳`,
+    });
+  }
+  // 5. Task 23: 灵宠陪伴效应
+  if (state.pets && state.pets.length > 0) {
+    const petBonus = computePetPassiveBonus(state).cultivationRate;
+    if (petBonus > 0) {
+      // 取最高稀有度的灵宠代表
+      const topPet = [...state.pets].sort((a, b) => {
+        const order = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+        return order.indexOf(b.rarity) - order.indexOf(a.rarity);
+      })[0];
+      factors.push({
+        name: `灵宠陪伴（${state.pets.length}只）`,
+        value: 1 + petBonus,
+        operation: 'multiply',
+        rarity: topPet.rarity as any,
+        note: `${topPet.name}等灵宠伴修`,
+      });
+    }
+  }
   return factors;
 }
 
@@ -327,6 +377,19 @@ export function computeEffectiveCultivationRate(state: CharacterState): { multip
       if (eff.operation === 'multiply' && eff.value > 0) multiplier *= eff.value;
       else if (eff.operation === 'add') flatBonus += eff.value;
     }
+  }
+  // Task 22: 心魔值惩罚——30+ 修炼效率 -10%，每 10 点额外 -10%（60→-40%，90→-70%）
+  // 心魔扰乱心神，难以入定，故修炼速度倍率折扣
+  const hd = state.heartDemon ?? 0;
+  if (hd >= 30 && multiplier > 0) {
+    const penalty = Math.min(0.7, Math.floor((hd - 20) / 10) * 0.1); // 30→0.1, 40→0.2, ..., 90→0.7
+    multiplier = Math.max(0, multiplier * (1 - penalty));
+  }
+  // Task 23: 灵宠陪伴效应——所有灵宠略微提升修炼速度倍率
+  // 仅当 multiplier > 0（即已能修炼）时才生效，无灵根者灵宠无法可促其修炼
+  if (multiplier > 0 && state.pets && state.pets.length > 0) {
+    const petBonus = computePetPassiveBonus(state).cultivationRate;
+    if (petBonus > 0) multiplier *= (1 + petBonus);
   }
   return { multiplier, flatBonus };
 }
@@ -803,6 +866,7 @@ export function tickStatusDurations(state: CharacterState): CharacterState {
 // 添加物品到 inventory。若物品是储物袋（含 storageCapacity 效果的 tool），自动增加 storageCapacity。
 // 兜底：若 AI 给了无效 item_type（如 'storage'），但物品含 storageCapacity 效果，则强转 item_type='tool'。
 // 兜底：若物品名含功法关键词（诀/经/典/录/篇/功法）但 item_type 不是 scripture，强转 scripture 并补默认效果
+// Task 22: 容量限制——超过 storageCapacity 时丢弃多余物品（储物袋本身优先保留，因可扩容）
 export function addItems(state: CharacterState, items: ItemEntry[]): CharacterState {
   if (!items.length) return state;
   // 规整化物品：确保 item_type 合法；储物袋 item_type 必为 'tool'；功法名必为 'scripture'
@@ -838,8 +902,8 @@ export function addItems(state: CharacterState, items: ItemEntry[]): CharacterSt
     }
     return { ...it, item_type: itemType as any, effects };
   });
-  let next = { ...state, inventory: [...state.inventory, ...normalized] };
-  // 储物袋获得即扩容
+
+  // Task 22: 计算加入后的总容量（含本批储物袋扩容），按容量限制裁剪
   let bagBoost = 0;
   for (const it of normalized) {
     if (isStorageBag(it)) {
@@ -850,7 +914,23 @@ export function addItems(state: CharacterState, items: ItemEntry[]): CharacterSt
       }
     }
   }
-  if (bagBoost > 0) next.storageCapacity = (next.storageCapacity || 5) + bagBoost;
+  const projectedCapacity = (state.storageCapacity || 5) + bagBoost;
+  const currentCount = state.inventory.length;
+  const availableSlots = Math.max(0, projectedCapacity - currentCount);
+  // 储物袋优先放入（因其扩容），其余按顺序填满
+  const bags = normalized.filter(isStorageBag);
+  const nonBags = normalized.filter(it => !isStorageBag(it));
+  const keptNonBags = nonBags.slice(0, Math.max(0, availableSlots - bags.length));
+  const droppedCount = nonBags.length - keptNonBags.length;
+  if (droppedCount > 0) {
+    console.warn(`[Task 22] Storage full (${currentCount}/${state.storageCapacity}): dropping ${droppedCount} items: ${nonBags.slice(keptNonBags.length).map(d => d.name).join(', ')}`);
+  }
+  const finalItems = [...bags, ...keptNonBags];
+  if (!finalItems.length) return state;
+
+  let next = { ...state, inventory: [...state.inventory, ...finalItems] };
+  // 储物袋获得即扩容
+  if (bagBoost > 0) next.storageCapacity = projectedCapacity;
   return next;
 }
 
@@ -911,6 +991,8 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
       spiritStones: state.spiritStones, reputation: state.reputation,
       faction: state.faction, master: state.master, location: state.location,
       alive: state.alive, ascended: state.ascended,
+      // Task 22: 心魔值——AI 可看到，可用 changes 中 attribute='heartDemon' 调整
+      heartDemon: state.heartDemon ?? 0,
     },
     activeStatuses: state.activeStatuses,
     inventory: state.inventory,
@@ -929,6 +1011,11 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     characterIntents: intents,
     recentEventTypes,
     recentBlueprintCategories,
+    // Task 23 新字段
+    pets: state.pets || [],
+    // Task 24 新字段
+    exploredRealms: state.exploredRealms || [],
+    currentExploration: (state as any)._currentExploration,
   };
 }
 
@@ -1183,7 +1270,37 @@ export function startCombat(state: CharacterState, trigger: NonNullable<AIEventO
         effect: (it.effects || []).map(e => `${e.operation === 'add' ? '+' : '×'}${e.value} ${e.target_attribute}`).join('，') || '无效果',
       })),
     victoryDrops: trigger.victoryDrops,
+    // Task 22: 心魔试炼字段透传
+    victoryHeartDemonDelta: trigger.victoryHeartDemonDelta,
+    defeatHeartDemonDelta: trigger.defeatHeartDemonDelta,
+    isHeartDemonTrial: trigger.isHeartDemonTrial,
   };
+  // Task 23: 选择忠诚度最高且饱食度足够的灵宠参战（satiety >= 20 才参战）
+  // 心魔试炼战斗灵宠无法参战（心魔投影不属于现实战场）
+  if (!trigger.isHeartDemonTrial && state.pets && state.pets.length > 0) {
+    const eligible = state.pets
+      .filter(p => p.loyalty >= 30 && p.satiety >= 20 && p.hp > 0)
+      .sort((a, b) => (b.attack + b.defense) - (a.attack + a.defense));
+    if (eligible.length > 0) {
+      const pet = eligible[0];
+      session.petCombatant = {
+        id: pet.id,
+        name: pet.name,
+        species: pet.species,
+        hp: pet.hp,
+        maxHp: pet.maxHp,
+        attack: pet.attack,
+        defense: pet.defense,
+        speed: pet.speed,
+        skillName: pet.skill.name,
+        skillDesc: pet.skill.description,
+        skillPower: pet.skill.power,
+        skillCooldown: pet.skill.cooldown,
+        currentCooldown: 0,
+        element: pet.element,
+      };
+    }
+  }
   return { ...state, combatSession: session };
 }
 
@@ -1207,7 +1324,7 @@ export interface CombatActionResult {
 
 export function executeCombatRound(
   state: CharacterState,
-  action: 'attack' | 'skill' | 'item' | 'defend' | 'flee',
+  action: 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee',
   payload?: { skillIdx?: number; itemId?: string },
 ): CombatActionResult {
   if (!state.combatSession || state.combatSession.status !== 'ongoing') {
@@ -1290,6 +1407,63 @@ export function executeCombatRound(
     // 消耗物品
     state = { ...state, inventory: state.inventory.filter(it => it.id !== payload.itemId) };
     session.playerItems = (session.playerItems || []).filter(it => it.itemId !== payload.itemId);
+  } else if (action === 'talisman' && payload?.itemId) {
+    // Task 23: 符箓系统——单次使用、即时生效的战斗道具
+    playerActionType = 'item';
+    const item = state.inventory.find(it => it.id === payload.itemId);
+    if (!item) {
+      return {
+        state,
+        round: { round: session.round, playerAction: '激发符箓', playerActionType: 'item', narrative: '符箓不存在', playerHpAfter: playerHp, enemyHpAfter: enemyHp },
+        ended: false,
+      };
+    }
+    playerActionDesc = `激发${item.name}`;
+    // 根据 effects 中的 target_attribute 判定符箓类型
+    for (const eff of item.effects || []) {
+      if (eff.target_attribute === 'talisman_attack' && eff.operation === 'add') {
+        // 攻击符：直接对敌人造成 value 伤害（无视防御一半）
+        const dmg = Math.max(1, Math.floor(eff.value - enemy.defense * 0.3));
+        playerDamageDealt = dmg;
+        enemyHp -= dmg;
+        narrative += `你激发${item.name}，符箓化为攻伐之力轰向${enemy.name}，造成 ${dmg} 点伤害。`;
+      } else if (eff.target_attribute === 'talisman_defense' && eff.operation === 'add') {
+        // 防御符：本回合减伤 value
+        session.talismanDefenseActive = eff.value;
+        narrative += `你激发${item.name}，符箓化为护体金光，本回合可减伤 ${eff.value} 点。`;
+      } else if (eff.target_attribute === 'talisman_heal' && eff.operation === 'add') {
+        // 治疗符：回复 HP
+        const heal = eff.value;
+        playerHp = Math.min(session.playerMaxHp, playerHp + heal);
+        playerHeal = heal;
+        narrative += `你激发${item.name}，符箓化为温润灵光，回复 ${heal} 点气血。`;
+      } else if (eff.target_attribute === 'talisman_escape' && eff.operation === 'add') {
+        // 遁逃符：高概率逃跑
+        const escapeChance = Math.min(0.95, 0.5 + eff.value * 0.1);
+        if (Math.random() < escapeChance) {
+          narrative += `你激发${item.name}，符箓化为金光裹身，瞬间脱离战场！`;
+          // 消耗符箓
+          state = { ...state, inventory: state.inventory.filter(it => it.id !== payload.itemId) };
+          session.playerItems = (session.playerItems || []).filter(it => it.itemId !== payload.itemId);
+          const endSession: CombatSession = { ...session, status: 'fled' };
+          return {
+            state: { ...state, combatSession: endSession, hp: playerHp, mp: playerMp },
+            round: { round: session.round, playerAction: playerActionDesc, playerActionType, narrative, playerHpAfter: playerHp, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
+            ended: true,
+            endStatus: 'fled',
+          };
+        } else {
+          narrative += `你激发${item.name}，但灵力被压制，未能脱身。`;
+        }
+      } else if (eff.target_attribute === 'talisman_stun' && eff.operation === 'add') {
+        // 镇压符：让敌人本回合无法行动
+        session.enemyStunned = true;
+        narrative += `你激发${item.name}，符箓化为镇压力量，${enemy.name}本回合无法行动！`;
+      }
+    }
+    // 消耗符箓（除遁逃符已消耗外）
+    state = { ...state, inventory: state.inventory.filter(it => it.id !== payload.itemId) };
+    session.playerItems = (session.playerItems || []).filter(it => it.itemId !== payload.itemId);
   } else if (action === 'defend') {
     playerActionType = 'defend';
     playerActionDesc = '凝神防御';
@@ -1337,26 +1511,81 @@ export function executeCombatRound(
       narrative += `新的对手${session.enemies[nextIdx].name}逼近！`;
     }
   } else {
-    // 敌人未死 → 敌人反击
-    const enemyDmg = action === 'defend'
-      ? Math.floor(computeDamage(enemy.attack, session.playerDefense, 1, 0.2) * 0.5)
-      : computeDamage(enemy.attack, session.playerDefense, 1, 0.2);
-    enemyDamageDealt = enemyDmg;
-    playerHp -= enemyDmg;
-    narrative += `${enemy.name}反扑，对你造成 ${enemyDmg} 点伤害。`;
-    // 玩家死亡判定
-    if (playerHp <= 0) {
-      playerHp = 0;
-      const endSession: CombatSession = { ...session, status: 'defeat', playerHp: 0 };
-      narrative += '你气血耗尽，败下阵来...';
-      return {
-        state: { ...state, combatSession: endSession, hp: 0, alive: false, causeOfDeath: `战死于${enemy.name}之手` },
-        round: { round: session.round, playerAction: playerActionDesc, playerActionType, playerDamage: playerDamageDealt, enemyDamage: enemyDamageDealt, narrative, playerHpAfter: 0, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
-        ended: true,
-        endStatus: 'defeat',
-      };
+    // 敌人未死 → 灵宠参战追加攻击（在敌人反击前）
+    if (session.petCombatant && session.petCombatant.hp > 0) {
+      const petC = session.petCombatant;
+      // 冷却中 → 普通攻击；否则施放技能并进入冷却
+      let petDmg: number;
+      let petActionDesc: string;
+      if (petC.currentCooldown > 0) {
+        petDmg = computeDamage(petC.attack, enemy.defense, 0.5, 0.25);
+        petActionDesc = `${petC.name}迅疾扑击`;
+        petC.currentCooldown -= 1;
+      } else {
+        petDmg = computeDamage(petC.attack, enemy.defense, petC.skillPower, 0.3);
+        petActionDesc = `${petC.name}施展${petC.skillName}`;
+        petC.currentCooldown = petC.skillCooldown;
+      }
+      enemyHp -= petDmg;
+      playerDamageDealt += petDmg;
+      narrative += `${petActionDesc}，对${enemy.name}追加 ${petDmg} 点伤害。`;
+      // 灵宠攻击后再次检查敌人是否被击败
+      if (enemyHp <= 0) {
+        enemyHp = 0;
+        narrative += `${enemy.name}倒下！`;
+        const nextIdx = session.enemies.findIndex((e, i) => i > session.currentEnemyIdx && e.hp > 0);
+        if (nextIdx < 0) {
+          const updatedEnemies = session.enemies.map((e, i) => i === session.currentEnemyIdx ? { ...e, hp: 0 } : e);
+          const endSession: CombatSession = { ...session, enemies: updatedEnemies, status: 'victory', playerHp, playerMp };
+          narrative += '战场归于沉寂，你胜了！';
+          return {
+            state: { ...state, combatSession: endSession, hp: playerHp, mp: playerMp },
+            round: { round: session.round, playerAction: playerActionDesc, playerActionType, playerDamage: playerDamageDealt, playerHeal, narrative, playerHpAfter: playerHp, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
+            ended: true,
+            endStatus: 'victory',
+            victoryDrops: session.victoryDrops,
+          };
+        } else {
+          session.currentEnemyIdx = nextIdx;
+          narrative += `新的对手${session.enemies[nextIdx].name}逼近！`;
+        }
+      }
+    }
+
+    // 敌人反击（除非被镇符眩晕）
+    if (!session.enemyStunned) {
+      let enemyDmg = action === 'defend'
+        ? Math.floor(computeDamage(enemy.attack, session.playerDefense, 1, 0.2) * 0.5)
+        : computeDamage(enemy.attack, session.playerDefense, 1, 0.2);
+      // Task 23: 防御符减伤
+      if (session.talismanDefenseActive && session.talismanDefenseActive > 0) {
+        const blocked = Math.min(enemyDmg, session.talismanDefenseActive);
+        enemyDmg -= blocked;
+        narrative += `护体金光抵消 ${blocked} 点伤害。`;
+      }
+      enemyDamageDealt = enemyDmg;
+      playerHp -= enemyDmg;
+      narrative += `${enemy.name}反扑，对你造成 ${enemyDmg} 点伤害。`;
+      // 玩家死亡判定
+      if (playerHp <= 0) {
+        playerHp = 0;
+        const endSession: CombatSession = { ...session, status: 'defeat', playerHp: 0 };
+        narrative += '你气血耗尽，败下阵来...';
+        return {
+          state: { ...state, combatSession: endSession, hp: 0, alive: false, causeOfDeath: `战死于${enemy.name}之手` },
+          round: { round: session.round, playerAction: playerActionDesc, playerActionType, playerDamage: playerDamageDealt, enemyDamage: enemyDamageDealt, narrative, playerHpAfter: 0, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
+          ended: true,
+          endStatus: 'defeat',
+        };
+      }
+    } else {
+      narrative += `${enemy.name}被镇符压制，无法行动！`;
     }
   }
+
+  // 清除本回合临时状态（符箓减伤/镇符眩晕）
+  session.talismanDefenseActive = undefined;
+  session.enemyStunned = undefined;
 
   // 更新敌人 HP 并推进回合
   const updatedEnemies = session.enemies.map((e, i) => i === session.currentEnemyIdx ? { ...e, hp: enemyHp } : e);
@@ -1427,7 +1656,22 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   next = addStatuses(next, aiOutput.newStatuses || []);
 
   // 3. 添加新物品
-  next = addItems(next, aiOutput.newItems || []);
+  // Task 22: 修复 AI 生成重复 ID 的问题——确保新物品 ID 与现有 inventory/equipped 不冲突
+  {
+    const rawNew = aiOutput.newItems || [];
+    if (rawNew.length) {
+      const existing = new Set<string>();
+      for (const it of next.inventory) existing.add(it.id);
+      for (const it of (next.equipped || [])) existing.add(it.id);
+      const deduped = rawNew.map(it => {
+        let id = it.id || `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        while (existing.has(id)) id = `${id}_${Math.random().toString(36).slice(2, 6)}`;
+        existing.add(id);
+        return { ...it, id };
+      });
+      next = addItems(next, deduped);
+    }
+  }
 
   // 3.5 AI 联动：移除/破坏物品（如战斗中武器被毁、丹药被消耗）
   if (aiOutput.removedItemIds && aiOutput.removedItemIds.length) {
@@ -1533,8 +1777,21 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   next = threadCheck.state;
 
   // 7.6 触发战斗（若 AI 给出 triggerCombat）
+  // Task 22 修复：若同时有 hasChoice，延迟战斗——选择通常决定战斗策略（奋力搏杀/灵活周旋/抛物安抚）
+  // 选项后才进入战斗，避免 ChoiceModal 与 CombatModal 同时弹出
   if (aiOutput.triggerCombat && aiOutput.triggerCombat.enemies?.length) {
-    next = startCombat(next, aiOutput.triggerCombat);
+    if (aiOutput.hasChoice) {
+      (next as any)._deferredCombat = aiOutput.triggerCombat;
+    } else {
+      next = startCombat(next, aiOutput.triggerCombat);
+    }
+  }
+
+  // ===== Task 23: 应用 AI 授予的灵宠 =====
+  if (aiOutput.newPets && aiOutput.newPets.length) {
+    for (const pet of aiOutput.newPets) {
+      next = addPet(next, pet);
+    }
   }
 
   // 8. 角色主动意图重新生成（每岁重算）
@@ -1598,6 +1855,12 @@ export function stateToResponse(s: CharacterState) {
     pendingThreads: s.pendingThreads || [],
     characterIntents: s.characterIntents || [],
     combatSession: s.combatSession || null,
+    // Task 22 新字段
+    heartDemon: s.heartDemon ?? 0,
+    // Task 23 新字段
+    pets: s.pets || [],
+    // Task 24 新字段
+    exploredRealms: s.exploredRealms || [],
   };
 }
 
@@ -1748,3 +2011,408 @@ export function tickFormations(state: CharacterState): { state: CharacterState; 
   }
   return { state: { ...state, spiritStones: state.spiritStones - totalCost }, consumed: totalCost };
 }
+
+// ==================== Task 22: 心魔值系统 ====================
+
+// 调整心魔值（钳制 0-100）
+export function adjustHeartDemon(state: CharacterState, delta: number, reason?: string): CharacterState {
+  const next = Math.max(0, Math.min(100, (state.heartDemon ?? 0) + delta));
+  if (reason) {
+    // 心魔变化仅写日志，不污染长期记忆
+    console.log(`[Task 22] heartDemon ${delta >= 0 ? '+' : ''}${delta} → ${next} (${reason})`);
+  }
+  return { ...state, heartDemon: next };
+}
+
+// 每岁心魔值自然变化：
+// - 修仙者静修可净化心魔：境界越高，净化越快（mortal 不净化）
+// - 但若有未解 urgent 线索，每条 +2（执念缠心）
+// - 若心魔已 >= 60，每岁额外 +3（心魔反噬，自循环恶化）
+export function tickHeartDemon(state: CharacterState): CharacterState {
+  if (!state.alive || state.ascended) return state;
+  const realmIdx = REALMS.findIndex(r => r.id === state.realm);
+  const qiRefiningIdx = REALMS.findIndex(r => r.id === 'qi_refining');
+  let delta = 0;
+  // 静修净化（境界 >= 炼气期才开始）
+  if (realmIdx >= qiRefiningIdx) {
+    delta -= 1; // 每岁 -1
+    // 境界越高，净化越快（筑基 -2，金丹 -3，元婴 -4 ...）
+    const extraPurify = Math.max(0, realmIdx - qiRefiningIdx);
+    delta -= extraPurify;
+  }
+  // 未解 urgent 线索：每条 +2
+  const urgentCount = (state.pendingThreads || []).filter(t => t.status === 'urgent' || (t.status === 'pending' && t.deadlineAge - state.age <= 3)).length;
+  if (urgentCount > 0) delta += urgentCount * 2;
+  // 高心魔自循环恶化
+  if ((state.heartDemon ?? 0) >= 60) delta += 3;
+  // 净化优先：若 delta < 0 但心魔已为 0，不再下降
+  if (delta === 0) return state;
+  return adjustHeartDemon(state, delta, `tickHeartDemon@${state.age}岁`);
+}
+
+// 心魔试炼触发判定：心魔值 >= 60 时，每岁有概率触发心魔试炼战斗
+// 心魔越高，概率越大（60→10%，70→20%，80→30%，90→40%）
+// 心魔试炼敌人 = 玩家自身心魔投影（属性随境界缩放）
+export function tryHeartDemonTrial(state: CharacterState): { triggered: boolean; trigger?: NonNullable<AIEventOutput['triggerCombat']> } {
+  const hd = state.heartDemon ?? 0;
+  if (hd < 60) return { triggered: false };
+  if (!state.alive || state.ascended) return { triggered: false };
+  if (state.combatSession) return { triggered: false }; // 已在战斗中
+  if (state.isAtChoice) return { triggered: false }; // 选择节点不叠加
+  const chance = Math.min(0.4, (hd - 50) / 100);
+  if (Math.random() > chance) return { triggered: false };
+  // 生成心魔投影敌人（属性随境界 + 心魔值缩放）
+  const realmIdx = REALMS.findIndex(r => r.id === state.realm);
+  const scale = 1 + realmIdx * 0.5 + (hd - 60) / 30; // 60→1, 90→2
+  const enemy = {
+    id: `enemy_heartdemon_${Date.now()}`,
+    name: hd >= 90 ? '心魔真身' : hd >= 75 ? '执念魔影' : '心魔幻影',
+    description: `你内心深处的执念化作实体（心魔值 ${hd}/100），似我非我，反噬而来`,
+    hp: Math.round(state.maxHp * 0.8 * scale),
+    maxHp: Math.round(state.maxHp * 0.8 * scale),
+    attack: Math.round(state.attack * 0.9 * scale),
+    defense: Math.round(state.defense * 0.7 * scale),
+    speed: state.speed,
+    realm: REALMS[realmIdx]?.name || '炼气期',
+    currentCooldown: 0,
+  };
+  return {
+    triggered: true,
+    trigger: {
+      contextTitle: hd >= 90 ? '心魔真身现·走火入魔' : hd >= 75 ? '执念魔影·心魔试炼' : '心魔幻影·道心磨砺',
+      contextNarrative: `${state.age}岁，${state.name}于静坐中忽觉心神不宁，眼前幻象丛生。心魔值已至 ${hd}/100，执念化作实体，向其扑来。此战关乎道心，胜则心魔稍减，败则恐走火入魔。`,
+      enemies: [enemy],
+      victoryDrops: [], // 心魔战无物质掉落
+      victoryHeartDemonDelta: -25, // 胜则心魔大减
+      defeatHeartDemonDelta: +15,  // 败则心魔加重
+      isHeartDemonTrial: true, // Task 22: 标记为心魔试炼
+    },
+  };
+}
+
+// 心魔试炼战斗后结算：根据胜负调整心魔值
+export function resolveHeartDemonTrial(state: CharacterState, victory: boolean): CharacterState {
+  if (victory) {
+    return adjustHeartDemon(state, -25, '心魔试炼·胜·道心坚定');
+  } else {
+    // 败则心魔加重，并扣血（走火入魔征兆）
+    const next = adjustHeartDemon(state, +15, '心魔试炼·败·走火入魔');
+    const dmg = Math.round(state.maxHp * 0.2);
+    return { ...next, hp: Math.max(1, next.hp - dmg) }; // 不直接致死，留 1 血
+  }
+}
+
+// ==================== Task 23: 灵宠系统 ====================
+
+// 灵宠稀有度 → 等级倍率
+const PET_RARITY_MULTIPLIER: Record<string, number> = {
+  common: 1.0, uncommon: 1.2, rare: 1.5, epic: 1.8, legendary: 2.2, mythic: 2.8,
+};
+
+// 根据物种 + 稀有度 + 境界生成完整灵宠属性
+export function createPet(
+  species: PetSpecies,
+  rarity: Pet['rarity'],
+  realm: Realm,
+  name: string,
+  description: string,
+  sourceAcquired: string,
+  acquiredAge: number,
+  customSkill?: Partial<Pet['skill']>,
+): Pet {
+  const template = PET_SPECIES_TEMPLATES[species];
+  const rarityMul = PET_RARITY_MULTIPLIER[rarity] || 1.0;
+  // 境界加成：每境界 +20% 基础属性
+  const realmIdx = REALMS.findIndex(r => r.id === realm);
+  const realmMul = 1 + Math.max(0, realmIdx) * 0.2;
+  const baseHp = Math.round(template.baseHp * rarityMul * realmMul);
+  const baseAttack = Math.round(template.baseAttack * rarityMul * realmMul);
+  const baseDefense = Math.round(template.baseDefense * rarityMul * realmMul);
+  const baseSpeed = Math.round(template.baseSpeed * rarityMul * realmMul);
+  return {
+    id: `pet_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    name: name || template.name,
+    species,
+    description: description || `${template.name}，${rarity}品质`,
+    rarity,
+    realm,
+    hp: baseHp,
+    maxHp: baseHp,
+    attack: baseAttack,
+    defense: baseDefense,
+    speed: baseSpeed,
+    element: template.defaultElement,
+    loyalty: 70,         // 初始忠诚度 70（较高，但会随时间下降）
+    satiety: 80,         // 初始饱食度 80
+    level: 1,
+    exp: 0,
+    expToLevel: 100,
+    sourceAcquired,
+    acquiredAge,
+    skill: {
+      name: customSkill?.name || template.skillName,
+      description: customSkill?.description || template.skillDesc,
+      power: customSkill?.power || template.skillPower,
+      cooldown: customSkill?.cooldown || template.skillCooldown,
+    },
+  };
+}
+
+// 添加灵宠到角色
+export function addPet(state: CharacterState, pet: Pet): CharacterState {
+  // 上限 5 只（避免灵宠过多复杂化游戏）
+  const existing = state.pets || [];
+  if (existing.length >= 5) {
+    // 已满，不加（AI 应避免过度授予；可考虑替换最弱的一只）
+    console.log(`[Task 23] 灵宠已满 5 只，拒绝新灵宠 ${pet.name}`);
+    return state;
+  }
+  // ID 去重
+  const usedIds = new Set(existing.map(p => p.id));
+  let id = pet.id;
+  while (usedIds.has(id)) id = `${id}_${Math.random().toString(36).slice(2, 6)}`;
+  return { ...state, pets: [...existing, { ...pet, id }] };
+}
+
+// 解雇/放生灵宠
+export function dismissPet(state: CharacterState, petId: string): CharacterState {
+  return { ...state, pets: (state.pets || []).filter(p => p.id !== petId) };
+}
+
+// 喂养灵宠：消耗一个材料类物品，回复饱食度 + 提升忠诚度 + 增加经验
+export function feedPet(
+  state: CharacterState,
+  petId: string,
+  itemId: string,
+): { state: CharacterState; ok: boolean; error?: string; pet?: Pet } {
+  const pet = (state.pets || []).find(p => p.id === petId);
+  if (!pet) return { state, ok: false, error: '灵宠不存在' };
+  const item = state.inventory.find(it => it.id === itemId);
+  if (!item) return { state, ok: false, error: '物品不在储物袋中' };
+  // 仅允许材料类、丹药类、食物类（tool）物品喂养
+  if (item.item_type !== 'material' && item.item_type !== 'consumable' && item.item_type !== 'tool') {
+    return { state, ok: false, error: '该物品不适合喂养灵宠' };
+  }
+  // 按稀有度计算喂养价值
+  const rarityValue: Record<string, number> = { common: 15, uncommon: 25, rare: 40, epic: 60, legendary: 80, mythic: 100 };
+  const feedValue = rarityValue[item.rarity] || 15;
+  // 更新灵宠
+  const newSatiety = Math.min(100, pet.satiety + feedValue);
+  const newLoyalty = Math.min(100, pet.loyalty + Math.floor(feedValue / 4));
+  let newExp = pet.exp + Math.floor(feedValue / 2);
+  let newLevel = pet.level;
+  let newExpToLevel = pet.expToLevel;
+  let levelUpBonus = 0;
+  while (newExp >= newExpToLevel) {
+    newExp -= newExpToLevel;
+    newLevel += 1;
+    newExpToLevel = Math.round(newExpToLevel * 1.4);
+    levelUpBonus += 1;
+  }
+  // 升级提升属性
+  const updatedPet: Pet = {
+    ...pet,
+    satiety: newSatiety,
+    loyalty: newLoyalty,
+    level: newLevel,
+    exp: newExp,
+    expToLevel: newExpToLevel,
+    attack: pet.attack + levelUpBonus * 2,
+    defense: pet.defense + levelUpBonus * 1,
+    maxHp: pet.maxHp + levelUpBonus * 8,
+    hp: Math.min(pet.maxHp + levelUpBonus * 8, pet.hp + levelUpBonus * 8),
+  };
+  // 移除消耗品
+  const newInventory = state.inventory.filter(it => it.id !== itemId);
+  const newPets = state.pets.map(p => p.id === petId ? updatedPet : p);
+  return {
+    state: { ...state, pets: newPets, inventory: newInventory },
+    ok: true,
+    pet: updatedPet,
+  };
+}
+
+// 每岁灵宠状态变化：
+// - 饱食度 -10
+// - 忠诚度 -2（饥饿时 -5）
+// - HP 自然回复（满饱食度 +10% maxHp，半饱 +5%，饥饿不回复）
+// - 忠诚度 < 30 的灵宠有概率逃离（每岁 5%）
+export function tickPets(state: CharacterState): CharacterState {
+  if (!state.pets || state.pets.length === 0) return state;
+  const survivedPets: Pet[] = [];
+  for (const pet of state.pets) {
+    let newSatiety = Math.max(0, pet.satiety - 10);
+    let newLoyalty = pet.loyalty - (newSatiety < 30 ? 5 : 2);
+    newLoyalty = Math.max(0, newLoyalty);
+    // HP 自然回复
+    const hpRegen = newSatiety >= 70 ? Math.round(pet.maxHp * 0.1) : newSatiety >= 30 ? Math.round(pet.maxHp * 0.05) : 0;
+    const newHp = Math.min(pet.maxHp, pet.hp + hpRegen);
+    // 忠诚度 < 30 时 5% 概率逃离
+    if (newLoyalty < 30 && Math.random() < 0.05) {
+      console.log(`[Task 23] 灵宠 ${pet.name} 忠诚度过低（${newLoyalty}），逃离了！`);
+      continue; // 灵宠逃离
+    }
+    survivedPets.push({ ...pet, satiety: newSatiety, loyalty: newLoyalty, hp: newHp });
+  }
+  return { ...state, pets: survivedPets };
+}
+
+// 灵宠战斗贡献计算：返回灵宠对玩家属性的额外加成（被动效果）
+// 不同物种提供不同被动：龟加防御、鹰加速度、虎加攻击、狐加气运、龙加全属性
+export function computePetPassiveBonus(state: CharacterState): {
+  attack: number;
+  defense: number;
+  speed: number;
+  luck: number;
+  cultivationRate: number;  // 修炼速度倍率加成
+} {
+  const result = { attack: 0, defense: 0, speed: 0, luck: 0, cultivationRate: 0 };
+  for (const pet of state.pets || []) {
+    if (pet.loyalty < 30 || pet.satiety < 20 || pet.hp <= 0) continue;
+    const tier = Math.max(1, Math.floor(pet.level / 3) + 1);
+    switch (pet.species) {
+      case 'turtle':   result.defense += tier * 2; break;
+      case 'eagle':    result.speed += tier * 2; break;
+      case 'tiger':
+      case 'ape':      result.attack += tier * 2; break;
+      case 'fox':
+      case 'butterfly':result.luck += tier * 2; break;
+      case 'dragon':
+      case 'phoenix':  result.attack += tier; result.defense += tier; result.speed += tier; break;
+      case 'wolf':
+      case 'snake':    result.attack += tier; break;
+    }
+    // 所有灵宠略微提升修炼速度（陪伴效应）
+    result.cultivationRate += 0.02 * tier;
+  }
+  return result;
+}
+
+// ==================== Task 23: 符箓识别 ====================
+
+// 判断物品是否为符箓（通过 effects 中的 target_attribute 判定）
+export function getTalismanType(item: ItemEntry): TalismanType | null {
+  for (const eff of item.effects || []) {
+    if (eff.target_attribute === 'talisman_attack') return 'talisman_attack';
+    if (eff.target_attribute === 'talisman_defense') return 'talisman_defense';
+    if (eff.target_attribute === 'talisman_heal') return 'talisman_heal';
+    if (eff.target_attribute === 'talisman_escape') return 'talisman_escape';
+    if (eff.target_attribute === 'talisman_stun') return 'talisman_stun';
+  }
+  return null;
+}
+
+// 判断物品是否为普通丹药（非符箓的 consumable）
+export function isPillItem(item: ItemEntry): boolean {
+  if (item.item_type !== 'consumable') return false;
+  return getTalismanType(item) === null;
+}
+
+// 获取战斗中可用的符箓列表
+export function getAvailableTalismans(state: CharacterState): ItemEntry[] {
+  return (state.inventory || []).filter(it => getTalismanType(it) !== null);
+}
+
+// ==================== Task 24: 秘境探索系统 ====================
+
+// 获取当前角色可探索的秘境列表（含冷却状态）
+export function getAvailableRealms(state: CharacterState): Array<SecretRealm & {
+  onCooldown: boolean;
+  cooldownRemaining: number;  // 剩余冷却年数
+  timesExplored: number;
+  lastExploredAge?: number;
+}> {
+  const realmIdx = REALMS.findIndex(r => r.id === state.realm);
+  const records = state.exploredRealms || [];
+  return SECRET_REALMS
+    .filter(r => realmIdx >= r.minRealm && state.age >= r.minAge)
+    .map(r => {
+      const rec = records.find(rec => rec.realmId === r.id);
+      const lastAge = rec?.lastExploredAge ?? -999;
+      const elapsed = state.age - lastAge;
+      const onCooldown = elapsed < r.cooldownYears;
+      return {
+        ...r,
+        onCooldown,
+        cooldownRemaining: onCooldown ? (r.cooldownYears - elapsed) : 0,
+        timesExplored: rec?.timesExplored ?? 0,
+        lastExploredAge: rec?.lastExploredAge,
+      };
+    });
+}
+
+// 探索秘境前置校验：返回 { ok, error? }
+export function canExploreRealm(state: CharacterState, realmId: string): { ok: boolean; error?: string; realm?: SecretRealm } {
+  const realm = SECRET_REALMS.find(r => r.id === realmId);
+  if (!realm) return { ok: false, error: '秘境不存在' };
+  if (!state.alive) return { ok: false, error: '角色已陨落' };
+  if (state.combatSession && state.combatSession.status === 'ongoing') {
+    return { ok: false, error: '战斗进行中，无法探索秘境' };
+  }
+  if (state.isAtChoice) return { ok: false, error: '当前有待选择，请先完成选择' };
+  const realmIdx = REALMS.findIndex(r => r.id === state.realm);
+  if (realmIdx < realm.minRealm) return { ok: false, error: `境界不足，需${REALMS[realm.minRealm].name}以上` };
+  if (state.age < realm.minAge) return { ok: false, error: `年龄不足，需${realm.minAge}岁以上` };
+  if (state.spiritStones < realm.spiritStoneCost) {
+    return { ok: false, error: `灵石不足，需${realm.spiritStoneCost}灵石（路费+护身符）` };
+  }
+  // 冷却检查
+  const rec = (state.exploredRealms || []).find(rec => rec.realmId === realmId);
+  if (rec) {
+    const elapsed = state.age - rec.lastExploredAge;
+    if (elapsed < realm.cooldownYears) {
+      return { ok: false, error: `秘境冷却中，还需${realm.cooldownYears - elapsed}年` };
+    }
+  }
+  return { ok: true, realm };
+}
+
+// 扣除灵石 + 标记秘境探索 + 返回新 state（探索事件由 AI 生成，引擎只负责状态前置）
+export function startExploration(state: CharacterState, realm: SecretRealm): CharacterState {
+  const newState: CharacterState = {
+    ...state,
+    spiritStones: Math.max(0, state.spiritStones - realm.spiritStoneCost),
+  };
+  // 标记当前探索的秘境（让 buildStateContext 透传给 AI）
+  (newState as any)._currentExploration = realm;
+  return newState;
+}
+
+// 探索结束后更新探索记录（在 explore route 收到 AI 输出后调用）
+export function recordExploration(
+  state: CharacterState,
+  realmId: string,
+  bestReward?: string,
+): CharacterState {
+  const existing = state.exploredRealms || [];
+  const idx = existing.findIndex(r => r.realmId === realmId);
+  let newRecords: ExplorationRecord[];
+  if (idx >= 0) {
+    // 已有记录：更新 lastExploredAge + timesExplored + bestReward
+    const old = existing[idx];
+    const updated: ExplorationRecord = {
+      realmId,
+      lastExploredAge: state.age,
+      timesExplored: old.timesExplored + 1,
+      bestReward: bestReward || old.bestReward,
+    };
+    newRecords = [...existing];
+    newRecords[idx] = updated;
+  } else {
+    // 新记录
+    newRecords = [...existing, {
+      realmId,
+      lastExploredAge: state.age,
+      timesExplored: 1,
+      bestReward,
+    }];
+  }
+  // 清除 _currentExploration（探索结束）
+  const newState: CharacterState = {
+    ...state,
+    exploredRealms: newRecords,
+  };
+  delete (newState as any)._currentExploration;
+  return newState;
+}
+

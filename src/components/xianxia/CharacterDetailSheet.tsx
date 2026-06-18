@@ -2,7 +2,7 @@
 
 import { CharacterState } from '@/lib/xianxia/store';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Heart, Sparkles, Sword, Shield, Zap, Clover, Brain, Coins, Star, MapPin, Users, GraduationCap } from 'lucide-react';
+import { Heart, Sparkles, Sword, Shield, Zap, Clover, Brain, Coins, Star, MapPin, Users, GraduationCap, Flame } from 'lucide-react';
 import { REALMS, ELEMENTS, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
 
 interface CharacterDetailSheetProps {
@@ -157,6 +157,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
               <StatCard icon={<Brain className="w-3 h-3" />} label="悟性" value={character.comprehension} color="#a855f7" />
               <StatCard icon={<Coins className="w-3 h-3" />} label="灵石" value={character.spiritStones} color="#d4af37" />
               <StatCard icon={<Star className="w-3 h-3" />} label="声望" value={character.reputation} color="#f97316" />
+              <StatCard icon={<Flame className="w-3 h-3" />} label="心魔" value={(character as any).heartDemon ?? 0} color={(character as any).heartDemon >= 60 ? '#dc2626' : (character as any).heartDemon >= 30 ? '#d97706' : '#65a30d'} />
               <StatCard icon={<Users className="w-3 h-3" />} label="阵营" value={character.faction || '散修'} color="#6b7280" isText />
             </div>
           </section>

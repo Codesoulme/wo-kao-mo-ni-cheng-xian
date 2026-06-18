@@ -9,6 +9,7 @@ import { ChevronDown, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
+import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280',
@@ -53,6 +54,9 @@ export function StatusList() {
     <div className="space-y-3">
       {/* 心之所向——角色主动意图 */}
       <CharacterIntentsCard />
+
+      {/* Task 22: 心魔值卡片 */}
+      <HeartDemonCard />
 
       {/* 未决线索 */}
       <PendingThreadsCard />

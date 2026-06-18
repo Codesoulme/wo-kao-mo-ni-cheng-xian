@@ -17,6 +17,7 @@ import {
 import { AlchemyFurnace } from './AlchemyFurnace';
 import { ItemDetailDialog } from './ItemDetailDialog';
 import { FormationPanel } from './FormationPanel';
+import { PetPanel } from './PetPanel';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -336,6 +337,9 @@ export function InventoryPanel() {
 
       {/* Task 21: 阵法管理面板 */}
       <FormationPanel />
+
+      {/* Task 23: 灵宠管理面板 */}
+      <PetPanel />
 
       {/* ==================== 储物袋（含容量显示） ==================== */}
       <Collapsible open={bagOpen} onOpenChange={setBagOpen}>

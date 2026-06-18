@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const parsed = z.object({
       characterId: z.string(),
-      action: z.enum(['attack', 'skill', 'item', 'defend', 'flee']),
+      action: z.enum(['attack', 'skill', 'item', 'talisman', 'defend', 'flee']),
       payload: z.object({
         skillIdx: z.number().optional(),
         itemId: z.string().optional(),

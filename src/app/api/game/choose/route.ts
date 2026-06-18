@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, markFateNodeDone, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, markFateNodeDone, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 
 export const runtime = 'nodejs';
@@ -17,8 +17,8 @@ export async function POST(req: NextRequest) {
     const choicePrompt: string | undefined = body?.choicePrompt;
     const options: any[] | undefined = body?.options;
 
-    if (!characterId || chosenIndex === undefined || !choicePrompt || !Array.isArray(options)) {
-      return NextResponse.json({ success: false, error: `参数缺失: ${!characterId ? 'characterId' : ''} ${chosenIndex === undefined ? 'chosenIndex' : ''} ${!choicePrompt ? 'choicePrompt' : ''} ${!Array.isArray(options) ? 'options' : ''}` }, { status: 400 });
+    if (!characterId || chosenIndex === undefined || typeof choicePrompt !== 'string' || !Array.isArray(options)) {
+      return NextResponse.json({ success: false, error: `参数缺失: ${!characterId ? 'characterId' : ''} ${chosenIndex === undefined ? 'chosenIndex' : ''} ${typeof choicePrompt !== 'string' ? 'choicePrompt' : ''} ${!Array.isArray(options) ? 'options' : ''}` }, { status: 400 });
     }
 
     const char = await db.character.findUnique({ where: { id: characterId } });
@@ -43,6 +43,15 @@ export async function POST(req: NextRequest) {
 
     let state = dbToState(char);
     const ctx = buildStateContext(state, recentEvents);
+
+    // Task 22: 读取 pendingChoice 中的 deferredCombat（advance 时若同时有 choice + combat，战斗延迟到选择后触发）
+    let deferredCombat: any = null;
+    try {
+      const pc = char.pendingChoiceJson ? JSON.parse(char.pendingChoiceJson) : null;
+      if (pc && pc.deferredCombat && pc.deferredCombat.enemies?.length) {
+        deferredCombat = pc.deferredCombat;
+      }
+    } catch { /* ignore parse errors */ }
 
     const result = await generateChoiceResult(ctx, choicePrompt, chosenOption.text);
 
@@ -88,8 +97,18 @@ export async function POST(req: NextRequest) {
       for (const id of result.failThreadIds) state = failThread(state, id);
     }
     // Task 20: 触发战斗
+    // Task 22: 优先使用选择结果的 triggerCombat（AI 可根据玩家选择定制战斗）；
+    // 若选择结果未触发战斗，但 advance 时延迟了战斗 → 现在作为 fallback 触发
     if (result.triggerCombat && result.triggerCombat.enemies?.length) {
       state = startCombat(state, result.triggerCombat);
+    } else if (deferredCombat) {
+      state = startCombat(state, deferredCombat);
+    }
+    // Task 23: 应用 AI 授予的灵宠
+    if ((result as any).newPets && (result as any).newPets.length) {
+      for (const pet of (result as any).newPets) {
+        state = addPet(state, pet);
+      }
     }
 
     // 处理死亡
@@ -166,6 +185,10 @@ export async function POST(req: NextRequest) {
         pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
         characterIntentsJson: JSON.stringify(state.characterIntents || []),
         combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : '',
+        // Task 22: 心魔值
+        heartDemon: state.heartDemon ?? 0,
+        // Task 23: 灵宠
+        petsJson: JSON.stringify(state.pets || []),
       },
     });
 

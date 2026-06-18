@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +19,15 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 // 战斗动作类型
-type CombatAction = 'attack' | 'skill' | 'item' | 'defend' | 'flee';
+type CombatAction = 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee';
+
+// Task 22: 伤害飘字
+interface FloatNumber {
+  id: string;
+  value: number;
+  type: 'damage' | 'heal' | 'crit' | 'miss';
+  target: 'player' | 'enemy';
+}
 
 export function CombatModal() {
   const { character, setCharacter, addEvent, setLoading, setError } = useGameStore();
@@ -27,6 +35,10 @@ export function CombatModal() {
   const [contextCollapsed, setContextCollapsed] = useState(false);
   // 战斗结束后短暂展示结果界面（玩家点"了结"按钮关闭）
   const [endResult, setEndResult] = useState<{ status: string; narrative: string } | null>(null);
+  // Task 22: 伤害飘字
+  const [floats, setFloats] = useState<FloatNumber[]>([]);
+  // 上一次的 HP/MP 快照，用于计算差值生成飘字
+  const prevHpRef = useRef<{ player: number; enemy: number } | null>(null);
 
   // 没有战斗或不在进行中 → 不显示
   // 但战斗结束后短暂展示结果界面（玩家点"了结"按钮关闭）
@@ -59,6 +71,46 @@ export function CombatModal() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '行动失败');
+
+      // Task 22: 计算伤害飘字
+      const round = data.round;
+      const newFloats: FloatNumber[] = [];
+      if (round) {
+        // 玩家造成的伤害（飘在敌人头上）
+        if (round.playerDamage && round.playerDamage > 0) {
+          newFloats.push({
+            id: `f_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            value: round.playerDamage,
+            type: round.playerDamage >= 30 ? 'crit' : 'damage',
+            target: 'enemy',
+          });
+        }
+        // 玩家回复（飘在玩家头上）
+        if (round.playerHeal && round.playerHeal > 0) {
+          newFloats.push({
+            id: `f_${Date.now() + 1}_${Math.random().toString(36).slice(2, 6)}`,
+            value: round.playerHeal,
+            type: 'heal',
+            target: 'player',
+          });
+        }
+        // 敌人造成的伤害（飘在玩家头上）
+        if (round.enemyDamage && round.enemyDamage > 0) {
+          newFloats.push({
+            id: `f_${Date.now() + 2}_${Math.random().toString(36).slice(2, 6)}`,
+            value: round.enemyDamage,
+            type: round.enemyDamage >= 30 ? 'crit' : 'damage',
+            target: 'player',
+          });
+        }
+      }
+      if (newFloats.length) {
+        setFloats(prev => [...prev, ...newFloats]);
+        // 1.2 秒后清除飘字
+        setTimeout(() => {
+          setFloats(prev => prev.filter(f => !newFloats.find(nf => nf.id === f.id)));
+        }, 1200);
+      }
 
       // 更新角色（含 combatSession）
       setCharacter({ ...character, ...data.state });
@@ -143,6 +195,31 @@ export function CombatModal() {
   const skills: any[] = session?.playerSkills || [];
   // 玩家可用丹药
   const items: any[] = session?.playerItems || [];
+  // Task 23: 参战灵宠
+  const petCombatant = (session as any)?.petCombatant || null;
+  // Task 23: 战斗中可用的符箓（从 inventory 提取，通过 effects 中的 target_attribute 判定）
+  const talismans: any[] = (character?.inventory || []).filter((it: any) => {
+    if (it.item_type !== 'consumable') return false;
+    return (it.effects || []).some((e: any) =>
+      e.target_attribute === 'talisman_attack' ||
+      e.target_attribute === 'talisman_defense' ||
+      e.target_attribute === 'talisman_heal' ||
+      e.target_attribute === 'talisman_escape' ||
+      e.target_attribute === 'talisman_stun'
+    );
+  });
+  // 普通丹药（非符箓的 consumable）
+  const pills: any[] = (session?.playerItems || []).filter((it: any) => {
+    const item = (character?.inventory || []).find((i: any) => i.id === it.itemId);
+    if (!item) return false;
+    return !(item.effects || []).some((e: any) =>
+      e.target_attribute === 'talisman_attack' ||
+      e.target_attribute === 'talisman_defense' ||
+      e.target_attribute === 'talisman_heal' ||
+      e.target_attribute === 'talisman_escape' ||
+      e.target_attribute === 'talisman_stun'
+    );
+  });
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -159,7 +236,14 @@ export function CombatModal() {
             )}
           </CardTitle>
           {session?.contextTitle && (
-            <div className="text-xs text-foreground/80 font-serif-cn mt-1">{session.contextTitle}</div>
+            <div className="text-xs text-foreground/80 font-serif-cn mt-1 flex items-center gap-1.5 flex-wrap">
+              {(session as any).isHeartDemonTrial && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-serif-cn" style={{ background: '#dc262620', color: '#dc2626', border: '1px solid #dc262640' }}>
+                  👹 心魔试炼
+                </span>
+              )}
+              <span>{session.contextTitle}</span>
+            </div>
           )}
         </CardHeader>
 
@@ -190,7 +274,9 @@ export function CombatModal() {
 
           {/* 敌方信息（顶部） */}
           {enemy && (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2 relative overflow-visible">
+              {/* Task 22: 敌人伤害飘字 */}
+              <FloatNumbersOverlay floats={floats.filter(f => f.target === 'enemy')} />
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive font-semibold">
@@ -248,7 +334,9 @@ export function CombatModal() {
 
           {/* 玩家信息（session 可能为 null——endResult 显示场景跳过） */}
           {session && (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2 relative overflow-visible">
+            {/* Task 22: 玩家伤害飘字 */}
+            <FloatNumbersOverlay floats={floats.filter(f => f.target === 'player')} />
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/20 text-primary font-semibold">
@@ -282,6 +370,44 @@ export function CombatModal() {
               </div>
               <Progress value={playerMpPct} className="h-2.5 bg-amber-500/10 [&>div]:bg-amber-500 [&>div]:transition-all [&>div]:duration-500 [&>div]:ease-out" />
             </div>
+
+            {/* Task 23: 参战灵宠快照 */}
+            {petCombatant && (
+              <div className="rounded-md border border-rose-500/30 bg-rose-500/5 p-2 space-y-1 mt-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] px-1 py-0.5 rounded bg-rose-500/20 text-rose-600 font-semibold">
+                      灵宠
+                    </span>
+                    <span className="text-xs font-semibold font-serif-cn text-rose-700 dark:text-rose-300">{petCombatant.name}</span>
+                    <span className="text-[9px] text-muted-foreground">{petCombatant.skillName}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                    <span>攻 {petCombatant.attack}</span>
+                    <span>·</span>
+                    <span>速 {petCombatant.speed}</span>
+                    <span>·</span>
+                    <span style={{ color: petCombatant.currentCooldown > 0 ? '#f97316' : '#22c55e' }}>
+                      {petCombatant.currentCooldown > 0 ? `冷却${petCombatant.currentCooldown}` : '技能就绪'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.max(0, Math.min(100, (petCombatant.hp / petCombatant.maxHp) * 100))}%`,
+                        background: '#f43f5e',
+                      }}
+                    />
+                  </div>
+                  <span className="text-[9px] text-muted-foreground tabular-nums">
+                    {petCombatant.hp}/{petCombatant.maxHp}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           )}
 
@@ -364,7 +490,7 @@ export function CombatModal() {
         {/* 底部：行动按钮区（仅 ongoing 且未结束展示时显示） */}
         {isOngoing && !endResult && (
           <div className="shrink-0 border-t border-border/40 bg-card/40 p-2">
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-6 gap-1">
               {/* 普攻 */}
               <ActionButton
                 onClick={() => doAction('attack')}
@@ -422,31 +548,31 @@ export function CombatModal() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* 丹药（dropdown） */}
+              {/* 丹药（dropdown）—— 仅非符箓 */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    disabled={busy || items.length === 0}
+                    disabled={busy || pills.length === 0}
                     className={cn(
                       "flex flex-col items-center justify-center gap-0.5 h-14 rounded-md border-2 transition-all",
                       "border-green-500/40 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500/60 active:scale-95",
                       "text-green-700 dark:text-green-400",
-                      (busy || items.length === 0) && "opacity-40 cursor-not-allowed"
+                      (busy || pills.length === 0) && "opacity-40 cursor-not-allowed"
                     )}
                   >
                     <FlaskConical className="w-3.5 h-3.5" />
                     <span className="text-[10px] font-serif-cn font-semibold">丹药</span>
-                    <span className="text-[8px] text-muted-foreground">{items.length || 0}</span>
+                    <span className="text-[8px] text-muted-foreground">{pills.length || 0}</span>
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="w-56">
                   <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
                     选择丹药服用
                   </div>
-                  {items.length === 0 ? (
+                  {pills.length === 0 ? (
                     <DropdownMenuItem disabled>无丹药可用</DropdownMenuItem>
                   ) : (
-                    items.map((it, i) => (
+                    pills.map((it, i) => (
                       <DropdownMenuItem
                         key={i}
                         onClick={() => doAction('item', { itemId: it.itemId })}
@@ -461,6 +587,80 @@ export function CombatModal() {
                         </div>
                       </DropdownMenuItem>
                     ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Task 23: 符箓（dropdown）—— 单次使用、即时生效 */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    disabled={busy || talismans.length === 0}
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-0.5 h-14 rounded-md border-2 transition-all",
+                      "border-purple-500/40 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/60 active:scale-95",
+                      "text-purple-700 dark:text-purple-400",
+                      (busy || talismans.length === 0) && "opacity-40 cursor-not-allowed"
+                    )}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-serif-cn font-semibold">符箓</span>
+                    <span className="text-[8px] text-muted-foreground">{talismans.length || 0}</span>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-56">
+                  <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
+                    激发符箓（单次消耗）
+                  </div>
+                  {talismans.length === 0 ? (
+                    <DropdownMenuItem disabled>无符箓可用</DropdownMenuItem>
+                  ) : (
+                    talismans.map((it, i) => {
+                      const talismanType = (it.effects || []).find((e: any) =>
+                        e.target_attribute === 'talisman_attack' ||
+                        e.target_attribute === 'talisman_defense' ||
+                        e.target_attribute === 'talisman_heal' ||
+                        e.target_attribute === 'talisman_escape' ||
+                        e.target_attribute === 'talisman_stun'
+                      );
+                      const typeLabel: Record<string, string> = {
+                        talisman_attack: '攻',
+                        talisman_defense: '防',
+                        talisman_heal: '疗',
+                        talisman_escape: '遁',
+                        talisman_stun: '镇',
+                      };
+                      const tColor: Record<string, string> = {
+                        talisman_attack: '#dc2626',
+                        talisman_defense: '#0891b2',
+                        talisman_heal: '#22c55e',
+                        talisman_escape: '#a16207',
+                        talisman_stun: '#7c3aed',
+                      };
+                      const tt = talismanType?.target_attribute || '';
+                      return (
+                        <DropdownMenuItem
+                          key={i}
+                          onClick={() => doAction('talisman', { itemId: it.id })}
+                          disabled={busy}
+                          className="flex items-start gap-2 py-2"
+                        >
+                          <span className="text-[9px] px-1 py-0.5 rounded shrink-0" style={{
+                            background: `${tColor[tt] || '#6b7280'}25`,
+                            color: tColor[tt] || '#6b7280',
+                          }}>
+                            {typeLabel[tt] || '?'}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold font-serif-cn">{it.name}</div>
+                            <div className="text-[10px] text-muted-foreground truncate">
+                              {talismanType ? `效力 ${talismanType.value}` : ''}
+                              {it.description ? ` · ${it.description}` : ''}
+                            </div>
+                          </div>
+                        </DropdownMenuItem>
+                      );
+                    })
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -525,5 +725,30 @@ function ActionButton({
       {icon}
       <span className="text-[10px] font-serif-cn font-semibold">{label}</span>
     </button>
+  );
+}
+
+// Task 22: 伤害飘字 overlay
+// 渲染飘字在父容器（敌人/玩家区域）的右上角，飘字向上飘并淡出
+function FloatNumbersOverlay({ floats }: { floats: FloatNumber[] }) {
+  if (!floats.length) return null;
+  return (
+    <div className="absolute top-0 right-2 pointer-events-none z-10 flex flex-col items-end gap-0.5">
+      {floats.map(f => (
+        <span
+          key={f.id}
+          className="text-sm font-bold tabular-nums font-serif-cn"
+          style={{
+            color: f.type === 'heal' ? '#22c55e' : f.type === 'crit' ? '#fbbf24' : f.type === 'miss' ? '#9ca3af' : '#ef4444',
+            textShadow: '0 1px 2px rgba(0,0,0,0.5), 0 0 4px currentColor',
+            animation: 'combat-float-up 1.2s ease-out forwards',
+            display: 'inline-block',
+          }}
+        >
+          {f.type === 'heal' ? '+' : f.type === 'miss' ? '闪' : '-'}{f.value}
+          {f.type === 'crit' && <span className="text-[9px] ml-0.5">暴击</span>}
+        </span>
+      ))}
+    </div>
   );
 }

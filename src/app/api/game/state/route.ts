@@ -82,6 +82,8 @@ export async function GET(req: NextRequest) {
         pendingThreads: state.pendingThreads || [],
         characterIntents: state.characterIntents || [],
         combatSession: state.combatSession || null,
+        // Task 22: 心魔值
+        heartDemon: state.heartDemon ?? 0,
       },
       pendingChoice,
       events: events.map(e => ({

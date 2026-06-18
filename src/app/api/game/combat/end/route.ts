@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import {
   dbToState, endCombat, buildStateContext, stateToResponse,
-  addItems, addThreads, completeThread,
+  addItems, addThreads, completeThread, resolveHeartDemonTrial,
 } from '@/lib/xianxia/engine';
 import { generateCombatEndNarrative } from '@/lib/xianxia/llm';
 
@@ -42,6 +42,18 @@ export async function POST(req: NextRequest) {
     const endResult = endCombat(state, true);
     state = endResult.state;
     const appliedDrops = endResult.drops || [];
+
+    // Task 22: 心魔试炼战斗后特殊结算——根据胜负调整心魔值
+    const wasHeartDemonTrial = !!(session as any).isHeartDemonTrial;
+    if (wasHeartDemonTrial) {
+      const victory = endStatus === 'victory';
+      state = resolveHeartDemonTrial(state, victory);
+    } else if (endStatus === 'victory') {
+      // Task 22: 普通战斗胜利也轻微增加心魔（杀生扰动道心）
+      // 心魔试炼战斗不计入（避免循环）
+      state = { ...state, heartDemon: Math.min(100, (state.heartDemon ?? 0) + 3) };
+      console.log(`[Task 22] Combat victory +3 heartDemon (kill disturbs dao heart) → ${state.heartDemon}`);
+    }
 
     // 调用 LLM 生成战后叙事 + 联动线索/物品
     let narrative = '';
@@ -114,6 +126,10 @@ export async function POST(req: NextRequest) {
         combatStateJson: '',
         // Task 20: 同步未决线索（LLM 可能加新线索或完成旧线索）
         pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
+        // Task 22: 心魔值
+        heartDemon: state.heartDemon ?? 0,
+        // Task 23: 灵宠（战斗结束后灵宠 HP 需要持久化——但当前灵宠快照存在 combatSession.petCombatant，未来可考虑回写到 state.pets）
+        petsJson: JSON.stringify(state.pets || []),
       },
     });
 

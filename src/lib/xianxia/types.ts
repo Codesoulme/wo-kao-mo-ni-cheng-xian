@@ -393,6 +393,33 @@ export interface CombatSession {
   playerItems?: { itemId: string; name: string; description: string; effect: string }[];
   // 战斗胜利后掉落（由 AI 在结束叙事中给出，引擎在 endCombat 中应用）
   victoryDrops?: ItemEntry[];
+  // Task 22: 心魔试炼战斗的胜负心魔值变化（仅心魔战设置）
+  victoryHeartDemonDelta?: number;
+  defeatHeartDemonDelta?: number;
+  // Task 22: 是否为心魔试炼战斗（用于战斗结束后特殊结算）
+  isHeartDemonTrial?: boolean;
+  // ===== Task 23 新增 =====
+  // 参战灵宠快照（含 hp/attack/defense/speed/skill 与当前 cooldown）
+  // 战斗中灵宠每回合自动追加一次攻击（伤害为玩家 attack 的 30-50%）
+  petCombatant?: {
+    id: string;
+    name: string;
+    species: string;
+    hp: number;
+    maxHp: number;
+    attack: number;
+    defense: number;
+    speed: number;
+    skillName: string;
+    skillDesc: string;
+    skillPower: number;
+    skillCooldown: number;
+    currentCooldown: number;
+    element: string;
+  };
+  // Task 23: 符箓效果临时状态（本回合减伤、本回合敌人眩晕等）
+  talismanDefenseActive?: number;  // 本回合减伤数值
+  enemyStunned?: boolean;          // 敌人本回合是否被镇符眩晕
 }
 
 // ==================== AI 输出结构 (EngineCommand) ====================
@@ -469,7 +496,14 @@ export interface AIEventOutput {
     victoryDrops?: ItemEntry[];
     // 战斗失败的代价（如死亡、重伤、被夺宝）
     defeatCost?: string;
+    // Task 22: 心魔试炼战斗的胜负心魔值变化（仅心魔战设置）
+    victoryHeartDemonDelta?: number;
+    defeatHeartDemonDelta?: number;
+    isHeartDemonTrial?: boolean;
   };
+  // ===== Task 23 新增 =====
+  // AI 授予玩家灵宠（如收服妖兽幼崽、前辈相赠、灵宠店购买）
+  newPets?: Pet[];
 }
 
 export interface AttributeChange {
@@ -516,6 +550,8 @@ export interface ChoiceResultOutput {
     victoryDrops?: ItemEntry[];
     defeatCost?: string;
   };
+  // ===== Task 23 新增 =====
+  newPets?: Pet[];
 }
 
 // 干扰模拟输出
@@ -548,6 +584,8 @@ export interface InterfereOutput {
     victoryDrops?: ItemEntry[];
     defeatCost?: string;
   };
+  // ===== Task 23 新增 =====
+  newPets?: Pet[];
 }
 
 // ==================== 引擎状态上下文 (注入给 AI) ====================
@@ -573,6 +611,8 @@ export interface EngineStateContext {
     spiritStones: number; reputation: number;
     faction: string; master: string; location: string;
     alive: boolean; ascended: boolean;
+    // Task 22: 心魔值（0-100）——AI 可读取，可用 changes 中 attribute='heartDemon' 调整
+    heartDemon: number;
   };
   // 修炼心得（当前已存的修炼速度说明文本，AI 可读取参考并决定是否更新）
   cultivationInsight: string;
@@ -603,6 +643,14 @@ export interface EngineStateContext {
   recentEventTypes: string[];
   // 最近 3 次蓝图分类（避免连续同类主题）
   recentBlueprintCategories: string[];
+  // ===== Task 23 新增 =====
+  // 灵宠列表（AI 可读取玩家拥有的灵宠，并据此生成事件/触发灵宠技能）
+  pets: Pet[];
+  // ===== Task 24 新增 =====
+  // 秘境探索记录（AI 可读取玩家已探秘境 + 冷却状态，避免重复推荐）
+  exploredRealms: ExplorationRecord[];
+  // 当前正在探索的秘境（仅 explore route 调用时设置，让 AI 围绕此秘境生成探索事件）
+  currentExploration?: SecretRealm;
 }
 
 // ==================== 命节点 ====================
@@ -679,6 +727,16 @@ export interface CharacterState {
   characterIntents: CharacterIntent[];
   // 进行中的战斗（若有；持久化以支持页面刷新恢复）
   combatSession: CombatSession | null;
+  // ===== Task 22 新增 =====
+  // 心魔值 0-100：杀生/邪修/未解执念会增加；静修/净化物品/岁月流逝会减少
+  // 30+ 修炼速度 -10%；60+ 偶发心魔试炼战斗；90+ 走火入魔风险（突死/重伤）
+  heartDemon: number;
+  // ===== Task 23 新增 =====
+  // 灵宠列表（Pet[]）—— 玩家收服的灵宠
+  pets: Pet[];
+  // ===== Task 24 新增 =====
+  // 秘境探索记录（ExplorationRecord[]）—— 玩家探索过的秘境 + 冷却追踪
+  exploredRealms: ExplorationRecord[];
 }
 
 // ==================== Task 21: 阵法系统 ====================
@@ -719,3 +777,256 @@ export interface Formation {
   // 是否已激活
   active: boolean;
 }
+
+// ==================== Task 23: 灵宠系统 ====================
+
+// 灵宠物种——参考《凡人修仙传》修仙世界常见灵宠
+export type PetSpecies =
+  | 'fox'          // 灵狐：幻术、敏捷
+  | 'wolf'         // 灵狼：攻击、群战
+  | 'snake'        // 灵蛇：毒术、阴狠
+  | 'turtle'       // 灵龟：防御、长寿
+  | 'eagle'        // 灵鹰：飞行、侦察
+  | 'ape'          // 灵猿：力量、近战
+  | 'spider'       // 灵蛛：织网、陷阱
+  | 'butterfly'    // 灵蝶：迷幻、辅助
+  | 'fish'         // 灵鱼：水系、灵动
+  | 'tiger'        // 灵虎：威压、暴击
+  | 'phoenix'      // 火凤：火系、复活
+  | 'dragon';      // 幼龙：全能、稀有
+
+export interface Pet {
+  id: string;
+  name: string;              // 灵宠名（玩家或 AI 起名）
+  species: PetSpecies;       // 物种
+  description: string;       // 描述
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  realm: Realm;              // 灵宠境界（决定基础属性）
+  // 战斗属性
+  hp: number;
+  maxHp: number;
+  attack: number;
+  defense: number;
+  speed: number;
+  // 五行倾向（影响战斗属性与技能）
+  element: 'metal' | 'wood' | 'water' | 'fire' | 'earth';
+  // 情感状态
+  loyalty: number;           // 忠诚度 0-100（低于 30 可能逃离）
+  satiety: number;           // 饱食度 0-100（低于 30 忠诚度下降加速）
+  // 成长
+  level: number;             // 灵宠等级（喂养/战斗可提升）
+  exp: number;               // 当前经验
+  expToLevel: number;        // 升级所需经验
+  // 来源
+  sourceAcquired: string;    // 如何获得（"收服于青云山""前辈相赠"等）
+  acquiredAge: number;       // 获得时的年龄
+  // 主动技能（每只灵宠一个主动技能，参战时使用）
+  skill: {
+    name: string;            // 技能名（如"幻影分身""毒雾""烈焰冲击"）
+    description: string;     // 技能描述
+    power: number;           // 技能威力倍率（1.0=普通攻击等价）
+    cooldown: number;        // 冷却回合数
+  };
+}
+
+// 灵宠物种 → 默认属性模板
+export const PET_SPECIES_TEMPLATES: Record<PetSpecies, {
+  name: string;
+  defaultElement: 'metal' | 'wood' | 'water' | 'fire' | 'earth';
+  baseHp: number;
+  baseAttack: number;
+  baseDefense: number;
+  baseSpeed: number;
+  skillName: string;
+  skillDesc: string;
+  skillPower: number;
+  skillCooldown: number;
+}> = {
+  fox:      { name: '灵狐',   defaultElement: 'water', baseHp: 60,  baseAttack: 12, baseDefense: 4,  baseSpeed: 18, skillName: '幻影分身', skillDesc: '化出数道幻影迷惑敌人', skillPower: 1.5, skillCooldown: 3 },
+  wolf:     { name: '灵狼',   defaultElement: 'metal', baseHp: 80,  baseAttack: 16, baseDefense: 6,  baseSpeed: 14, skillName: '狼群围猎', skillDesc: '召唤同伴围攻敌人', skillPower: 1.8, skillCooldown: 4 },
+  snake:    { name: '灵蛇',   defaultElement: 'wood',  baseHp: 50,  baseAttack: 14, baseDefense: 3,  baseSpeed: 12, skillName: '毒雾吐息', skillDesc: '喷吐毒雾持续伤害', skillPower: 1.4, skillCooldown: 3 },
+  turtle:   { name: '灵龟',   defaultElement: 'water', baseHp: 120, baseAttack: 8,  baseDefense: 14, baseSpeed: 6,  skillName: '玄甲护主', skillDesc: '为玩家挡下伤害', skillPower: 1.0, skillCooldown: 3 },
+  eagle:    { name: '灵鹰',   defaultElement: 'metal', baseHp: 55,  baseAttack: 15, baseDefense: 4,  baseSpeed: 20, skillName: '俯冲利爪', skillDesc: '从空中俯冲攻击要害', skillPower: 1.7, skillCooldown: 3 },
+  ape:      { name: '灵猿',   defaultElement: 'earth', baseHp: 100, baseAttack: 18, baseDefense: 8,  baseSpeed: 10, skillName: '巨力猛砸', skillDesc: '巨力猛砸造成重创', skillPower: 2.0, skillCooldown: 4 },
+  spider:   { name: '灵蛛',   defaultElement: 'wood',  baseHp: 45,  baseAttack: 11, baseDefense: 5,  baseSpeed: 13, skillName: '蛛网束缚', skillDesc: '吐蛛网束缚敌人减速', skillPower: 1.2, skillCooldown: 3 },
+  butterfly:{ name: '灵蝶',   defaultElement: 'wood',  baseHp: 40,  baseAttack: 7,  baseDefense: 3,  baseSpeed: 16, skillName: '迷幻花粉', skillDesc: '散布花粉让敌人迷乱', skillPower: 0.8, skillCooldown: 2 },
+  fish:     { name: '灵鱼',   defaultElement: 'water', baseHp: 65,  baseAttack: 10, baseDefense: 5,  baseSpeed: 15, skillName: '水刃冲击', skillDesc: '水刃冲击敌人', skillPower: 1.3, skillCooldown: 2 },
+  tiger:    { name: '灵虎',   defaultElement: 'fire',  baseHp: 95,  baseAttack: 17, baseDefense: 7,  baseSpeed: 13, skillName: '虎威震慑', skillDesc: '虎威震慑降低敌人攻击', skillPower: 1.5, skillCooldown: 4 },
+  phoenix:  { name: '火凤',   defaultElement: 'fire',  baseHp: 110, baseAttack: 20, baseDefense: 8,  baseSpeed: 17, skillName: '涅槃烈焰', skillDesc: '烈焰焚烧一切', skillPower: 2.2, skillCooldown: 5 },
+  dragon:   { name: '幼龙',   defaultElement: 'metal', baseHp: 150, baseAttack: 22, baseDefense: 12, baseSpeed: 16, skillName: '龙息吐息', skillDesc: '龙息横扫战场', skillPower: 2.5, skillCooldown: 5 },
+};
+
+// ==================== Task 23: 符箓系统 ====================
+
+// 符箓子类型——单次使用、即时生效的战斗道具
+// 复用 item_type='consumable'，通过 effects 中的 target_attribute 区分
+export type TalismanType =
+  | 'talisman_attack'    // 攻击符：直接对敌人造成伤害
+  | 'talisman_defense'   // 防御符：本回合减伤
+  | 'talisman_heal'      // 治疗符：回复 HP
+  | 'talisman_escape'    // 遁逃符：高概率逃跑
+  | 'talisman_stun';     // 镇压符：让敌人本回合无法行动
+
+export const TALISMAN_TYPE_LABEL: Record<TalismanType, string> = {
+  talisman_attack: '攻符',
+  talisman_defense: '防符',
+  talisman_heal: '疗符',
+  talisman_escape: '遁符',
+  talisman_stun: '镇符',
+};
+
+// ==================== Task 24: 秘境探索系统 ====================
+// 参考《凡人修仙传》修仙界常见秘境——玩家可主动选择探索，触发独特事件链
+
+export type SecretRealmTier =
+  | 'common'      // 凡境秘境：低难度，普通奖励
+  | 'uncommon'    // 灵境秘境：中低难度
+  | 'rare'        // 玄境秘境：中等难度，稀有奖励
+  | 'epic'        // 仙境秘境：高难度，史诗奖励
+  | 'legendary'   // 圣境秘境：极高难度，传说奖励
+  | 'mythic';     // 混沌秘境：顶级难度，神话奖励
+
+export interface SecretRealm {
+  id: string;                  // 唯一 id
+  name: string;                // 秘境名（如"万妖谷""幽冥古道"）
+  description: string;         // 秘境描述（外观、传说、特性）
+  tier: SecretRealmTier;       // 秘境品级
+  // 进入条件
+  minRealm: number;            // 最低境界 idx（0=mortal, 1=qi_refining...）
+  minAge: number;              // 最低年龄
+  spiritStoneCost: number;     // 进入所需灵石（用作"路费+护身符")
+  // 探索特性
+  dangerLevel: number;         // 危险度 1-10（影响战斗触发率/伤害）
+  rewardMultiplier: number;    // 奖励倍率（影响物品稀有度/数量）
+  cooldownYears: number;       // 探索冷却（多少年后可再探）
+  // 秘境主题/事件类型倾向
+  themeTags: string[];         // 主题标签（指导 AI 生成事件）：['beast','inheritance','illusion','lightning','blood','undead','dragon','ancient']
+  elementAffinity?: 'metal' | 'wood' | 'water' | 'fire' | 'earth';  // 五行亲和（影响奖励五行倾向）
+  // 探索结果倾向（AI 应参考）
+  encounterHints: string[];    // 探索可能遭遇的灵感样例
+  // 视觉
+  color: string;               // 主色调（UI 卡片用）
+  icon: string;                // 图标 emoji
+}
+
+// 秘境池——参考《凡人修仙传》修仙界地理设定
+export const SECRET_REALMS: SecretRealm[] = [
+  // ===== 凡人/炼气期可探 =====
+  {
+    id: 'wan_yao_gu',
+    name: '万妖谷外围',
+    description: '青云山东麓一处妖兽聚集之地，常有低阶妖兽出没，散修趋之若鹜求取妖丹兽皮。',
+    tier: 'common',
+    minRealm: 1, minAge: 12, spiritStoneCost: 5,
+    dangerLevel: 3, rewardMultiplier: 1.0, cooldownYears: 3,
+    themeTags: ['beast', 'combat', 'material'],
+    elementAffinity: 'wood',
+    encounterHints: ['遭遇独狼妖兽', '发现灵草丛生', '拾得前人遗骨', '听见妖兽吼叫'],
+    color: '#84cc16', icon: '🐺',
+  },
+  {
+    id: 'ling_yao_lin',
+    name: '灵药密林',
+    description: '终年云雾缭绕的密林，传闻有上古灵药遗种，亦有毒虫猛兽守护。',
+    tier: 'uncommon',
+    minRealm: 1, minAge: 14, spiritStoneCost: 10,
+    dangerLevel: 4, rewardMultiplier: 1.3, cooldownYears: 4,
+    themeTags: ['material', 'beast', 'herb'],
+    elementAffinity: 'wood',
+    encounterHints: ['采得百年灵芝', '毒蛇拦路', '迷雾中迷失方向', '遇同行采药人'],
+    color: '#16a34a', icon: '🌿',
+  },
+  // ===== 筑基期可探 =====
+  {
+    id: 'you_ming_gu_dao',
+    name: '幽冥古道',
+    description: '一条通往幽冥的废弃古道，阴气森森，鬼修与不死生物游荡其间。',
+    tier: 'rare',
+    minRealm: 2, minAge: 30, spiritStoneCost: 30,
+    dangerLevel: 6, rewardMultiplier: 1.6, cooldownYears: 5,
+    themeTags: ['undead', 'inheritance', 'ghost'],
+    elementAffinity: 'water',
+    encounterHints: ['遭遇鬼修', '拾得阴属性功法', '冥河畔遇故人残魂', '阴煞之气侵体'],
+    color: '#0ea5e9', icon: '💀',
+  },
+  {
+    id: 'shang_gu_yi_ji',
+    name: '上古修士遗迹',
+    description: '上古修士坐化后留下的洞府，机关重重，亦有传承玉简与遗宝。',
+    tier: 'rare',
+    minRealm: 2, minAge: 35, spiritStoneCost: 50,
+    dangerLevel: 6, rewardMultiplier: 1.8, cooldownYears: 6,
+    themeTags: ['inheritance', 'trap', 'treasure'],
+    encounterHints: ['触发阵法机关', '拾得玉简传承', '前辈残魂指点', '宝物现世引发争抢'],
+    color: '#a855f7', icon: '🏛',
+  },
+  {
+    id: 'xue_se_jin_di',
+    name: '血色禁地',
+    description: '一片血色迷雾笼罩的禁地，传闻为上古大战之地，杀气未散，机缘与杀机并存。',
+    tier: 'epic',
+    minRealm: 2, minAge: 40, spiritStoneCost: 80,
+    dangerLevel: 8, rewardMultiplier: 2.2, cooldownYears: 8,
+    themeTags: ['combat', 'blood', 'murderous', 'treasure'],
+    elementAffinity: 'fire',
+    encounterHints: ['遭遇魔修', '血气入体增心魔', '血池中拾得血魂丹', '与同入禁地者火并'],
+    color: '#dc2626', icon: '🩸',
+  },
+  // ===== 金丹期可探 =====
+  {
+    id: 'long_mai_mi_jing',
+    name: '龙脉秘境',
+    description: '一处天地龙脉交汇之地，灵气浓郁至极，传闻有龙族遗宝与龙血草。',
+    tier: 'epic',
+    minRealm: 3, minAge: 100, spiritStoneCost: 200,
+    dangerLevel: 7, rewardMultiplier: 2.5, cooldownYears: 10,
+    themeTags: ['dragon', 'inheritance', 'spiritual_energy'],
+    elementAffinity: 'earth',
+    encounterHints: ['龙脉灵气灌体', '遇龙族后裔', '拾得龙血草', '龙吟震慑心神'],
+    color: '#fbbf24', icon: '🐲',
+  },
+  {
+    id: 'tai_xu_huan_jing',
+    name: '太虚幻境',
+    description: '存在于虚幻与现实夹缝中的奇异空间，进入者会经历心境试炼，亦可能获得心法传承。',
+    tier: 'epic',
+    minRealm: 3, minAge: 120, spiritStoneCost: 250,
+    dangerLevel: 8, rewardMultiplier: 2.4, cooldownYears: 12,
+    themeTags: ['illusion', 'heart_demon', 'inheritance'],
+    encounterHints: ['幻境中重见故人', '道心拷问', '破幻得心法', '心魔试炼'],
+    color: '#c084fc', icon: '🌫',
+  },
+  // ===== 元婴+ =====
+  {
+    id: 'lei_chi_jin_di',
+    name: '雷池禁地',
+    description: '一片终年雷电交加的禁地，雷属性至宝与雷劫残余之力并存，金丹以下入内必死。',
+    tier: 'legendary',
+    minRealm: 4, minAge: 200, spiritStoneCost: 500,
+    dangerLevel: 9, rewardMultiplier: 3.0, cooldownYears: 15,
+    themeTags: ['lightning', 'trial', 'treasure'],
+    elementAffinity: 'metal',
+    encounterHints: ['雷池淬体', '拾得雷属性至宝', '雷劫残余伤体', '雷电中参悟雷法'],
+    color: '#facc15', icon: '⚡',
+  },
+  {
+    id: 'xian_mo_gu_zhan_chang',
+    name: '仙魔古战场',
+    description: '上古仙魔大战之地，残留仙魔气息与未消散的杀机，顶级法宝与传承皆在其中。',
+    tier: 'mythic',
+    minRealm: 4, minAge: 300, spiritStoneCost: 1000,
+    dangerLevel: 10, rewardMultiplier: 4.0, cooldownYears: 20,
+    themeTags: ['ancient', 'combat', 'inheritance', 'blood'],
+    encounterHints: ['仙魔残魂争夺宝物', '拾得仙器残片', '魔气入体', '仙魔大战重演'],
+    color: '#7c3aed', icon: '⚔',
+  },
+];
+
+// 探索结果记录（用于冷却追踪）
+export interface ExplorationRecord {
+  realmId: string;
+  lastExploredAge: number;     // 上次探索时的角色年龄
+  timesExplored: number;       // 累计探索次数
+  bestReward?: string;         // 最佳奖励描述（AI 给出）
+}
+
