@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export function ChoiceModal() {
   const {
@@ -16,6 +17,7 @@ export function ChoiceModal() {
     setCharacter, addEvent, addChoice, setLastChange,
   } = useGameStore();
   const [busy, setBusy] = useState(false);
+  const [aiConfigPromptOpen, setAiConfigPromptOpen] = useState(false);
   // 前情提要默认展开；用户可手动折叠以聚焦选项
   const [contextCollapsed, setContextCollapsed] = useState(false);
 
@@ -79,7 +81,11 @@ export function ChoiceModal() {
       }
     } catch (err: any) {
       setError(err.message);
-      toast.error('选择失败', { description: err.message });
+      if (String(err.message || '').includes('请先配置 AI 接口')) {
+        setAiConfigPromptOpen(true);
+      } else {
+        toast.error('选择失败', { description: err.message });
+      }
     } finally {
       setBusy(false);
       setLoading(false);
@@ -142,13 +148,6 @@ export function ChoiceModal() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 space-y-2">
-            <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-200 font-serif-cn">
-              天道抉择需要 AI 接口生成后续剧情。若点击选项提示未配置，请先在这里配置 AI 接口，再继续选择。
-            </p>
-            <AIConfigDialog variant="start" />
-          </div>
-
           {/* 选项 */}
           <div className="space-y-2">
             {pendingChoice.options.map((opt, i) => (
@@ -184,6 +183,18 @@ export function ChoiceModal() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={aiConfigPromptOpen} onOpenChange={setAiConfigPromptOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-serif-cn">需要配置 AI 接口</DialogTitle>
+            <DialogDescription>
+              天道抉择需要 AI 生成后续剧情。请先配置 API Base URL 和 API Key，保存后回到此处继续选择。
+            </DialogDescription>
+          </DialogHeader>
+          <AIConfigDialog variant="start" />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
