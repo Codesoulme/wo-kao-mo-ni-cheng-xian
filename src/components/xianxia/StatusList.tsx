@@ -98,20 +98,30 @@ export function StatusList() {
         </Card>
       </Collapsible>
 
+      {/* 未决线索：紧贴状态之后，方便查看当前牵挂与约期 */}
+      <PendingThreadsCard />
+
       {/* 心之所向——角色主动意图 */}
       <CharacterIntentsCard />
 
       {/* Task 22: 心魔值卡片 */}
       <HeartDemonCard />
 
-      {/* 未决线索 */}
-      <PendingThreadsCard />
-
       <p className="text-[10px] text-muted-foreground text-center pt-1">
         装备与储物袋请查看「宝」页
       </p>
     </div>
   );
+}
+
+function effectTone(status: any, effect: any) {
+  const text = `${effect?.description || ''}${effect?.attribute || ''}`;
+  const value = Number(effect?.value ?? effect?.delta ?? 0);
+  const isDebuff = status?.category === 'debuff' || status?.category === 'environment' || /降低|减少|削弱|受损|伤|毒|虚弱|不利|减/.test(text);
+  const isBuff = status?.category === 'buff' || status?.category === 'attribute' || status?.category === 'skill' || /提升|增加|增强|恢复|护持|加/.test(text);
+  if (isDebuff || value < 0) return 'border-red-500/25 bg-red-500/10 text-red-600 dark:text-red-400';
+  if (isBuff || value > 0) return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+  return 'border-muted bg-muted/60 text-muted-foreground';
 }
 
 function StatusGroup({ title, items }: { title: string; items: any[] }) {
@@ -147,7 +157,7 @@ function StatusGroup({ title, items }: { title: string; items: any[] }) {
             {s.effects && s.effects.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-1">
                 {s.effects.map((e: any, j: number) => (
-                  <span key={j} className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary">
+                  <span key={j} className={cn("text-[9px] px-1 py-0.5 rounded border", effectTone(s, e))}>
                     {e.description}
                   </span>
                 ))}

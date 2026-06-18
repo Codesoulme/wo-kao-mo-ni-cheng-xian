@@ -134,12 +134,15 @@ const SCENE_PROMPTS: Record<string, string> = {
   * 修为将满 → 主动闭关参悟
 - 你必须在 narrative 中体现这些主动行为（除非蓝图主题明确是其他更重要的事件打断）。
 - 例：蓝图主题是"妖兽搏杀"但角色意图是"备战宗门比武"——你可以写"角色在山林采药为比武磨砺，途中遭遇狼妖……"两者自然融合。
+- 角色在意的东西不是装饰：父母、故乡、师门、旧友、誓约、秘境约期、三年后再探某地等，应在合适年份自然回响。若角色没法去、没钱、闭关、受伤或改变想法，也要用叙事交代，不要当作从未发生。
 
 【未决线索连续性——重要！】
 - pendingThreads 中的线索必须保持连续性。临近 deadlineAge 的标记为 urgent，本轮必须推进或解决。
 - 例：3个月前定下"宗门比武"，本轮 age 已到 deadline——必须生成比武事件或备战关键节点。
 - 若事件中出现"不久后/三月后/半年后/今年内/入夜后"这类同年后续，不要只写开端；必须在 extraEvents 追加后续，或创建 dueInSameYear=true 的 newThreads，让引擎同年续写。
 - 不要让线索凭空消失！前文提到的事，后文必须有呼应（哪怕是侧面提及"还差三月比武"）。
+- deadlineAge 已到的线索不是建议，而是本轮必须承接：完成、推进、失败、错过，或说明因伤势/资源/心境/外力暂不能成行；绝不能另起无关事件。
+- 远期牵挂可低频回响，不要机械每年刷；但到约期、临近约期、或与当前蓝图可融合时，应自然出现。
 
 【事件类型选择——避免单一化】
 - 严禁连续3次生成同类事件（见 recentEventTypes）。
@@ -295,19 +298,28 @@ ${ctx.currentExploration.elementAffinity ? `五行亲和：${{metal:'金',wood:'
 8. 严禁每岁重复探索同一秘境（引擎有冷却机制，AI 无需处理）
 ` : ''}
 
-【角色主动意图区】（角色当前会主动做这些事——你必须在 narrative 中体现）
+【角色牵挂与主动意图区】（这是 AI 的提示池：高优先级必须承接；低优先级应在合适时自然回响）
 ${ctx.characterIntents && ctx.characterIntents.length
-  ? ctx.characterIntents.map(i => `- [优先级${i.priority}] ${i.title}：${i.description}`).join('\n')
+  ? ctx.characterIntents.map(i => `- [优先级${i.priority}] ${i.title}：${i.description}${i.relatedThreadId ? `（关联线索 ${i.relatedThreadId}）` : ''}`).join('\n')
   : '（无特定主动意图，按蓝图主题自由生成）'}
+- 优先级 8-10：本轮必须明显推进、完成、失败，或解释为何无法执行。
+- 优先级 4-7：尽量与本轮蓝图融合，成为角色主动行为。
+- 优先级 1-3：低频牵挂，可带过、托人、写信、购买调养丹药、回乡探望，或说明暂不能成行。
 
-【未决线索区】（必须保持连续性！urgent 的本轮必须推进或解决）
+【未决线索区】（必须保持连续性！urgent 与到期线索本轮必须推进或解决）
 ${ctx.pendingThreads && ctx.pendingThreads.length
-  ? ctx.pendingThreads.map(t => `- [id:${t.id}][${t.status}] ${t.title}（截止 ${t.deadlineAge} 岁，剩 ${t.deadlineAge - sc.age} 岁，进度 ${t.progress}%）：${t.description}${t.reward ? `；奖励：${t.reward}` : ''}${t.failureCost ? `；失败代价：${t.failureCost}` : ''}`).join('\n')
+  ? ctx.pendingThreads.map(t => `- [id:${t.id}][${t.status}] ${t.title}（截止 ${t.deadlineAge} 岁，剩 ${t.deadlineAge - sc.age} 岁，进度 ${t.progress}%${t.dueInSameYear ? '，同年后续' : ''}）：${t.description}${t.followUpHint ? `；后续关窍：${t.followUpHint}` : ''}${t.reward ? `；奖励：${t.reward}` : ''}${t.failureCost ? `；失败代价：${t.failureCost}` : ''}`).join('\n')
   : '（无未决线索）'}
 ${ctx.pendingThreads && ctx.pendingThreads.some(t => t.status === 'urgent')
-  ? `\n【urgent 线索处理——必须行动！】\n本轮有 urgent 线索，你必须：\n- 在 advanceThreads 中推进该线索进度（progressDelta 20-50）\n- 或在 completeThreadIds 中标记完成（若剧情已到解决点）\n- 或在 failThreadIds 中标记失败（若剧情注定错过）\n- 严禁在 advanceThreads/completeThreadIds/failThreadIds 都为空的情况下生成 urgent 线索相关事件——这等于让线索"原地踏步"，违反剧情推进原则\n- 严禁重复使用上次相同的标题——若上轮已是"家道再陷困境"，本轮必须换标题（如"灵药现世""师徒同行"等）`
+  ? `
+【urgent 线索处理——必须行动！】
+本轮有 urgent 线索，你必须：
+- 在 advanceThreads 中推进该线索进度（progressDelta 20-50）
+- 或在 completeThreadIds 中标记完成（若剧情已到解决点）
+- 或在 failThreadIds 中标记失败（若剧情注定错过）
+- 严禁在 advanceThreads/completeThreadIds/failThreadIds 都为空的情况下生成 urgent 线索相关事件——这等于让线索"原地踏步"，违反剧情推进原则
+- 严禁重复使用上次相同的标题——若上轮已是"家道再陷困境"，本轮必须换标题（如"灵药现世""师徒同行"等）`
   : ''}
-
 【反重复机制——严格遵守！】
 最近事件类型（严禁连续 3 次同类）：${ctx.recentEventTypes && ctx.recentEventTypes.length ? ctx.recentEventTypes.join(' → ') : '无'}
 最近蓝图分类（避免连续同类）：${ctx.recentBlueprintCategories && ctx.recentBlueprintCategories.length ? ctx.recentBlueprintCategories.join(' → ') : '无'}

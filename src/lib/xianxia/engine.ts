@@ -1405,7 +1405,37 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
   for (const t of safeThreads) {
     if (t.status !== 'pending' && t.status !== 'urgent') continue;
     const remaining = t.deadlineAge - now;
-    if (remaining <= 0) continue;
+    if (remaining < 0) continue;
+    if (remaining === 0) {
+      intents.push({
+        id: `intent_due_${t.id}`,
+        type: t.category === 'exploration' || t.category === 'mystery' || t.category === 'inheritance' ? 'explore_opportunity' : 'resolve_thread',
+        title: `应约·${t.title}`,
+        description: `「${t.title}」已到约期。角色必须正面承接这段因果：前往赴约、尝试入境/应试/还愿，或写清楚为何暂时无法继续、为何改变心意；不可无故略过。${t.followUpHint ? `后续关窍：${t.followUpHint}` : ''}`,
+        priority: 10,
+        relatedThreadId: t.id,
+      });
+      continue;
+    }
+    if ((t.category === 'exploration' || t.category === 'mystery' || t.category === 'inheritance') && remaining <= 3) {
+      intents.push({
+        id: `intent_realm_${t.id}`,
+        type: 'explore_opportunity',
+        title: `牵挂·${t.title}`,
+        description: `「${t.title}」将在 ${remaining} 岁内重新牵动。角色应主动整理信物、参悟禁制、回访旧地，或说明暂时无法入内的原因；秘境/传承线索不能被后续流年遗忘。${t.followUpHint ? `后续关窍：${t.followUpHint}` : ''}`,
+        priority: 9,
+        relatedThreadId: t.id,
+      });
+    } else if ((t.category === 'promise' || t.category === 'romance') && remaining <= 3) {
+      intents.push({
+        id: `intent_promise_${t.id}`,
+        type: 'socialize',
+        title: `守约·${t.title}`,
+        description: `「${t.title}」临近。角色应主动履约、传信、探望或给出不得不失约的叙事原因；不要让人际牵挂凭空消失。`,
+        priority: 8,
+        relatedThreadId: t.id,
+      });
+    }
     if (t.category === 'competition' && remaining <= 5) {
       intents.push({
         id: `intent_comp_${t.id}`,
@@ -1477,7 +1507,35 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
       });
     }
   }
-  // 5. 限制最多保留 5 个意图（按优先级排序）
+  // 5. 软牵挂：父母、故乡、师承、旧友等不是硬任务，但会在合适年份自然回响。
+  const concernText = [
+    ...(state.longTermMemory || []),
+    ...(state.activeStatuses || []).map(st => `${st.name} ${st.description} ${st.source || ''}`),
+    ...(state.pendingThreads || []).map(t => `${t.title} ${t.description} ${t.followUpHint || ''}`),
+  ].join(' ');
+  const concernSeed = Math.abs((state.age * 17) + String(state.name || '').split('').reduce((n, ch) => n + ch.charCodeAt(0), 0));
+  if (/父母|爹娘|双亲|母亲|父亲|家中|故乡|旧宅|亲人/.test(concernText) && (concernSeed % 4 === 0 || intents.length === 0)) {
+    intents.push({
+      id: `intent_family_${now}`,
+      type: state.spiritStones >= 20 ? 'trade' : 'socialize',
+      title: state.spiritStones >= 20 ? '奉亲问安' : '牵挂家中',
+      description: state.spiritStones >= 20
+        ? '角色心中牵挂父母亲人，若路途与处境允许，可购买调养丹药、托人送信或回乡探望；若不能成行，也应在叙事中自然带过原因。'
+        : '角色心中牵挂父母亲人，可能回乡探望、托人问安，或因修行/险地所阻只能暂寄书信。此类牵挂应偶尔回响，不必每年硬写。',
+      priority: 3,
+    });
+  }
+  if (/师父|师尊|师门|同门|旧友|好友|恩人|道侣/.test(concernText) && (concernSeed % 5 === 0 || intents.length === 0)) {
+    intents.push({
+      id: `intent_social_${now}`,
+      type: 'socialize',
+      title: '旧缘回响',
+      description: '角色心中仍有师门、旧友或恩人牵挂；合适时可传信、探访、互赠丹药法器，或写明因闭关/险阻暂不能赴约。',
+      priority: 3,
+    });
+  }
+
+  // 6. 限制最多保留 5 个意图（按优先级排序）
   intents.sort((a, b) => b.priority - a.priority);
   return intents.slice(0, 5);
 }
