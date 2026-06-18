@@ -344,43 +344,16 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
 
 
 function isVisibleEffect(eff: any): boolean {
-  if (!eff) return false;
-  if (eff.kind) return Boolean(String(eff.name || '').trim());
-  return Boolean(eff.attribute) && Number(eff.delta || 0) !== 0;
+  return isVisibleNumericEventEffect(eff);
 }
 
 function formatEffectLabel(eff: any): React.ReactNode {
-  if (eff.kind) {
-    const label = String(eff.label || '获得');
-    const name = String(eff.name || '').trim();
-    return <>{label}<span className="ml-0.5 font-medium">{name}</span></>;
-  }
-  return <>{ATTR_LABEL[eff.attribute] || eff.attribute}<span className="ml-0.5 tabular-nums">{eff.delta > 0 ? '+' : ''}{eff.delta}</span></>;
+  const label = formatEventEffectLabel(eff);
+  const match = label.match(/^(获得|装备|获得状态|收服灵宠|失去|得|售)(.+)$/);
+  if (match) return <>{match[1]}<span className="ml-0.5 font-medium">{match[2]}</span></>;
+  return <>{label}</>;
 }
 
 function getEffectTone(eff: { attribute?: string; delta?: number; kind?: string; tone?: 'positive' | 'negative' | 'neutral' }): 'positive' | 'negative' | 'neutral' {
-  if (eff.tone) return eff.tone;
-  const delta = Number(eff.delta || 0);
-  if (delta === 0) return 'neutral';
-
-  // 心魔是反向属性：心魔上升是负面，心魔下降才是正面
-  const reversedAttributes = new Set(['heartDemon']);
-  if (reversedAttributes.has(eff.attribute || '')) {
-    return delta > 0 ? 'negative' : 'positive';
-  }
-
-  return delta > 0 ? 'positive' : 'negative';
+  return eventEffectTone(eff);
 }
-
-const ATTR_LABEL: Record<string, string> = {
-  age: '年龄', lifespan: '寿元',
-  cultivationExp: '修为',
-  hp: '生命', maxHp: '生命上限',
-  mp: '灵力', maxMp: '灵力上限',
-  attack: '攻击', defense: '防御', speed: '速度',
-  luck: '气运', comprehension: '悟性',
-  spiritStones: '灵石', reputation: '声望',
-  heartDemon: '心魔',
-  storageCapacity: '储物容量', cultivationMultiplier: '修炼倍率',
-  elementMetal: '金灵性', elementWood: '木灵性', elementWater: '水灵性', elementFire: '火灵性', elementEarth: '土灵性',
-};
