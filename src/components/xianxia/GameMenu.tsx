@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
@@ -57,7 +57,7 @@ export function GameMenu() {
               className="text-xs cursor-pointer"
             >
               <Info className="w-3.5 h-3.5 mr-2" />
-              <span>本局概况</span>
+              <span>本剧概况</span>
             </DropdownMenuItem>
           )}
           <AIConfigDialog variant="menu" />
@@ -96,13 +96,13 @@ export function GameMenu() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* 本局概况 */}
+      {/* 本剧概况 */}
       {character && <AlertDialog open={aboutOpen} onOpenChange={setAboutOpen}>
         <AlertDialogContent className="max-w-[320px]">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif-cn text-base flex items-center gap-2">
               <ScrollText className="w-4 h-4 text-primary" />
-              本局概况
+              本剧概况
             </AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="text-xs space-y-1.5 pt-1">
@@ -174,3 +174,4 @@ export function GameMenu() {
     </>
   );
 }
+
