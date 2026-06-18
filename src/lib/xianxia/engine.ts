@@ -1780,10 +1780,16 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   // Task 22 修复：若同时有 hasChoice，延迟战斗——选择通常决定战斗策略（奋力搏杀/灵活周旋/抛物安抚）
   // 选项后才进入战斗，避免 ChoiceModal 与 CombatModal 同时弹出
   if (aiOutput.triggerCombat && aiOutput.triggerCombat.enemies?.length) {
+    const combatTrigger = {
+      ...aiOutput.triggerCombat,
+      // 战斗弹窗承接刚才的事件：标题和缘由必须与事件描述一致，避免玩家跳戏
+      contextTitle: aiOutput.title || aiOutput.triggerCombat.contextTitle,
+      contextNarrative: aiOutput.narrative || aiOutput.triggerCombat.contextNarrative,
+    };
     if (aiOutput.hasChoice) {
-      (next as any)._deferredCombat = aiOutput.triggerCombat;
+      (next as any)._deferredCombat = combatTrigger;
     } else {
-      next = startCombat(next, aiOutput.triggerCombat);
+      next = startCombat(next, combatTrigger);
     }
   }
 

@@ -5,8 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import {
-  dbToState, executeCombatRound, stateToResponse,
+  dbToState, executeCombatRound, stateToResponse, buildStateContext,
 } from '@/lib/xianxia/engine';
+import { generateCombatRoundNarrative } from '@/lib/xianxia/llm';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -41,8 +42,30 @@ export async function POST(req: NextRequest) {
     }
 
     // 执行战斗回合（引擎权威：计算伤害、扣血、扣灵力、消耗丹药、判定胜负）
+    const sessionBefore = state.combatSession;
     const result = executeCombatRound(state, action, payload || {});
     state = result.state;
+
+    // AI 只润色叙事，不参与数值和胜负判定；失败则保留引擎本地叙事
+    if (sessionBefore && result.round) {
+      const enemyName = sessionBefore.enemies?.[sessionBefore.currentEnemyIdx]?.name;
+      const ctx = buildStateContext(state, []);
+      const narrative = await generateCombatRoundNarrative({
+        ctx,
+        sessionBefore,
+        round: result.round,
+        enemyName,
+      });
+      result.round.narrative = narrative;
+      if (state.combatSession?.log?.length) {
+        const log = [...state.combatSession.log];
+        const lastIdx = log.length - 1;
+        if (log[lastIdx]?.round === result.round.round) {
+          log[lastIdx] = { ...log[lastIdx], narrative };
+          state = { ...state, combatSession: { ...state.combatSession, log } };
+        }
+      }
+    }
 
     // 持久化：HP/MP/inventory（丹药可能被消耗）/ combatStateJson
     // 死亡时也要持久化 alive=false

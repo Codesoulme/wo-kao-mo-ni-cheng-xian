@@ -88,7 +88,11 @@ export async function POST(req: NextRequest) {
       }
       // Task 20: 触发战斗
       if (result.triggerCombat && result.triggerCombat.enemies?.length) {
-        state = startCombat(state, result.triggerCombat);
+        state = startCombat(state, {
+          ...result.triggerCombat,
+          contextTitle: '干扰·天道回响',
+          contextNarrative: result.narrative || result.triggerCombat.contextNarrative,
+        });
       }
       // Task 23: 应用 AI 授予的灵宠
       if ((result as any).newPets && (result as any).newPets.length) {

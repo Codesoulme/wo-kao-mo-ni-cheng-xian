@@ -102,7 +102,11 @@ export async function POST(req: NextRequest) {
     // Task 22: 优先使用选择结果的 triggerCombat（AI 可根据玩家选择定制战斗）；
     // 若选择结果未触发战斗，但 advance 时延迟了战斗 → 现在作为 fallback 触发
     if (result.triggerCombat && result.triggerCombat.enemies?.length) {
-      state = startCombat(state, result.triggerCombat);
+      state = startCombat(state, {
+        ...result.triggerCombat,
+        contextTitle: `抉择：${chosenOption.text.slice(0, 12)}`,
+        contextNarrative: result.narrative || result.triggerCombat.contextNarrative,
+      });
     } else if (deferredCombat) {
       state = startCombat(state, deferredCombat);
     }

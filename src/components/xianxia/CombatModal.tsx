@@ -37,12 +37,22 @@ export function CombatModal() {
   const [endResult, setEndResult] = useState<{ status: string; narrative: string } | null>(null);
   // Task 22: 伤害飘字
   const [floats, setFloats] = useState<FloatNumber[]>([]);
+  // 先让玩家读完事件缘由，再进入战斗操作界面
+  const [battleStarted, setBattleStarted] = useState(false);
+  const lastSessionIdRef = useRef<string | null>(null);
   // 上一次的 HP/MP 快照，用于计算差值生成飘字
   const prevHpRef = useRef<{ player: number; enemy: number } | null>(null);
 
   // 没有战斗或不在进行中 → 不显示
   // 但战斗结束后短暂展示结果界面（玩家点"了结"按钮关闭）
   const session = character?.combatSession;
+  useEffect(() => {
+    const sessionId = session?.id || null;
+    if (sessionId !== lastSessionIdRef.current) {
+      lastSessionIdRef.current = sessionId;
+      setBattleStarted(false);
+    }
+  }, [session?.id]);
   if (!character) return null;
   const isOngoing = !!session && session.status === 'ongoing';
   // 显示条件：战斗进行中 OR 有待展示的 endResult
@@ -228,7 +238,7 @@ export function CombatModal() {
         <CardHeader className="pb-2 shrink-0 border-b-2 border-destructive/40 bg-destructive/5">
           <CardTitle className="text-base flex items-center gap-2 font-serif-cn text-destructive">
             <Swords className="w-5 h-5" />
-            <span>⚔ 战斗</span>
+            <span>⚔ {session?.contextTitle || '战斗'}</span>
             {session && (
               <Badge variant="outline" className="text-[10px] ml-auto border-destructive/40 text-destructive">
                 第 {session.round || 1} 回合
@@ -242,13 +252,42 @@ export function CombatModal() {
                   👹 心魔试炼
                 </span>
               )}
-              <span>{session.contextTitle}</span>
+              <span>战端由此而起</span>
             </div>
           )}
         </CardHeader>
 
         <CardContent className="flex-1 overflow-y-auto xianxia-scroll space-y-3 p-3">
-          {/* 战场背景叙事（可折叠） */}
+          {session && !battleStarted && !endResult && (
+            <div className="rounded-lg border-2 border-destructive/40 bg-destructive/5 p-3 space-y-3">
+              <div className="space-y-1">
+                <div className="text-xs font-bold font-serif-cn text-destructive">
+                  {session.contextTitle || '战端将启'}
+                </div>
+                {session.contextNarrative && (
+                  <p className="text-xs leading-relaxed text-foreground/90 font-serif-cn whitespace-pre-wrap">
+                    {session.contextNarrative}
+                  </p>
+                )}
+              </div>
+              {enemy && (
+                <div className="rounded-md border border-destructive/30 bg-background/40 p-2 text-[11px] text-muted-foreground font-serif-cn">
+                  对手：<span className="text-destructive font-semibold">{enemy.name}</span>
+                  {enemy.description ? `｜${enemy.description}` : ''}
+                </div>
+              )}
+              <Button
+                onClick={() => setBattleStarted(true)}
+                className="w-full h-9 font-serif-cn"
+                variant="destructive"
+              >
+                入战
+              </Button>
+            </div>
+          )}
+
+          {(!session || battleStarted || endResult) && (<>
+          {/* 事件缘由叙事（可折叠） */}
           {session?.contextNarrative && (
             <div className="rounded-lg border border-border/60 bg-card/40 overflow-hidden">
               <button
@@ -257,7 +296,7 @@ export function CombatModal() {
               >
                 <BookOpen className="w-3 h-3 text-muted-foreground shrink-0" />
                 <span className="text-[11px] font-semibold font-serif-cn text-muted-foreground flex-1">
-                  战场背景
+                  事件缘由
                 </span>
                 <ChevronDown className={cn(
                   "w-3 h-3 text-muted-foreground transition-transform shrink-0",
@@ -424,28 +463,12 @@ export function CombatModal() {
                 </p>
               ) : (
                 recentLog.map((r: any, i: number) => (
-                  <div key={i} className="space-y-1">
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <span className="text-[9px] text-muted-foreground shrink-0">
-                        第{r.round}回合
-                      </span>
-                      {/* 玩家行动 chip（蓝色） */}
-                      {r.playerAction && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/30">
-                          {r.playerAction}
-                          {r.playerDamage ? ` ·-${r.playerDamage}` : ''}
-                          {r.playerHeal ? ` ·+${r.playerHeal}` : ''}
-                        </span>
-                      )}
-                      {/* 敌人行动 chip（红色） */}
-                      {r.enemyDamage != null && r.enemyDamage > 0 && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-destructive/15 text-destructive border border-destructive/30">
-                          敌反扑 ·-{r.enemyDamage}
-                        </span>
-                      )}
+                  <div key={i} className="rounded-md border border-border/50 bg-background/35 px-2 py-1.5 space-y-1">
+                    <div className="text-[9px] text-muted-foreground font-serif-cn">
+                      第{r.round}回合 · {r.playerAction || '交锋'}
                     </div>
                     {r.narrative && (
-                      <p className="text-[11px] leading-relaxed text-foreground/80 font-serif-cn pl-1">
+                      <p className="text-[11px] leading-relaxed text-foreground/85 font-serif-cn whitespace-pre-wrap">
                         {r.narrative}
                       </p>
                     )}
@@ -485,10 +508,11 @@ export function CombatModal() {
               </Button>
             </div>
           )}
+          </>)}
         </CardContent>
 
         {/* 底部：行动按钮区（仅 ongoing 且未结束展示时显示） */}
-        {isOngoing && !endResult && (
+        {isOngoing && battleStarted && !endResult && (
           <div className="shrink-0 border-t border-border/40 bg-card/40 p-2">
             <div className="grid grid-cols-6 gap-1">
               {/* 普攻 */}

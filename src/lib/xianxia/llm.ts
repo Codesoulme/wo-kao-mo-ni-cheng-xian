@@ -22,6 +22,8 @@ import {
   PendingThread,
   CharacterIntent,
   CombatEnemy,
+  CombatRound,
+  CombatSession,
   EventBlueprint,
 } from './types';
 import { ensureUniqueIds } from './engine';
@@ -1131,6 +1133,66 @@ ${item.equipNote ? '装备位置：' + item.equipNote : ''}
       narrative: `${actionZh}了${item.name}。`,
       cultivationInsight: curInsight,
     };
+  }
+}
+
+
+// ==================== 战斗回合叙事润色 ====================
+
+export async function generateCombatRoundNarrative(args: {
+  ctx: EngineStateContext;
+  sessionBefore: CombatSession;
+  round: CombatRound;
+  enemyName?: string;
+}): Promise<string> {
+  const { ctx, sessionBefore, round } = args;
+  const sc = ctx.character;
+  const enemy = args.enemyName || sessionBefore.enemies?.[sessionBefore.currentEnemyIdx]?.name || '敌手';
+  const rawSummary = [
+    `第${round.round}回合`,
+    `玩家行动：${round.playerAction || '交锋'}`,
+    typeof round.playerDamage === 'number' ? `玩家造成伤害：${round.playerDamage}` : '',
+    typeof round.playerHeal === 'number' && round.playerHeal > 0 ? `玩家回复：${round.playerHeal}` : '',
+    typeof round.enemyDamage === 'number' && round.enemyDamage > 0 ? `敌人造成伤害：${round.enemyDamage}` : '',
+    `玩家气血剩余：${round.playerHpAfter}`,
+    `敌方气血剩余：${round.enemyHpAfter}`,
+    `引擎原始描述：${round.narrative}`,
+  ].filter(Boolean).join('\n');
+
+  const system = `${IDENTITY_PROMPT}
+
+【当前场景：战斗回合叙事润色】
+你只负责把既定战斗结果写成更有小说感的回合描述，不得改写胜负、伤害、治疗、死亡、逃跑等事实。
+严格 JSON 输出。`;
+
+  const user = `【角色】${sc.name}，${sc.age}岁，${sc.realmName}
+【战斗缘由】${sessionBefore.contextTitle || '战斗'}：${sessionBefore.contextNarrative || '战端已起'}
+【对手】${enemy}
+
+【本回合事实】
+${rawSummary}
+
+请输出 JSON：
+{
+  "narrative": "60-140字，修仙小说口吻，画面感强；可以自然嵌入伤害/气血变化，但不要堆数字，不要改变事实。"
+}`;
+
+  try {
+    const zai = await getZAI();
+    const completion = await zai.chat.completions.create(withModel({
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      thinking: { type: 'disabled' },
+    }));
+    const content = completion.choices[0]?.message?.content || '';
+    const raw = parseJSON(content);
+    const narrative = String(raw?.narrative || '').trim();
+    return narrative ? narrative.slice(0, 260) : round.narrative;
+  } catch (err: any) {
+    console.error('generateCombatRoundNarrative failed:', err?.message || err);
+    return round.narrative;
   }
 }
 
