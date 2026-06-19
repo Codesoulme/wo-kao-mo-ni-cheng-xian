@@ -592,6 +592,26 @@ export interface AttributeChange {
   reason: string;        // 变化原因
 }
 
+export type EffectResolveSeverity = 'info' | 'warning' | 'error';
+
+export interface EffectResolveTrace {
+  severity: EffectResolveSeverity;
+  code: string;
+  attribute?: string;
+  message: string;
+  before?: number;
+  delta?: number;
+  after?: number;
+  source?: string;
+}
+
+export interface EffectResolveResult {
+  state: CharacterState;
+  appliedChanges: AttributeChange[];
+  rejectedChanges: AttributeChange[];
+  trace: EffectResolveTrace[];
+}
+
 export interface ChoicePrompt {
   prompt: string;         // 选择提示
   options: ChoiceOption[];

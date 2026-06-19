@@ -45,8 +45,10 @@ import {
   CausalGraph,
   CausalNode,
   CausalEdge,
+  EffectResolveTrace,
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
+import { resolveAttributeChanges } from './effect-resolver';
 import {
   registerItem,
   registerMany,
@@ -247,7 +249,7 @@ function scaleByRealmPower(value: number, mult: number): number {
 //   - advance 流程：引擎 state.age += 1
 //   - interfere 流程：引擎根据 AI 的 ageAdvance 字段推进
 //   AI 不得通过 changes 直接修改 age，否则会与引擎推进叠加导致跳岁
-const ATTRIBUTE_BOUNDS: Record<string, { min: number; max: number }> = {
+export const ATTRIBUTE_BOUNDS: Record<string, { min: number; max: number }> = {
   lifespan:        { min: 1,    max: 99999 },
   cultivationExp:  { min: 0,    max: 99999999 },
   hp:              { min: 0,    max: 99999 },
@@ -271,39 +273,10 @@ const ATTRIBUTE_BOUNDS: Record<string, { min: number; max: number }> = {
 };
 
 export function applyChanges(state: CharacterState, changes: AttributeChange[]): CharacterState {
-  const next = { ...state };
-  for (const change of changes) {
-    const attr = change.attribute;
-    const bounds = ATTRIBUTE_BOUNDS[attr];
-    if (!bounds) continue; // 引擎拒绝未知属性
-
-    // 修炼速度倍率：cultivationExp 的增量乘以 (灵根×功法) 倍率
-    // 这样 AI 给 +10 修为时，装备了引气决(×1.5)+真灵根(×1.5) 的角色实际得 +22.5→22
-    let delta = change.delta;
-    if (attr === 'cultivationExp' && next.cultivationMultiplier > 0 && delta > 0) {
-      delta = Math.round(delta * next.cultivationMultiplier);
-    }
-
-    const current = (next as any)[attr] ?? 0;
-    let newVal = current + delta;
-
-    // 引擎钳制：不可超出范围
-    newVal = Math.max(bounds.min, Math.min(bounds.max, newVal));
-    (next as any)[attr] = newVal;
-
-    // 派生约束
-    if (attr === 'hp' && newVal <= 0) {
-      next.hp = 0;
-      next.alive = false;
-      if (!next.causeOfDeath) next.causeOfDeath = '气血耗尽，陨落';
-    }
-    if (attr === 'lifespan' && next.age >= next.lifespan) {
-      // 寿元检查由 age 推进时触发
-    }
-    if (attr === 'maxHp' && next.hp > next.maxHp) next.hp = next.maxHp;
-    if (attr === 'maxMp' && next.mp > next.maxMp) next.mp = next.maxMp;
-  }
-  return next;
+  return resolveAttributeChanges(state, changes, {
+    bounds: ATTRIBUTE_BOUNDS,
+    source: 'applyChanges',
+  }).state;
 }
 
 // ==================== 装备管理 (引擎权威) ====================
@@ -2196,6 +2169,8 @@ export interface EngineExecutionResult {
   rejectedChanges: AttributeChange[];
   contentRegistryTrace: ValidationTrace[];
   contentRegistryWarnings: string[];
+  effectResolveTrace: EffectResolveTrace[];
+  effectResolveWarnings: string[];
   breakthroughHappened: boolean;
   newRealm?: Realm;
   breakthroughMajor?: boolean;
@@ -2210,14 +2185,18 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   const rejected: AttributeChange[] = [];
   const contentRegistryTrace: ValidationTrace[] = [];
   const contentRegistryWarnings: string[] = [];
+  const effectResolveTrace: EffectResolveTrace[] = [];
+  const effectResolveWarnings: string[] = [];
 
-  // 1. 应用属性变更
-  const before = next;
-  next = applyChanges(next, aiOutput.changes || []);
-  // 识别被拒绝的（属性不在白名单的）
-  for (const ch of aiOutput.changes || []) {
-    if (!ATTRIBUTE_BOUNDS[ch.attribute]) rejected.push(ch);
-  }
+  // 1. Apply attribute changes through EffectResolver / ERPE Lite.
+  const resolvedChanges = resolveAttributeChanges(next, aiOutput.changes || [], {
+    bounds: ATTRIBUTE_BOUNDS,
+    source: aiOutput.title || 'ai-event',
+  });
+  next = resolvedChanges.state;
+  rejected.push(...resolvedChanges.rejectedChanges);
+  effectResolveTrace.push(...resolvedChanges.trace);
+  effectResolveWarnings.push(...resolvedChanges.trace.filter(t => t.severity !== 'info').map(t => t.message));
 
   // 2. 新状态先经过 ContentRegistry Lite 统一校验/补全，再进入状态系统
   {
@@ -2422,7 +2401,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 
   next = recordEventCausality(next, aiOutput);
 
-  const appliedChanges = (aiOutput.changes || []).filter(ch => ATTRIBUTE_BOUNDS[ch.attribute]);
+  const appliedChanges = resolvedChanges.appliedChanges;
 
   return {
     state: next,
@@ -2430,6 +2409,8 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     rejectedChanges: rejected,
     contentRegistryTrace,
     contentRegistryWarnings,
+    effectResolveTrace,
+    effectResolveWarnings,
     breakthroughHappened,
     newRealm,
     breakthroughMajor,
