@@ -549,6 +549,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
 
 可修改属性白名单：${ctx.availableAttributes.join(', ')}
 注意：attribute 必须在白名单内；delta 合理（普通事件 -50~+100，奇遇 -200~+500）；newStatuses 与 newItems 给出完整字段。
+世界推演原则：不要把玩家角色当主角保护。敌人、秘境、势力压力和死亡风险按世界逻辑出现；如果角色实力不足，应允许失败、重伤、逃亡、失去资源或死亡，causedDeath/eventType=death 是合法结果。
 灵根若因洗髓、传承、体质觉醒等明确因果发生改变，不要写进 changes；必须使用 spiritualRootChange，格式为 {"spiritualRoot":"mixed|common|pure|heavenly|chaos|none", "rootDetail":"玩家可见的中文灵根名", "reason":"中文因果"}；无改变填 null。
 
 【叙事契约字段——重要！用于世界连续性审计】
@@ -674,7 +675,7 @@ newEquippedItems：用于「AI 创造性装备」场景——例如玩家说"我
     victoryDrops: [ItemEntry],  // 战斗胜利后额外掉落物品（可选；敌人随身物优先放 enemies[].lootItems）
     defeatCost: "战败代价描述(如'重伤、失去所有灵石'，可选)"
   }
-  * 敌人 hp/attack/defense 应与角色战力匹配（不要给 hp=10000 的神级敌人）
+  * 敌人强弱必须按地点、境界、因果和世界逻辑推演，不要为了保护玩家而自动匹配战力；高危秘境/高境界敌人可以远强于角色，打不过就应逃亡、重伤、被夺宝或死亡；也不要无因果刷 hp=10000 的神级敌人。
   * 妖兽类敌人 realm 可填境界名（如"筑基期妖兽"）
   * 仅在以下情况触发战斗：
     1. 蓝图主题是 combat（妖兽搏杀/邪修截杀/擂台比武/夺宝大战）
@@ -686,7 +687,7 @@ newEquippedItems：用于「AI 创造性装备」场景——例如玩家说"我
 
 statusEntry 结构：{id,name,description,category(attribute/skill/buff/debuff/special/identity/quest/environment),rarity(common/uncommon/rare/epic/legendary/mythic),duration(-1永久/正数为剩余岁数),source,effects:[{target_attribute,operation(add/multiply/override/cap/floor/trigger),value,description}]}
 
-itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,equipNote(可选，装备位置自由文本)}
+itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,equipNote(可选),technique(功法/法宝可选但推荐)}
 【物品生成规则——必须严格遵守】
 - item_type 取值（必须严格使用以下之一）：weapon(兵器)/armor(防具)/accessory(饰物)/artifact(法宝)/consumable(丹药)/material(材料)/tool(器具)/scripture(功法)
   * 储物袋必须用 item_type='tool'（不可用 'storage' 等其他值，会报错）
@@ -701,8 +702,9 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
   * armor(防具)：effects 用 add，target 为 defense（如 +8 defense）；高阶可加 maxHp
   * accessory(饰物)：effects 用 add，target 为 luck/comprehension/maxMp 等
   * artifact(法宝)：effects 用 add 或 multiply，target 为 attack/defense/speed/cultivationExp 等；高阶法宝可有 multiply 效果
+    若法宝可施展法术，必须尽量给 technique.spell（name/description/mpCost/power/element）和 technique.requirements；法术也应受境界、灵根、五行、悟性或传承适配影响。
   * consumable(丹药)：effects 用 add，target 为 hp/mp/cultivationExp/lifespan 等；服用后消失
-  * scripture(功法)：effects 必含一条 multiply cultivationExp（修炼倍率，凡品×1.2~1.5、良品×1.5~2.0、稀有×2.0~3.0、史诗×3.0~4.0、传说×4.0~5.0、神话×5.0~6.0）；可附带 add cultivationExp 等被动
+  * scripture(功法)：effects 必含一条 multiply cultivationExp（修炼倍率，凡品×1.2~1.5、良品×1.5~2.0、稀有×2.0~3.0、史诗×3.0~4.0、传说×4.0~5.0、神话×5.0~6.0）；必须尽量给 technique.requirements 与 technique.traits，写清灵根/境界/悟性/五行/传承门槛、适配风险和功法特性，不能只给白板修炼速度。
   * tool(器具)：可以是储物袋——effects 用 add，target 为 storageCapacity（如 +10 storageCapacity 表示增加 10 格容量）；储物袋获得即扩容，无需装备
   * 阵盘（tool 类，特殊效果 target_attribute='formationType'）：可激活阵法的物品。例：
     {id:"item_frm_xxxx",name:"小聚灵阵盘",item_type:"tool",rarity:"uncommon",
@@ -712,6 +714,9 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
     阵盘名含"聚灵/护体/迷踪/杀/火/水/木/金/土"等关键词会决定阵法类型。
     阵盘激活后作为 statusEntry 持久生效，每岁消耗灵石维持。
   * material：通常无 effects，仅作剧情道具或炼丹材料
+- 功法/法术 technique 字段示例：
+  technique:{kind:"cultivation",requirements:{spiritualRoots:["pure","heavenly"],minRealm:"foundation",minComprehension:55,minElements:{fire:40},requiredStatuses:["九阳"]},traits:[{name:"纯阳炼息",description:"火行灵气入脉更顺，寒水根性者易逆行",risk:"不合根性则修炼效率折减"}],spell:{name:"赤阳指",description:"聚阳火于指端",mpCost:18,power:1.8,element:"fire"},mismatchRisk:"根性不合时进境迟滞，严重者心魔暗生"}
+  spiritualRoots 是严格门槛，缺对应灵根原则上几乎不能修习；preferredRoots 是最佳适配，未达会低效。除非剧情给出洗髓、传承、改命等强因果，不要让角色无视灵根门槛。
 - id 格式：item_<类型缩写>_<4位随机>，如 item_wpn_a3f2、item_scr_b8c1、item_pil_d2e4、item_bag_f0a1。同一事件多个物品 id 不可重复。
 - name：符合修仙世界风格（如"青锋剑""玄铁甲""聚气丹""引气诀""紫金葫芦""初级储物袋"），≤8字
 - description：10-40字，描述外观/功效/来历

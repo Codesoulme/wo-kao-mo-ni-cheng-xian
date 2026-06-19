@@ -1,7 +1,7 @@
 ﻿import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, getSameYearThreads, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
 function assert(condition: unknown, message: string): void {
@@ -621,6 +621,45 @@ function smokeAnnualNarrativePrompt(): void {
   log('annual-narrative-prompt', { passed: true });
 }
 
+function smokeTechniqueRequirements(): void {
+  const baseState: any = {
+    name: '????', age: 20, lifespan: 100, realm: 'qi_refining', realmLevel: 1,
+    spiritualRoot: 'mixed', rootDetail: '???', rootMultiplier: 0.3,
+    elements: { metal: 10, wood: 10, water: 10, fire: 10, earth: 10 },
+    comprehension: 30, activeStatuses: [], longTermMemory: [], equipped: [], inventory: [], pets: [],
+    hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 8, speed: 10,
+  };
+  const strictScripture: any = {
+    id: 'item_scr_strict', name: '???????', description: '???????????', item_type: 'scripture', rarity: 'rare', source: 'smoke',
+    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 3, description: '????' }],
+    technique: { kind: 'cultivation', requirements: { spiritualRoots: ['heavenly', 'pure'], minRealm: 'foundation' }, traits: [{ name: '????', description: '????' }] },
+  };
+  const rejected = evaluateTechniqueCompatibility(baseState, strictScripture);
+  assert(!rejected.usable && rejected.adaptation === 0, 'strict spiritual root requirement should reject mismatched root');
+  const looseScripture: any = {
+    id: 'item_scr_loose', name: '?????', description: '???????', item_type: 'scripture', rarity: 'rare', source: 'smoke',
+    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 3, description: '????' }],
+    technique: { kind: 'cultivation', requirements: { preferredRoots: ['pure'], minRealm: 'foundation', minComprehension: 60 }, traits: [{ name: '????', description: '????' }] },
+  };
+  const adapted = evaluateTechniqueCompatibility(baseState, looseScripture);
+  assert(adapted.usable && adapted.adaptation > 0 && adapted.adaptation < 1, 'soft requirements should reduce adaptation, not reject');
+  const normalized = normalizeCultivationState({ ...baseState, equipped: [looseScripture] });
+  assert(normalized.cultivationMultiplier > baseState.rootMultiplier && normalized.cultivationMultiplier < baseState.rootMultiplier * 3, 'cultivation multiplier should be partially reduced by adaptation');
+  const skills = buildLearnedCombatArts({ ...baseState, equipped: [strictScripture, looseScripture] });
+  assert(!skills.some((skill: any) => skill.itemId === strictScripture.id), 'unusable strict scripture should not grant combat art');
+  assert(skills.every((skill: any) => skill.adaptation === undefined || skill.adaptation <= 1), 'combat arts should expose adaptation when applicable');
+  log('technique-requirements', { passed: true, rejected: rejected.reasons[0], adaptation: adapted.adaptation, multiplier: normalized.cultivationMultiplier, skills: skills.length });
+}
+
+function smokeNoProtagonistShieldPrompt(): void {
+  const source = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  assert(source.includes('\u4e0d\u8981\u4e3a\u4e86\u4fdd\u62a4\u73a9\u5bb6\u800c\u81ea\u52a8\u5339\u914d\u6218\u529b'), 'combat prompt should forbid protagonist shielding');
+  assert(source.includes('causedDeath/eventType=death \u662f\u5408\u6cd5\u7ed3\u679c'), 'prompt should allow death as legitimate outcome');
+  assert(source.includes('technique.requirements'), 'item prompt should require technique requirements');
+  assert(source.includes('spiritualRoots \u662f\u4e25\u683c\u95e8\u69db'), 'prompt should explain strict spiritual root gates');
+  log('no-protagonist-shield-prompt', { passed: true });
+}
+
 async function smokeAuctionDbRoute(): Promise<void> {
   const { db } = await import('../src/lib/db');
   const { POST } = await import('../src/app/api/game/auction/route');
@@ -681,6 +720,8 @@ async function main(): Promise<void> {
   smokeThreadOutcomeSync();
   smokeSameYearContinuation();
   smokeAnnualNarrativePrompt();
+  smokeTechniqueRequirements();
+  smokeNoProtagonistShieldPrompt();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();

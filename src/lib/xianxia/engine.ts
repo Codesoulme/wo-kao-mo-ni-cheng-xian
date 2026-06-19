@@ -7,6 +7,8 @@ import {
   AttributeChange,
   StatusEntry,
   ItemEntry,
+  TechniqueProfile,
+  TechniqueRequirement,
   Realm,
   RealmProfile,
   REALMS,
@@ -24,6 +26,7 @@ import {
   ITEM_TYPE_LABEL,
   SLOT_LABEL,
   itemToSlot,
+  ELEMENTS,
   CultivationFactor,
   EventBlueprint,
   EVENT_BLUEPRINTS,
@@ -314,12 +317,24 @@ function emptyItemActionResult(state: CharacterState, ok = false, error?: string
 
 export function resolveItemEffects(state: CharacterState, item: ItemEntry, sign: 1 | -1, label?: string): ItemEffectResolveResult {
   const changes: AttributeChange[] = [];
-  for (const eff of item.effects || []) {
+  const compat = evaluateTechniqueCompatibility(state, item);
+  if (sign > 0 && !compat.usable) {
+    return {
+      state,
+      appliedChanges: [],
+      rejectedChanges: [],
+      effectResolveTrace: [{ severity: 'warning', code: 'technique_requirement_unmet', source: label || item.name, message: `${item.name}?????${compat.reasons.join('?') || '???????'}` }],
+      effectResolveWarnings: compat.warnings,
+    };
+  }
+  for (const rawEff of item.effects || []) {
+    const eff = sign > 0 ? adaptTechniqueEffect(state, item, rawEff) : rawEff;
+    if (!eff) continue;
     if (eff.operation === 'add' && ATTRIBUTE_BOUNDS[eff.target_attribute]) {
       changes.push({
         attribute: eff.target_attribute,
         delta: sign * eff.value,
-        reason: label || (sign > 0 ? `装备 ${item.name}` : `卸下 ${item.name}`),
+        reason: label || (sign > 0 ? `?? ${item.name}` : `?? ${item.name}`),
       });
     }
   }
@@ -328,16 +343,19 @@ export function resolveItemEffects(state: CharacterState, item: ItemEntry, sign:
     bounds: ATTRIBUTE_BOUNDS,
     source: label || item.name || 'item-action',
   });
+  const extraTrace: EffectResolveTrace[] = [];
+  if (sign > 0 && compat.profile && compat.adaptation < 0.98) {
+    extraTrace.push({ severity: 'warning', code: 'technique_adaptation_reduced', source: label || item.name, message: `${item.name}?????${compat.warnings.join('?')}` });
+  }
   return {
     state: resolved.state,
     appliedChanges: resolved.appliedChanges,
     rejectedChanges: resolved.rejectedChanges,
-    effectResolveTrace: resolved.trace,
-    effectResolveWarnings: resolved.trace.filter(trace => trace.severity !== 'info').map(trace => trace.message),
+    effectResolveTrace: [...resolved.trace, ...extraTrace],
+    effectResolveWarnings: [...resolved.trace.filter(trace => trace.severity !== 'info').map(trace => trace.message), ...compat.warnings],
   };
 }
 
-// 将物品 add 效果应用到角色属性；装备时 +delta，卸下时 -delta。
 export function applyItemEffects(state: CharacterState, item: ItemEntry, sign: 1 | -1): CharacterState {
   return resolveItemEffects(state, item, sign).state;
 }
@@ -371,7 +389,14 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
   }
   // 2. 已装备物品中所有影响 cultivationExp 的效果
   for (const it of state.equipped || []) {
-    for (const eff of it.effects || []) {
+    const compat = evaluateTechniqueCompatibility(state, it);
+    if (!compat.usable) {
+      factors.push({ name: it.name, value: 0, operation: 'multiply', rarity: it.rarity as any, note: compat.reasons[0] || '???????' });
+      continue;
+    }
+    for (const rawEff of it.effects || []) {
+      const eff = adaptTechniqueEffect(state, it, rawEff);
+      if (!eff) continue;
       if (eff.target_attribute === 'cultivationExp') {
         if (eff.operation === 'multiply' && eff.value > 0) {
           factors.push({
@@ -460,8 +485,10 @@ export function computeEffectiveCultivationRate(state: CharacterState): { multip
   let multiplier = rootInfo?.multiplier ?? 0;
   let flatBonus = 0;
   for (const it of state.equipped || []) {
-    for (const eff of it.effects || []) {
-      if (eff.target_attribute !== 'cultivationExp') continue;
+    if (!evaluateTechniqueCompatibility(state, it).usable) continue;
+    for (const rawEff of it.effects || []) {
+      const eff = adaptTechniqueEffect(state, it, rawEff);
+      if (!eff || eff.target_attribute !== 'cultivationExp') continue;
       if (eff.operation === 'multiply' && eff.value > 0) multiplier *= eff.value;
       else if (eff.operation === 'add') flatBonus += eff.value;
     }
@@ -529,19 +556,147 @@ function makeLootId(prefix = 'loot'): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function buildLearnedCombatArts(state: CharacterState): { itemId: string; name: string; description: string; mpCost: number; power: number; rarity?: string; sourceType?: string }[] {
+const ELEMENT_KEYS = ['metal', 'wood', 'water', 'fire', 'earth'] as const;
+
+function realmIndexOf(realm?: string): number {
+  if (!realm) return -1;
+  return REALMS.findIndex(r => r.id === realm || r.name === realm || r.shortName === realm);
+}
+
+function statusTextPool(state: CharacterState): string {
+  return [
+    state.faction || '',
+    state.master || '',
+    ...(state.activeStatuses || []).flatMap(st => [st.name, st.description, st.source]),
+    ...(state.longTermMemory || []),
+  ].join(';');
+}
+
+function inferTechniqueProfile(item: ItemEntry): TechniqueProfile | undefined {
+  if (item.technique) return item.technique;
+  if (item.item_type !== 'scripture' && item.item_type !== 'artifact') return undefined;
+  const text = `${item.name || ''}${item.description || ''}`;
+  const requirements: TechniqueRequirement = {};
+  const preferredRoots: SpiritualRoot[] = [];
+  if (/metal|sword|blade|sharp|jin/i.test(text)) preferredRoots.push('pure', 'heavenly');
+  if (/wood|green|life|plant|mu/i.test(text)) preferredRoots.push('common', 'pure', 'heavenly');
+  if (/water|ice|cold|tide|shui/i.test(text)) preferredRoots.push('common', 'pure', 'heavenly');
+  if (/fire|flame|sun|yang|huo/i.test(text)) preferredRoots.push('common', 'pure', 'heavenly');
+  if (/earth|mountain|rock|tu/i.test(text)) preferredRoots.push('common', 'pure', 'heavenly');
+  if (text.includes('\u5929\u7075\u6839') || text.includes('\u5355\u7075\u6839') || text.includes('\u7eaf')) requirements.spiritualRoots = ['pure', 'heavenly', 'chaos'];
+  else if (text.includes('\u6df7\u6c8c') || text.includes('\u4e94\u884c\u4ff1\u5168') || text.includes('\u592a\u521d')) requirements.spiritualRoots = ['chaos'];
+  else if (preferredRoots.length) requirements.preferredRoots = Array.from(new Set(preferredRoots));
+  const ri = safeRarityIndex(item.rarity);
+  if (ri >= 5) requirements.minRealm = 'nascent_soul';
+  else if (ri >= 4) requirements.minRealm = 'golden_core';
+  else if (ri >= 3) requirements.minRealm = 'foundation';
+  else if (ri >= 1) requirements.minRealm = 'qi_refining';
+  requirements.minComprehension = ri >= 4 ? 70 : ri >= 3 ? 55 : ri >= 2 ? 40 : undefined;
+  return {
+    kind: item.item_type === 'scripture' ? 'cultivation' : 'combat',
+    requirements,
+    traits: item.item_type === 'scripture'
+      ? [{ name: '\u884c\u529f\u8def\u7ebf', description: '\u4fee\u70bc\u65f6\u6539\u53d8\u5410\u7eb3\u8282\u5f8b\u4e0e\u7075\u6c14\u8fd0\u8f6c\uff0c\u5f71\u54cd\u957f\u671f\u4fee\u4e3a\u79ef\u7d2f\u3002' }]
+      : [{ name: '\u5668\u7075\u672f\u5f0f', description: '\u6597\u6cd5\u65f6\u53ef\u501f\u6cd5\u5b9d\u7075\u673a\u65bd\u5c55\u4e00\u5f0f\u3002' }],
+    spell: item.item_type === 'artifact' || ['\u672f','\u8bc0','\u5251','\u706b','\u96f7','\u51b0','\u98ce','\u5370','\u638c','\u6307'].some(k => text.includes(k))
+      ? { name: item.name, description: item.description || `${item.name}\u6240\u8f7d\u672f\u5f0f`, power: 1 + safeRarityIndex(item.rarity) * 0.45 }
+      : undefined,
+    mismatchRisk: '\u5f3a\u884c\u4fee\u4e60\u4e0d\u5408\u6839\u6027\u7684\u6cd5\u95e8\uff0c\u8f7b\u5219\u8fdb\u5883\u8fdf\u6ede\uff0c\u91cd\u5219\u7075\u529b\u9006\u884c\u3002',
+  };
+}
+
+export function evaluateTechniqueCompatibility(state: CharacterState, item: ItemEntry): { usable: boolean; adaptation: number; reasons: string[]; warnings: string[]; profile?: TechniqueProfile } {
+  const profile = inferTechniqueProfile(item);
+  if (!profile) return { usable: true, adaptation: 1, reasons: [], warnings: [] };
+  const req = profile.requirements || {};
+  let adaptation = 1;
+  const reasons: string[] = [];
+  const warnings: string[] = [];
+  const strictRoots = req.spiritualRoots || [];
+  if (strictRoots.length && !strictRoots.includes(state.spiritualRoot)) {
+    return { usable: false, adaptation: 0, reasons: [`\u7075\u6839\u4e0d\u5408\uff1a\u9700${strictRoots.map(r => SPIRITUAL_ROOTS[r]?.name || r).join('\u3001')}`], warnings: ['\u6b64\u6cd5\u95e8\u7075\u6839\u8981\u6c42\u4e25\u82db\uff0c\u5f53\u524d\u6839\u6027\u51e0\u4e4e\u4e0d\u80fd\u5165\u95e8\u3002'], profile };
+  }
+  const preferred = req.preferredRoots || [];
+  if (preferred.length && !preferred.includes(state.spiritualRoot) && state.spiritualRoot !== 'chaos') {
+    adaptation *= 0.55;
+    warnings.push('\u7075\u6839\u5e76\u975e\u6700\u4f73\u9002\u914d\uff0c\u4fee\u4e60\u6548\u7387\u5927\u5e45\u964d\u4f4e\u3002');
+  }
+  if (req.minRealm) {
+    const need = realmIndexOf(req.minRealm);
+    const cur = realmIndexOf(state.realm);
+    if (cur >= 0 && need >= 0 && cur < need) {
+      const gap = need - cur;
+      adaptation *= Math.max(0.25, 1 - gap * 0.28);
+      warnings.push(`\u5883\u754c\u672a\u81f3${REALMS[need]?.name || req.minRealm}\uff0c\u53ea\u80fd\u52c9\u5f3a\u53c2\u609f\u3002`);
+    }
+  }
+  if (typeof req.minComprehension === 'number' && state.comprehension < req.minComprehension) {
+    adaptation *= Math.max(0.35, state.comprehension / Math.max(1, req.minComprehension));
+    warnings.push('\u609f\u6027\u4e0d\u8db3\uff0c\u53c2\u609f\u6b64\u6cd5\u8fdb\u5c55\u7f13\u6162\u3002');
+  }
+  for (const el of ELEMENT_KEYS) {
+    const need = req.minElements?.[el];
+    if (typeof need === 'number' && (state.elements?.[el] || 0) < need) {
+      adaptation *= Math.max(0.35, (state.elements?.[el] || 0) / Math.max(1, need));
+      warnings.push(`${ELEMENTS[el].name}\u884c\u611f\u5e94\u4e0d\u8db3\uff0c\u672f\u8def\u4e0d\u987a\u3002`);
+    }
+  }
+  if (req.requiredStatuses?.length) {
+    const pool = statusTextPool(state);
+    const missing = req.requiredStatuses.filter(k => k && !pool.includes(k));
+    if (missing.length) {
+      adaptation *= 0.35;
+      warnings.push(`\u7f3a\u5c11${missing.join('\u3001')}\u7b49\u524d\u7f6e\u56e0\u7f18\uff0c\u53ea\u80fd\u63e3\u6469\u76ae\u6bdb\u3002`);
+    }
+  }
+  adaptation = Number(Math.max(0, Math.min(1.2, adaptation)).toFixed(2));
+  if (adaptation >= 0.95) reasons.push('\u6cd5\u95e8\u4e0e\u5f53\u524d\u6839\u57fa\u76f8\u5408');
+  else if (adaptation > 0) reasons.push(`\u6cd5\u95e8\u9002\u914d\u7ea6${Math.round(adaptation * 100)}%`);
+  return { usable: adaptation > 0, adaptation, reasons, warnings, profile };
+}
+
+function adaptTechniqueEffect(state: CharacterState, item: ItemEntry, eff: any): any {
+  if (item.item_type !== 'scripture' && item.item_type !== 'artifact') return eff;
+  const compat = evaluateTechniqueCompatibility(state, item);
+  if (!compat.usable) return null;
+  if (compat.adaptation >= 0.98) return eff;
+  if (eff.target_attribute === 'cultivationExp') {
+    if (eff.operation === 'multiply') {
+      const value = 1 + Math.max(0, (Number(eff.value) - 1) * compat.adaptation);
+      return { ...eff, value: Number(value.toFixed(2)), description: `${eff.description || item.name}\uff08\u9002\u914d${Math.round(compat.adaptation * 100)}%\uff0c\u6548\u529b\u6298\u51cf\uff09` };
+    }
+    if (eff.operation === 'add') {
+      return { ...eff, value: Number((Number(eff.value) * compat.adaptation).toFixed(2)), description: `${eff.description || item.name}\uff08\u9002\u914d\u4e0d\u8db3\uff0c\u6536\u76ca\u6298\u51cf\uff09` };
+    }
+  }
+  if (eff.operation === 'add') return { ...eff, value: Number((Number(eff.value) * compat.adaptation).toFixed(2)) };
+  if (eff.operation === 'multiply' && Number(eff.value) > 1) return { ...eff, value: Number((1 + (Number(eff.value) - 1) * compat.adaptation).toFixed(2)) };
+  return eff;
+}
+
+export function buildLearnedCombatArts(state: CharacterState): { itemId: string; name: string; description: string; mpCost: number; power: number; rarity?: string; sourceType?: string; element?: 'metal' | 'wood' | 'water' | 'fire' | 'earth' | 'none'; adaptation?: number }[] {
   return (state.equipped || [])
     .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
-    .map(it => ({
-      itemId: it.id,
-      name: it.name,
-      description: it.description,
-      mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
-      power: 1 + (safeRarityIndex(it.rarity) * 0.5),
-      rarity: it.rarity,
-      sourceType: it.item_type,
-    }))
-    .slice(0, 8);
+    .map(it => {
+      const compat = evaluateTechniqueCompatibility(state, it);
+      if (!compat.usable) return null;
+      const profile = compat.profile;
+      const spell = profile?.spell;
+      const rarityCost = it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10;
+      return {
+        itemId: it.id,
+        name: spell?.name || it.name,
+        description: spell?.description || it.description,
+        mpCost: Math.max(5, Math.floor(spell?.mpCost || rarityCost)),
+        power: Number(((spell?.power || (1 + safeRarityIndex(it.rarity) * 0.5)) * Math.max(0.25, compat.adaptation)).toFixed(2)),
+        rarity: it.rarity,
+        sourceType: it.item_type,
+        element: spell?.element,
+        adaptation: compat.adaptation,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 8) as any;
 }
 
 function enemyLootTier(enemy: CombatEnemy, state: CharacterState): number {
@@ -1365,7 +1520,11 @@ function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
     }];
   }
 
-  return { ...it, item_type: itemType as any, effects };
+  const base = { ...it, item_type: itemType as any, effects };
+  if ((itemType === 'scripture' || itemType === 'artifact') && !base.technique) {
+    return { ...base, technique: inferTechniqueProfile(base) };
+  }
+  return base;
 }
 
 // 添加物品到 inventory。若物品是储物袋（含 storageCapacity 效果的 tool），自动增加 storageCapacity。

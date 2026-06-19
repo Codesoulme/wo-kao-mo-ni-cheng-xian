@@ -171,6 +171,7 @@ export const SPIRITUAL_ROOTS: Record<SpiritualRoot, SpiritualRootInfo> = {
 // ==================== 五行属性 ====================
 
 export type Element = 'metal' | 'wood' | 'water' | 'fire' | 'earth';
+export type ElementType = Element;
 
 export const ELEMENTS: Record<Element, { name: string; color: string; icon: string }> = {
   metal: { name: '金', color: '#d4af37', icon: '⚔' },
@@ -230,6 +231,30 @@ export function itemToSlot(type: ItemType): EquipSlot | null {
   return null;
 }
 
+export interface TechniqueRequirement {
+  spiritualRoots?: SpiritualRoot[];      // strict root requirement
+  preferredRoots?: SpiritualRoot[];      // preferred root affinity
+  minRealm?: Realm;                      // minimum realm
+  minComprehension?: number;             // comprehension threshold
+  minElements?: Partial<Record<ElementType, number>>; // element affinity thresholds
+  requiredStatuses?: string[];           // required status keywords
+}
+
+export interface TechniqueTrait {
+  name: string;
+  description: string;
+  effect?: StatusEffect;
+  risk?: string;
+}
+
+export interface TechniqueProfile {
+  kind?: 'cultivation' | 'combat' | 'body' | 'movement' | 'support' | 'forbidden';
+  requirements?: TechniqueRequirement;
+  traits?: TechniqueTrait[];
+  spell?: { name: string; description: string; mpCost?: number; power?: number; element?: ElementType | 'none' };
+  mismatchRisk?: string;
+}
+
 // 修炼速度来源结构化条目：AI 输出 + 前端按 rarity 上色显示来源名称与具体倍率数字
 export interface CultivationFactor {
   name: string;                  // 来源名称（如「土天灵根」「《引气诀》」「聚灵佩」）
@@ -247,6 +272,7 @@ export interface ItemEntry {
   rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
   effects: StatusEffect[];
   source: string;
+  technique?: TechniqueProfile;
   // 装备位置备注（自由文本，由 AI 给出或玩家装备时按类型默认生成）
   // 例：「左手」「右手中指」「项链·储物戒指×5」「腰悬」「头戴」
   // 不再限制每种类型装备数量上限——玩家可戴十个戒指、脖挂一串储物戒指等
@@ -431,7 +457,7 @@ export interface CombatSession {
   playerMp: number; playerMaxMp: number;
   playerAttack: number; playerDefense: number; playerSpeed: number;
   // 玩家可用的法术/法宝（从 equipped 提取）
-  playerSkills?: { name: string; description: string; mpCost: number; power: number }[];
+  playerSkills?: { name: string; description: string; mpCost: number; power: number; element?: ElementType | 'none'; adaptation?: number }[];
   // 玩家可用的丹药（从 inventory 的 consumable 提取）
   playerItems?: { itemId: string; name: string; description: string; effect: string }[];
   // 战斗胜利后掉落（由 AI 在结束叙事中给出，引擎在 endCombat 中应用）
