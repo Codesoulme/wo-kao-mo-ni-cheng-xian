@@ -51,6 +51,7 @@ import {
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
+import { validateAIBoundary, BoundaryValidationTrace } from './ai-boundary-validator';
 import {
   registerItem,
   registerMany,
@@ -2222,6 +2223,8 @@ export interface EngineExecutionResult {
   contentRegistryWarnings: string[];
   effectResolveTrace: EffectResolveTrace[];
   effectResolveWarnings: string[];
+  aiBoundaryTrace: BoundaryValidationTrace[];
+  aiBoundaryWarnings: string[];
   breakthroughHappened: boolean;
   newRealm?: Realm;
   breakthroughMajor?: boolean;
@@ -2238,6 +2241,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   const contentRegistryWarnings: string[] = [];
   const effectResolveTrace: EffectResolveTrace[] = [];
   const effectResolveWarnings: string[] = [];
+  const boundaryValidation = validateAIBoundary(state, aiOutput);
 
   // 1. Apply attribute changes through EffectResolver / ERPE Lite.
   const resolvedChanges = resolveAttributeChanges(next, aiOutput.changes || [], {
@@ -2463,6 +2467,8 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     contentRegistryWarnings,
     effectResolveTrace,
     effectResolveWarnings,
+    aiBoundaryTrace: boundaryValidation.trace,
+    aiBoundaryWarnings: boundaryValidation.warnings,
     breakthroughHappened,
     newRealm,
     breakthroughMajor,
