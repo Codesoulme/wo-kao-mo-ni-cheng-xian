@@ -316,7 +316,8 @@ ${buildCausalEchoList(ctx)}
 - 已确认世界事实只能自然承接，不要凭空改写；若地点、宗门、NPC、秘境已存在，应沿用既有名字和关系。
 - 旧 NPC 再登场时优先沿用 npc id/name/态度/旧记忆；只有真正新人物才放入 newNpcs。
 - 因果图中的 created/continues/triggers 是后续事件种子；resolved/failed 是旧因果结论，不要反复重开，除非叙事有充分由头。
-- 若本次只是日常，也应让角色围绕上述锚点做小行动、小打听、小修补或小代价，避免空白。`;
+- 若本次只是日常，也应让角色围绕上述锚点做小行动、小打听、小修补或小代价，避免空白。
+- 若存在“世界压力与机会”摘要，优先把最大威胁、最大机会、焦点地点或焦点人物/势力之一自然融入本年事件。`;
 }
 
 // ==================== Prompt 构建 ====================
@@ -346,9 +347,15 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
     : '无';
   const questEntryList = buildQuestFocusList(ctx);
   const worldFactList = buildWorldFactFocusList(ctx);
+  const pressureMapText = ctx.eventSchedule?.pressureMap?.summary
+    ? `世界压力与机会：${ctx.eventSchedule.pressureMap.summary}`
+    : '世界压力与机会：暂无明确主轴，可从日常小行动中自然承接长期锚点。';
   const scheduleList = ctx.eventSchedule?.hints?.length
-    ? ctx.eventSchedule.hints.slice(0, 8).map(h => `- [priority:${h.priority}][${h.kind}][${h.requiredAction}] ${h.title}：${h.reason}${h.sourceThreadId ? `（thread:${h.sourceThreadId}）` : ''}${h.dueAge ? `（期限:${h.dueAge}岁）` : ''}`).join('\n')
-    : '本年无硬性调度目标，但仍需生成具体行动和小推进';
+    ? [
+      pressureMapText,
+      ...ctx.eventSchedule.hints.slice(0, 8).map(h => `- [priority:${h.priority}][${h.kind}][${h.requiredAction}] ${h.title}：${h.reason}${h.sourceThreadId ? `（thread:${h.sourceThreadId}）` : ''}${h.dueAge ? `（期限:${h.dueAge}岁）` : ''}`),
+    ].join('\n')
+    : `${pressureMapText}\n本年无硬性调度目标，但仍需生成具体行动和小推进`;
   const mult = ctx.cultivationMultiplier || 0;
   const multDesc = mult > 0 ? `${mult.toFixed(2)}倍（已含灵根与功法加成）` : '0（无灵根，无法修炼）';
   const curInsight = ctx.cultivationInsight || '';

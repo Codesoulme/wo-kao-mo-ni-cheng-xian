@@ -545,10 +545,20 @@ export interface ScheduledEventHint {
   requiredAction: ScheduledEventAction;
 }
 
+export interface WorldPressureOpportunityMap {
+  topThreat?: string;
+  topOpportunity?: string;
+  focalLocation?: string;
+  focalActor?: string;
+  likelyEventTypes: string[];
+  summary: string;
+}
+
 export interface EventSchedulerPlan {
   generatedAtAge: number;
   focus?: ScheduledEventHint;
   hints: ScheduledEventHint[];
+  pressureMap?: WorldPressureOpportunityMap;
   warnings: string[];
 }
 

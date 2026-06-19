@@ -1,4 +1,4 @@
-﻿import type { CausalGraph, CharacterState, EventSchedulerPlan, ScheduledEventHint } from './types';
+﻿import type { CausalGraph, CharacterState, EventSchedulerPlan, ScheduledEventHint, WorldPressureOpportunityMap } from './types';
 
 function urgencyToPriority(urgency: number | undefined): number {
   return Math.max(0, Math.min(100, Number(urgency) || 0));
@@ -197,6 +197,58 @@ export function deriveWorldFactStateProfile(fact: { kind?: string; title?: strin
   return undefined;
 }
 
+function hintText(hint: ScheduledEventHint): string {
+  return [hint.title, hint.reason, hint.kind, hint.requiredAction].filter(Boolean).join('；');
+}
+
+function scoreHintText(hint: ScheduledEventHint, pattern: RegExp): number {
+  const text = hintText(hint);
+  return pattern.test(text) ? hint.priority : 0;
+}
+
+function uniqueLimited(values: string[], limit: number): string[] {
+  return Array.from(new Set(values.map(v => String(v || '').trim()).filter(Boolean))).slice(0, limit);
+}
+
+export function buildWorldPressureOpportunityMap(state: CharacterState, hints: ScheduledEventHint[]): WorldPressureOpportunityMap {
+  const sorted = [...hints].sort((a, b) => b.priority - a.priority);
+  const threats = sorted
+    .map(hint => ({ hint, score: hint.priority + scoreHintText(hint, /威胁|敌|仇|截杀|劫杀|追踪|盯梢|通缉|追责|危险|报复|心魔|deadline|到期/) }))
+    .filter(entry => entry.score > entry.hint.priority || entry.hint.kind === 'deadline')
+    .sort((a, b) => b.score - a.score);
+  const opportunities = sorted
+    .map(hint => ({ hint, score: hint.priority + scoreHintText(hint, /机会|资源流向|交易活跃|坊市|黑市|拍卖|秘境|洞府|传承|钥|信物|邀请|庇护|引荐|赠予/) }))
+    .filter(entry => entry.score > entry.hint.priority && !/敌视|追责|通缉|截杀|劫杀|盯梢|报复|施压/.test(hintText(entry.hint)))
+    .sort((a, b) => b.score - a.score);
+  const locations = sorted
+    .filter(hint => hint.kind === 'world' && (hint.title === state.location || /地点画像|此地|所在地/.test(hintText(hint))))
+    .sort((a, b) => b.priority - a.priority);
+  const actors = sorted
+    .filter(hint => ['npc', 'world'].includes(hint.kind) && /NPC|人物|势力画像|势力|宗|门|会|盟|阁|族|客|修|道人/.test(hintText(hint)))
+    .sort((a, b) => b.priority - a.priority);
+  const likelyEventTypes = uniqueLimited([
+    threats.length ? '威胁回响' : '',
+    opportunities.length ? '机缘推进' : '',
+    locations.some(h => /交易活跃|坊市|黑市|拍卖|资源/.test(hintText(h))) ? '交易传闻' : '',
+    locations.some(h => /秘境波动|秘境|洞府|遗迹|传承/.test(hintText(h))) ? '秘境异动' : '',
+    actors.some(h => /追责|通缉|截杀|敌视|仇/.test(hintText(h))) ? '势力施压' : '',
+    actors.some(h => /邀请|差遣|庇护|引荐/.test(hintText(h))) ? '宗门人情' : '',
+    sorted.some(h => h.kind === 'deadline') ? '限期了结' : '',
+  ], 6);
+  const topThreat = threats[0]?.hint.title;
+  const topOpportunity = opportunities.find(entry => entry.hint.title !== topThreat)?.hint.title || opportunities[0]?.hint.title;
+  const focalLocation = locations[0]?.title;
+  const focalActor = actors.find(hint => hint.title !== focalLocation)?.title || actors[0]?.title;
+  const summary = [
+    topThreat ? `最大威胁：${topThreat}` : '',
+    topOpportunity ? `最大机会：${topOpportunity}` : '',
+    focalLocation ? `最该回响地点：${focalLocation}` : '',
+    focalActor ? `最该回响人物/势力：${focalActor}` : '',
+    likelyEventTypes.length ? `事件倾向：${likelyEventTypes.join('、')}` : '事件倾向：日常推进',
+  ].filter(Boolean).join('；');
+  return { topThreat, topOpportunity, focalLocation, focalActor, likelyEventTypes, summary };
+}
+
 export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPlan {
   const age = state.age;
   const hints: ScheduledEventHint[] = [];
@@ -304,10 +356,12 @@ export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPl
   }
 
   const ordered = Array.from(dedup.values()).sort((a, b) => b.priority - a.priority || (a.dueAge ?? 9999) - (b.dueAge ?? 9999)).slice(0, 12);
+  const pressureMap = buildWorldPressureOpportunityMap(state, ordered);
   return {
     generatedAtAge: age,
     focus: ordered[0],
     hints: ordered,
+    pressureMap,
     warnings: ordered.some(h => h.kind === 'deadline' && h.priority >= 100) ? ['存在已经到期或极高优先级的线索，本年必须承接、完成、失败或解释无法执行。'] : [],
   };
 }

@@ -1,5 +1,5 @@
 ﻿import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
-import { buildEventSchedulerPlan, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
+import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { deriveWorldEventConsequences, deriveWorldFactsFromState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
 import { appendStateChangeAuditEffect } from '../src/lib/xianxia/state-change-log';
 
@@ -198,6 +198,53 @@ function smokeFactionLocationStateProfiles(): void {
   log('faction-location-state', { passed: true, location: locationProfile?.summary, faction: factionProfile?.summary, hints: plan.hints.length });
 }
 
+function smokeWorldPressureOpportunityMap(): void {
+  const state: any = {
+    age: 47,
+    location: '青岚坊市',
+    npcs: [{
+      id: 'npc_shadow',
+      name: '阴鸦客',
+      faction: '黑鸦会',
+      attitude: 'hostile',
+      relationshipScore: -45,
+      firstMetAge: 44,
+      lastSeenAge: 47,
+      lastKnownLocation: '青岚坊市',
+      source: 'auction',
+      memory: '因旧洞府铜钥落入角色手中而记下一笔。',
+      tags: ['auction', 'aftermath', 'rivalry'],
+    }],
+    pendingThreads: [{
+      id: 'thread_key',
+      title: '旧洞府铜钥的旧主线索',
+      description: '旧洞府铜钥牵动一座失落洞府。',
+      category: 'mystery',
+      startAge: 45,
+      deadlineAge: 48,
+      status: 'pending',
+      progress: 45,
+      followUpHint: '可循铜钥禁制探查洞府旧主，也可能遭阴鸦客截杀。',
+    }],
+    questEntries: [],
+    causalGraph: { nodes: [], edges: [] },
+    worldFacts: [
+      { id: 'wf_location_market', kind: 'location', title: '青岚坊市', summary: '近期拍卖余波未散。', confidence: 0.8, firstSeenAge: 44, lastSeenAge: 47, source: 'smoke', tags: ['location', 'market', 'auction', 'event-consequence'] },
+      { id: 'wf_faction_black', kind: 'faction', title: '黑鸦会', summary: '黑鸦会与旧洞府铜钥余波相连。', confidence: 0.8, firstSeenAge: 44, lastSeenAge: 47, source: 'smoke', tags: ['faction', 'hostile', 'danger'] },
+      { id: 'wf_realm_key', kind: 'realm', title: '旧洞府铜钥', summary: '旧洞府铜钥或可开启遗府。', confidence: 0.8, firstSeenAge: 45, lastSeenAge: 47, source: 'smoke', tags: ['realm', 'realm-hint'] },
+    ],
+  };
+  const plan = buildEventSchedulerPlan(state);
+  const map = plan.pressureMap || buildWorldPressureOpportunityMap(state, plan.hints);
+  assert(map.topThreat === '阴鸦客' || map.topThreat === '黑鸦会', 'pressure map should pick hostile NPC/faction as top threat');
+  assert(!!map.topOpportunity, 'pressure map should expose a top opportunity');
+  assert(map.focalLocation === '青岚坊市', 'pressure map should pick focal location');
+  assert(map.focalActor === '阴鸦客' || map.focalActor === '黑鸦会', 'pressure map should pick focal actor/faction');
+  assert(map.likelyEventTypes.some(t => ['威胁回响', '势力施压', '机缘推进', '秘境异动'].includes(t)), 'pressure map should expose likely event types');
+  assert(map.summary.includes('最大威胁') && map.summary.includes('事件倾向'), 'pressure map should have readable summary');
+  log('world-pressure-map', { passed: true, summary: map.summary, hints: plan.hints.length });
+}
+
 function smokeWorldEventConsequences(): void {
   const state: any = {
     age: 45,
@@ -310,6 +357,7 @@ async function main(): Promise<void> {
   smokeBoundaryFactChecks();
   smokeWorldFactsLite();
   smokeFactionLocationStateProfiles();
+  smokeWorldPressureOpportunityMap();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();
