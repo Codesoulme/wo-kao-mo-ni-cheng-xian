@@ -83,6 +83,9 @@ export async function GET(req: NextRequest) {
         pendingThreads: state.pendingThreads || [],
         characterIntents: state.characterIntents || [],
         combatSession: state.combatSession || null,
+        // World continuity internals
+        npcs: responseState.npcs || [],
+        causalGraph: responseState.causalGraph || { nodes: [], edges: [] },
         // Task 22: 心魔值
         heartDemon: state.heartDemon ?? 0,
         // Task 23: 灵宠
