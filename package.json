@@ -10,7 +10,9 @@
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:reset": "prisma migrate reset"
+    "db:reset": "prisma migrate reset",
+    "smoke:xianxia": "bun scripts/xianxia-regression-smoke.ts",
+    "smoke:xianxia:db": "bun scripts/xianxia-regression-smoke.ts --db"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
