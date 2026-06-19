@@ -40,7 +40,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
     .map((s: any, __idx: number) => ({ ...s, __idx }))
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
     .sort((a: any, b: any) => b.__idx - a.__idx)
-    .slice(0, 4);
+    .slice(0, 3);
   const dynamicAttributes = (character.cultivationAttributes || [])
     .filter((attr: any) => attr && attr.visible !== false && attr.name)
     .slice(0, 3);
@@ -75,8 +75,12 @@ export function StatusPanel({ character }: StatusPanelProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <h2 className="font-serif-cn text-base font-bold truncate">{character.name}</h2>
+                    <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[92px] shrink">
+                      <Sprout className="w-2.5 h-2.5 shrink-0" />
+                      <span className="truncate">{rootLabel}</span>
+                    </span>
                     <span className="seal text-[9px]">修</span>
                     {character.ascended && (
                       <span className="text-[9px] px-1 rounded bg-yellow-400/20 text-yellow-600">飞升</span>
@@ -89,17 +93,16 @@ export function StatusPanel({ character }: StatusPanelProps) {
                     <span className="rounded bg-muted/60 px-1.5 py-0.5 shrink-0">{genderLabel}</span>
                     <span className="rounded bg-muted/60 px-1.5 py-0.5 shrink-0">{character.age}岁</span>
                     <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700/90 shrink-0">寿余 {lifespanLeft} 岁</span>
+                    <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[112px]">
+                      <MapPin className="w-2.5 h-2.5 shrink-0" />
+                      <span className="truncate">{character.location}</span>
+                    </span>
+                    <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 tabular-nums shrink-0">
+                      <Coins className="w-2.5 h-2.5" />
+                      {character.spiritStones}
+                    </span>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setExpandedVitals(v => !v)}
-                  className="shrink-0 inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/60 transition-colors"
-                  aria-expanded={expandedVitals}
-                >
-                  {expandedVitals ? '收起' : '展开'}
-                  <ChevronDown className={`w-3 h-3 transition-transform ${expandedVitals ? 'rotate-180' : ''}`} />
-                </button>
               </div>
 
               {/* 境界与修为同区展示 */}
@@ -127,23 +130,9 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 </div>
               </div>
 
-              <div className="mt-1.5 flex items-center gap-1 min-w-0 overflow-hidden text-[10px] text-muted-foreground">
-                <span className="flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[118px] shrink">
-                  <Sprout className="w-2.5 h-2.5 shrink-0" />
-                  <span className="truncate">{rootLabel}</span>
-                </span>
-                <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[128px]">
-                  <MapPin className="w-2.5 h-2.5 shrink-0" />
-                  <span className="truncate">{character.location}</span>
-                </span>
-                <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 tabular-nums shrink-0">
-                  <Coins className="w-2.5 h-2.5" />
-                  {character.spiritStones}
-                </span>
-              </div>
 
               {topStatuses.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1 min-w-0">
+                <div className="mt-1.5 grid grid-cols-3 gap-1 min-w-0 overflow-hidden">
                   {topStatuses.map((s: any, idx: number) => {
                     const negative = s.category === 'debuff' || /伤|毒|虚|痛|劫|魔|损|衰/.test(s.name);
                     const color = negative ? '#c8453c' : '#2f8f5b';
@@ -153,11 +142,11 @@ export function StatusPanel({ character }: StatusPanelProps) {
                           <span
                             role="button"
                             tabIndex={0}
-                            className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm cursor-pointer hover:scale-[1.02] transition-transform min-w-0 max-w-full"
+                            className="inline-flex items-center justify-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm cursor-pointer hover:scale-[1.02] transition-transform min-w-0 max-w-full"
                             style={{ borderColor: `${color}40`, background: `${color}10`, color }}
                           >
                             {negative ? <AlertTriangle className="w-2.5 h-2.5" /> : <Leaf className="w-2.5 h-2.5" />}
-                            <span className="max-w-[72px] truncate">{s.name}</span>
+                            <span className="truncate">{s.name}</span>
                             {s.duration && s.duration !== -1 && <span className="opacity-70">{s.duration}岁</span>}
                           </span>
                         </PopoverTrigger>
@@ -207,11 +196,18 @@ export function StatusPanel({ character }: StatusPanelProps) {
                       </Popover>
                     );
                   })}
-                  {visibleStatuses.length > topStatuses.length && (
-                    <span className="text-[9px] text-muted-foreground px-1 py-0.5">+{visibleStatuses.length - topStatuses.length}</span>
-                  )}
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={() => setExpandedVitals(v => !v)}
+                className="mt-1.5 w-full inline-flex items-center justify-center gap-1 rounded-lg border border-border/50 bg-background/45 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/60 transition-colors"
+                aria-expanded={expandedVitals}
+              >
+                {expandedVitals ? '收起属性与气血' : '展开属性与气血'}
+                <ChevronDown className={`w-3 h-3 transition-transform ${expandedVitals ? 'rotate-180' : ''}`} />
+              </button>
 
               {expandedVitals && (
                 <div className="mt-2 space-y-1.5 border-t border-border/40 pt-2 animate-in fade-in duration-150">
