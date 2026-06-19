@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Sparkles, Mountain, Feather } from 'lucide-react';
+import { Sparkles, Mountain, Feather, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
@@ -14,9 +14,46 @@ import { SimulationHallDialog } from '@/components/xianxia/SimulationHallDialog'
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 
 export function StartScreen() {
-  const { setCharacter, setEvents, setChoices, setFateNodes, setLoading, selectedHeritage } = useGameStore();
+  const { setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice, setLoading, selectedHeritage } = useGameStore();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
+  const [latestSave, setLatestSave] = useState<any>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/game/latest');
+        const data = await res.json();
+        if (!cancelled && data.success && data.hasSave) setLatestSave(data.character);
+      } catch {
+        // If the old path cannot be read, simply hide the continuation entrance.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const continueLatest = async () => {
+    if (busy || !latestSave?.id) return;
+    setBusy(true);
+    setLoading(true);
+    try {
+      const stateRes = await fetch(`/api/game/state?characterId=${latestSave.id}`);
+      const stateData = await stateRes.json();
+      if (!stateData.success) throw new Error(stateData.error || '\u65e7\u9014\u5df2\u4e0d\u53ef\u5bfb');
+      setCharacter(stateData.character);
+      setFateNodes(stateData.fateNodes);
+      setEvents(stateData.events || []);
+      setChoices(stateData.choices || []);
+      setPendingChoice(stateData.pendingChoice && stateData.character?.isAtChoice ? stateData.pendingChoice : null);
+      toast.success('\u65e7\u9014\u5df2\u7eed', { description: `${stateData.character.name} ? ${stateData.character.age}\u5c81` });
+    } catch (err: any) {
+      toast.error('\u5bfb\u56de\u65e7\u9014\u5931\u8d25', { description: err.message });
+    } finally {
+      setBusy(false);
+      setLoading(false);
+    }
+  };
 
   const start = async () => {
     if (busy) return;
