@@ -372,7 +372,7 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
   const scheduleList = ctx.eventSchedule?.hints?.length
     ? [
       pressureMapText,
-      ...ctx.eventSchedule.hints.slice(0, 8).map(h => `- [priority:${h.priority}][${h.kind}][${h.requiredAction}] ${h.title}：${h.reason}${h.sourceThreadId ? `（thread:${h.sourceThreadId}）` : ''}${h.dueAge ? `（期限:${h.dueAge}岁）` : ''}`),
+      ...ctx.eventSchedule.hints.slice(0, 8).map(h => `- [priority:${h.priority}][${h.kind}][${h.requiredAction}][${h.resolutionStage || 'open'}] ${h.title}：${h.reason}${h.resolutionHint ? `；记忆状态：${h.resolutionHint}` : ''}${h.sourceThreadId ? `（thread:${h.sourceThreadId}）` : ''}${h.dueAge ? `（期限:${h.dueAge}岁）` : ''}`),
     ].join('\n')
     : `${pressureMapText}\n本年无硬性调度目标，但仍需生成具体行动和小推进`;
   const mult = ctx.cultivationMultiplier || 0;
@@ -467,7 +467,7 @@ ${ctx.characterIntents && ctx.characterIntents.length
 任务索引 QuestEntry（由未决线索规范化而来，优先看 urgency/stage，再回看 pendingThreads 原文）
 ${questEntryList}
 
-本年事件调度建议（优先级越高越应承接；deadline/urgent 必须推进、完成、失败或解释无法执行）：
+本年事件调度建议（优先级越高越应承接；括号中的 open/escalating/cooling/background/resolved/failed 是世界记忆状态；deadline/urgent 必须推进、完成、失败或解释无法执行）：
 ${scheduleList}
 ${ctx.eventSchedule?.warnings?.length ? `调度警告：${ctx.eventSchedule.warnings.join("；")}` : ""}
 

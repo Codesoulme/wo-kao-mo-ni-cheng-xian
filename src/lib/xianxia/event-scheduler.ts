@@ -1,4 +1,4 @@
-﻿import type { CausalGraph, CharacterState, EventSchedulerPlan, NarrativeContractFeedbackEntry, ScheduledEventHint, WorldPressureOpportunityMap } from './types';
+﻿import type { CausalGraph, CharacterState, EventSchedulerPlan, NarrativeContractFeedbackEntry, ScheduledEventHint, ScheduledEventResolutionStage, WorldPressureOpportunityMap } from './types';
 
 function urgencyToPriority(urgency: number | undefined): number {
   return Math.max(0, Math.min(100, Number(urgency) || 0));
@@ -275,6 +275,40 @@ function applyMemoryPressureDecay(hints: ScheduledEventHint[], state: CharacterS
   return { hints: adjusted, warnings: Array.from(new Set(warnings)).slice(0, 4) };
 }
 
+function deriveResolutionStage(hint: ScheduledEventHint): { stage: ScheduledEventResolutionStage; hint: string } {
+  const text = hintText(hint);
+  if (hint.kind === 'deadline' || hint.requiredAction === 'resolve_or_fail') {
+    return { stage: 'escalating', hint: '已到关键关口，本轮应推进到完成、失败、战斗、选择或明确解释无法执行。' };
+  }
+  if (/已失|失败|错过|失约|\bfailed\b/.test(text)) {
+    return { stage: 'failed', hint: '此事已失，应写后果、代价或余波，不要当作仍可正常完成的目标。' };
+  }
+  if (/已了|已解决|平息|余波已散|\bresolved\b|\bcompleted\b/.test(text)) {
+    return { stage: 'resolved', hint: '此事已了，只可作为低频背景或新因果的旧因，不要重复重开。' };
+  }
+  if (/记忆潮汐：近两年已反复承接|记忆潮汐：近期已多次回响/.test(text)) {
+    return { stage: 'cooling', hint: '近期已多次回响，本轮若再写必须推进/转折/了结；否则降为旁支背景。' };
+  }
+  if (hint.requiredAction === 'advance_or_resolve' || hint.priority >= 100) {
+    return { stage: 'escalating', hint: '压力正在升高，宜出现实质推进、转折或新的结构化线索。' };
+  }
+  if (hint.requiredAction === 'background' || hint.priority < 45) {
+    return { stage: 'background', hint: '只作世界背景或低频传闻，除非与主事件自然相合。' };
+  }
+  return { stage: 'open', hint: '仍是未了因果，可自然推进、试探、铺垫或留下下一步结构化痕迹。' };
+}
+
+function applyResolutionStages(hints: ScheduledEventHint[]): ScheduledEventHint[] {
+  return hints.map(hint => {
+    const resolution = deriveResolutionStage(hint);
+    return {
+      ...hint,
+      resolutionStage: resolution.stage,
+      resolutionHint: resolution.hint,
+    };
+  });
+}
+
 function scoreHintText(hint: ScheduledEventHint, pattern: RegExp): number {
   const text = hintText(hint);
   return pattern.test(text) ? hint.priority : 0;
@@ -430,7 +464,9 @@ export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPl
   }
 
   const memoryAdjusted = applyMemoryPressureDecay(Array.from(dedup.values()), state);
-  const ordered = memoryAdjusted.hints.sort((a, b) => b.priority - a.priority || (a.dueAge ?? 9999) - (b.dueAge ?? 9999)).slice(0, 12);
+  const ordered = applyResolutionStages(memoryAdjusted.hints)
+    .sort((a, b) => b.priority - a.priority || (a.dueAge ?? 9999) - (b.dueAge ?? 9999))
+    .slice(0, 12);
   const pressureMap = buildWorldPressureOpportunityMap(state, ordered);
   const warnings = [
     ...(ordered.some(h => h.kind === 'deadline' && h.priority >= 100) ? ['存在已经到期或极高优先级的线索，本年必须承接、完成、失败或解释无法执行。'] : []),

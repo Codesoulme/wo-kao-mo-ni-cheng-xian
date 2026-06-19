@@ -532,6 +532,7 @@ export interface WorldFact {
 
 export type ScheduledEventKind = 'quest' | 'deadline' | 'realm' | 'npc' | 'world' | 'downtime';
 export type ScheduledEventAction = 'advance' | 'advance_or_resolve' | 'resolve_or_fail' | 'echo_or_develop' | 'background';
+export type ScheduledEventResolutionStage = 'open' | 'escalating' | 'cooling' | 'background' | 'resolved' | 'failed';
 
 export interface ScheduledEventHint {
   id: string;
@@ -543,6 +544,8 @@ export interface ScheduledEventHint {
   dueAge?: number;
   relatedFactIds?: string[];
   requiredAction: ScheduledEventAction;
+  resolutionStage?: ScheduledEventResolutionStage;
+  resolutionHint?: string;
 }
 
 export interface WorldPressureOpportunityMap {

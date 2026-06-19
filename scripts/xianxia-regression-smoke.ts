@@ -328,6 +328,31 @@ function smokeWorldMemoryPressureDecay(): void {
   log('world-memory-pressure-decay', { passed: true, base: noFeedbackNpc!.priority, cooled: cooledNpcHint.priority, boosted: boostedNpc!.priority });
 }
 
+function smokeWorldMemoryResolution(): void {
+  const state: any = {
+    age: 50,
+    location: '青岚坊市',
+    causalGraph: { nodes: [], edges: [] },
+    worldFacts: [{ id: 'wf_old', kind: 'event', title: '旧怨余波', summary: '此事已了，只余旧人口风。', confidence: 0.9, firstSeenAge: 44, lastSeenAge: 49, source: 'smoke', tags: ['consequence'] }],
+    npcs: [{ id: 'npc_shadow', name: '阴鸦客', attitude: 'hostile', relationshipScore: -50, lastSeenAge: 50, memory: '阴鸦客因旧洞府铜钥盯上角色。', tags: ['auction', 'aftermath'] }],
+    pendingThreads: [{ id: 'thread_due', title: '三日之约', description: '阴鸦客约在坊外了断旧事。', category: 'quest', startAge: 49, deadlineAge: 50, status: 'pending', progress: 70, followUpHint: '若不赴约，阴鸦客会转为追杀。' }],
+    questEntries: [],
+    narrativeContractFeedback: [
+      { age: 48, title: '坊外微影', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
+      { age: 49, title: '黑羽窥市', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
+    ],
+  };
+  const plan = buildEventSchedulerPlan(state);
+  const due = plan.hints.find(h => h.sourceThreadId === 'thread_due');
+  const npc = plan.hints.find(h => h.id === 'seh_npc_npc_shadow');
+  const oldFact = plan.hints.find(h => h.relatedFactIds?.includes('wf_old'));
+  assert(due?.resolutionStage === 'escalating', 'due thread should be escalating');
+  assert(due?.resolutionHint?.includes('完成') || due?.resolutionHint?.includes('失败'), 'escalating hint should tell AI to resolve or fail');
+  assert(npc?.resolutionStage === 'cooling', 'recently repeated NPC should enter cooling stage');
+  assert(oldFact?.resolutionStage === 'resolved', 'resolved world fact should stay resolved/background-like');
+  log('world-memory-resolution', { passed: true, due: due?.resolutionStage, npc: npc?.resolutionStage, fact: oldFact?.resolutionStage });
+}
+
 function smokeWorldEventConsequences(): void {
   const state: any = {
     age: 45,
@@ -481,6 +506,7 @@ async function main(): Promise<void> {
   smokeFactionLocationStateProfiles();
   smokeWorldPressureOpportunityMap();
   smokeWorldMemoryPressureDecay();
+  smokeWorldMemoryResolution();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();
