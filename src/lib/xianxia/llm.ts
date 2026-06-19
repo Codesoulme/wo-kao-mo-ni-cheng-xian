@@ -202,6 +202,109 @@ const SCENE_PROMPTS: Record<string, string> = {
 玩家干扰可能：触发战斗（triggerCombat）、添加/推进/完成未决线索（newThreads/advanceThreads/completeThreadIds）、装备/卸下/合成物品。`,
 };
 
+﻿function textLimit(value: unknown, max = 120): string {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function buildQuestFocusList(ctx: EngineStateContext): string {
+  const quests = [...(ctx.questEntries || [])]
+    .sort((a, b) => (b.urgency || 0) - (a.urgency || 0) || (a.dueAge || 99999) - (b.dueAge || 99999))
+    .slice(0, 10);
+  if (!quests.length) return '暂无强牵引未了因果。';
+  return quests.map(q => `- [${q.stage}][urgency:${q.urgency}][thread:${q.sourceThreadId}] ${q.title}：${textLimit(q.summary, 160)}${q.currentHook ? `；当前牵引：${textLimit(q.currentHook, 100)}` : ''}${q.dueAge ? `；约期：${q.dueAge}岁` : ''}${q.rewardHint ? `；可能所得：${textLimit(q.rewardHint, 80)}` : ''}${q.failureHint ? `；错失代价：${textLimit(q.failureHint, 80)}` : ''}`).join('\n');
+}
+
+function buildWorldFactFocusList(ctx: EngineStateContext): string {
+  const currentLocation = ctx.character.location || '';
+  const currentFaction = ctx.character.faction || '';
+  const facts = [...(ctx.worldFacts || [])]
+    .sort((a, b) => {
+      const score = (f: any) =>
+        (f.confidence || 0) * 10 +
+        (f.lastSeenAge || 0) * 0.4 +
+        (currentLocation && String(f.title || '').includes(currentLocation) ? 20 : 0) +
+        (currentFaction && String(f.title || '').includes(currentFaction) ? 16 : 0) +
+        (['npc', 'relationship', 'event', 'realm'].includes(f.kind) ? 8 : 0);
+      return score(b) - score(a);
+    })
+    .slice(0, 16);
+  if (!facts.length) return '暂无已确认的长期世界事实。';
+  return facts.map(f => `- [${f.kind}][confidence:${f.confidence}][seen:${f.firstSeenAge}-${f.lastSeenAge}] ${f.title}：${textLimit(f.summary, 180)}${f.tags?.length ? `；标记：${f.tags.slice(0, 5).join('、')}` : ''}`).join('\n');
+}
+
+function buildNpcFocusList(ctx: EngineStateContext): string {
+  const urgentThreadIds = new Set((ctx.questEntries || []).filter(q => (q.urgency || 0) >= 70).map(q => q.sourceThreadId));
+  const npcs = [...(ctx.npcs || [])]
+    .sort((a, b) => {
+      const score = (n: any) =>
+        (n.lastSeenAge || 0) * 0.5 +
+        ((n.relatedThreadIds || []).some((id: string) => urgentThreadIds.has(id)) ? 35 : 0) +
+        (['enemy', 'hostile'].includes(n.attitude) ? 22 : 0) +
+        (['ally', 'friendly'].includes(n.attitude) ? 14 : 0) +
+        Math.abs(n.relationshipScore || 0) * 0.2 +
+        ((n.tags || []).includes('auction') ? 8 : 0);
+      return score(b) - score(a);
+    })
+    .slice(0, 12);
+  if (!npcs.length) return '暂无需要重点回响的人物。';
+  return npcs.map(n => `- [npc:${n.id}][${n.attitude}][${n.realm || '境界不明'}] ${n.name}${n.faction ? `（${n.faction}）` : ''}：${textLimit(n.memory || n.description, 180)}${n.lastKnownLocation ? `；常现：${n.lastKnownLocation}` : ''}${n.relatedThreadIds?.length ? `；牵连：${n.relatedThreadIds.slice(0, 4).join('、')}` : ''}`).join('\n');
+}
+
+function buildCausalEchoList(ctx: EngineStateContext): string {
+  const graph = ctx.causalGraph || { nodes: [], edges: [] };
+  const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+  const edges = Array.isArray(graph.edges) ? graph.edges : [];
+  if (!nodes.length && !edges.length) return '暂无可追踪因果。';
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+  const urgentIds = new Set((ctx.questEntries || []).filter(q => (q.urgency || 0) >= 60).map(q => q.sourceThreadId));
+  const pickedEdges = [...edges]
+    .sort((a, b) => {
+      const score = (e: any) => {
+        const to = nodeById.get(e.to);
+        return (e.age || 0) * 0.5 +
+          (urgentIds.has(String(to?.refId || '')) ? 35 : 0) +
+          (['created', 'updated', 'continues', 'triggers'].includes(e.type) ? 12 : 0) +
+          (['failed', 'resolved'].includes(e.type) ? 8 : 0);
+      };
+      return score(b) - score(a);
+    })
+    .slice(0, 12);
+  const edgeLines = pickedEdges.map(e => {
+    const from = nodeById.get(e.from);
+    const to = nodeById.get(e.to);
+    return `- [${e.type}][${e.age}岁] ${from?.label || e.from} → ${to?.label || e.to}${e.summary ? `：${textLimit(e.summary, 140)}` : ''}`;
+  });
+  const orphanNodes = nodes
+    .filter(n => !pickedEdges.some(e => e.from === n.id || e.to === n.id))
+    .sort((a, b) => (b.age || 0) - (a.age || 0))
+    .slice(0, Math.max(0, 6 - edgeLines.length))
+    .map(n => `- [${n.type}][${n.age}岁] ${n.label}${n.summary ? `：${textLimit(n.summary, 140)}` : ''}`);
+  return [...edgeLines, ...orphanNodes].join('\n') || '暂无可追踪因果。';
+}
+
+function buildContinuityFocusBlock(ctx: EngineStateContext): string {
+  return `长期连续性锚点（供叙事自然回响，严禁机械照抄；若本次承接其中任一项，必须在 newThreads/advanceThreads/completeThreadIds/failThreadIds/newNpcs 中留下结构化痕迹）：
+
+【最该承接的未了因果】
+${buildQuestFocusList(ctx)}
+
+【已确认的世界事实】
+${buildWorldFactFocusList(ctx)}
+
+【需要记住的人物】
+${buildNpcFocusList(ctx)}
+
+【因果图回响】
+${buildCausalEchoList(ctx)}
+
+连续性使用原则：
+- 高 urgency、urgent、deadline 临近的线索优先推进、完成、失败或解释暂缓，不能无故遗忘。
+- 已确认世界事实只能自然承接，不要凭空改写；若地点、宗门、NPC、秘境已存在，应沿用既有名字和关系。
+- 旧 NPC 再登场时优先沿用 npc id/name/态度/旧记忆；只有真正新人物才放入 newNpcs。
+- 因果图中的 created/continues/triggers 是后续事件种子；resolved/failed 是旧因果结论，不要反复重开，除非叙事有充分由头。
+- 若本次只是日常，也应让角色围绕上述锚点做小行动、小打听、小修补或小代价，避免空白。`;
+}
+
 // ==================== Prompt 构建 ====================
 
 function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): string {
@@ -227,12 +330,8 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
   const memory = ctx.longTermMemory.length
     ? ctx.longTermMemory.map(m => `- ${m}`).join('\n')
     : '无';
-  const questEntryList = ctx.questEntries?.length
-    ? ctx.questEntries.slice(0, 12).map(q => `- [${q.stage}][urgency:${q.urgency}][thread:${q.sourceThreadId}] ${q.title}：${q.summary}${q.currentHook ? `；钩子：${q.currentHook}` : ''}${q.dueAge ? `；期限${q.dueAge}岁` : ''}`).join('\n')
-    : '暂无任务索引';
-  const worldFactList = ctx.worldFacts?.length
-    ? ctx.worldFacts.slice(-20).map(f => `- [${f.kind}][${f.confidence}] ${f.title}：${f.summary}`).join('\n')
-    : '暂无已沉淀的长期世界事实';
+  const questEntryList = buildQuestFocusList(ctx);
+  const worldFactList = buildWorldFactFocusList(ctx);
   const scheduleList = ctx.eventSchedule?.hints?.length
     ? ctx.eventSchedule.hints.slice(0, 8).map(h => `- [priority:${h.priority}][${h.kind}][${h.requiredAction}] ${h.title}：${h.reason}${h.sourceThreadId ? `（thread:${h.sourceThreadId}）` : ''}${h.dueAge ? `（期限:${h.dueAge}岁）` : ''}`).join('\n')
     : '本年无硬性调度目标，但仍需生成具体行动和小推进';
@@ -361,6 +460,8 @@ ${memory}
 
 【短期对话区】最近事件：
 ${recentEvts}
+
+${buildContinuityFocusBlock(ctx)}
 
 ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx.nextFateNode.index}「${ctx.nextFateNode.name}」（对应境界：${ctx.nextFateNode.realm}）。它只供你理解长期方向，不是本轮必须发生的命运，也不得强行定性角色。` : '【命节点参考】暂无明确锚点，按角色处境自然推进。'}
 
@@ -633,6 +734,8 @@ ${ctx.longTermMemory.map(m => `- ${m}`).join('\n') || '无'}
 ${ctx.recentEvents.map(e => `${e.age}岁：${e.title}`).join('\n') || '无'}
 
 【玩家选择情境】
+${buildContinuityFocusBlock(ctx)}
+
 ${choicePrompt}
 
 【玩家选择了】
@@ -699,6 +802,8 @@ ${ctx.longTermMemory.map(m => `- ${m}`).join('\n') || '无'}
 ${ctx.recentEvents.map(e => `${e.age}岁：${e.title}`).join('\n') || '无'}
 
 【玩家输入】
+${buildContinuityFocusBlock(ctx)}
+
 ${playerInput}
 
 请按 interfere 场景规则处理。生成 JSON：
