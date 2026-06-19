@@ -676,7 +676,9 @@ export function equipItem(state: CharacterState, itemId: string): ItemActionResu
   const resolved = resolveItemEffects(next, equippedItem, 1, `装备 ${equippedItem.name}`);
   next = recalcCultivationMultiplier(resolved.state);
   return { ...resolved, state: next, ok: true, item: equippedItem };
-}export function unequipItem(state: CharacterState, itemId: string): ItemActionResult {
+}
+
+export function unequipItem(state: CharacterState, itemId: string): ItemActionResult {
   const item = (state.equipped || []).find(it => it.id === itemId);
   if (!item) return emptyItemActionResult(state, false, '此物尚未装备');
   let next: CharacterState = {
@@ -687,7 +689,9 @@ export function equipItem(state: CharacterState, itemId: string): ItemActionResu
   const resolved = resolveItemEffects(next, item, -1, `卸下 ${item.name}`);
   next = recalcCultivationMultiplier(resolved.state);
   return { ...resolved, state: next, ok: true, item };
-}export function consumeItem(state: CharacterState, itemId: string): ItemActionResult {
+}
+
+export function consumeItem(state: CharacterState, itemId: string): ItemActionResult {
   const item = state.inventory.find(it => it.id === itemId);
   if (!item) return emptyItemActionResult(state, false, '物品不在储物中');
   if (item.item_type !== 'consumable') return emptyItemActionResult(state, false, '只有丹药等消耗品可直接使用');
@@ -700,11 +704,22 @@ export function equipItem(state: CharacterState, itemId: string): ItemActionResu
   return { ...resolved, state: next, ok: true, item };
 }
 
-export function removeItemsByIds(state: CharacterState, ids: string[]): { state: CharacterState; removed: ItemEntry[] } {
-  if (!ids.length) return { state, removed: [] };
+export function removeItemsByIds(state: CharacterState, ids: string[]): ItemEffectResolveResult & { removed: ItemEntry[] } {
+  if (!ids.length) return { state, removed: [], appliedChanges: [], rejectedChanges: [], effectResolveTrace: [], effectResolveWarnings: [] };
   const idSet = new Set(ids);
   let next = { ...state };
   const removed: ItemEntry[] = [];
+  const appliedChanges: AttributeChange[] = [];
+  const rejectedChanges: AttributeChange[] = [];
+  const effectResolveTrace: EffectResolveTrace[] = [];
+  const effectResolveWarnings: string[] = [];
+  const collect = (resolved: ItemEffectResolveResult) => {
+    appliedChanges.push(...resolved.appliedChanges);
+    rejectedChanges.push(...resolved.rejectedChanges);
+    effectResolveTrace.push(...resolved.effectResolveTrace);
+    effectResolveWarnings.push(...resolved.effectResolveWarnings);
+    next = resolved.state;
+  };
   // 从 inventory 移除
   const keptInv: ItemEntry[] = [];
   for (const it of state.inventory) {
@@ -718,7 +733,7 @@ export function removeItemsByIds(state: CharacterState, ids: string[]): { state:
     for (const it of next.equipped) {
       if (idSet.has(it.id)) {
         removed.push(it);
-        next = applyItemEffects(next, it, -1);
+        collect(resolveItemEffects(next, it, -1, `移除装备 ${it.name}`));
       } else {
         keptEq.push(it);
       }
@@ -736,14 +751,26 @@ export function removeItemsByIds(state: CharacterState, ids: string[]): { state:
       }
     }
   }
-  return { state: next, removed };
+  next = normalizeCultivationState(next);
+  return { state: next, removed, appliedChanges, rejectedChanges, effectResolveTrace, effectResolveWarnings };
 }
 
 // AI 联动：按 id 将物品从 inventory 移到 equipped（AI 可在 interfere 中装备物品，并设置 equipNote）
-export function equipItemsByIds(state: CharacterState, ids: string[]): { state: CharacterState; equipped: ItemEntry[] } {
-  if (!ids.length) return { state, equipped: [] };
+export function equipItemsByIds(state: CharacterState, ids: string[]): ItemEffectResolveResult & { equipped: ItemEntry[] } {
+  if (!ids.length) return { state, equipped: [], appliedChanges: [], rejectedChanges: [], effectResolveTrace: [], effectResolveWarnings: [] };
   const idSet = new Set(ids);
   let next = { ...state };
+  const appliedChanges: AttributeChange[] = [];
+  const rejectedChanges: AttributeChange[] = [];
+  const effectResolveTrace: EffectResolveTrace[] = [];
+  const effectResolveWarnings: string[] = [];
+  const collect = (resolved: ItemEffectResolveResult) => {
+    appliedChanges.push(...resolved.appliedChanges);
+    rejectedChanges.push(...resolved.rejectedChanges);
+    effectResolveTrace.push(...resolved.effectResolveTrace);
+    effectResolveWarnings.push(...resolved.effectResolveWarnings);
+    next = resolved.state;
+  };
   const toEquip: ItemEntry[] = [];
   const keptInv: ItemEntry[] = [];
   for (const it of state.inventory) {
@@ -758,31 +785,42 @@ export function equipItemsByIds(state: CharacterState, ids: string[]): { state: 
       keptInv.push(it);
     }
   }
-  if (!toEquip.length) return { state: next, equipped: [] };
+  if (!toEquip.length) return { state: next, equipped: [], appliedChanges, rejectedChanges, effectResolveTrace, effectResolveWarnings };
   next.inventory = keptInv;
   next.equipped = [...(next.equipped || []), ...toEquip];
-  for (const it of toEquip) next = applyItemEffects(next, it, 1);
+  for (const it of toEquip) collect(resolveItemEffects(next, it, 1, `装备 ${it.name}`));
   next = recalcCultivationMultiplier(next);
-  return { state: next, equipped: toEquip };
+  return { state: next, equipped: toEquip, appliedChanges, rejectedChanges, effectResolveTrace, effectResolveWarnings };
 }
 
 // AI 联动：按 id 将物品从 equipped 移回 inventory（AI 可在 interfere 中卸下物品）
-export function unequipItemsByIds(state: CharacterState, ids: string[]): { state: CharacterState; unequipped: ItemEntry[] } {
-  if (!ids.length) return { state, unequipped: [] };
+export function unequipItemsByIds(state: CharacterState, ids: string[]): ItemEffectResolveResult & { unequipped: ItemEntry[] } {
+  if (!ids.length) return { state, unequipped: [], appliedChanges: [], rejectedChanges: [], effectResolveTrace: [], effectResolveWarnings: [] };
   const idSet = new Set(ids);
   let next = { ...state };
+  const appliedChanges: AttributeChange[] = [];
+  const rejectedChanges: AttributeChange[] = [];
+  const effectResolveTrace: EffectResolveTrace[] = [];
+  const effectResolveWarnings: string[] = [];
+  const collect = (resolved: ItemEffectResolveResult) => {
+    appliedChanges.push(...resolved.appliedChanges);
+    rejectedChanges.push(...resolved.rejectedChanges);
+    effectResolveTrace.push(...resolved.effectResolveTrace);
+    effectResolveWarnings.push(...resolved.effectResolveWarnings);
+    next = resolved.state;
+  };
   const toUnequip: ItemEntry[] = [];
   const keptEq: ItemEntry[] = [];
   for (const it of next.equipped || []) {
     if (idSet.has(it.id)) toUnequip.push(it);
     else keptEq.push(it);
   }
-  if (!toUnequip.length) return { state: next, unequipped: [] };
+  if (!toUnequip.length) return { state: next, unequipped: [], appliedChanges, rejectedChanges, effectResolveTrace, effectResolveWarnings };
   next.equipped = keptEq;
-  for (const it of toUnequip) next = applyItemEffects(next, it, -1);
+  for (const it of toUnequip) collect(resolveItemEffects(next, it, -1, `卸下 ${it.name}`));
   next = recalcCultivationMultiplier(next);
   next.inventory = [...next.inventory, ...toUnequip];
-  return { state: next, unequipped: toUnequip };
+  return { state: next, unequipped: toUnequip, appliedChanges, rejectedChanges, effectResolveTrace, effectResolveWarnings };
 }
 
 // ==================== 炼丹炉系统 ====================
@@ -2379,7 +2417,14 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   const contentRegistryWarnings: string[] = [];
   const effectResolveTrace: EffectResolveTrace[] = [];
   const effectResolveWarnings: string[] = [];
+  const appliedChanges: AttributeChange[] = [];
   const boundaryValidation = validateAIBoundary(state, aiOutput);
+  const collectItemResolve = (resolved: ItemEffectResolveResult) => {
+    appliedChanges.push(...resolved.appliedChanges);
+    rejected.push(...resolved.rejectedChanges);
+    effectResolveTrace.push(...resolved.effectResolveTrace);
+    effectResolveWarnings.push(...resolved.effectResolveWarnings);
+  };
 
   // 1. Apply attribute changes through EffectResolver / ERPE Lite.
   const resolvedChanges = resolveAttributeChanges(next, aiOutput.changes || [], {
@@ -2387,6 +2432,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     source: aiOutput.title || 'ai-event',
   });
   next = resolvedChanges.state;
+  appliedChanges.push(...resolvedChanges.appliedChanges);
   rejected.push(...resolvedChanges.rejectedChanges);
   effectResolveTrace.push(...resolvedChanges.trace);
   effectResolveWarnings.push(...resolvedChanges.trace.filter(t => t.severity !== 'info').map(t => t.message));
@@ -2422,6 +2468,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   if (aiOutput.removedItemIds && aiOutput.removedItemIds.length) {
     const rem = removeItemsByIds(next, aiOutput.removedItemIds);
     next = rem.state;
+    collectItemResolve(rem);
   }
 
   // 3.6 AI 联动：直接放入已装备的物品（AI 创造性装备：项链·储物戒指串等）
@@ -2438,8 +2485,11 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
       ...next,
       equipped: [...(next.equipped || []), ...newEqItems],
     };
-    // 应用装备 add 效果
-    for (const it of newEqItems) next = applyItemEffects(next, it, 1);
+    for (const it of newEqItems) {
+      const resolved = resolveItemEffects(next, it, 1, `生成并装备 ${it.name}`);
+      next = resolved.state;
+      collectItemResolve(resolved);
+    }
     next = recalcCultivationMultiplier(next);
   }
 
@@ -2447,12 +2497,14 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   if (aiOutput.equipItemIds && aiOutput.equipItemIds.length) {
     const r = equipItemsByIds(next, aiOutput.equipItemIds);
     next = r.state;
+    collectItemResolve(r);
   }
 
   // 3.8 AI 联动：把已装备的物品卸下来（AI 在 advance/interfere 中指定 id）
   if (aiOutput.unequipItemIds && aiOutput.unequipItemIds.length) {
     const r = unequipItemsByIds(next, aiOutput.unequipItemIds);
     next = r.state;
+    collectItemResolve(r);
   }
 
   // 4. 添加长期记忆
@@ -2596,7 +2648,6 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 
   next = recordEventCausality(next, aiOutput);
 
-  const appliedChanges = resolvedChanges.appliedChanges;
   const stateChangeLog = buildStateChangeLog({
     before: state,
     after: next,
