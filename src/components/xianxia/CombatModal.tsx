@@ -13,14 +13,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Swords, Heart, Sparkles, Shield, Footprints, ChevronDown, BookOpen, FlaskConical, Loader2,
+  Swords, Heart, Sparkles, Shield, Footprints, ChevronDown, BookOpen, FlaskConical, Loader2, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
 
 // 战斗动作类型
-type CombatAction = 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee';
+type CombatAction = 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee' | 'other';
 
 // Task 22: 伤害飘字
 interface FloatNumber {
@@ -33,6 +33,7 @@ interface FloatNumber {
 export function CombatModal() {
   const { character, setCharacter, addEvent, setLoading, setError, setSettlementResult } = useGameStore();
   const [busy, setBusy] = useState(false);
+  const [autoBattle, setAutoBattle] = useState(false);
   const [contextCollapsed, setContextCollapsed] = useState(false);
   // 战斗结束后短暂展示结果界面（玩家点"了结"按钮关闭）
   const [endResult, setEndResult] = useState<{ status: string; narrative: string } | null>(null);
@@ -61,19 +62,18 @@ export function CombatModal() {
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [session?.id, session?.log?.length, battleStarted, endResult?.status]);
 
-  if (!character) return null;
   const isOngoing = !!session && session.status === 'ongoing';
+  const shouldRender = !!character && (isOngoing || !!endResult);
   // 显示条件：战斗进行中 OR 有待展示的 endResult
   // （endResult 在 setCharacter 清掉 combatSession 后才展示，所以即使 session=null 也要渲染）
-  if (!isOngoing && !endResult) return null;
 
   // 当前攻击的敌人（session 可能为 null——endResult 显示场景）
   const enemyIdx = session?.currentEnemyIdx ?? 0;
   const enemy = session?.enemies?.[enemyIdx];
 
   // ====== 执行战斗行动 ======
-  const doAction = async (action: CombatAction, payload?: { skillIdx?: number; itemId?: string }) => {
-    if (busy || !isOngoing) return;
+  const doAction = async (action: CombatAction, payload?: { skillIdx?: number; itemId?: string; optionId?: string }) => {
+    if (busy || !isOngoing || !character) return;
     setBusy(true);
     setLoading(true);
     setError(null);
@@ -151,6 +151,7 @@ export function CombatModal() {
 
   // ====== 结束战斗 ======
   const endCombat = async (status: string) => {
+    if (!character) return;
     try {
       const res = await fetch('/api/game/combat/end', {
         method: 'POST',
@@ -219,6 +220,14 @@ export function CombatModal() {
   const playerHpPct = session && session.playerMaxHp > 0 ? (session.playerHp / session.playerMaxHp) * 100 : 0;
   const playerMpPct = session && session.playerMaxMp > 0 ? (session.playerMp / session.playerMaxMp) * 100 : 0;
   const enemyHpPct = enemy && enemy.maxHp > 0 ? (enemy.hp / enemy.maxHp) * 100 : 0;
+  const halfHpOrLower = !!session && session.playerHp <= session.playerMaxHp * 0.5;
+  useEffect(() => {
+    if (autoBattle && halfHpOrLower) {
+      setAutoBattle(false);
+      toast.warning('自运已止', { description: '气血跌破半数，已交还你亲自决断。' });
+    }
+  }, [autoBattle, halfHpOrLower]);
+
 
   // 战斗日志：最近 5 条，最新在底部
   const recentLog: any[] = session ? (session.log || []).slice(-5) : [];
@@ -242,6 +251,37 @@ export function CombatModal() {
     if (!item) return false;
     return !(item.effects || []).some((e: any) => talismanTargets.has(getEffectTarget(e)));
   });
+
+  const palette: any = (session as any)?.actionPalette || null;
+  const groupOf = (key: string, fallbackLabel: string) => palette?.[key] || { enabled: false, label: fallbackLabel, options: [] };
+  const actionFromOption = (option: any): CombatAction => {
+    if (option?.actionType === 'spell') return 'skill';
+    if (option?.actionType === 'item') return 'item';
+    if (option?.actionType === 'talisman') return 'talisman';
+    if (option?.actionType === 'defense') return 'defend';
+    if (option?.actionType === 'flee') return 'flee';
+    if (option?.actionType === 'other') return 'other';
+    return 'attack';
+  };
+  const runPaletteOption = (option: any) => doAction(actionFromOption(option), { skillIdx: option?.skillIdx, itemId: option?.itemId, optionId: option?.id });
+  const chooseAutoOption = () => {
+    const groups = [groupOf('spell', '法术'), groupOf('basicAttack', '普攻'), groupOf('defense', '防御'), groupOf('other', '应变')];
+    return groups.flatMap((g: any) => g.options || []).find((o: any) => o.enabled && !String(o.id || '').includes('flee') && !o.risk)
+      || groups.flatMap((g: any) => g.options || []).find((o: any) => o.enabled && !String(o.id || '').includes('flee'));
+  };
+  useEffect(() => {
+    if (!autoBattle || busy || !isOngoing || !battleStarted || endResult || halfHpOrLower) return;
+    const timer = setTimeout(() => {
+      const option = chooseAutoOption();
+      if (!option) {
+        setAutoBattle(false);
+        toast.warning('自运已止', { description: '此刻没有稳妥可用的行动。' });
+        return;
+      }
+      runPaletteOption(option);
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [autoBattle, busy, isOngoing, battleStarted, endResult, halfHpOrLower, session?.round]);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -527,194 +567,30 @@ export function CombatModal() {
         {isOngoing && battleStarted && !endResult && (
           <div className="relative shrink-0 border-t border-border/40 bg-card/40 p-2">
             <div className="grid grid-cols-6 gap-1">
-              {/* 普攻 */}
-              <ActionButton
-                onClick={() => doAction('attack')}
-                disabled={busy}
-                icon={<Swords className="w-3.5 h-3.5" />}
-                label="挥击"
-                tone="primary"
-              />
-
-              {/* 法术（dropdown） */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    disabled={busy || skills.length === 0}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-0.5 h-14 rounded-md border-2 transition-all",
-                      "border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/60 active:scale-95",
-                      "text-amber-700 dark:text-amber-400",
-                      (busy || skills.length === 0) && "opacity-40 cursor-not-allowed"
-                    )}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span className="text-[10px] font-serif-cn font-semibold">法术</span>
-                    <span className="text-[8px] text-muted-foreground">{skills.length || 0}</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="z-[80] w-56">
-                  <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
-                    选择法术施展
-                  </div>
-                  {skills.length === 0 ? (
-                    <DropdownMenuItem disabled>无可施法术</DropdownMenuItem>
-                  ) : (
-                    skills.map((sk, i) => (
-                      <DropdownMenuItem
-                        key={i}
-                        onClick={() => doAction('skill', { skillIdx: i })}
-                        disabled={busy || session.playerMp < (sk.mpCost || 0)}
-                        className="flex items-start gap-2 py-2"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold font-serif-cn flex items-center gap-1">
-                            {sk.name}
-                            <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-700">
-                              -{sk.mpCost}灵
-                            </span>
-                          </div>
-                          {sk.description && (
-                            <div className="text-[10px] text-muted-foreground truncate">{sk.description}</div>
-                          )}
-                        </div>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* 丹药（dropdown）—— 仅非符箓 */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    disabled={busy || pills.length === 0}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-0.5 h-14 rounded-md border-2 transition-all",
-                      "border-green-500/40 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500/60 active:scale-95",
-                      "text-green-700 dark:text-green-400",
-                      (busy || pills.length === 0) && "opacity-40 cursor-not-allowed"
-                    )}
-                  >
-                    <FlaskConical className="w-3.5 h-3.5" />
-                    <span className="text-[10px] font-serif-cn font-semibold">丹药</span>
-                    <span className="text-[8px] text-muted-foreground">{pills.length || 0}</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="z-[80] w-56">
-                  <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
-                    选择丹药服用
-                  </div>
-                  {pills.length === 0 ? (
-                    <DropdownMenuItem disabled>无丹药可用</DropdownMenuItem>
-                  ) : (
-                    pills.map((it, i) => (
-                      <DropdownMenuItem
-                        key={i}
-                        onClick={() => doAction('item', { itemId: it.itemId })}
-                        disabled={busy}
-                        className="flex items-start gap-2 py-2"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold font-serif-cn">{it.name}</div>
-                          {it.effect && (
-                            <div className="text-[10px] text-muted-foreground truncate">{it.effect}</div>
-                          )}
-                        </div>
-                      </DropdownMenuItem>
-                    ))
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Task 23: 符箓（dropdown）—— 单次使用、即时生效 */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    disabled={busy || talismans.length === 0}
-                    className={cn(
-                      "flex flex-col items-center justify-center gap-0.5 h-14 rounded-md border-2 transition-all",
-                      "border-purple-500/40 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/60 active:scale-95",
-                      "text-purple-700 dark:text-purple-400",
-                      (busy || talismans.length === 0) && "opacity-40 cursor-not-allowed"
-                    )}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span className="text-[10px] font-serif-cn font-semibold">符箓</span>
-                    <span className="text-[8px] text-muted-foreground">{talismans.length || 0}</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="z-[80] w-56">
-                  <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
-                    激发符箓（单次消耗）
-                  </div>
-                  {talismans.length === 0 ? (
-                    <DropdownMenuItem disabled>无符箓可用</DropdownMenuItem>
-                  ) : (
-                    talismans.map((it, i) => {
-                      const talismanType = (it.effects || []).find((e: any) => talismanTargets.has(getEffectTarget(e)));
-                      const typeLabel: Record<string, string> = {
-                        talisman_attack: '攻',
-                        talisman_defense: '防',
-                        talisman_heal: '疗',
-                        talisman_escape: '遁',
-                        talisman_stun: '镇',
-                      };
-                      const tColor: Record<string, string> = {
-                        talisman_attack: '#dc2626',
-                        talisman_defense: '#0891b2',
-                        talisman_heal: '#22c55e',
-                        talisman_escape: '#a16207',
-                        talisman_stun: '#7c3aed',
-                      };
-                      const tt = getEffectTarget(talismanType);
-                      return (
-                        <DropdownMenuItem
-                          key={i}
-                          onClick={() => {
-                            const itemId = it.id || it.itemId;
-                            if (itemId) doAction('talisman', { itemId });
-                          }}
-                          disabled={busy}
-                          className="flex items-start gap-2 py-2 cursor-pointer"
-                        >
-                          <span className="text-[9px] px-1 py-0.5 rounded shrink-0" style={{
-                            background: `${tColor[tt] || '#6b7280'}25`,
-                            color: tColor[tt] || '#6b7280',
-                          }}>
-                            {typeLabel[tt] || '?'}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs font-semibold font-serif-cn">{it.name}</div>
-                            <div className="text-[10px] text-muted-foreground truncate">
-                              {talismanType ? `效力 ${talismanType.value}` : ''}
-                              {it.description ? ` · ${it.description}` : ''}
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
-                      );
-                    })
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* 防御 */}
-              <ActionButton
-                onClick={() => doAction('defend')}
-                disabled={busy}
-                icon={<Shield className="w-3.5 h-3.5" />}
-                label="戒备"
-                tone="neutral"
-              />
-
-              {/* 逃跑 */}
-              <ActionButton
-                onClick={() => doAction('flee')}
-                disabled={busy}
-                icon={<Footprints className="w-3.5 h-3.5" />}
-                label="遁走"
-                tone="muted"
-              />
+              <PaletteButton group={groupOf('basicAttack', '普攻')} icon={<Swords className="w-3.5 h-3.5" />} tone="primary" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton group={groupOf('spell', '法术')} icon={<Sparkles className="w-3.5 h-3.5" />} tone="gold" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton group={groupOf('defense', '防御')} icon={<Shield className="w-3.5 h-3.5" />} tone="neutral" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton group={groupOf('item', '物品')} icon={<FlaskConical className="w-3.5 h-3.5" />} tone="green" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton group={groupOf('other', '应变')} icon={<Zap className="w-3.5 h-3.5" />} tone="purple" busy={busy} onPick={runPaletteOption} />
+              <button
+                onClick={() => {
+                  if (halfHpOrLower) {
+                    toast.warning('不可自运', { description: '气血不足半数，请亲自决断。' });
+                    return;
+                  }
+                  setAutoBattle(v => !v);
+                }}
+                disabled={busy || halfHpOrLower}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-0.5 h-14 rounded-md border-2 transition-all active:scale-95",
+                  autoBattle ? "border-red-500/50 bg-red-500/10 text-red-600" : "border-muted-foreground/30 bg-muted/30 hover:bg-muted/50 text-muted-foreground",
+                  (busy || halfHpOrLower) && "opacity-40 cursor-not-allowed"
+                )}
+              >
+                <Footprints className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-serif-cn font-semibold">{autoBattle ? '止运' : '自运'}</span>
+                <span className="text-[8px] text-muted-foreground">半血止</span>
+              </button>
             </div>
 
             {busy && (
@@ -731,6 +607,63 @@ export function CombatModal() {
 }
 
 // 紧凑行动按钮组件
+
+function PaletteButton({ group, icon, tone, busy, onPick }: { group: any; icon: React.ReactNode; tone: 'primary' | 'gold' | 'neutral' | 'green' | 'purple'; busy?: boolean; onPick: (option: any) => void }) {
+  const options = group?.options || [];
+  const enabledOptions = options.filter((o: any) => o.enabled);
+  const disabled = busy || !group?.enabled || enabledOptions.length === 0;
+  const toneClasses: Record<string, string> = {
+    primary: 'border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 text-primary',
+    gold: 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/60 text-amber-700 dark:text-amber-400',
+    neutral: 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/60 text-amber-700 dark:text-amber-400',
+    green: 'border-green-500/40 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500/60 text-green-700 dark:text-green-400',
+    purple: 'border-purple-500/40 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/60 text-purple-700 dark:text-purple-400',
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          disabled={disabled}
+          className={cn(
+            "flex flex-col items-center justify-center gap-0.5 h-14 rounded-md border-2 transition-all active:scale-95",
+            toneClasses[tone],
+            disabled && "opacity-40 cursor-not-allowed"
+          )}
+          title={group?.disabledReason}
+        >
+          {icon}
+          <span className="text-[10px] font-serif-cn font-semibold">{group?.label || '行动'}</span>
+          <span className="text-[8px] text-muted-foreground">{enabledOptions.length || 0}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center" className="z-[80] w-64">
+        <div className="text-[10px] text-muted-foreground px-2 py-1 font-serif-cn">
+          {group?.disabledReason || `选择${group?.label || '行动'}`}
+        </div>
+        {options.length === 0 ? (
+          <DropdownMenuItem disabled>此刻无可用选项</DropdownMenuItem>
+        ) : options.map((option: any) => (
+          <DropdownMenuItem
+            key={option.id}
+            onClick={() => option.enabled && onPick(option)}
+            disabled={busy || !option.enabled}
+            className="flex items-start gap-2 py-2"
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold font-serif-cn flex items-center gap-1">
+                {option.name}
+                {option.mpCost > 0 && <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-700">-{option.mpCost}灵</span>}
+              </div>
+              <div className="text-[10px] text-muted-foreground line-clamp-2">{option.enabled ? option.description : (option.disabledReason || option.description)}</div>
+              {option.risk && <div className="text-[10px] text-red-500/80 truncate">险：{option.risk}</div>}
+            </div>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function ActionButton({
   onClick, disabled, icon, label, tone,
 }: {

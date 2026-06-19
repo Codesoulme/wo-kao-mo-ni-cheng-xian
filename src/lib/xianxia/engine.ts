@@ -41,6 +41,8 @@ import {
   CombatEnemy,
   CombatRound,
   CombatSession,
+  CombatActionOption,
+  CombatActionPalette,
   Formation,
   FormationType,
   Pet,
@@ -2761,10 +2763,209 @@ export function startCombat(state: CharacterState, trigger: NonNullable<AIEventO
       };
     }
   }
+  session.actionPalette = buildCombatActionPalette(state, session);
   return { ...state, combatSession: session };
 }
 
 // 战斗伤害计算（简化版：基于攻防差 + 随机浮动）
+
+function lowerText(...parts: (string | undefined | null)[]): string {
+  return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+function hasRestrainingStatus(state: CharacterState, session?: CombatSession): boolean {
+  const text = lowerText(
+    session?.contextTitle,
+    session?.contextNarrative,
+    ...(state.activeStatuses || []).map(s => `${s.name} ${s.description}`),
+    ...(session?.log || []).slice(-3).map(r => r.narrative),
+  );
+  return new RegExp('\\u675f\\u7f1a|\\u6346|\\u7ed1|\\u7f1a|\\u62d8|\\u7981\\u9522|\\u9501|\\u7f51|\\u7f20|\\u5c01\\u4f4f\\u53cc\\u624b|\\u624b\\u811a\\u88ab').test(text);
+}
+
+function hasSealedSpiritStatus(state: CharacterState, session?: CombatSession): boolean {
+  const text = lowerText(
+    session?.contextTitle,
+    session?.contextNarrative,
+    ...(state.activeStatuses || []).map(s => `${s.name} ${s.description}`),
+    ...(session?.log || []).slice(-3).map(r => r.narrative),
+  );
+  return new RegExp('\\u5c01\\u7075|\\u7981\\u7075|\\u7075\\u529b\\u51dd\\u6ede|\\u6cd5\\u529b\\u88ab\\u5c01|\\u7ecf\\u8109\\u53d7\\u5236').test(text);
+}
+
+function weaponLikeItems(state: CharacterState): ItemEntry[] {
+  return (state.equipped || []).filter(it => {
+    const text = `${it.name} ${it.description || ''} ${it.item_type || ''}`;
+    return it.item_type === 'weapon' || new RegExp('\\u5251|\\u5200|\\u67aa|\\u621f|\\u5f13|\\u9488|\\u5203|\\u9524|\\u68cd|\\u77db|\\u65a7|\\u97ad|\\u73af').test(text);
+  });
+}
+
+function armorLikeItems(state: CharacterState): ItemEntry[] {
+  return (state.equipped || []).filter(it => {
+    const text = `${it.name} ${it.description || ''} ${it.item_type || ''}`;
+    return it.item_type === 'armor' || new RegExp('\\u7532|\\u888d|\\u8863|\\u76fe|\\u955c|\\u51a0|\\u9774|\\u62a4|\\u94e0|\\u80c4').test(text);
+  });
+}
+
+function optionById(palette: CombatActionPalette | undefined, optionId?: string): CombatActionOption | undefined {
+  if (!palette || !optionId) return undefined;
+  for (const group of [palette.basicAttack, palette.spell, palette.defense, palette.item, palette.other]) {
+    const found = group.options.find(o => o.id === optionId);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+export function buildCombatActionPalette(state: CharacterState, session: CombatSession): CombatActionPalette {
+  const restrained = hasRestrainingStatus(state, session);
+  const sealed = hasSealedSpiritStatus(state, session);
+  const weapons = weaponLikeItems(state);
+  const armors = armorLikeItems(state);
+  const skills = session.playerSkills || buildLearnedCombatArts(state).slice(0, 6);
+  const items = session.playerItems || [];
+  const basicOptions: CombatActionOption[] = [];
+
+  basicOptions.push({
+    id: 'basic-mana-burst',
+    name: '法力轰击',
+    description: '以自身法力直接轰出，粗粝但不依赖兵器。',
+    actionType: 'basic_attack',
+    source: 'body',
+    enabled: !sealed && session.playerMp >= 3,
+    disabledReason: sealed ? '灵力受制，难以外放法力。' : session.playerMp < 3 ? '法力不足。' : undefined,
+    mpCost: 3,
+    intent: '以自身灵力试探性攻伐',
+    tags: ['mana', 'fallback'],
+  });
+
+  for (const weapon of weapons.slice(0, 5)) {
+    basicOptions.push({
+      id: `weapon-${weapon.id}`,
+      name: weapon.name,
+      description: `${weapon.name}当前在手，可作为普通攻伐手段。`,
+      actionType: 'basic_attack',
+      source: 'weapon',
+      enabled: !restrained,
+      disabledReason: restrained ? '手脚受制，难以挥使兵器。' : undefined,
+      itemId: weapon.id,
+      mpCost: 0,
+      intent: `以${weapon.name}近身或御使攻敌`,
+      requiredItems: [weapon.id],
+      tags: ['weapon'],
+    });
+  }
+
+  if (!weapons.length) {
+    basicOptions.push({
+      id: 'basic-body-strike',
+      name: '拳脚近击',
+      description: '以体魄和身法贴身攻敌。',
+      actionType: 'basic_attack',
+      source: 'body',
+      enabled: !restrained,
+      disabledReason: restrained ? '手脚受制，无法近身出手。' : undefined,
+      mpCost: 0,
+      tags: ['body'],
+    });
+  }
+
+  const spellOptions = skills.slice(0, 8).map((sk, idx): CombatActionOption => ({
+    id: `skill-${idx}`,
+    name: sk.name,
+    description: sk.description || '催动已掌握的术式。',
+    actionType: 'spell',
+    source: sk.sourceType === 'artifact' ? 'artifact' : 'spell',
+    enabled: !sealed && session.playerMp >= (sk.mpCost || 0),
+    disabledReason: sealed ? '灵力受制，术式难以成形。' : session.playerMp < (sk.mpCost || 0) ? '法力不足。' : undefined,
+    skillIdx: idx,
+    itemId: sk.itemId,
+    mpCost: sk.mpCost || 0,
+    risk: sk.adaptation != null && sk.adaptation < 0.7 ? '适配不足，可能反噬或威力折损。' : undefined,
+    requiredItems: sk.itemId ? [sk.itemId] : undefined,
+    tags: ['spell'],
+  }));
+
+  const defenseOptions: CombatActionOption[] = [{
+    id: 'defense-guard',
+    name: '护体守势',
+    description: '收束气机护住要害，降低下一轮承伤。',
+    actionType: 'defense',
+    source: 'body',
+    enabled: true,
+    mpCost: 0,
+    tags: ['guard'],
+  }];
+
+  for (const armor of armors.slice(0, 4)) {
+    defenseOptions.push({
+      id: `armor-${armor.id}`,
+      name: `${armor.name}护身`,
+      description: `借${armor.name}承受来袭攻势；若攻势过强，可能损伤此物。`,
+      actionType: 'defense',
+      source: 'armor',
+      enabled: true,
+      itemId: armor.id,
+      requiredItems: [armor.id],
+      tags: ['armor'],
+    });
+  }
+
+  const itemOptions = items.map((it): CombatActionOption => ({
+    id: `item-${it.itemId}`,
+    name: it.name,
+    description: it.effect || it.description || '战斗中可用之物。',
+    actionType: 'item',
+    source: 'item',
+    enabled: !restrained,
+    disabledReason: restrained ? '手脚受制，难以取用物品。' : undefined,
+    itemId: it.itemId,
+    tags: ['item'],
+  }));
+
+  const otherOptions: CombatActionOption[] = [];
+  if (restrained) {
+    otherOptions.push({
+      id: 'other-break-binding',
+      name: '催力挣缚',
+      description: sealed ? '强行调动残余气血与体魄挣开束缚。' : '鼓荡法力撑破束缚，争取恢复行动。',
+      actionType: 'other',
+      source: sealed ? 'body' : 'status',
+      enabled: true,
+      mpCost: sealed ? 0 : Math.min(8, Math.max(3, Math.floor(session.playerMaxMp * 0.08))),
+      risk: '若失败，可能露出破绽。',
+      intent: '解除当前束缚',
+      tags: ['break-binding', 'scene'],
+    });
+  }
+  otherOptions.push({ id: 'other-observe-opening', name: '观隙寻机', description: '暂缓强攻，观察敌人气机、法器与防护破绽。', actionType: 'other', source: 'ai', enabled: true, mpCost: 0, intent: '寻找下一轮机会', tags: ['observe'] });
+  otherOptions.push({ id: 'other-flee', name: '伺机脱身', description: '借地形或烟尘尝试脱离战场。', actionType: 'flee', source: 'environment', enabled: true, mpCost: 0, tags: ['flee'] });
+
+  return {
+    basicAttack: { enabled: basicOptions.some(o => o.enabled), label: '普攻', disabledReason: basicOptions.some(o => o.enabled) ? undefined : (restrained ? '当前受制，常规攻伐难以施展。' : '暂无可用普攻。'), options: basicOptions },
+    spell: { enabled: spellOptions.some(o => o.enabled), label: '法术', disabledReason: spellOptions.length ? '当前法术受限。' : '暂无可用法术。', options: spellOptions },
+    defense: { enabled: defenseOptions.some(o => o.enabled), label: '防御', options: defenseOptions },
+    item: { enabled: itemOptions.some(o => o.enabled), label: '物品', disabledReason: itemOptions.length ? '当前难以取用物品。' : '暂无可用物品。', options: itemOptions },
+    other: { enabled: otherOptions.some(o => o.enabled), label: '应变', options: otherOptions },
+    generatedBy: 'engine-fallback',
+    sceneHint: restrained ? '当前行动受束缚影响，AI 可生成解除、拖延、神识或环境应变。' : undefined,
+  };
+}
+
+function validateCombatActionOption(state: CharacterState, session: CombatSession, option?: CombatActionOption): { ok: boolean; reason?: string } {
+  if (!option) return { ok: true };
+  if (!option.enabled) return { ok: false, reason: option.disabledReason || '此刻不可施展。' };
+  if (option.mpCost && session.playerMp < option.mpCost) return { ok: false, reason: '法力不足。' };
+  const equippedIds = new Set((state.equipped || []).map(it => it.id));
+  const inventoryIds = new Set((state.inventory || []).map(it => it.id));
+  for (const itemId of option.requiredItems || []) {
+    if (!equippedIds.has(itemId) && !inventoryIds.has(itemId)) return { ok: false, reason: '前置器物已经不在身边。' };
+  }
+  for (const forbidden of option.forbiddenStatuses || []) {
+    if ((state.activeStatuses || []).some(s => s.name === forbidden || s.id === forbidden)) return { ok: false, reason: '当前状态不允许此行动。' };
+  }
+  return { ok: true };
+}
+
 function computeDamage(attack: number, defense: number, power: number = 1, variance: number = 0.2): number {
   const base = Math.max(1, attack - defense * 0.5);
   const dmg = base * power * (1 + (Math.random() * 2 - 1) * variance);
@@ -2784,8 +2985,8 @@ export interface CombatActionResult {
 
 export function executeCombatRound(
   state: CharacterState,
-  action: 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee',
-  payload?: { skillIdx?: number; itemId?: string },
+  action: 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee' | 'other',
+  payload?: { skillIdx?: number; itemId?: string; optionId?: string },
 ): CombatActionResult {
   if (!state.combatSession || state.combatSession.status !== 'ongoing') {
     return {
@@ -2804,6 +3005,17 @@ export function executeCombatRound(
       endStatus: 'victory',
     };
   }
+  session.actionPalette = buildCombatActionPalette(state, session);
+  const selectedOption = optionById(session.actionPalette, payload?.optionId);
+  const validation = validateCombatActionOption(state, session, selectedOption);
+  if (!validation.ok) {
+    return {
+      state: { ...state, combatSession: session },
+      round: { round: session.round, playerAction: selectedOption?.name || '行动受阻', playerActionType: 'defend', narrative: validation.reason || '此刻无法成招。', playerHpAfter: session.playerHp, enemyHpAfter: enemy.hp, playerMpAfter: session.playerMp },
+      ended: false,
+    };
+  }
+
   let playerHp = session.playerHp;
   let playerMp = session.playerMp;
   let enemyHp = enemy.hp;
@@ -2823,7 +3035,8 @@ export function executeCombatRound(
     narrative += `你出招攻向${enemy.name}，造成 ${playerDamageDealt} 点伤害。`;
   } else if (action === 'skill' && payload?.skillIdx != null) {
     playerActionType = 'skill';
-    const skill = session.playerSkills?.[payload.skillIdx];
+    const skillIdx = selectedOption?.skillIdx ?? payload.skillIdx;
+    const skill = skillIdx != null ? session.playerSkills?.[skillIdx] : undefined;
     if (!skill) {
       return {
         state,
@@ -2843,6 +3056,25 @@ export function executeCombatRound(
     playerDamageDealt = computeDamage(session.playerAttack, enemy.defense, skill.power, 0.3);
     enemyHp -= playerDamageDealt;
     narrative += `你催动${skill.name}，灵力化为攻伐之力，造成 ${playerDamageDealt} 点伤害。`;
+  } else if (action === 'other') {
+    playerActionType = 'defend';
+    const option = selectedOption;
+    const mpCost = option?.mpCost || 0;
+    if (mpCost > 0) playerMp = Math.max(0, playerMp - mpCost);
+    if (option?.id === 'other-break-binding') {
+      playerActionDesc = option.name;
+      narrative += `你以${option.name}应对战局，稳住当前险势。`;
+    } else if (option?.id === 'other-observe-opening') {
+      playerActionDesc = option.name;
+      narrative += `你暂缓强攻，凝神观察${enemy.name}的气机流转，记下一处可乘破绽。`;
+    } else if (option?.id === 'other-flee') {
+      playerActionType = 'flee';
+      playerActionDesc = option.name;
+      narrative += `你借地形与烟尘伺机脱身。`;
+    } else {
+      playerActionDesc = option?.name || '护体守势';
+      narrative += `你立起${playerActionDesc}，收束气机护住要害。`;
+    }
   } else if (action === 'item' && payload?.itemId) {
     playerActionType = 'item';
     const item = state.inventory.find(it => it.id === payload.itemId);

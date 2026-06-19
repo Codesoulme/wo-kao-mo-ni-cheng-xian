@@ -452,6 +452,60 @@ export interface QuestEntry {
 
 // ==================== 战斗系统 (Task 20) ====================
 
+
+export type CombatActionGroupKey = 'basicAttack' | 'spell' | 'defense' | 'item' | 'other';
+export type CombatActionOptionType = 'basic_attack' | 'spell' | 'defense' | 'item' | 'talisman' | 'other' | 'flee';
+export type CombatActionOptionSource = 'body' | 'weapon' | 'spell' | 'artifact' | 'armor' | 'item' | 'environment' | 'social' | 'pet' | 'status' | 'ai';
+
+// AI action palette: the combat UI is a projection of AI/world-state affordances.
+// The engine validates hard facts (owned items, costs, statuses) instead of hard-coding all creative choices.
+export interface CombatActionOption {
+  id: string;
+  name: string;
+  description: string;
+  actionType: CombatActionOptionType;
+  source?: CombatActionOptionSource;
+  enabled: boolean;
+  disabledReason?: string;
+  itemId?: string;
+  skillIdx?: number;
+  mpCost?: number;
+  hpCost?: number;
+  risk?: string;
+  intent?: string;
+  requiredItems?: string[];
+  requiredStatuses?: string[];
+  forbiddenStatuses?: string[];
+  tags?: string[];
+}
+
+export interface CombatActionGroup {
+  enabled: boolean;
+  label: string;
+  disabledReason?: string;
+  options: CombatActionOption[];
+}
+
+export interface CombatActionPalette {
+  basicAttack: CombatActionGroup;
+  spell: CombatActionGroup;
+  defense: CombatActionGroup;
+  item: CombatActionGroup;
+  other: CombatActionGroup;
+  generatedBy: 'engine-fallback' | 'ai';
+  sceneHint?: string;
+}
+
+export interface CultivationAttributeEntry {
+  id: string;
+  name: string;
+  value?: number | string;
+  description: string;
+  source?: string;
+  category?: 'body' | 'spirit' | 'dao' | 'combat' | 'fate' | 'custom';
+  visible?: boolean;
+}
+
 export interface CombatEnemy {
   id: string;
   name: string;             // 敌人名称
@@ -499,7 +553,9 @@ export interface CombatSession {
   playerMp: number; playerMaxMp: number;
   playerAttack: number; playerDefense: number; playerSpeed: number;
   // 玩家可用的法术/法宝（从 equipped 提取）
-  playerSkills?: { name: string; description: string; mpCost: number; power: number; element?: ElementType | 'none'; adaptation?: number }[];
+  playerSkills?: { itemId?: string; name: string; description: string; mpCost: number; power: number; element?: ElementType | 'none'; adaptation?: number; sourceType?: string }[];
+  // AI/engine current action palette: UI renders available interactions from this, not fixed combat assumptions.
+  actionPalette?: CombatActionPalette;
   // 玩家可用的丹药（从 inventory 的 consumable 提取）
   playerItems?: { itemId: string; name: string; description: string; effect: string }[];
   // 战斗胜利后掉落（由 AI 在结束叙事中给出，引擎在 endCombat 中应用）
@@ -896,6 +952,7 @@ export interface EngineStateContext {
     hp: number; maxHp: number;
     mp: number; maxMp: number;
     attack: number; defense: number; speed: number;
+    cultivationAttributes?: CultivationAttributeEntry[];
     luck: number; comprehension: number;
     spiritStones: number; reputation: number;
     faction: string; master: string; location: string;
@@ -996,6 +1053,8 @@ export interface CharacterState {
   hp: number; maxHp: number;
   mp: number; maxMp: number;
   attack: number; defense: number; speed: number;
+  // 当前战斗动作面板：由 AI/引擎生成，UI 只负责展示可交互内容
+  cultivationAttributes?: CultivationAttributeEntry[];
   luck: number; comprehension: number;
   spiritStones: number; reputation: number;
   alive: boolean; ascended: boolean;

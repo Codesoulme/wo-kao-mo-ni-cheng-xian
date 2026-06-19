@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
@@ -795,6 +795,44 @@ function smokeCombatSettlementSingleFlow(): void {
   log('combat-settlement-single-flow', { passed: true });
 }
 
+
+function smokeAiDrivenCombatActionPalette(): void {
+  const state: any = {
+    id: 'c-palette',
+    name: '试剑者',
+    age: 20,
+    activeStatuses: [{ id: 'bound', name: '手脚被缚', description: '双手双脚被妖藤束住', category: 'debuff', duration: 1, effects: [] }],
+    equipped: [{ id: 'sword-qingyun', name: '青云剑', description: '一柄青色法剑', item_type: 'weapon', rarity: 'rare', effects: [{ target_attribute: 'attack', operation: 'add', value: 12 }] }],
+    inventory: [],
+  };
+  const session: any = {
+    id: 'battle-palette',
+    enemies: [{ id: 'enemy', name: '藤妖', description: '缠绕成形', hp: 80, maxHp: 80, attack: 12, defense: 4, speed: 8 }],
+    currentEnemyIdx: 0,
+    round: 1,
+    log: [],
+    status: 'ongoing',
+    startAge: 20,
+    contextTitle: '藤网缠身',
+    contextNarrative: '你被妖藤绑住手脚，剑柄近在身侧却难以挥动。',
+    playerHp: 60,
+    playerMaxHp: 100,
+    playerMp: 30,
+    playerMaxMp: 50,
+    playerAttack: 10,
+    playerDefense: 6,
+    playerSpeed: 9,
+    playerSkills: [],
+    playerItems: [],
+  };
+  const palette = buildCombatActionPalette(state, session);
+  const weapon = palette.basicAttack.options.find(o => o.id === 'weapon-sword-qingyun');
+  assert(weapon && !weapon.enabled, 'bound scene should disable weapon basic attack');
+  assert(palette.other.options.some(o => o.id === 'other-break-binding' && o.enabled), 'bound scene should expose AI-style other interaction');
+  assert(palette.other.label === '应变', 'other action group should be named 应变');
+  log('ai-driven-combat-action-palette', { passed: true, basicEnabled: palette.basicAttack.enabled, other: palette.other.options.map(o => o.name).join('|') });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeSchedulerContinuity();
@@ -813,6 +851,7 @@ async function main(): Promise<void> {
   smokeNoProtagonistShieldPrompt();
   smokeConstitutionProfiles();
   smokeCombatSettlementSingleFlow();
+  smokeAiDrivenCombatActionPalette();
   smokeTechniqueSpellNaming();
   smokeWorldEventConsequences();
   smokeActionCausality();
