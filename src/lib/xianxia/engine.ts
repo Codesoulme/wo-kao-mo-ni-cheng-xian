@@ -1780,6 +1780,8 @@ export function appendCausalGraph(state: CharacterState, nodes: CausalNode[], ed
   unequippedItems?: ItemEntry[];
   threads?: PendingThread[];
   statuses?: StatusEntry[];
+  pets?: Pet[];
+  removedPets?: Pet[];
 };
 
 export function recordActionCausality(state: CharacterState, opts: ActionCausalityOptions): CharacterState {
@@ -1868,6 +1870,31 @@ export function recordActionCausality(state: CharacterState, opts: ActionCausali
       summary: status.description?.slice(0, 100),
     });
   }
+
+  const addPetNode = (pet: Pet | undefined, edgeType: CausalEdge['type'], summary: string) => {
+    if (!pet?.id || !pet?.name) return;
+    const nodeId = causalId('pet', pet.id);
+    nodes.push({
+      id: nodeId,
+      type: 'pet',
+      label: pet.name,
+      age: pet.acquiredAge || age,
+      refId: pet.id,
+      summary: pet.description?.slice(0, 140),
+      tags: [pet.species, pet.rarity, pet.realm || ''].filter(Boolean),
+    });
+    edges.push({
+      id: causalId('edge', actionNodeId + '_' + edgeType + '_' + nodeId),
+      from: actionNodeId,
+      to: nodeId,
+      type: edgeType,
+      age,
+      summary,
+    });
+  };
+
+  for (const pet of opts.pets || []) addPetNode(pet, 'created', '本次行动结缘或照料灵宠');
+  for (const pet of opts.removedPets || []) addPetNode(pet, 'updated', '本次行动放归或离散灵宠');
 
   return appendCausalGraph(state, nodes, edges);
 }

@@ -11,6 +11,7 @@ import {
   dismissPet,
   feedPet,
   normalizeCultivationState,
+  recordActionCausality,
   refreshWorldFacts,
   stateToResponse,
 } from '@/lib/xianxia/engine';
@@ -182,6 +183,18 @@ export async function POST(req: NextRequest) {
       appliedChanges.push({ attribute: 'pets', delta: 1, reason: `结缘${newPet.name}` } as any);
       narrative = `林间灵机微动，一只${newPet.name}循缘而至，与${state.name}结下同行之约。`;
     }
+
+    state = recordActionCausality(state, {
+      actionId: `pet_${action}_${state.age}_${pet?.id || petId || 'new'}`,
+      actionType: 'pet',
+      title: eventAndResponseTitle(action, pet?.name || '灵宠').title,
+      summary: narrative,
+      tags: ['pet', action],
+      usedItems: action === 'feed' && itemId ? before.inventory.filter(item => item.id === itemId) : [],
+      consumedItems: action === 'feed' && itemId ? before.inventory.filter(item => item.id === itemId) : [],
+      pets: action === 'dismiss' ? [] : (pet ? [pet] : []),
+      removedPets: action === 'dismiss' && pet ? [pet] : [],
+    });
 
     const stateChangeLog = buildStateChangeLog({
       before,

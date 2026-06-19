@@ -9,6 +9,7 @@ import {
   dbToState,
   deactivateFormation,
   normalizeCultivationState,
+  recordActionCausality,
   refreshWorldFacts,
   stateToResponse,
 } from '@/lib/xianxia/engine';
@@ -169,6 +170,15 @@ export async function POST(req: NextRequest) {
       title = `阵启·${result.formation?.name || '阵法'}`;
       narrative = `阵盘灵纹依次亮起，“${result.formation?.name || '阵法'}”被引动，四周灵机随之改换。`;
 
+      state = recordActionCausality(state, {
+        actionId: `formation_activate_${state.age}_${result.formation?.id || diskItemId}`,
+        actionType: 'formation',
+        title,
+        summary: narrative,
+        tags: ['formation', 'activate'],
+        usedItems: before.inventory.filter(item => item.id === diskItemId),
+        statuses: activated ? [activated] : [],
+      });
       const stateChangeLog = buildStateChangeLog({ before, after: state, appliedChanges, rejectedChanges: [], contentRegistryTrace, effectResolveTrace: [], aiBoundaryTrace: [] });
       const displayEffects = buildEventDisplayEffects({ before, after: state, changes: appliedChanges });
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
@@ -196,6 +206,14 @@ export async function POST(req: NextRequest) {
       title = `阵息·${closing?.name.replace('[阵]', '') || '阵法'}`;
       narrative = `阵纹渐次暗下，“${closing?.name.replace('[阵]', '') || '阵法'}”归于沉寂，周遭灵机恢复平常。`;
 
+      state = recordActionCausality(state, {
+        actionId: `formation_deactivate_${state.age}_${formationId}`,
+        actionType: 'formation',
+        title,
+        summary: narrative,
+        tags: ['formation', 'deactivate'],
+        statuses: closing ? [closing] : [],
+      });
       const stateChangeLog = buildStateChangeLog({ before, after: state, appliedChanges, rejectedChanges: [], contentRegistryTrace, effectResolveTrace: [], aiBoundaryTrace: [] });
       const displayEffects = buildEventDisplayEffects({ before, after: state, changes: appliedChanges, removedItemIds: [] });
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);

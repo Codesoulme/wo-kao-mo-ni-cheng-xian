@@ -10,6 +10,7 @@ import {
   stateToResponse,
   buildStateContext,
   normalizeCultivationState,
+  recordActionCausality,
 } from '@/lib/xianxia/engine';
 import { generateCombatRoundNarrative } from '@/lib/xianxia/llm';
 import { buildStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
@@ -130,6 +131,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const usedCombatItem = payload?.itemId ? stateBeforeAction.inventory.filter(item => item.id === payload.itemId) : [];
+    state = recordActionCausality(state, {
+      actionId: `combat_round_${state.age}_${state.combatSession?.id || 'session'}_${result.round?.round || 'round'}_${action}`,
+      actionType: 'combat',
+      title: `战斗回合：${action}`,
+      summary: result.round?.narrative,
+      tags: ['combat-round', action],
+      usedItems: usedCombatItem,
+      consumedItems: (action === 'item' || action === 'talisman') ? usedCombatItem : [],
+    });
     const appliedChanges = buildCombatRoundChanges(stateBeforeAction, state, action, payload?.itemId);
     const stateChangeLog = buildStateChangeLog({
       before: stateBeforeAction,

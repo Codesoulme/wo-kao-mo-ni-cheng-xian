@@ -14,6 +14,7 @@ import {
   completeThread,
   resolveHeartDemonTrial,
   normalizeCultivationState,
+  recordActionCausality,
   refreshWorldFacts,
 } from '@/lib/xianxia/engine';
 import { generateCombatEndNarrative } from '@/lib/xianxia/llm';
@@ -199,6 +200,15 @@ export async function POST(req: NextRequest) {
     }
 
     state = refreshWorldFacts(state, 'combat-end');
+    state = recordActionCausality(state, {
+      actionId: `combat_end_${state.age}_${session.id || endStatus}`,
+      actionType: 'combat',
+      title: endStatus === 'victory' ? '战斗得胜' : endStatus === 'defeat' ? '战斗落败' : '脱离战局',
+      summary: narrative,
+      tags: ['combat', endStatus || 'ended'],
+      newItems: [...appliedDrops, ...llmNewItems],
+      threads: llmNewThreads,
+    });
 
     const stateChangeLog = buildStateChangeLog({
       before: stateBeforeCombatEnd,

@@ -487,7 +487,7 @@ export interface WorldNpc {
   tags?: string[];
 }
 
-export type CausalNodeType = 'event' | 'thread' | 'npc' | 'item' | 'status' | 'realm' | 'memory' | 'choice' | 'combat' | 'system';
+export type CausalNodeType = 'event' | 'thread' | 'npc' | 'item' | 'status' | 'realm' | 'memory' | 'choice' | 'combat' | 'pet' | 'system';
 export type CausalEdgeType = 'created' | 'updated' | 'resolved' | 'failed' | 'mentions' | 'caused' | 'rewards' | 'harms' | 'continues' | 'triggers';
 
 export interface CausalNode {
