@@ -44,8 +44,43 @@ function worldFactPriorityBoost(fact: { kind?: string; title?: string; summary?:
   if (tags.includes('market')) boost += 12;
   if (tags.includes('danger')) boost += 18;
   if (tags.includes('auction')) boost += 10;
+  if (tags.includes('hostile') || tags.includes('enemy')) boost += 16;
+  if (tags.includes('friendly') || tags.includes('ally')) boost += 8;
   boost += Math.min(24, continuityTextScore(text) * 0.35);
   return boost;
+}
+
+function npcAutonomousEcho(npc: any): { text: string; boost: number } {
+  const tags = Array.isArray(npc?.tags) ? npc.tags : [];
+  const attitude = String(npc?.attitude || 'unknown');
+  const name = String(npc?.name || '此人');
+  const faction = npc?.faction ? String(npc.faction) : '';
+  const base = faction ? `${name}背后牵连${faction}` : `${name}与角色已有因果`;
+  const auctionTail = tags.includes('auction') || tags.includes('aftermath') || tags.includes('rivalry')
+    ? '；拍卖余波可低频转为盯梢、探价、截杀、交易谈判或借他人之手试探'
+    : '';
+  if (attitude === 'enemy' || attitude === 'hostile') {
+    return { text: `${base}，可能暗中盯梢、试探、散播消息、设伏截杀，或在利益足够时暂作交易${auctionTail}。`, boost: 34 + (auctionTail ? 12 : 0) };
+  }
+  if (attitude === 'ally' || attitude === 'friendly') {
+    return { text: `${base}，可能递信、赠予小资源、求助、引荐人脉，或在危急时出手相助。`, boost: 18 };
+  }
+  if (faction) {
+    return { text: `${base}，可通过传讯、任务、盘问、邀约、追责或交易需求自然回响。`, boost: 12 };
+  }
+  return { text: `${base}，可低频以传闻、偶遇、打听或旁人口风自然回响。`, boost: 6 };
+}
+
+function worldFactAutonomousTail(fact: { kind?: string; tags?: string[] }): string {
+  const tags = fact.tags || [];
+  if (fact.kind !== 'faction') return '';
+  if (tags.includes('hostile') || tags.includes('enemy') || tags.includes('danger')) {
+    return '此势力可能暗中盘问、悬赏、追踪、截杀、压价或借任务试探角色。';
+  }
+  if (tags.includes('friendly') || tags.includes('ally') || tags.includes('current')) {
+    return '此势力可能递出差遣、庇护、人情请求、资源交换或宗门消息。';
+  }
+  return '此势力可通过任务、传闻、交易、盘问或人情往来自然牵动角色。';
 }
 
 export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPlan {
@@ -98,23 +133,28 @@ export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPl
 
   const recentNpcs = [...(state.npcs || [])]
     .map((npc: any) => {
-      const text = [npc.name, npc.description, npc.memory, npc.role, ...(npc.tags || [])].filter(Boolean).join('；');
+      const text = [npc.name, npc.description, npc.memory, npc.role, npc.faction, ...(npc.tags || [])].filter(Boolean).join('；');
       const attitudeBoost = ['enemy', 'hostile'].includes(npc.attitude) ? 32 : ['friendly', 'ally'].includes(npc.attitude) ? 12 : 0;
       const relationBoost = Math.min(20, Math.abs(Number(npc.relationshipScore || 0)) * 0.5);
       const continuityBoost = continuityTextScore(text);
       const recentBoost = Math.max(0, 12 - Math.max(0, age - Number(npc.lastSeenAge || age)) * 3);
-      return { npc, priority: 20 + attitudeBoost + relationBoost + continuityBoost + recentBoost };
+      const autonomous = npcAutonomousEcho(npc);
+      return { npc, autonomous, priority: 20 + attitudeBoost + relationBoost + continuityBoost + recentBoost + autonomous.boost };
     })
     .filter(entry => entry.priority >= 45)
     .sort((a, b) => b.priority - a.priority)
     .slice(0, 6);
-  for (const { npc, priority } of recentNpcs) {
+  for (const { npc, priority, autonomous } of recentNpcs) {
     hints.push({
       id: hintId('npc', npc.id || npc.name),
       kind: 'npc',
       priority,
       title: npc.name,
-      reason: [npc.memory || npc.description, ['enemy', 'hostile'].includes(npc.attitude) ? '此人与角色已有敌意或仇怨，适合低频回响、试探、盯梢或冲突。' : '此人与近期因果相连，可自然回响。'].filter(Boolean).join(' '),
+      reason: [
+        npc.memory || npc.description,
+        ['enemy', 'hostile'].includes(npc.attitude) ? '此人与角色已有敌意或仇怨，适合低频回响、试探、盯梢或冲突。' : '此人与近期因果相连，可自然回响。',
+        `自主倾向：${autonomous.text}`,
+      ].filter(Boolean).join(' '),
       relatedFactIds: npc.id ? [npc.id] : [],
       requiredAction: 'echo_or_develop',
     });
@@ -128,7 +168,7 @@ export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPl
     const reasonTail = fact.kind === 'location'
       ? '此地可作为后续遭遇、交易、追踪、历练或休整的空间锚点。'
       : fact.kind === 'faction'
-        ? '此势力可作为后续人情、宗门、恩怨或资源网络的背景锚点。'
+        ? ['此势力可作为后续人情、宗门、恩怨或资源网络的背景锚点。', worldFactAutonomousTail(fact)].filter(Boolean).join(' ')
         : '';
     hints.push({
       id: hintId('fact', fact.id),

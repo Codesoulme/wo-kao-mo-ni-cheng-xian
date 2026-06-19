@@ -232,6 +232,16 @@ function buildWorldFactFocusList(ctx: EngineStateContext): string {
   return facts.map(f => `- [${f.kind}][confidence:${f.confidence}][seen:${f.firstSeenAge}-${f.lastSeenAge}] ${f.title}：${textLimit(f.summary, 180)}${f.tags?.length ? `；标记：${f.tags.slice(0, 5).join('、')}` : ''}`).join('\n');
 }
 
+function npcAutonomousHintText(n: any): string {
+  const tags = Array.isArray(n?.tags) ? n.tags : [];
+  const attitude = String(n?.attitude || 'unknown');
+  const faction = n?.faction ? String(n.faction) : '';
+  const auctionTail = tags.includes('auction') || tags.includes('aftermath') || tags.includes('rivalry') ? '；拍卖余波可转为盯梢、探价、截杀、交易谈判或借人试探' : '';
+  if (attitude === 'enemy' || attitude === 'hostile') return faction ? '自主倾向：背后牵连' + faction + '，可能盯梢、散播消息、设伏截杀，或因利益暂作交易' + auctionTail + '。' : '自主倾向：可能盯梢、散播消息、设伏截杀，或因利益暂作交易' + auctionTail + '。';
+  if (attitude === 'ally' || attitude === 'friendly') return faction ? '自主倾向：背后牵连' + faction + '，可能递信、引荐、求助、赠予小资源或危急相助。' : '自主倾向：可能递信、引荐、求助、赠予小资源或危急相助。';
+  if (faction) return '自主倾向：背后牵连' + faction + '，可通过传讯、任务、盘问、邀约、追责或交易需求回响。';
+  return '自主倾向：可低频以传闻、偶遇、打听或旁人口风自然回响。';
+}
 function buildNpcFocusList(ctx: EngineStateContext): string {
   const urgentThreadIds = new Set((ctx.questEntries || []).filter(q => (q.urgency || 0) >= 70).map(q => q.sourceThreadId));
   const npcs = [...(ctx.npcs || [])]
@@ -247,7 +257,7 @@ function buildNpcFocusList(ctx: EngineStateContext): string {
     })
     .slice(0, 12);
   if (!npcs.length) return '暂无需要重点回响的人物。';
-  return npcs.map(n => `- [npc:${n.id}][${n.attitude}][${n.realm || '境界不明'}] ${n.name}${n.faction ? `（${n.faction}）` : ''}：${textLimit(n.memory || n.description, 180)}${n.lastKnownLocation ? `；常现：${n.lastKnownLocation}` : ''}${n.relatedThreadIds?.length ? `；牵连：${n.relatedThreadIds.slice(0, 4).join('、')}` : ''}`).join('\n');
+  return npcs.map(n => `- [npc:${n.id}][${n.attitude}][${n.realm || '境界不明'}] ${n.name}${n.faction ? `（${n.faction}）` : ''}：${textLimit(n.memory || n.description, 180)}${n.lastKnownLocation ? `；常现：${n.lastKnownLocation}` : ''}${n.relatedThreadIds?.length ? `；牵连：${n.relatedThreadIds.slice(0, 4).join('、')}` : ''}；${npcAutonomousHintText(n)}`).join('\n');
 }
 
 function buildCausalEchoList(ctx: EngineStateContext): string {

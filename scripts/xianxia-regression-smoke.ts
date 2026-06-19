@@ -61,6 +61,7 @@ function smokeSchedulerContinuity(): void {
   assert(plan.focus?.title === '阴鸦客', 'scheduler should focus hostile auction aftermath NPC');
   assert((plan.focus?.priority || 0) >= 60, 'scheduler focus priority should be high');
   assert(plan.hints.some(h => h.kind === 'quest' && h.title.includes('盯梢')), 'scheduler should include related quest hint');
+  assert(plan.hints.some(h => h.kind === 'npc' && h.reason.includes('自主倾向') && h.reason.includes('截杀')), 'scheduler should include NPC autonomous hostile echo');
   log('scheduler-continuity', { passed: true, focus: plan.focus?.title, priority: plan.focus?.priority, hints: plan.hints.length });
 }
 
