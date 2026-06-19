@@ -51,11 +51,14 @@ export function CombatModal() {
   const session = character?.combatSession;
   useEffect(() => {
     const sessionId = session?.id || null;
+    const hasCombatProgress = !!session && ((session.round || 1) > 1 || (session.log || []).length > 0);
     if (sessionId !== lastSessionIdRef.current) {
       lastSessionIdRef.current = sessionId;
-      setBattleStarted(false);
+      setBattleStarted(hasCombatProgress);
+    } else if (hasCombatProgress && !battleStarted) {
+      setBattleStarted(true);
     }
-  }, [session?.id]);
+  }, [session?.id, session?.round, session?.log?.length, battleStarted]);
   useEffect(() => {
     const el = logScrollRef.current;
     if (!el) return;
@@ -311,7 +314,8 @@ export function CombatModal() {
 
         <CardContent className="flex-1 min-h-0 overflow-hidden p-3 flex flex-col">
           {session && !battleStarted && !endResult && (
-            <div className="flex-1 min-h-0 overflow-y-auto xianxia-scroll rounded-lg border-2 border-destructive/40 bg-destructive/5 p-3 space-y-3">
+            <div className="flex-1 min-h-0 rounded-lg border-2 border-destructive/40 bg-destructive/5 p-3 flex flex-col gap-3">
+              <div className="flex-1 min-h-0 overflow-y-auto xianxia-scroll space-y-3 pr-1">
               <div className="space-y-1">
                 <div className="text-xs font-bold font-serif-cn text-destructive xianxia-readable">
                   {session.contextTitle || '战端将启'}
@@ -328,9 +332,10 @@ export function CombatModal() {
                   {enemy.description ? `｜${enemy.description}` : ''}
                 </div>
               )}
+              </div>
               <Button
                 onClick={() => setBattleStarted(true)}
-                className="w-full h-9 font-serif-cn"
+                className="w-full h-9 font-serif-cn shrink-0"
                 variant="destructive"
               >
                 入战
