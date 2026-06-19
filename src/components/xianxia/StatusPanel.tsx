@@ -98,13 +98,13 @@ export function StatusPanel({ character }: StatusPanelProps) {
                   <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700/90">寿余 {lifespanLeft} 年</span>
                 </div>
                 <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-                  <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[120px]">
-                    <MapPin className="w-2.5 h-2.5 shrink-0" />
-                    <span className="truncate">{character.location}</span>
-                  </span>
                   <span className="flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[110px] shrink">
                     <Sprout className="w-2.5 h-2.5 shrink-0" />
                     <span className="truncate">{rootLabel}</span>
+                  </span>
+                  <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[120px]">
+                    <MapPin className="w-2.5 h-2.5 shrink-0" />
+                    <span className="truncate">{character.location}</span>
                   </span>
                   <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 tabular-nums shrink-0">
                     <Coins className="w-2.5 h-2.5" />

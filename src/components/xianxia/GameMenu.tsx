@@ -126,10 +126,6 @@ export function GameMenu() {
                   <span className="text-foreground">{character.age} / {character.lifespan} 岁</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">命节点</span>
-                  <span className="text-foreground">{character.fateNodes.length} / 8 已过</span>
-                </div>
-                <div className="flex justify-between">
                   <span className="text-muted-foreground">流年记事</span>
                   <span className="text-foreground">{totalEvents} 条</span>
                 </div>

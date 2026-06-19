@@ -24,6 +24,7 @@ export function CultivationSpeedCard() {
   const hiddenSourceCount = Math.max(0, groupedSources.length - visibleSources.length);
   const insightText: string = character.cultivationInsight || '';
   const hasInsight = insightText.trim().length > 0;
+  const canExpandDetails = groupedSources.length > 0 || hasInsight;
 
   return (
     <Card className="paper-texture">
@@ -50,7 +51,7 @@ export function CultivationSpeedCard() {
           <div className="space-y-1">
             <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
               <span>来源 · 名称与加成</span>
-              {groupedSources.length > 3 && (
+              {groupedSources.length > 3 && !showAllSources && (
                 <span>已列 {visibleSources.length}/{groupedSources.length}</span>
               )}
             </div>
@@ -99,14 +100,18 @@ export function CultivationSpeedCard() {
                 </div>
               );
             })}
-            {groupedSources.length > 3 && (
+            {canExpandDetails && (
               <button
                 type="button"
                 onClick={() => setShowAllSources(v => !v)}
                 className="w-full mt-1 rounded-md border border-dashed border-border/70 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
               >
                 <ChevronDown className={cn("w-3 h-3 transition-transform", showAllSources && "rotate-180")} />
-                {showAllSources ? '收起来源' : `展开其余 ${hiddenSourceCount} 个来源`}
+                {showAllSources
+                  ? '收起详解'
+                  : hiddenSourceCount > 0
+                    ? `展开其余 ${hiddenSourceCount} 个来源与详解`
+                    : '展开修炼详解'}
               </button>
             )}
           </div>
@@ -118,24 +123,28 @@ export function CultivationSpeedCard() {
           </div>
         )}
 
-        {hasInsight && (
-          <div
-            className="rounded-md p-2.5 leading-relaxed text-[11px] font-serif-cn xianxia-scroll"
-            style={{
-              background: 'linear-gradient(135deg, rgba(200,69,60,0.04), rgba(60,80,90,0.04))',
-              border: '1px solid rgba(200,69,60,0.12)',
-              color: '#3a3530',
-            }}
-          >
-            {insightText.split(/(?<=[。；])/).filter(s => s.trim()).map((seg, i) => (
-              <p key={i} className="mb-0.5 last:mb-0">{seg.trim()}</p>
-            ))}
+        {showAllSources && (
+          <div className="space-y-2">
+            {hasInsight && (
+              <div
+                className="rounded-md p-2.5 leading-relaxed text-[11px] font-serif-cn xianxia-scroll"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(200,69,60,0.04), rgba(60,80,90,0.04))',
+                  border: '1px solid rgba(200,69,60,0.12)',
+                  color: '#3a3530',
+                }}
+              >
+                {insightText.split(/(?<=[。；])/).filter(s => s.trim()).map((seg, i) => (
+                  <p key={i} className="mb-0.5 last:mb-0">{seg.trim()}</p>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
+              每岁修为 = 基础 × 倍率（×{totalMult.toFixed(2)}）{flatBonus > 0 ? ` + 额外修为（${flatBonus}/岁）` : ''}。来源依灵根、功法、奇缘实时归算。
+            </p>
           </div>
         )}
-
-        <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-0.5">
-          每岁修为 = 基础 × 倍率（×{totalMult.toFixed(2)}）{flatBonus > 0 ? ` + 额外修为（${flatBonus}/岁）` : ''}。来源依灵根、功法、奇缘实时归算。
-        </p>
       </CardContent>
     </Card>
   );
