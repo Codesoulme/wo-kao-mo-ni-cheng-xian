@@ -4,7 +4,7 @@ import type { EffectResolveTrace } from './types';
 import type { BoundaryValidationTrace } from './ai-boundary-validator';
 
 export type StateChangeLogSeverity = 'info' | 'warning' | 'error';
-export type StateChangeLogSource = 'effect' | 'registry' | 'boundary' | 'thread' | 'combat' | 'npc' | 'system';
+export type StateChangeLogSource = 'effect' | 'registry' | 'boundary' | 'thread' | 'combat' | 'npc' | 'pet' | 'system';
 
 export interface StateChangeLogEntry {
   id: string;
@@ -77,6 +77,18 @@ function summarizeStructuralDiff(before: CharacterState, after: CharacterState, 
   const afterNpcCount = after.npcs?.length || 0;
   if (afterNpcCount > beforeNpcCount) {
     push(out, age, 'npc', 'info', 'npc_registered', `NPC registry gained ${afterNpcCount - beforeNpcCount} record(s).`, { before: beforeNpcCount, after: afterNpcCount });
+  }
+  const beforePetMap = new Map((before.pets || []).map(pet => [pet.id, pet]));
+  const afterPetMap = new Map((after.pets || []).map(pet => [pet.id, pet]));
+  for (const pet of after.pets || []) {
+    if (!beforePetMap.has(pet.id)) {
+      push(out, age, 'pet', 'info', 'pet_added', `Pet joined: ${pet.name}`, { refId: pet.id, meta: { species: pet.species, rarity: pet.rarity, level: pet.level } });
+    }
+  }
+  for (const pet of before.pets || []) {
+    if (!afterPetMap.has(pet.id)) {
+      push(out, age, 'pet', 'warning', 'pet_removed', `Pet left: ${pet.name}`, { refId: pet.id, meta: { species: pet.species, rarity: pet.rarity, level: pet.level } });
+    }
   }
   const beforeStatusMap = new Map((before.activeStatuses || []).map(status => [status.id, status]));
   const afterStatusMap = new Map((after.activeStatuses || []).map(status => [status.id, status]));
