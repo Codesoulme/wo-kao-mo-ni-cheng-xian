@@ -46,7 +46,7 @@ export function StartScreen() {
       setEvents(stateData.events || []);
       setChoices(stateData.choices || []);
       setPendingChoice(stateData.pendingChoice && stateData.character?.isAtChoice ? stateData.pendingChoice : null);
-      toast.success('\u65e7\u9014\u5df2\u7eed', { description: `${stateData.character.name} ? ${stateData.character.age}\u5c81` });
+      toast.success('\u65e7\u9014\u5df2\u7eed', { description: `${stateData.character.name} \u00b7 ${stateData.character.age}\u5c81` });
     } catch (err: any) {
       toast.error('\u5bfb\u56de\u65e7\u9014\u5931\u8d25', { description: err.message });
     } finally {
@@ -100,15 +100,15 @@ export function StartScreen() {
           <Mountain className="w-8 h-8 text-primary" />
         </div>
         <h1 className="font-serif-cn text-4xl font-bold mb-2 tracking-wider">
-          修仙模拟器
+          {'\u6211\u9760\u6a21\u62df\u6210\u4ed9'}
         </h1>
         <div className="flex items-center justify-center gap-2 text-muted-foreground">
           <span className="h-px w-8 bg-border" />
-          <span className="text-sm font-serif-cn">我要修真</span>
+          <span className="text-sm font-serif-cn">{'\u4e00\u5ff5\u5165\u4e16\uff0c\u767e\u5e74\u6c42\u4ed9'}</span>
           <span className="h-px w-8 bg-border" />
         </div>
         <p className="text-xs text-muted-foreground mt-4 max-w-xs mx-auto leading-relaxed">
-          天道执笔，演绎修真之路。每岁一事，命节点抉择，天地因果自相循。
+          {'\u4ece\u51e1\u5c18\u8d77\u6b65\uff0c\u5728\u5c81\u6708\u3001\u56e0\u679c\u4e0e\u6289\u62e9\u4e2d\u8d70\u51fa\u81ea\u5df1\u7684\u4fee\u4ed9\u8def\u3002\u6b64\u4e16\u65e0\u5b9a\uff0c\u552f\u89c1\u771f\u5fc3\u3002'}
         </p>
       </div>
 
@@ -118,12 +118,12 @@ export function StartScreen() {
           <div>
             <label className="text-xs text-muted-foreground mb-1.5 flex items-center gap-1">
               <Feather className="w-3 h-3" />
-              道号（留空则由天道赐名）
+              {'\u9053\u53f7\uff08\u53ef\u7559\u7a7a\uff0c\u7531\u5929\u547d\u81ea\u5b9a\uff09'}
             </label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="如：李青云"
+              placeholder={'\u4f8b\u5982\uff1a\u9752\u7384'}
               maxLength={12}
               className="bg-background/60 font-serif-cn"
               onKeyDown={(e) => { if (e.key === 'Enter') start(); }}
@@ -138,9 +138,9 @@ export function StartScreen() {
             )}
           >
             {busy ? (
-              <><Sparkles className="w-4 h-4 mr-2 animate-spin" />天道降生...</>
+              <><Sparkles className="w-4 h-4 mr-2 animate-spin" />{'\u63a8\u884d\u547d\u9014...'}</>
             ) : (
-              <><Sparkles className="w-4 h-4 mr-2" />入道开局</>
+              <><Sparkles className="w-4 h-4 mr-2" />{'\u8e0f\u5165\u6b64\u4e16'}</>
             )}
           </Button>
           {latestSave && (
@@ -153,12 +153,12 @@ export function StartScreen() {
               <RotateCcw className="w-4 h-4 mr-2" />
               {'\u7eed\u5165\u65e7\u9014'}
               <span className="ml-2 text-[10px] text-muted-foreground font-normal truncate">
-                {latestSave.name} ? {latestSave.age}{'\u5c81'}
+                {latestSave.name} {'\u00b7'} {latestSave.age}{'\u5c81'}
               </span>
             </Button>
           )}
           <div className="text-[10px] text-muted-foreground text-center leading-relaxed">
-            灵根随机 · 命运无常 · 天道不佑
+            {'AI \u63a8\u6f14 \u00b7 \u56e0\u679c\u7eed\u5199 \u00b7 \u6b64\u4e16\u65e0\u5e38'}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <CustomSimulationDialog />
@@ -167,21 +167,6 @@ export function StartScreen() {
           <AIConfigDialog variant="start" />
         </CardContent>
       </Card>
-
-      {/* 特色 */}
-      <div className="mt-8 grid grid-cols-3 gap-3 max-w-sm w-full scroll-reveal" style={{ animationDelay: '0.2s' }}>
-        {[
-          { icon: '🎯', title: '命节点', desc: '八大关口' },
-          { icon: '⚡', title: '干扰模拟', desc: '随时介入' },
-          { icon: '📜', title: '天道叙事', desc: 'AI 演绎' },
-        ].map((f, i) => (
-          <div key={i} className="text-center p-2 rounded-lg border border-border/40 bg-card/50">
-            <div className="text-lg mb-1">{f.icon}</div>
-            <div className="text-[11px] font-semibold font-serif-cn">{f.title}</div>
-            <div className="text-[9px] text-muted-foreground">{f.desc}</div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
