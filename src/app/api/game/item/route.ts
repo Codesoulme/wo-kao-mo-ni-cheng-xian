@@ -1,16 +1,78 @@
-// POST /api/game/item
-// 物品操作：装备(equip) / 卸下(unequip) / 使用(use)
-// 装备/卸下/使用后调用 LLM 生成动作叙事 + 更新 cultivationInsight + cultivationFactors
+﻿// POST /api/game/item
+// 物品动作：装备、卸下、使用。动作结果经引擎校验，并写入可追踪审计。
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import { dbToState, equipItem, unequipItem, consumeItem, stateToResponse, buildStateContext, normalizeCultivationState } from '@/lib/xianxia/engine';
 import { generateItemActionNarrative } from '@/lib/xianxia/llm';
+import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+type ItemAction = 'equip' | 'unequip' | 'use';
+
+function actionVerb(action: ItemAction): string {
+  if (action === 'equip') return '装备';
+  if (action === 'unequip') return '卸下';
+  return '使用';
+}
+
+function persistableStateData(state: ReturnType<typeof dbToState>) {
+  return {
+    age: state.age,
+    lifespan: state.lifespan,
+    realm: state.realm,
+    realmLevel: state.realmLevel,
+    cultivationExp: state.cultivationExp,
+    expToBreak: state.expToBreak,
+    elementMetal: state.elements.metal,
+    elementWood: state.elements.wood,
+    elementWater: state.elements.water,
+    elementFire: state.elements.fire,
+    elementEarth: state.elements.earth,
+    hp: state.hp,
+    maxHp: state.maxHp,
+    mp: state.mp,
+    maxMp: state.maxMp,
+    attack: state.attack,
+    defense: state.defense,
+    speed: state.speed,
+    luck: state.luck,
+    comprehension: state.comprehension,
+    spiritStones: state.spiritStones,
+    reputation: state.reputation,
+    alive: state.alive,
+    ascended: state.ascended,
+    causeOfDeath: state.causeOfDeath,
+    faction: state.faction,
+    master: state.master,
+    location: state.location,
+    fateNodes: state.fateNodes.join(','),
+    isAtChoice: state.isAtChoice,
+    lastEventAge: state.lastEventAge,
+    statusJson: JSON.stringify(state.activeStatuses),
+    inventoryJson: JSON.stringify(state.inventory),
+    equippedJson: JSON.stringify(state.equipped || []),
+    storageCapacity: state.storageCapacity ?? 5,
+    cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
+    cultivationInsight: state.cultivationInsight || '',
+    cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
+    memoryJson: JSON.stringify(state.longTermMemory || []),
+    pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
+    characterIntentsJson: JSON.stringify(state.characterIntents || []),
+    combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : '',
+    npcsJson: JSON.stringify(state.npcs || []),
+    causalGraphJson: JSON.stringify(state.causalGraph || { nodes: [], edges: [] }),
+    worldFactsJson: JSON.stringify(state.worldFacts || []),
+    heartDemon: state.heartDemon ?? 0,
+    petsJson: JSON.stringify(state.pets || []),
+    exploredRealmsJson: JSON.stringify(state.exploredRealms || []),
+  };
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +84,7 @@ export async function POST(req: NextRequest) {
     }).safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json({ success: false, error: '参数错误' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '参数有误' }, { status: 400 });
     }
     const { characterId, action, itemId } = parsed.data;
 
@@ -32,41 +94,30 @@ export async function POST(req: NextRequest) {
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
 
     let state = dbToState(char as any);
-    let result: { ok: boolean; error?: string; item?: any };
-    let message = '';
-    let appliedItem: any = null;
+    const stateBeforeAction = {
+      ...state,
+      inventory: [...state.inventory],
+      equipped: [...(state.equipped || [])],
+      activeStatuses: [...(state.activeStatuses || [])],
+      pets: [...(state.pets || [])],
+    };
 
-    if (action === 'equip') {
-      if (!itemId) return NextResponse.json({ success: false, error: 'itemId 必填' }, { status: 400 });
-      const r = equipItem(state, itemId);
-      state = r.state; // 关键：equipItem 返回新 state，不修改入参
-      result = r;
-      message = r.ok ? '装备成功' : (r.error || '装备失败');
-      appliedItem = r.item;
-    } else if (action === 'unequip') {
-      if (!itemId) return NextResponse.json({ success: false, error: 'itemId 必填' }, { status: 400 });
-      const r = unequipItem(state, itemId);
-      state = r.state; // 关键：unequipItem 返回新 state，不修改入参
-      result = r;
-      message = r.ok ? '卸下成功' : (r.error || '卸下失败');
-      appliedItem = r.item;
-    } else {
-      // use
-      if (!itemId) return NextResponse.json({ success: false, error: 'itemId 必填' }, { status: 400 });
-      const r = consumeItem(state, itemId);
-      state = r.state; // 关键：consumeItem 返回新 state，不修改入参
-      result = r;
-      message = r.ok ? '使用成功' : (r.error || '使用失败');
-      appliedItem = r.item;
-    }
+    if (!itemId) return NextResponse.json({ success: false, error: '缺少 itemId' }, { status: 400 });
+
+    const result = action === 'equip'
+      ? equipItem(state, itemId)
+      : action === 'unequip'
+        ? unequipItem(state, itemId)
+        : consumeItem(state, itemId);
+
+    state = result.state;
+    const message = result.ok ? `${actionVerb(action)}成功` : (result.error || `${actionVerb(action)}失败`);
+    const appliedItem = result.item;
 
     if (!result.ok) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });
     }
 
-    // 调用 LLM 生成动作叙事 + 更新 cultivationInsight
-    // 让 AI 知道玩家装备/使用/卸下了什么，并据此修改修炼心得文本
-    // 来源条目（cultivationFactors）由引擎权威计算，AI 不输出
     let narrative = '';
     try {
       const recentEventsDb = await db.eventLog.findMany({
@@ -74,70 +125,78 @@ export async function POST(req: NextRequest) {
         orderBy: { age: 'desc' },
         take: 3,
       });
-      const recentEvents = recentEventsDb.reverse().map(e => ({
-        age: e.age,
-        title: e.title,
-        narrative: e.narrative,
+      const recentEvents = recentEventsDb.reverse().map(event => ({
+        age: event.age,
+        title: event.title,
+        narrative: event.narrative,
       }));
       const ctx = buildStateContext(state, recentEvents);
-      const r = await generateItemActionNarrative(ctx, action, appliedItem);
-      narrative = r.narrative;
-      if (r.cultivationInsight && r.cultivationInsight.trim()) {
-        state.cultivationInsight = r.cultivationInsight.trim();
+      if (!appliedItem) throw new Error('item action produced no item');
+      const generated = await generateItemActionNarrative(ctx, action, appliedItem);
+      narrative = generated.narrative;
+      if (generated.cultivationInsight && generated.cultivationInsight.trim()) {
+        state.cultivationInsight = generated.cultivationInsight.trim();
       }
     } catch (err: any) {
-      // LLM 失败不阻塞物品操作，仅无叙事
       console.error('item action narrative failed:', err?.message || err);
     }
-    // 引擎权威：修炼速度完全由灵根、已装备与有效状态实时归算。
+
     state = normalizeCultivationState(state);
 
-    // 持久化
-    await db.character.update({
-      where: { id: characterId },
-      data: {
-        hp: state.hp, maxHp: state.maxHp,
-        mp: state.mp, maxMp: state.maxMp,
-        attack: state.attack, defense: state.defense, speed: state.speed,
-        luck: state.luck, comprehension: state.comprehension,
-        spiritStones: state.spiritStones, reputation: state.reputation,
-        inventoryJson: JSON.stringify(state.inventory),
-        equippedJson: JSON.stringify(state.equipped || []),
-        storageCapacity: state.storageCapacity ?? 5,
-        cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
-        cultivationInsight: state.cultivationInsight || '',
-        cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
-      },
+    const stateChangeLog = buildStateChangeLog({
+      before: stateBeforeAction,
+      after: state,
+      appliedChanges: result.appliedChanges,
+      rejectedChanges: result.rejectedChanges,
+      contentRegistryTrace: [],
+      effectResolveTrace: result.effectResolveTrace,
+      aiBoundaryTrace: [],
     });
 
-    // 物品操作也算一次小事件，写入事件日志（让史册可查）
-    if (narrative) {
-      try {
-        await db.eventLog.create({
-          data: {
-            characterId,
-            age: state.age,
-            title: `${action === 'equip' ? '装备' : action === 'unequip' ? '卸下' : '使用'}·${(appliedItem?.name || '').slice(0, 8)}`,
-            narrative,
-            eventType: 'interference',
-            effects: JSON.stringify([]),
-          },
-        });
-      } catch {
-        // 日志写入失败不影响主流程
-      }
+    await db.character.update({
+      where: { id: characterId },
+      data: persistableStateData(state),
+    });
+
+    const removedItemIds = action === 'use' && appliedItem?.id ? [appliedItem.id] : [];
+    const displayEffects = buildEventDisplayEffects({
+      before: stateBeforeAction,
+      after: state,
+      changes: result.appliedChanges,
+      newItems: action === 'unequip' && appliedItem ? [appliedItem] : [],
+      newEquippedItems: action === 'equip' && appliedItem ? [appliedItem] : [],
+      removedItemIds,
+    });
+    const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
+
+    const fallbackNarrative = `${actionVerb(action)}${appliedItem?.name ? `「${appliedItem.name}」` : '此物'}后，气机随之微动。`;
+    try {
+      await db.eventLog.create({
+        data: {
+          characterId,
+          age: state.age,
+          title: `${actionVerb(action)}·${(appliedItem?.name || '物品').slice(0, 12)}`,
+          narrative: narrative || fallbackNarrative,
+          eventType: 'item',
+          effects: JSON.stringify(effectsWithAudit),
+        },
+      });
+    } catch {
+      // 日志写入失败不影响物品动作本身。
     }
 
     return NextResponse.json({
       success: true,
       message,
       narrative,
+      effectResolveWarnings: result.effectResolveWarnings,
+      stateChangeLog,
       state: stateToResponse(state),
     });
   } catch (err: any) {
     console.error('item action error:', err);
     return NextResponse.json(
-      { success: false, error: err?.message || '操作失败' },
+      { success: false, error: err?.message || '物品操作失败' },
       { status: 500 }
     );
   }

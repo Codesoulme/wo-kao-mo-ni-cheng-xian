@@ -292,20 +292,52 @@ export function applyChanges(state: CharacterState, changes: AttributeChange[]):
 // ==================== 装备管理 (引擎权威) ====================
 
 // 把物品的 add 效果应用到角色属性（装备时 +delta，卸下时 -delta）
-export function applyItemEffects(state: CharacterState, item: ItemEntry, sign: 1 | -1): CharacterState {
-  let next = { ...state };
+export interface ItemEffectResolveResult {
+  state: CharacterState;
+  appliedChanges: AttributeChange[];
+  rejectedChanges: AttributeChange[];
+  effectResolveTrace: EffectResolveTrace[];
+  effectResolveWarnings: string[];
+}
+
+export interface ItemActionResult extends ItemEffectResolveResult {
+  ok: boolean;
+  error?: string;
+  item?: ItemEntry;
+}
+
+function emptyItemActionResult(state: CharacterState, ok = false, error?: string, item?: ItemEntry): ItemActionResult {
+  return { state, ok, error, item, appliedChanges: [], rejectedChanges: [], effectResolveTrace: [], effectResolveWarnings: [] };
+}
+
+export function resolveItemEffects(state: CharacterState, item: ItemEntry, sign: 1 | -1, label?: string): ItemEffectResolveResult {
   const changes: AttributeChange[] = [];
   for (const eff of item.effects || []) {
     if (eff.operation === 'add' && ATTRIBUTE_BOUNDS[eff.target_attribute]) {
       changes.push({
         attribute: eff.target_attribute,
         delta: sign * eff.value,
-        reason: sign > 0 ? `装备 ${item.name}` : `卸下 ${item.name}`,
+        reason: label || (sign > 0 ? `装备 ${item.name}` : `卸下 ${item.name}`),
       });
     }
   }
-  if (changes.length) next = applyChanges(next, changes);
-  return next;
+  if (!changes.length) return { state, appliedChanges: [], rejectedChanges: [], effectResolveTrace: [], effectResolveWarnings: [] };
+  const resolved = resolveAttributeChanges(state, changes, {
+    bounds: ATTRIBUTE_BOUNDS,
+    source: label || item.name || 'item-action',
+  });
+  return {
+    state: resolved.state,
+    appliedChanges: resolved.appliedChanges,
+    rejectedChanges: resolved.rejectedChanges,
+    effectResolveTrace: resolved.trace,
+    effectResolveWarnings: resolved.trace.filter(trace => trace.severity !== 'info').map(trace => trace.message),
+  };
+}
+
+// 将物品 add 效果应用到角色属性；装备时 +delta，卸下时 -delta。
+export function applyItemEffects(state: CharacterState, item: ItemEntry, sign: 1 | -1): CharacterState {
+  return resolveItemEffects(state, item, sign).state;
 }
 
 // 重算修炼倍率 = 灵根倍率 × 所有已装备物品与状态词条的 multiply cultivationExp 效果之积
@@ -461,6 +493,8 @@ export function computeEffectiveCultivationRate(state: CharacterState): { multip
 export function normalizeCultivationState(state: CharacterState): CharacterState {
   const normalizedState: CharacterState = {
     ...state,
+    hp: Math.max(0, Math.min(Number(state.hp ?? 0), Math.max(1, Number(state.maxHp ?? 1)))),
+    mp: Math.max(0, Math.min(Number(state.mp ?? 0), Math.max(0, Number(state.maxMp ?? 0)))),
     inventory: (state.inventory || []).map(normalizeCultivationBearingItem),
     equipped: (state.equipped || []).map(normalizeCultivationBearingItem),
   };
@@ -622,16 +656,14 @@ export function buildCombatVictorySpoils(state: CharacterState, session: CombatS
 
 // 装备物品（从 inventory 移到 equipped 数组末尾，不限制同类型数量）
 // 不再替换同槽位物品——玩家可戴多个戒指、脖挂一串储物戒指等，由 AI 在 equipNote 中描述位置
-export function equipItem(state: CharacterState, itemId: string): { state: CharacterState; ok: boolean; error?: string; item?: ItemEntry } {
+export function equipItem(state: CharacterState, itemId: string): ItemActionResult {
   const idx = state.inventory.findIndex(it => it.id === itemId);
-  if (idx < 0) return { state, ok: false, error: '物品不在储物袋中' };
+  if (idx < 0) return emptyItemActionResult(state, false, '物品不在储物中');
   const item = state.inventory[idx];
   const slot = itemToSlot(item.item_type);
-  if (!slot) return { state, ok: false, error: '该物品不可装备' };
-  // 储物袋本身不需要装备（获得即生效），装备上去反而会使其属性不生效
-  if (isStorageBag(item)) return { state, ok: false, error: '储物袋无需装备，获得即扩容' };
+  if (!slot) return emptyItemActionResult(state, false, '此物不可装备');
+  if (isStorageBag(item)) return emptyItemActionResult(state, false, '储物袋只能随身携带，不可装备');
 
-  // 补默认 equipNote（若物品本身没有）
   const equippedItem: ItemEntry = {
     ...item,
     equipNote: item.equipNote || DEFAULT_EQUIP_NOTE[slot] || '装备',
@@ -641,40 +673,33 @@ export function equipItem(state: CharacterState, itemId: string): { state: Chara
     inventory: state.inventory.filter(it => it.id !== itemId),
     equipped: [...(state.equipped || []), equippedItem],
   };
-  next = applyItemEffects(next, equippedItem, 1);
-  next = recalcCultivationMultiplier(next);
-  return { state: next, ok: true, item: equippedItem };
-}
-
-// 卸下指定物品（按 id 从 equipped 数组移除）
-export function unequipItem(state: CharacterState, itemId: string): { state: CharacterState; ok: boolean; error?: string; item?: ItemEntry } {
+  const resolved = resolveItemEffects(next, equippedItem, 1, `装备 ${equippedItem.name}`);
+  next = recalcCultivationMultiplier(resolved.state);
+  return { ...resolved, state: next, ok: true, item: equippedItem };
+}export function unequipItem(state: CharacterState, itemId: string): ItemActionResult {
   const item = (state.equipped || []).find(it => it.id === itemId);
-  if (!item) return { state, ok: false, error: '该物品未装备' };
+  if (!item) return emptyItemActionResult(state, false, '此物尚未装备');
   let next: CharacterState = {
     ...state,
     equipped: (state.equipped || []).filter(it => it.id !== itemId),
     inventory: [...state.inventory, item],
   };
-  next = applyItemEffects(next, item, -1);
-  next = recalcCultivationMultiplier(next);
-  return { state: next, ok: true, item };
-}
-
-// 使用消耗品（consumable）：应用效果后从 inventory 移除
-export function consumeItem(state: CharacterState, itemId: string): { state: CharacterState; ok: boolean; error?: string; item?: ItemEntry } {
+  const resolved = resolveItemEffects(next, item, -1, `卸下 ${item.name}`);
+  next = recalcCultivationMultiplier(resolved.state);
+  return { ...resolved, state: next, ok: true, item };
+}export function consumeItem(state: CharacterState, itemId: string): ItemActionResult {
   const item = state.inventory.find(it => it.id === itemId);
-  if (!item) return { state, ok: false, error: '物品不在储物袋中' };
-  if (item.item_type !== 'consumable') return { state, ok: false, error: '仅丹药类物品可使用' };
+  if (!item) return emptyItemActionResult(state, false, '物品不在储物中');
+  if (item.item_type !== 'consumable') return emptyItemActionResult(state, false, '只有丹药等消耗品可直接使用');
   let next: CharacterState = {
     ...state,
     inventory: state.inventory.filter(it => it.id !== itemId),
   };
-  // 应用 add 效果到属性；trigger 效果暂不处理（可后续扩展为加状态词条）
-  next = applyItemEffects(next, item, 1);
-  return { state: next, ok: true, item };
+  const resolved = resolveItemEffects(next, item, 1, `使用 ${item.name}`);
+  next = normalizeCultivationState(resolved.state);
+  return { ...resolved, state: next, ok: true, item };
 }
 
-// AI 联动：按 id 移除物品（破坏/消耗）。可同时存在于 inventory 或 equipped。
 export function removeItemsByIds(state: CharacterState, ids: string[]): { state: CharacterState; removed: ItemEntry[] } {
   if (!ids.length) return { state, removed: [] };
   const idSet = new Set(ids);
