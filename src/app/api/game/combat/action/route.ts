@@ -7,12 +7,13 @@ import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import {
   dbToState,
   executeCombatRound,
+  executeCombatRoundWithProposal,
   stateToResponse,
   buildStateContext,
   normalizeCultivationState,
   recordActionCausality,
 } from '@/lib/xianxia/engine';
-import { generateCombatRoundNarrative } from '@/lib/xianxia/llm';
+import { generateCombatRoundNarrative, generateCombatRoundProposal } from '@/lib/xianxia/llm';
 import { buildStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import type { AttributeChange } from '@/lib/xianxia/types';
 import { z } from 'zod';
@@ -106,7 +107,19 @@ export async function POST(req: NextRequest) {
     }
 
     const sessionBefore = state.combatSession;
-    const result = executeCombatRound(state, action, payload || {});
+    const ctxBefore = buildStateContext(state, []);
+    let aiProposal = null as Awaited<ReturnType<typeof generateCombatRoundProposal>> | null;
+    try {
+      aiProposal = await Promise.race([
+        generateCombatRoundProposal({ ctx: ctxBefore, sessionBefore, action, payload: payload || {} }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500)),
+      ]);
+    } catch (err: any) {
+      console.error('generateCombatRoundProposal failed:', err?.message || err);
+    }
+    const result = aiProposal
+      ? executeCombatRoundWithProposal(state, action, payload || {}, aiProposal)
+      : executeCombatRound(state, action, payload || {});
     state = normalizeCultivationState(result.state);
 
     if (sessionBefore && result.round) {

@@ -525,17 +525,34 @@ export interface CombatEnemy {
 
 export interface CombatRound {
   round: number;
-  playerAction: string;       // 玩家行动描述
+  playerAction: string;       // Player action label
   playerActionType: 'attack' | 'skill' | 'item' | 'defend' | 'flee' | 'scripture';
-  playerDamage?: number;      // 玩家造成的伤害
-  playerHeal?: number;        // 玩家回复
-  enemyAction?: string;       // 敌人行动描述（可能为空，如玩家逃跑成功）
+  playerDamage?: number;      // Damage dealt by player side
+  playerHeal?: number;        // Healing received by player side
+  enemyAction?: string;       // Enemy action label
   enemyActionType?: string;
-  enemyDamage?: number;       // 敌人造成的伤害
-  narrative: string;          // 本回合叙事
+  enemyDamage?: number;       // Damage dealt by enemy side
+  narrative: string;          // In-world round narrative
   playerHpAfter: number;
   enemyHpAfter: number;
   playerMpAfter?: number;
+  aiAudit?: string[];         // Engine audit trace for AI combat adjudication
+}
+
+// AI proposes a structured combat adjudication; the engine clamps and persists the authoritative result.
+export interface CombatRoundProposal {
+  playerActionLabel?: string;
+  playerActionType?: CombatRound['playerActionType'];
+  enemyAction?: string;
+  enemyActionType?: string;
+  playerDamage?: number;
+  playerHeal?: number;
+  enemyDamage?: number;
+  mpCost?: number;
+  consumeItem?: boolean;
+  fleeOutcome?: 'success' | 'failed';
+  narrative?: string;
+  auditHints?: string[];
 }
 
 export interface CombatSession {

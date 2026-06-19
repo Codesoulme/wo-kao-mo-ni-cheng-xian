@@ -23,6 +23,7 @@ import {
   CharacterIntent,
   CombatEnemy,
   CombatRound,
+  CombatRoundProposal,
   CombatSession,
   EventBlueprint,
 } from './types';
@@ -1410,6 +1411,89 @@ ${item.equipNote ? '装备位置：' + item.equipNote : ''}
 
 
 // ==================== 战斗回合叙事润色 ====================
+
+function sanitizeCombatRoundProposal(raw: any): CombatRoundProposal {
+  const allowedActionTypes = new Set(['attack', 'skill', 'item', 'defend', 'flee', 'scripture']);
+  return {
+    playerActionLabel: raw?.playerActionLabel ? String(raw.playerActionLabel).slice(0, 40) : undefined,
+    playerActionType: allowedActionTypes.has(raw?.playerActionType) ? raw.playerActionType : undefined,
+    enemyAction: raw?.enemyAction ? String(raw.enemyAction).slice(0, 40) : undefined,
+    enemyActionType: raw?.enemyActionType ? String(raw.enemyActionType).slice(0, 24) : undefined,
+    playerDamage: Math.max(0, Math.floor(Number(raw?.playerDamage) || 0)),
+    playerHeal: Math.max(0, Math.floor(Number(raw?.playerHeal) || 0)),
+    enemyDamage: Math.max(0, Math.floor(Number(raw?.enemyDamage) || 0)),
+    mpCost: raw?.mpCost == null ? undefined : Math.max(0, Math.floor(Number(raw.mpCost) || 0)),
+    consumeItem: raw?.consumeItem === false ? false : raw?.consumeItem === true ? true : undefined,
+    fleeOutcome: raw?.fleeOutcome === 'success' ? 'success' : raw?.fleeOutcome === 'failed' ? 'failed' : undefined,
+    narrative: raw?.narrative ? String(raw.narrative).slice(0, 320) : undefined,
+    auditHints: Array.isArray(raw?.auditHints) ? raw.auditHints.map((x: any) => String(x).slice(0, 80)).filter(Boolean).slice(0, 4) : [],
+  };
+}
+
+export async function generateCombatRoundProposal(args: {
+  ctx: EngineStateContext;
+  sessionBefore: CombatSession;
+  action: 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee' | 'other';
+  payload?: { skillIdx?: number; itemId?: string; optionId?: string };
+}): Promise<CombatRoundProposal> {
+  const { ctx, sessionBefore, action, payload } = args;
+  const sc = ctx.character;
+  const enemy = sessionBefore.enemies?.[sessionBefore.currentEnemyIdx];
+  const palette = sessionBefore.actionPalette;
+  const allOptions = palette ? [palette.basicAttack, palette.spell, palette.defense, palette.item, palette.other].flatMap(g => g?.options || []) : [];
+  const option = payload?.optionId ? allOptions.find(o => o.id === payload.optionId) : undefined;
+  const skill = option?.skillIdx != null ? sessionBefore.playerSkills?.[option.skillIdx] : payload?.skillIdx != null ? sessionBefore.playerSkills?.[payload.skillIdx] : undefined;
+  const item = payload?.itemId ? (sessionBefore.playerItems || []).find(it => it.itemId === payload.itemId) : undefined;
+  const recentLog = (sessionBefore.log || []).slice(-3).map(r => `第${r.round}合：${r.narrative}`).join('\n') || '尚无旧回合。';
+
+  const system = `${IDENTITY_PROMPT}
+
+你是战斗回合裁决的 AI 提案层。你根据场景、角色状态、玩家动作、敌我硬事实，提出结构化回合结果。
+硬规则：
+- 你只提出裁决，最终生效由引擎审计、截断、落库。
+- 不得凭空创造玩家未拥有的物品、术法、护盾、复活、秒杀。
+- 伤害、回复、法力消耗必须符合敌我强弱、动作来源和当前状态；强敌可以重伤或杀死玩家。
+- 若玩家尝试逃走，fleeOutcome 只能按速度、处境、封锁合理判断。
+- narrative 写小说化战斗过程，必须和数字一致。
+严格只返回 JSON。`;
+
+  const user = `角色：${sc.name}，${sc.age}岁，${sc.realmName}
+气血/法力：${sessionBefore.playerHp}/${sessionBefore.playerMaxHp}，${sessionBefore.playerMp}/${sessionBefore.playerMaxMp}
+战力：攻${sessionBefore.playerAttack} 防${sessionBefore.playerDefense} 速${sessionBefore.playerSpeed}
+状态：${(ctx.activeStatuses || []).map(s => s.name).join('、') || '无显著状态'}
+
+战斗缘起：${sessionBefore.contextTitle || '遭逢战斗'}
+${sessionBefore.contextNarrative || ''}
+
+当前敌手：${enemy ? `${enemy.name}（${enemy.realm || '未知境界'}） 气血${enemy.hp}/${enemy.maxHp} 攻${enemy.attack} 防${enemy.defense} 速${enemy.speed}。${enemy.description || ''}` : '无'}
+敌方意图：${enemy?.nextActionDesc || enemy?.nextAction || '由你按场景判断'}
+
+玩家本回合动作：${action}
+动作选项：${option ? `${option.name}：${option.description}；意图：${option.intent || '无'}` : '未指定动作选项'}
+术法：${skill ? `${skill.name}，法力消耗${skill.mpCost}，威力${skill.power}。${skill.description}` : '无'}
+物品：${item ? `${item.name}：${item.effect}` : '无'}
+
+近三回合：
+${recentLog}
+
+返回 JSON：
+{
+  "playerActionLabel": "玩家动作名，20字内",
+  "playerActionType": "attack|skill|item|defend|flee",
+  "playerDamage": 0,
+  "playerHeal": 0,
+  "mpCost": 0,
+  "consumeItem": true,
+  "fleeOutcome": "success|failed",
+  "enemyAction": "敌方动作名",
+  "enemyActionType": "attack|skill|defend|flee|stunned",
+  "enemyDamage": 0,
+  "narrative": "80-180字，小说化写清本回合因果与伤势，不要暴露AI、审计、数值公式等局外词",
+  "auditHints": ["你认为需要引擎特别核验的事实"]
+}`;
+  const content = await callLLMText(system, user);
+  return sanitizeCombatRoundProposal(parseJSON(content));
+}
 
 export async function generateCombatRoundNarrative(args: {
   ctx: EngineStateContext;
