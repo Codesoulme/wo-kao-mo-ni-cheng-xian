@@ -46,6 +46,44 @@ function isHighPriorityQuest(q: QuestEntry): boolean {
   return (q.stage === 'urgent' || q.urgency >= 8) && q.stage !== 'completed' && q.stage !== 'failed';
 }
 
+function normalizeText(value: unknown): string {
+  return String(value || '').replace(/\s+/g, '').toLowerCase();
+}
+
+function hasMeaningfulOverlap(a: unknown, b: unknown): boolean {
+  const left = normalizeText(a);
+  const right = normalizeText(b);
+  if (!left || !right) return false;
+  if (left === right || left.includes(right) || right.includes(left)) return true;
+  const tokens = [...new Set((left.match(/[\u4e00-\u9fa5]{2,}|[a-z0-9_]{3,}/g) || []).filter(t => t.length >= 2))];
+  return tokens.some(token => right.includes(token));
+}
+
+function outputStoryText(output: AIEventOutput): string {
+  return [
+    output.title,
+    output.narrative,
+    output.memory,
+    output.cultivationInsight,
+    ...(output.newThreads || []).flatMap(t => [t.title, t.description, t.followUpHint, t.reward, t.failureCost]),
+    ...(output.newNpcs || []).flatMap(n => [n.name, n.description, n.memory, n.role]),
+    ...(output.newStatuses || []).flatMap(s => [s.name, s.description, s.source]),
+    ...(output.newItems || []).flatMap(i => [i.name, i.description, i.source]),
+  ].filter(Boolean).join('；');
+}
+
+function explainsRelationshipShift(text: string): boolean {
+  return /化解|和解|救命|相助|结盟|立誓|赔罪|交易|互利|误会|解开|道歉|投诚|恩情|托付|冲突|背叛|夺宝|截杀|袭击|翻脸|结怨/.test(text);
+}
+
+function isFriendly(attitude: string | undefined): boolean {
+  return attitude === 'ally' || attitude === 'friendly';
+}
+
+function isHostile(attitude: string | undefined): boolean {
+  return attitude === 'enemy' || attitude === 'hostile';
+}
+
 function validateThreadContinuity(state: CharacterState, output: AIEventOutput, trace: BoundaryValidationTrace[]): void {
   const existingThreads = new Set((state.pendingThreads || []).map(t => t.id));
   const touched = changedThreadIds(output);
@@ -69,6 +107,28 @@ function validateThreadContinuity(state: CharacterState, output: AIEventOutput, 
     newThreadIds.add(thread.id);
     if (thread.deadlineAge < state.age && thread.status !== 'resolved' && thread.status !== 'failed') {
       pushTrace(trace, 'warning', 'past_deadline_new_thread', `AI created an active thread with a past deadline: ${thread.title}`, { refId: thread.id, field: 'newThreads.deadlineAge' });
+    }
+  }
+
+  const closedThreads = (state.pendingThreads || []).filter(t => t.status === 'resolved' || t.status === 'failed');
+  const activeThreadIds = new Set((state.pendingThreads || []).filter(t => t.status !== 'resolved' && t.status !== 'failed').map(t => t.id));
+  for (const id of referencedThreadIds(output)) {
+    const closed = closedThreads.find(t => t.id === id);
+    if (closed) {
+      pushTrace(trace, 'warning', 'closed_thread_referenced', `AI tried to mutate a closed thread: ${closed.title}`, { refId: id, field: 'threads' });
+    }
+  }
+
+  for (const thread of output.newThreads || []) {
+    const similarClosed = closedThreads.find(old => hasMeaningfulOverlap(old.title, thread.title) || hasMeaningfulOverlap(old.description, thread.description));
+    if (similarClosed) {
+      pushTrace(trace, 'warning', 'closed_thread_reopened_as_new', `AI may be reopening a closed thread as new: ${thread.title}`, { refId: thread.id, field: 'newThreads' });
+    }
+    if (thread.sourceEventTitle && closedThreads.some(old => hasMeaningfulOverlap(old.sourceEventTitle, thread.sourceEventTitle))) {
+      pushTrace(trace, 'info', 'new_thread_from_closed_source', `AI created a thread from a previously closed source event: ${thread.title}`, { refId: thread.id, field: 'newThreads.sourceEventTitle' });
+    }
+    if (thread.status !== 'resolved' && thread.status !== 'failed' && thread.id && activeThreadIds.has(thread.id)) {
+      pushTrace(trace, 'warning', 'active_thread_duplicate_reference', `AI created a new active thread with an id already active: ${thread.id}`, { refId: thread.id, field: 'newThreads.id' });
     }
   }
 
@@ -96,6 +156,94 @@ function validateAttributeChanges(output: AIEventOutput, trace: BoundaryValidati
     }
     if (!c.reason || String(c.reason).trim().length < 2) {
       pushTrace(trace, 'info', 'missing_change_reason', `AI attribute change lacks a clear reason: ${c.attribute}`, { field: 'changes.reason', refId: c.attribute });
+    }
+  }
+}
+
+function validateItemConsistency(state: CharacterState, output: AIEventOutput, trace: BoundaryValidationTrace[]): void {
+  const inventory = state.inventory || [];
+  const equipped = state.equipped || [];
+  const heldIds = new Set([...inventory, ...equipped].map(i => i.id).filter(Boolean));
+  const inventoryIds = new Set(inventory.map(i => i.id).filter(Boolean));
+  const equippedIds = new Set(equipped.map(i => i.id).filter(Boolean));
+  const knownNames = [...inventory, ...equipped].map(i => normalizeText(i.name)).filter(Boolean);
+
+  for (const id of output.removedItemIds || []) {
+    if (!heldIds.has(id)) {
+      pushTrace(trace, 'warning', 'removed_unknown_item', `AI attempted to remove an item not currently held: ${id}`, { refId: id, field: 'removedItemIds' });
+    }
+  }
+  for (const id of output.equipItemIds || []) {
+    if (!inventoryIds.has(id) && !equippedIds.has(id)) {
+      pushTrace(trace, 'warning', 'equip_unknown_item', `AI attempted to equip an item not currently available: ${id}`, { refId: id, field: 'equipItemIds' });
+    }
+  }
+  for (const id of output.unequipItemIds || []) {
+    if (!equippedIds.has(id)) {
+      pushTrace(trace, 'warning', 'unequip_unknown_item', `AI attempted to unequip an item not currently equipped: ${id}`, { refId: id, field: 'unequipItemIds' });
+    }
+  }
+  for (const item of [...(output.newItems || []), ...(output.newEquippedItems || [])]) {
+    if (item.id && heldIds.has(item.id)) {
+      pushTrace(trace, 'warning', 'new_item_duplicate_id', `AI created an item using an existing held id: ${item.id}`, { refId: item.id, field: 'newItems.id' });
+    }
+    const name = normalizeText(item.name);
+    if (name && knownNames.includes(name)) {
+      pushTrace(trace, 'info', 'new_item_duplicate_name', `AI created another item with an existing held name: ${item.name}`, { refId: item.id, field: 'newItems.name' });
+    }
+  }
+}
+
+function validateNpcConsistency(state: CharacterState, output: AIEventOutput, trace: BoundaryValidationTrace[]): void {
+  const existing = state.npcs || [];
+  const text = outputStoryText(output);
+  for (const npc of output.newNpcs || []) {
+    const old = existing.find(n => (npc.id && n.id === npc.id) || hasMeaningfulOverlap(n.name, npc.name));
+    if (!old) continue;
+    const nextAttitude = String(npc.attitude || old.attitude || 'unknown');
+    if (isHostile(old.attitude) && isFriendly(nextAttitude) && !explainsRelationshipShift(text)) {
+      pushTrace(trace, 'warning', 'npc_hostile_to_friendly_without_cause', `AI changed hostile NPC toward friendly without clear narrative cause: ${old.name}`, { refId: old.id, field: 'newNpcs.attitude' });
+    }
+    if (isFriendly(old.attitude) && isHostile(nextAttitude) && !explainsRelationshipShift(text)) {
+      pushTrace(trace, 'warning', 'npc_friendly_to_hostile_without_cause', `AI changed friendly NPC toward hostile without clear narrative cause: ${old.name}`, { refId: old.id, field: 'newNpcs.attitude' });
+    }
+    const scoreDelta = Math.abs(Number(npc.relationshipScore ?? old.relationshipScore) - Number(old.relationshipScore || 0));
+    if (scoreDelta >= 50 && !explainsRelationshipShift(text)) {
+      pushTrace(trace, 'warning', 'npc_relationship_jump_without_cause', `AI changed NPC relationship score sharply without clear narrative cause: ${old.name}`, { refId: old.id, field: 'newNpcs.relationshipScore' });
+    }
+  }
+
+  for (const enemy of output.triggerCombat?.enemies || []) {
+    const old = existing.find(n => hasMeaningfulOverlap(n.name, enemy.name));
+    if (old && isFriendly(old.attitude) && !explainsRelationshipShift(text)) {
+      pushTrace(trace, 'warning', 'friendly_npc_used_as_enemy_without_cause', `AI used a friendly NPC as combat enemy without clear conflict cause: ${old.name}`, { refId: old.id, field: 'triggerCombat.enemies' });
+    }
+  }
+}
+
+function validateWorldFactConsistency(state: CharacterState, output: AIEventOutput, trace: BoundaryValidationTrace[]): void {
+  const text = outputStoryText(output);
+  const closedThreadTitles = (state.pendingThreads || [])
+    .filter(t => t.status === 'resolved' || t.status === 'failed')
+    .map(t => t.title)
+    .filter(Boolean);
+  for (const title of closedThreadTitles.slice(0, 20)) {
+    if (hasMeaningfulOverlap(text, title) && !/旧事|余波|传闻|后果|清算|回忆|遗留|残波|复盘/.test(text)) {
+      pushTrace(trace, 'info', 'closed_thread_mentioned_without_aftermath_frame', `AI mentioned a closed thread without clearly framing it as aftermath: ${title}`, { field: 'narrative' });
+    }
+  }
+
+  const factTitles = (state.worldFacts || []).map(f => normalizeText(f.title)).filter(Boolean);
+  const newWorldObjects = [
+    ...(output.newItems || []).map(i => i.name),
+    ...(output.newStatuses || []).map(st => st.name),
+    ...(output.newThreads || []).map(t => t.title),
+    ...(output.newNpcs || []).map(n => n.name),
+  ].filter(Boolean);
+  for (const name of newWorldObjects) {
+    const normalized = normalizeText(name);
+    if (normalized && factTitles.includes(normalized)) {
+      pushTrace(trace, 'info', 'generated_name_matches_existing_world_fact', `AI generated content whose name matches an existing world fact: ${name}`, { field: 'worldFacts' });
     }
   }
 }
@@ -131,6 +279,9 @@ export function validateAIBoundary(state: CharacterState, output: AIEventOutput)
   const trace: BoundaryValidationTrace[] = [];
 
   validateThreadContinuity(state, output, trace);
+  validateItemConsistency(state, output, trace);
+  validateNpcConsistency(state, output, trace);
+  validateWorldFactConsistency(state, output, trace);
   validateAttributeChanges(output, trace);
   validateRewardsAndCombat(state, output, trace);
 
