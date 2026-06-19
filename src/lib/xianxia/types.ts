@@ -938,6 +938,8 @@ export interface CharacterState {
   npcs: WorldNpc[];
   causalGraph: CausalGraph;
   worldFacts: WorldFact[];
+  // 最近叙事契约审计反馈，仅用于调度/提示词的短期记忆潮汐，不持久化到角色状态。
+  narrativeContractFeedback?: NarrativeContractFeedbackEntry[];
   pendingThreads: PendingThread[];
   questEntries: QuestEntry[];
   // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）

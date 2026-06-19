@@ -1,4 +1,4 @@
-﻿import type { CausalGraph, CharacterState, EventSchedulerPlan, ScheduledEventHint, WorldPressureOpportunityMap } from './types';
+﻿import type { CausalGraph, CharacterState, EventSchedulerPlan, NarrativeContractFeedbackEntry, ScheduledEventHint, WorldPressureOpportunityMap } from './types';
 
 function urgencyToPriority(urgency: number | undefined): number {
   return Math.max(0, Math.min(100, Number(urgency) || 0));
@@ -201,6 +201,80 @@ function hintText(hint: ScheduledEventHint): string {
   return [hint.title, hint.reason, hint.kind, hint.requiredAction].filter(Boolean).join('；');
 }
 
+function feedbackText(entry: NarrativeContractFeedbackEntry): string {
+  return [
+    entry.title,
+    entry.narrativeFocus,
+    entry.contractNote,
+    entry.focusHintId,
+    entry.focusHintTitle,
+    entry.topThreat,
+    entry.topOpportunity,
+    ...(entry.usedScheduleHintIds || []),
+    ...(entry.usedWorldFactIds || []),
+    ...(entry.usedNpcIds || []),
+    ...(entry.warningCodes || []),
+  ].filter(Boolean).join('；');
+}
+
+function hintMatchesFeedback(hint: ScheduledEventHint, entry: NarrativeContractFeedbackEntry): boolean {
+  const text = hintText(hint);
+  const ids = [hint.id, hint.sourceThreadId, ...(hint.relatedFactIds || [])].filter(Boolean);
+  const feedbackIds = [entry.focusHintId, ...(entry.usedScheduleHintIds || []), ...(entry.usedWorldFactIds || []), ...(entry.usedNpcIds || [])].filter(Boolean);
+  if (ids.some(id => feedbackIds.includes(id))) return true;
+  return Boolean(
+    (entry.focusHintTitle && text.includes(entry.focusHintTitle)) ||
+    (entry.topThreat && text.includes(entry.topThreat)) ||
+    (entry.topOpportunity && text.includes(entry.topOpportunity)) ||
+    (entry.title && text.includes(entry.title))
+  );
+}
+
+function memoryPressureAdjustment(hint: ScheduledEventHint, feedback: NarrativeContractFeedbackEntry[]): { delta: number; notes: string[] } {
+  if (!feedback.length) return { delta: 0, notes: [] };
+  const recent = feedback.slice(-4);
+  const matches = recent.filter(entry => hintMatchesFeedback(hint, entry));
+  const ignored = recent.filter(entry => (entry.warningCodes || []).some(code => code === 'top_schedule_focus_not_declared' || code === 'missing_narrative_contract' || code === 'daily_focus_ignores_pressure_map') && hintMatchesFeedback(hint, entry));
+  const exactRecentReuse = feedback.slice(-2).filter(entry => hintMatchesFeedback(hint, entry)).length;
+  let delta = 0;
+  const notes: string[] = [];
+  if (exactRecentReuse >= 2) {
+    delta -= 18;
+    notes.push('记忆潮汐：近两年已反复承接，除非推进/转折/了结，否则应降温。');
+  } else if (matches.length >= 2) {
+    delta -= 10;
+    notes.push('记忆潮汐：近期已多次回响，宜换角度或留作背景。');
+  }
+  if (ignored.length > 0) {
+    delta += 16;
+    notes.push('记忆潮汐：此前审计提示承接不足，本年可补上或明确解释暂缓。');
+  }
+  const hasThreatText = /威胁|敌|仇|截杀|劫杀|追踪|盯梢|通缉|追责|报复|危险|心魔/.test(hintText(hint));
+  if (hasThreatText && matches.length === 0 && feedback.length >= 3) {
+    delta += 8;
+    notes.push('记忆潮汐：高压锚点久未承接，权重小幅回升。');
+  }
+  return { delta, notes };
+}
+
+function applyMemoryPressureDecay(hints: ScheduledEventHint[], state: CharacterState): { hints: ScheduledEventHint[]; warnings: string[] } {
+  const feedback = (state.narrativeContractFeedback || []).slice(-8);
+  if (!feedback.length) return { hints, warnings: [] };
+  const warnings: string[] = [];
+  const adjusted = hints.map(hint => {
+    const adjustment = memoryPressureAdjustment(hint, feedback);
+    if (!adjustment.delta) return hint;
+    const priority = Math.max(1, Math.round(hint.priority + adjustment.delta));
+    if (adjustment.notes.length) warnings.push(`${hint.title}：${adjustment.notes.join(' ')}`);
+    return {
+      ...hint,
+      priority,
+      reason: `${hint.reason} ${adjustment.notes.join(' ')}`.trim(),
+    };
+  });
+  return { hints: adjusted, warnings: Array.from(new Set(warnings)).slice(0, 4) };
+}
+
 function scoreHintText(hint: ScheduledEventHint, pattern: RegExp): number {
   const text = hintText(hint);
   return pattern.test(text) ? hint.priority : 0;
@@ -355,13 +429,18 @@ export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPl
     if (!old || hint.priority > old.priority) dedup.set(key, hint);
   }
 
-  const ordered = Array.from(dedup.values()).sort((a, b) => b.priority - a.priority || (a.dueAge ?? 9999) - (b.dueAge ?? 9999)).slice(0, 12);
+  const memoryAdjusted = applyMemoryPressureDecay(Array.from(dedup.values()), state);
+  const ordered = memoryAdjusted.hints.sort((a, b) => b.priority - a.priority || (a.dueAge ?? 9999) - (b.dueAge ?? 9999)).slice(0, 12);
   const pressureMap = buildWorldPressureOpportunityMap(state, ordered);
+  const warnings = [
+    ...(ordered.some(h => h.kind === 'deadline' && h.priority >= 100) ? ['存在已经到期或极高优先级的线索，本年必须承接、完成、失败或解释无法执行。'] : []),
+    ...memoryAdjusted.warnings,
+  ];
   return {
     generatedAtAge: age,
     focus: ordered[0],
     hints: ordered,
     pressureMap,
-    warnings: ordered.some(h => h.kind === 'deadline' && h.priority >= 100) ? ['存在已经到期或极高优先级的线索，本年必须承接、完成、失败或解释无法执行。'] : [],
+    warnings: warnings.slice(0, 6),
   };
 }

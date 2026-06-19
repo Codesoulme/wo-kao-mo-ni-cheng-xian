@@ -1450,6 +1450,7 @@ export function buildStateContext(
   }));
   const questEntries = buildQuestEntriesFromThreads(threads, state.age);
   state.questEntries = questEntries;
+  state.narrativeContractFeedback = (narrativeContractFeedback || []).slice(-8);
   const eventSchedule = buildEventSchedulerPlan(state);
   // Task 20: 引擎根据当前处境生成角色主动意图（每岁重算）
   const intents = generateCharacterIntents(state, threads);

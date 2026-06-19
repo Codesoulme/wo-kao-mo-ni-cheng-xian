@@ -281,6 +281,53 @@ function smokeWorldPressureOpportunityMap(): void {
   log('world-pressure-map', { passed: true, summary: map.summary, hints: plan.hints.length });
 }
 
+function smokeWorldMemoryPressureDecay(): void {
+  const baseState: any = {
+    age: 50,
+    location: '青岚坊市',
+    pendingThreads: [],
+    questEntries: [],
+    causalGraph: { nodes: [], edges: [] },
+    worldFacts: [],
+    npcs: [{
+      id: 'npc_shadow',
+      name: '阴鸦客',
+      faction: '黑鸦会',
+      attitude: 'hostile',
+      relationshipScore: -50,
+      lastSeenAge: 50,
+      memory: '阴鸦客因旧洞府铜钥盯上角色。',
+      tags: ['auction', 'aftermath', 'rivalry'],
+    }],
+  };
+  const noFeedbackPlan = buildEventSchedulerPlan(baseState);
+  const noFeedbackNpc = noFeedbackPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
+  assert(noFeedbackNpc, 'baseline plan should include hostile NPC hint');
+
+  const cooledPlan = buildEventSchedulerPlan({
+    ...baseState,
+    narrativeContractFeedback: [
+      { age: 48, title: '坊外微影', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
+      { age: 49, title: '黑羽窥市', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
+    ],
+  });
+  const cooledNpc = cooledPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
+  assert(cooledNpc && cooledNpc.priority < noFeedbackNpc!.priority, 'recently repeated NPC focus should cool down');
+  const cooledNpcHint = cooledNpc!;
+  assert(cooledNpcHint.reason.includes('记忆潮汐'), 'cooled hint should explain memory tide adjustment');
+
+  const boostedPlan = buildEventSchedulerPlan({
+    ...baseState,
+    narrativeContractFeedback: [
+      { age: 49, title: '日常炼气', narrativeFocus: 'daily', focusHintId: 'seh_npc_npc_shadow', focusHintTitle: '阴鸦客', usedNpcIds: [], usedScheduleHintIds: [], usedWorldFactIds: [], topThreat: '阴鸦客', warningCodes: ['top_schedule_focus_not_declared'] },
+    ],
+  });
+  const boostedNpc = boostedPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
+  assert(boostedNpc && boostedNpc.priority > noFeedbackNpc!.priority, 'previously ignored high-pressure focus should warm up');
+  assert(boostedPlan.warnings.some(w => w.includes('承接不足')), 'pressure decay warnings should mention insufficient previous carryover');
+  log('world-memory-pressure-decay', { passed: true, base: noFeedbackNpc!.priority, cooled: cooledNpcHint.priority, boosted: boostedNpc!.priority });
+}
+
 function smokeWorldEventConsequences(): void {
   const state: any = {
     age: 45,
@@ -433,6 +480,7 @@ async function main(): Promise<void> {
   smokeWorldFactsLite();
   smokeFactionLocationStateProfiles();
   smokeWorldPressureOpportunityMap();
+  smokeWorldMemoryPressureDecay();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();
