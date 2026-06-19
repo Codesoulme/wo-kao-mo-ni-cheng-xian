@@ -1,6 +1,6 @@
 ﻿import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { deriveWorldEventConsequences, deriveWorldFactsFromState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
+import { deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
 function assert(condition: unknown, message: string): void {
@@ -394,6 +394,97 @@ function smokeWorldMemoryOutcomeFeedback(): void {
   log('world-memory-outcome-feedback', { passed: true, base: baseNpc!.priority, resolved: resolvedNpc!.priority, ignored: ignoredNpc!.priority, stage: resolvedNpc!.resolutionStage });
 }
 
+function smokeThreadOutcomeSync(): void {
+  const baseState: any = {
+    age: 22,
+    lifespan: 80,
+    realm: 'qi_refining',
+    realmLevel: 1,
+    cultivationExp: 0,
+    expToBreak: 100,
+    hp: 100,
+    maxHp: 100,
+    mp: 50,
+    maxMp: 50,
+    attack: 10,
+    defense: 8,
+    speed: 10,
+    luck: 10,
+    comprehension: 10,
+    spiritStones: 10,
+    reputation: 0,
+    alive: true,
+    ascended: false,
+    activeStatuses: [],
+    inventory: [],
+    equipped: [],
+    memory: [],
+    longTermMemory: [],
+    fateNodes: [],
+    pendingThreads: [{
+      id: 'auction_aftermath_x',
+      title: '阴鸦客的暗中盯梢',
+      description: '阴鸦客仍因旧洞府铜钥盯上角色。',
+      category: 'enemy',
+      startAge: 21,
+      deadlineAge: 24,
+      status: 'pending',
+      progress: 20,
+      followUpHint: '后续需处理阴鸦客的试探、截杀或交易。',
+    }],
+    questEntries: [],
+    npcs: [],
+    worldFacts: [],
+    causalGraph: { nodes: [], edges: [] },
+    pets: [],
+    exploredRealms: [],
+  };
+  const output: any = {
+    title: '旧怨了结',
+    narrative: '角色顺藤摸瓜，终于寻到阴鸦客藏身之处，以证据和灵契逼其退去，这桩铜钥旧怨暂告一段落。',
+    eventType: 'normal',
+    changes: [],
+    newStatuses: [],
+    newItems: [],
+    memory: '阴鸦客与旧洞府铜钥的旧怨已被压下。',
+    hasChoice: false,
+    newThreads: [],
+    advanceThreads: [],
+    completeThreadIds: [],
+    failThreadIds: [],
+    narrativeContract: {
+      narrativeFocus: 'threat',
+      narrativeOutcome: 'resolved',
+      usedScheduleHintIds: ['seh_thread_auction_aftermath_x'],
+      usedWorldFactIds: [],
+      usedNpcIds: [],
+      contractNote: '阴鸦客旧怨已了结。',
+    },
+  };
+  const result = executeAIEvent(baseState, output);
+  const thread = result.state.pendingThreads.find((t: any) => t.id === 'auction_aftermath_x');
+  assert(thread?.status === 'resolved', 'resolved narrative outcome should complete referenced thread');
+  assert(thread?.progress === 100, 'resolved narrative outcome should fill thread progress');
+
+  const advanced = executeAIEvent(baseState, {
+    ...output,
+    title: '旧怨推进',
+    narrativeContract: { ...output.narrativeContract, narrativeOutcome: 'advanced', contractNote: '查到阴鸦客去向。' },
+  });
+  const advancedThread = advanced.state.pendingThreads.find((t: any) => t.id === 'auction_aftermath_x');
+  assert(advancedThread?.status === 'pending', 'advanced narrative outcome should not close thread');
+  assert((advancedThread?.progress || 0) > 20, 'advanced narrative outcome should advance referenced thread');
+
+  const echoed = executeAIEvent(baseState, {
+    ...output,
+    title: '旧怨余声',
+    narrativeContract: { ...output.narrativeContract, narrativeOutcome: 'echoed', contractNote: '只是听闻阴鸦客仍在坊间出没。' },
+  });
+  const echoedThread = echoed.state.pendingThreads.find((t: any) => t.id === 'auction_aftermath_x');
+  assert(echoedThread?.status === 'pending' && echoedThread?.progress === 20, 'echoed outcome should not mutate thread state');
+  log('thread-outcome-sync', { passed: true, resolved: thread?.status, advanced: advancedThread?.progress, echoed: echoedThread?.progress });
+}
+
 function smokeWorldEventConsequences(): void {
   const state: any = {
     age: 45,
@@ -552,6 +643,7 @@ async function main(): Promise<void> {
   smokeWorldMemoryPressureDecay();
   smokeWorldMemoryResolution();
   smokeWorldMemoryOutcomeFeedback();
+  smokeThreadOutcomeSync();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();

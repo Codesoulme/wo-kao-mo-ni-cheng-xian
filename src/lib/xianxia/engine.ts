@@ -17,6 +17,7 @@ import {
   FATE_NODES,
   AIEventOutput,
   EngineStateContext,
+  NarrativeOutcomeKind,
   EquipSlot,
   EquippedMap,
   ITEM_TYPE_LABEL,
@@ -2253,6 +2254,55 @@ export function failThread(state: CharacterState, threadId: string): CharacterSt
   return { ...state, pendingThreads: threads, questEntries: buildQuestEntriesFromThreads(threads, state.age) };
 }
 
+function scheduleHintId(prefix: string, raw: string): string {
+  return `seh_${prefix}_${String(raw || 'unknown').replace(/[^a-zA-Z0-9_\-\u4e00-\u9fa5]+/g, '_').slice(0, 60)}`;
+}
+
+function narrativeOutcomeThreadIds(state: CharacterState, aiOutput: AIEventOutput): string[] {
+  const contract = aiOutput.narrativeContract;
+  if (!contract?.narrativeOutcome) return [];
+  const ids = new Set<string>();
+  const usedHintIds = new Set((contract.usedScheduleHintIds || []).filter(Boolean));
+  const focusText = [aiOutput.title, contract.contractNote].filter(Boolean).join('；');
+  for (const thread of state.pendingThreads || []) {
+    if (!thread?.id || thread.status === 'resolved' || thread.status === 'failed') continue;
+    const directIds = [
+      thread.id,
+      scheduleHintId('thread', thread.id),
+      scheduleHintId('quest', `quest_${thread.id}`),
+      scheduleHintId('quest', thread.id),
+    ];
+    if (directIds.some(id => usedHintIds.has(id))) {
+      ids.add(thread.id);
+      continue;
+    }
+    const title = String(thread.title || '').trim();
+    if (title && title.length >= 3 && focusText.includes(title)) ids.add(thread.id);
+  }
+  return Array.from(ids);
+}
+
+function syncThreadsFromNarrativeOutcome(state: CharacterState, aiOutput: AIEventOutput): CharacterState {
+  const outcome = aiOutput.narrativeContract?.narrativeOutcome as NarrativeOutcomeKind | undefined;
+  if (!outcome) return state;
+  const threadIds = narrativeOutcomeThreadIds(state, aiOutput)
+    .filter(id => !(aiOutput.completeThreadIds || []).includes(id) && !(aiOutput.failThreadIds || []).includes(id));
+  if (!threadIds.length) return state;
+  let next = state;
+  for (const id of threadIds) {
+    if (outcome === 'resolved') {
+      next = completeThread(next, id);
+    } else if (outcome === 'failed') {
+      next = failThread(next, id);
+    } else if (outcome === 'advanced') {
+      const current = next.pendingThreads?.find(t => t.id === id);
+      const remaining = Math.max(0, 100 - Number(current?.progress || 0));
+      next = advanceThread(next, id, Math.min(35, Math.max(10, remaining)), aiOutput.narrativeContract?.contractNote || aiOutput.title);
+    }
+  }
+  return next;
+}
+
 // 检查线索 deadline —— 若有线索已过期（age > deadlineAge）且未完成，标记为 failed
 export function checkThreadDeadlines(state: CharacterState): { state: CharacterState; failed: PendingThread[] } {
   const failed: PendingThread[] = [];
@@ -2903,6 +2953,9 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
       next = failThread(next, id);
     }
   }
+  // 7.4.5 叙事契约 outcome 保守同步到已引用的未决线索
+  next = syncThreadsFromNarrativeOutcome(next, aiOutput);
+
   // 7.5 检查线索 deadline —— 过期未完成的标记为 failed
   const threadCheck = checkThreadDeadlines(next);
   next = threadCheck.state;
