@@ -337,12 +337,12 @@ function MilestoneItem({
   const [expanded, setExpanded] = useState(false);
   return (
     <div
-      className="rounded-md border p-2 cursor-pointer hover:bg-secondary/20 transition-colors"
+      className="rounded-md border p-2 cursor-pointer hover:bg-secondary/20 transition-colors min-w-0"
       style={{ borderColor: `${color}30`, background: `${color}05` }}
       onClick={() => setExpanded(v => !v)}
     >
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between mb-1 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[10px] font-bold font-serif-cn" style={{ color }}>
             {age}岁
           </span>
@@ -355,17 +355,17 @@ function MilestoneItem({
         </div>
         <ChevronDown className={cn("w-3 h-3 text-muted-foreground transition-transform", expanded && "rotate-180")} />
       </div>
-      <div className="text-xs font-semibold font-serif-cn mb-1">{title}</div>
+      <div className="text-xs font-semibold font-serif-cn mb-1 xianxia-readable">{title}</div>
       {expanded ? (
         <>
-          <p className="text-[11px] leading-relaxed text-foreground/90 whitespace-pre-wrap">{narrative}</p>
+          <p className="text-[11px] leading-relaxed text-foreground/90 xianxia-prose">{narrative}</p>
           {effects && effects.filter(isVisibleNumericEventEffect).length > 0 && (
             <div className="mt-1.5 flex flex-wrap gap-1">
               {effects.filter(isVisibleNumericEventEffect).map((eff: any, i: number) => (
                 <span
                   key={i}
                   className={cn(
-                    "text-[9px] px-1 py-0.5 rounded border",
+                    "text-[9px] px-1 py-0.5 rounded border xianxia-chip",
                     eventEffectTone(eff) === 'positive'
                       ? "bg-green-500/10 text-green-700 border-green-500/30"
                       : eventEffectTone(eff) === 'negative'
@@ -380,7 +380,7 @@ function MilestoneItem({
           )}
         </>
       ) : (
-        <p className="text-[10px] text-muted-foreground line-clamp-1">{narrative}</p>
+        <p className="text-[10px] text-muted-foreground line-clamp-1 xianxia-readable">{narrative}</p>
       )}
     </div>
   );
@@ -390,12 +390,12 @@ function ChoiceMilestoneItem({ choice }: { choice: any }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div
-      className="rounded-md border p-2 cursor-pointer hover:bg-secondary/20 transition-colors"
+      className="rounded-md border p-2 cursor-pointer hover:bg-secondary/20 transition-colors min-w-0"
       style={{ borderColor: '#c8453c30', background: '#c8453c05' }}
       onClick={() => setExpanded(v => !v)}
     >
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center justify-between mb-1 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
           <span className="text-[10px] font-bold font-serif-cn text-primary">{choice.age}岁</span>
           <span className="text-[9px] px-1 py-0.5 rounded bg-primary/20 text-primary">抉择</span>
         </div>
@@ -403,18 +403,18 @@ function ChoiceMilestoneItem({ choice }: { choice: any }) {
       </div>
       {expanded ? (
         <>
-          <p className="text-[11px] text-muted-foreground mb-1 italic">{choice.prompt}</p>
-          <div className="text-xs font-semibold font-serif-cn mb-1 text-primary">
+          <p className="text-[11px] text-muted-foreground mb-1 italic xianxia-readable">{choice.prompt}</p>
+          <div className="text-xs font-semibold font-serif-cn mb-1 text-primary xianxia-readable">
             → {choice.chosenText}
           </div>
-          <p className="text-[11px] leading-relaxed text-foreground/90 whitespace-pre-wrap">{choice.result}</p>
+          <p className="text-[11px] leading-relaxed text-foreground/90 xianxia-prose">{choice.result}</p>
         </>
       ) : (
         <>
-          <div className="text-xs font-semibold font-serif-cn text-primary truncate">
+          <div className="text-xs font-semibold font-serif-cn text-primary truncate min-w-0">
             → {choice.chosenText}
           </div>
-          <p className="text-[10px] text-muted-foreground line-clamp-1">{choice.result}</p>
+          <p className="text-[10px] text-muted-foreground line-clamp-1 xianxia-readable">{choice.result}</p>
         </>
       )}
     </div>

@@ -62,7 +62,7 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
   return (
     <span
       className={cn(
-        "text-[9px] px-1.5 py-0.5 rounded border font-serif-cn",
+        "text-[9px] px-1.5 py-0.5 rounded border font-serif-cn xianxia-chip",
         style.bg, style.text, style.border
       )}
       title={`主题：${blueprint.name}`}
@@ -258,7 +258,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
               >
                 {/* 头部 - 始终可见 */}
                 <div className="flex items-center justify-between mb-0.5 px-3 pt-2">
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
                     {!ageMeta.isContinuation ? (
                       <span className="text-xs font-bold text-primary font-serif-cn">
                         {event.age}岁
@@ -272,7 +272,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                     {isBreakthrough && (
                       <span className="text-[9px] px-1 rounded bg-yellow-400/20 text-yellow-600">破</span>
                     )}
-                    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50">
+                    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 shrink-0">
                       {EVENT_LABELS[event.eventType] || '流年'}
                     </span>
                     {/* Task 20: 事件蓝图主题 chip */}
@@ -293,7 +293,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
 
                 {/* 标题 - 始终可见 */}
                 <h4 className={cn(
-                  "font-semibold font-serif-cn px-3",
+                  "font-semibold font-serif-cn px-3 xianxia-readable",
                   ageMeta.isContinuation ? "text-xs text-foreground/85" : "text-sm",
                   isExpanded ? "pb-1" : "pb-2"
                 )}>
@@ -303,7 +303,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 正文 - 可折叠 */}
                 {isExpanded && (
                   <div className="px-3 pb-2">
-                    <p className="text-xs leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                    <p className="text-xs leading-relaxed text-foreground/90 xianxia-prose">
                       {event.narrative}
                     </p>
                     {/* 效果 */}
@@ -313,7 +313,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                           <span
                             key={i}
                             className={cn(
-                              "text-[10px] px-1.5 py-0.5 rounded border",
+                              "text-[10px] px-1.5 py-0.5 rounded border xianxia-chip",
                               getEffectTone(eff) === 'positive'
                                 ? "bg-green-500/10 text-green-700 border-green-500/30"
                                 : getEffectTone(eff) === 'negative'
@@ -336,7 +336,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                       <span
                         key={i}
                         className={cn(
-                          "text-[9px] px-1 py-0.5 rounded border",
+                          "text-[9px] px-1 py-0.5 rounded border xianxia-chip",
                           getEffectTone(eff) === 'positive'
                             ? "bg-green-500/10 text-green-700 border-green-500/30"
                             : getEffectTone(eff) === 'negative'

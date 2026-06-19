@@ -82,12 +82,12 @@ export function PendingThreadsCard() {
               <div
                 key={t.id || i}
                 className={cn(
-                  "rounded-md border p-2 space-y-1.5",
+                  "rounded-md border p-2 space-y-1.5 min-w-0",
                   style.bg, style.border
                 )}
               >
                 {/* 标题行 */}
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-2 min-w-0">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className={cn("shrink-0", style.color)}>{style.icon}</span>
                     <span className={cn("text-xs font-bold font-serif-cn truncate", style.color)}>
@@ -104,7 +104,7 @@ export function PendingThreadsCard() {
 
                 {/* 描述 */}
                 {t.description && (
-                  <p className="text-[11px] text-foreground/70 font-serif-cn leading-relaxed line-clamp-2">
+                  <p className="text-[11px] text-foreground/70 font-serif-cn leading-relaxed line-clamp-2 xianxia-readable">
                     {t.description}
                   </p>
                 )}
@@ -138,14 +138,14 @@ export function PendingThreadsCard() {
 
                 {/* 奖励 / 失败代价 */}
                 {(t.reward || t.failureCost) && (
-                  <div className="flex flex-wrap gap-1 pt-0.5">
+                  <div className="flex flex-wrap gap-1 pt-0.5 min-w-0">
                     {t.reward && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-700 dark:text-green-300 border border-green-500/30 xianxia-chip">
                         酬：{t.reward}
                       </span>
                     )}
                     {t.failureCost && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30 xianxia-chip">
                         失：{t.failureCost}
                       </span>
                     )}

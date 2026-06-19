@@ -261,11 +261,11 @@ export function CombatModal() {
           {session && !battleStarted && !endResult && (
             <div className="flex-1 min-h-0 overflow-y-auto xianxia-scroll rounded-lg border-2 border-destructive/40 bg-destructive/5 p-3 space-y-3">
               <div className="space-y-1">
-                <div className="text-xs font-bold font-serif-cn text-destructive">
+                <div className="text-xs font-bold font-serif-cn text-destructive xianxia-readable">
                   {session.contextTitle || '战端将启'}
                 </div>
                 {session.contextNarrative && (
-                  <p className="text-xs leading-relaxed text-foreground/90 font-serif-cn whitespace-pre-wrap">
+                  <p className="text-xs leading-relaxed text-foreground/90 font-serif-cn xianxia-prose">
                     {session.contextNarrative}
                   </p>
                 )}
@@ -292,10 +292,10 @@ export function CombatModal() {
             <div className="rounded-lg border border-border/60 bg-card/40 overflow-hidden">
               <button
                 onClick={() => setContextCollapsed(v => !v)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/10 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/10 transition-colors min-w-0"
               >
                 <BookOpen className="w-3 h-3 text-muted-foreground shrink-0" />
-                <span className="text-[11px] font-semibold font-serif-cn text-muted-foreground flex-1">
+                <span className="text-[11px] font-semibold font-serif-cn text-muted-foreground flex-1 min-w-0 xianxia-readable">
                   事件缘由
                 </span>
                 <ChevronDown className={cn(
@@ -304,7 +304,7 @@ export function CombatModal() {
                 )} />
               </button>
               {!contextCollapsed && (
-                <p className="px-3 pb-2 text-xs leading-relaxed text-foreground/85 font-serif-cn whitespace-pre-wrap">
+                <p className="px-3 pb-2 text-xs leading-relaxed text-foreground/85 font-serif-cn xianxia-prose">
                   {session?.contextNarrative}
                 </p>
               )}
@@ -321,7 +321,7 @@ export function CombatModal() {
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-destructive/20 text-destructive font-semibold">
                     敌
                   </span>
-                  <span className="text-sm font-bold font-serif-cn text-foreground">{enemy.name}</span>
+                  <span className="text-sm font-bold font-serif-cn text-foreground truncate">{enemy.name}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                   <span>攻 {enemy.attack}</span>
@@ -468,7 +468,7 @@ export function CombatModal() {
                       第{r.round}回合 · {r.playerAction || '交锋'}
                     </div>
                     {r.narrative && (
-                      <p className="text-[11px] leading-relaxed text-foreground/85 font-serif-cn whitespace-pre-wrap">
+                      <p className="text-[11px] leading-relaxed text-foreground/85 font-serif-cn xianxia-prose">
                         {r.narrative}
                       </p>
                     )}
@@ -495,7 +495,7 @@ export function CombatModal() {
                 </span>
               </div>
               {endResult.narrative && (
-                <p className="text-xs leading-relaxed text-foreground/90 font-serif-cn whitespace-pre-wrap">
+                <p className="text-xs leading-relaxed text-foreground/90 font-serif-cn xianxia-prose">
                   {endResult.narrative}
                 </p>
               )}

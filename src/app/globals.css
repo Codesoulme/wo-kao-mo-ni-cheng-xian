@@ -284,3 +284,35 @@
   background-size: 200% 100%;
   animation: realm-card-shimmer 3s ease-in-out infinite;
 }
+
+/* Mobile reading safety helpers: keep AI-generated long text and chips from overflowing narrow screens. */
+@layer utilities {
+  .xianxia-readable {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-break: anywhere;
+  }
+
+  .xianxia-prose {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-break: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .xianxia-chip {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-break: anywhere;
+  }
+
+  .xianxia-chip-truncate {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

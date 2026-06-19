@@ -70,7 +70,7 @@ export function CharacterIntentsCard() {
             return (
               <div
                 key={it.id || i}
-                className="flex items-start gap-2 p-1.5 rounded-md hover:bg-accent/5 transition-colors"
+                className="flex items-start gap-2 p-1.5 rounded-md hover:bg-accent/5 transition-colors min-w-0"
               >
                 {/* 优先级数字徽标 */}
                 <span className={cn(
@@ -80,7 +80,7 @@ export function CharacterIntentsCard() {
                   {p}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <span className="text-xs font-bold font-serif-cn text-foreground truncate">
                       {it.title || '无名之意'}
                     </span>
@@ -91,7 +91,7 @@ export function CharacterIntentsCard() {
                     )}
                   </div>
                   {it.description && (
-                    <p className="text-[10px] text-muted-foreground font-serif-cn leading-relaxed line-clamp-2 mt-0.5">
+                    <p className="text-[10px] text-muted-foreground font-serif-cn leading-relaxed line-clamp-2 mt-0.5 xianxia-readable">
                       {sanitizeIntentDescription(it.description)}
                     </p>
                   )}

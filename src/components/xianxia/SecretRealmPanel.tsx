@@ -264,7 +264,7 @@ function ExplorationResult() {
                 <MapPin className="w-2.5 h-2.5" />
                 <span>秘境归来 · {lastExploration.realmName}</span>
               </div>
-              <div className="text-sm font-bold" style={{ color: tierColor }}>
+              <div className="text-sm font-bold xianxia-readable" style={{ color: tierColor }}>
                 {lastExploration.title}
               </div>
             </div>
@@ -281,7 +281,7 @@ function ExplorationResult() {
         </CardHeader>
         <CardContent className="pt-3 pb-4 flex-1 min-h-0 overflow-hidden flex flex-col">
           <div
-            className="text-[12px] font-serif-cn leading-relaxed text-foreground/90 whitespace-pre-wrap flex-1 min-h-0 overflow-y-auto xianxia-scroll pr-1"
+            className="text-[12px] font-serif-cn leading-relaxed text-foreground/90 xianxia-prose flex-1 min-h-0 overflow-y-auto xianxia-scroll pr-1"
             style={{
               borderLeft: `2px solid ${tierColor}50`,
               paddingLeft: '0.75rem',
@@ -290,9 +290,9 @@ function ExplorationResult() {
             {lastExploration.narrative}
           </div>
           {lastExploration.effects && lastExploration.effects.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1">
+            <div className="mt-3 flex flex-wrap gap-1 min-w-0">
               {lastExploration.effects.slice(0, 4).map((eff: any, idx: number) => (
-                <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200 font-serif-cn">
+                <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-200 font-serif-cn xianxia-chip">
                   {eff.label || eff.name || eff.reason || '有所变化'}
                 </span>
               ))}

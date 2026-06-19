@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { CharacterState } from '@/lib/xianxia/store';
@@ -77,7 +77,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
 
             {/* 名字 + 核心信息 */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <h2 className="font-serif-cn text-base font-bold truncate">{character.name}</h2>
                 <span className="seal text-[9px]">道</span>
                 {character.ascended && (
@@ -91,13 +91,13 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 <div className="flex items-center gap-1 flex-wrap">
                   <span
                     style={{ color: character.realmColor, background: `${character.realmColor}12` }}
-                    className="font-semibold rounded px-1.5 py-0.5"
+                    className="font-semibold rounded px-1.5 py-0.5 xianxia-chip-truncate max-w-full"
                   >
                     {character.realmName}{character.realmMaxLevel > 0 ? ` ${character.realmLevel + 1}层` : ''}
                   </span>
-                  <span className="rounded bg-muted/60 px-1.5 py-0.5">{genderLabel}</span>
-                  <span className="rounded bg-muted/60 px-1.5 py-0.5">{character.age}岁</span>
-                  <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700/90">寿余 {lifespanLeft} 年</span>
+                  <span className="rounded bg-muted/60 px-1.5 py-0.5 shrink-0">{genderLabel}</span>
+                  <span className="rounded bg-muted/60 px-1.5 py-0.5 shrink-0">{character.age}岁</span>
+                  <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700/90 shrink-0">寿余 {lifespanLeft} 年</span>
                 </div>
                 <div className="flex items-center gap-1 min-w-0 overflow-hidden">
                   <span className="flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[110px] shrink">
@@ -116,7 +116,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
               </div>
 
               {topStatuses.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
+                <div className="mt-1.5 flex flex-wrap gap-1 min-w-0">
                   {topStatuses.map((s: any, idx: number) => {
                     const negative = s.category === 'debuff' || /伤|毒|虚|痛|劫|魔|损|衰/.test(s.name);
                     const color = negative ? '#c8453c' : '#2f8f5b';
@@ -128,7 +128,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                             tabIndex={0}
                             onClick={(e) => e.stopPropagation()}
                             onKeyDown={(e) => e.stopPropagation()}
-                            className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm cursor-pointer hover:scale-[1.02] transition-transform"
+                            className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm cursor-pointer hover:scale-[1.02] transition-transform min-w-0 max-w-full"
                             style={{ borderColor: `${color}40`, background: `${color}10`, color }}
                           >
                             {negative ? <AlertTriangle className="w-2.5 h-2.5" /> : <Leaf className="w-2.5 h-2.5" />}
@@ -160,19 +160,19 @@ export function StatusPanel({ character }: StatusPanelProps) {
                               </span>
                             </div>
                             {s.description && (
-                              <p className="text-[11px] leading-relaxed text-foreground/85 whitespace-pre-wrap">
+                              <p className="text-[11px] leading-relaxed text-foreground/85 xianxia-prose">
                                 {s.description}
                               </p>
                             )}
                             {s.source && (
-                              <div className="text-[10px] text-muted-foreground">
+                              <div className="text-[10px] text-muted-foreground xianxia-readable">
                                 来源：{s.source}
                               </div>
                             )}
                             {Array.isArray(s.effects) && s.effects.length > 0 && (
                               <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
                                 {s.effects.slice(0, 4).map((eff: any, k: number) => (
-                                  <span key={k} className="rounded bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground">
+                                  <span key={k} className="rounded bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground xianxia-chip">
                                     {eff.description || '状态影响'}
                                   </span>
                                 ))}

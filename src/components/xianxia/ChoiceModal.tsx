@@ -94,9 +94,9 @@ export function ChoiceModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <Card className="w-full max-w-md paper-texture border-primary/40 shadow-2xl scroll-reveal flex flex-col max-h-[92vh] sm:max-h-[88vh]">
+      <Card className="w-full max-w-md min-w-0 paper-texture border-primary/40 shadow-2xl scroll-reveal flex flex-col max-h-[92vh] sm:max-h-[88vh]">
         <CardHeader className="pb-2 shrink-0">
-          <CardTitle className="text-base flex items-center gap-2 font-serif-cn">
+          <CardTitle className="text-base flex items-center gap-2 font-serif-cn min-w-0 xianxia-readable">
             <Mountain className="w-4 h-4 text-primary" />
             天道抉择
             {pendingChoice.contextFateNodeName && (
@@ -110,10 +110,10 @@ export function ChoiceModal() {
             <div className="rounded-lg border border-primary/30 bg-primary/5 overflow-hidden">
               <button
                 onClick={() => setContextCollapsed(v => !v)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-primary/10 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-primary/10 transition-colors min-w-0"
               >
                 <BookOpen className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span className="text-xs font-semibold font-serif-cn text-primary flex-1">
+                <span className="text-xs font-semibold font-serif-cn text-primary flex-1 min-w-0 xianxia-readable">
                   前情提要
                   {pendingChoice.contextAge !== undefined && (
                     <span className="text-muted-foreground font-normal ml-1">· {pendingChoice.contextAge}岁</span>
@@ -127,12 +127,12 @@ export function ChoiceModal() {
               {!contextCollapsed && (
                 <div className="px-3 pb-3 pt-1 space-y-1.5">
                   {pendingChoice.contextTitle && (
-                    <h4 className="text-sm font-bold font-serif-cn text-foreground">
+                    <h4 className="text-sm font-bold font-serif-cn text-foreground xianxia-readable">
                       {pendingChoice.contextTitle}
                     </h4>
                   )}
                   {pendingChoice.contextNarrative && (
-                    <p className="text-xs leading-relaxed text-foreground/85 font-serif-cn whitespace-pre-wrap">
+                    <p className="text-xs leading-relaxed text-foreground/85 font-serif-cn xianxia-prose">
                       {pendingChoice.contextNarrative}
                     </p>
                   )}
@@ -143,7 +143,7 @@ export function ChoiceModal() {
 
           {/* 抉择情境 */}
           <div className="rounded-lg border border-border/60 bg-card/60 p-3">
-            <p className="text-sm leading-relaxed text-foreground/90 font-serif-cn whitespace-pre-wrap">
+            <p className="text-sm leading-relaxed text-foreground/90 font-serif-cn xianxia-prose">
               {pendingChoice.prompt}
             </p>
           </div>
@@ -156,7 +156,7 @@ export function ChoiceModal() {
                 onClick={() => choose(i)}
                 disabled={busy}
                 className={cn(
-                  "w-full text-left p-3 rounded-lg border-2 transition-all",
+                  "w-full text-left p-3 rounded-lg border-2 transition-all min-w-0",
                   "hover:border-primary hover:bg-primary/5 active:scale-[0.99]",
                   "border-border bg-card/60",
                   busy && "opacity-50 cursor-not-allowed"
@@ -164,10 +164,10 @@ export function ChoiceModal() {
               >
                 <div className="flex items-start gap-2">
                   <span className="seal shrink-0 mt-0.5">{i + 1}</span>
-                  <div className="flex-1">
-                    <div className="text-sm font-semibold font-serif-cn">{opt.text}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold font-serif-cn xianxia-readable">{opt.text}</div>
                     {opt.hint && (
-                      <div className="text-[11px] text-muted-foreground mt-0.5">{opt.hint}</div>
+                      <div className="text-[11px] text-muted-foreground mt-0.5 xianxia-readable">{opt.hint}</div>
                     )}
                   </div>
                 </div>
