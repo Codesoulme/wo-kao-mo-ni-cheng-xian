@@ -1972,8 +1972,53 @@ function recordEventCausality(state: CharacterState, aiOutput: AIEventOutput): C
 }
 // ==================== WorldFacts Lite ====================
 
-function worldFactId(kind: WorldFactKind, raw: string): string {
+export function worldFactId(kind: WorldFactKind, raw: string): string {
   return `wf_${kind}_${String(raw || 'unknown').trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, '_').slice(0, 48)}`;
+}
+
+function uniqueText(values: Array<string | undefined | null>): string[] {
+  return Array.from(new Set(values.map(v => String(v || '').trim()).filter(Boolean)));
+}
+
+function locationTags(name: string): string[] {
+  const tags = ['location'];
+  if (/坊市|集市|黑市|拍卖|商会|交易|典当/.test(name)) tags.push('market');
+  if (/秘境|洞府|遗迹|遗府|禁地|禁制|浮阁|楼|谷|渊|海|江|山|岛|原|林/.test(name)) tags.push('site');
+  if (/邪|魔|劫|妖|险|毒|煞|禁|死|乱|战/.test(name)) tags.push('danger');
+  return Array.from(new Set(tags));
+}
+
+function factionTags(name: string, relation?: string): string[] {
+  const tags = ['faction'];
+  if (/宗|门|派|宫|观|寺|阁|盟|家|族|会/.test(name)) tags.push('organization');
+  if (/魔|邪|血|阴|煞|劫/.test(name)) tags.push('danger');
+  if (relation) tags.push(relation);
+  return Array.from(new Set(tags));
+}
+
+function factFromLocation(name: string, age: number, source: string, summary?: string, refIds: string[] = [], confidence = 0.7): WorldFact {
+  const tags = locationTags(name);
+  const defaultSummary = tags.includes('market')
+    ? `${name}是角色活动过的交易之地，可牵动坊市、拍卖、黑市、人情与资源流转。`
+    : tags.includes('danger')
+      ? `${name}带有危险或冲突气息，后续可低频回响为追踪、伏击、避险或历练。`
+      : `角色曾在${name}活动，此地可作为后续事件的空间锚点。`;
+  return { id: worldFactId('location', name), kind: 'location', title: name, summary: summary || defaultSummary, confidence, firstSeenAge: age, lastSeenAge: age, source, refIds, tags };
+}
+
+function factFromFaction(name: string, age: number, source: string, summary?: string, refIds: string[] = [], relation?: string, confidence = 0.7): WorldFact {
+  return {
+    id: worldFactId('faction', name),
+    kind: 'faction',
+    title: name,
+    summary: summary || `${name}与角色当前经历存在联系，可作为宗门、人情、恩怨或资源网络的长期事实。`,
+    confidence,
+    firstSeenAge: age,
+    lastSeenAge: age,
+    source,
+    refIds,
+    tags: factionTags(name, relation),
+  };
 }
 
 function mergeWorldFact(existing: WorldFact, incoming: WorldFact): WorldFact {
@@ -2004,20 +2049,32 @@ export function upsertWorldFacts(state: CharacterState, facts: WorldFact[]): Cha
   return { ...state, worldFacts: Array.from(byId.values()).sort((a, b) => a.lastSeenAge - b.lastSeenAge).slice(-160) };
 }
 
-function deriveWorldFactsFromState(state: CharacterState, source: string): WorldFact[] {
+export function deriveWorldFactsFromState(state: CharacterState, source: string): WorldFact[] {
   const age = state.age;
   const facts: WorldFact[] = [];
-  if (state.location) facts.push({ id: worldFactId('location', state.location), kind: 'location', title: state.location, summary: `角色曾在${state.location}活动。`, confidence: 0.8, firstSeenAge: age, lastSeenAge: age, source, tags: ['location'] });
-  if (state.faction) facts.push({ id: worldFactId('faction', state.faction), kind: 'faction', title: state.faction, summary: `角色与${state.faction}存在联系。`, confidence: 0.8, firstSeenAge: age, lastSeenAge: age, source, tags: ['faction'] });
+  if (state.location) facts.push(factFromLocation(state.location, age, source, undefined, [], 0.85));
+  if (state.faction) facts.push(factFromFaction(state.faction, age, source, `角色与${state.faction}存在稳定联系。`, [], 'current', 0.85));
+
   for (const npc of state.npcs || []) {
     facts.push({ id: worldFactId('npc', npc.id || npc.name), kind: 'npc', title: npc.name, summary: npc.memory || npc.description || npc.name, confidence: 0.75, firstSeenAge: npc.firstMetAge ?? age, lastSeenAge: npc.lastSeenAge ?? age, source: npc.source || source, refIds: [npc.id], tags: ['npc', npc.attitude, npc.faction || '', npc.realm || ''].filter(Boolean) });
-    if (npc.faction) facts.push({ id: worldFactId('faction', npc.faction), kind: 'faction', title: npc.faction, summary: `${npc.name}与${npc.faction}有关。`, confidence: 0.65, firstSeenAge: npc.firstMetAge ?? age, lastSeenAge: npc.lastSeenAge ?? age, source: npc.source || source, refIds: [npc.id], tags: ['faction', 'npc-linked'] });
+    if (npc.faction) facts.push(factFromFaction(npc.faction, npc.lastSeenAge ?? age, npc.source || source, `${npc.name}与${npc.faction}有关，态度为${npc.attitude || 'unknown'}。`, [npc.id], npc.attitude, 0.7));
+    if (npc.lastKnownLocation) facts.push(factFromLocation(npc.lastKnownLocation, npc.lastSeenAge ?? age, npc.source || source, `${npc.name}常在${npc.lastKnownLocation}一带现身。`, [npc.id], 0.68));
   }
+
   for (const thread of state.pendingThreads || []) {
-    if (thread.realmId) facts.push({ id: worldFactId('realm', thread.realmId), kind: 'realm', title: thread.title, summary: thread.followUpHint || thread.description || thread.title, confidence: 0.7, firstSeenAge: thread.startAge ?? age, lastSeenAge: age, source: thread.sourceEventTitle || source, refIds: [thread.id, thread.realmId], tags: ['realm', thread.category, thread.status] });
+    if (thread.realmId) facts.push({ id: worldFactId('realm', thread.realmId), kind: 'realm', title: thread.title, summary: thread.followUpHint || thread.description || thread.title, confidence: 0.72, firstSeenAge: thread.startAge ?? age, lastSeenAge: age, source: thread.sourceEventTitle || source, refIds: [thread.id, thread.realmId], tags: ['realm', thread.category, thread.status] });
+    const threadText = [thread.title, thread.description, thread.followUpHint, thread.sourceEventTitle].filter(Boolean).join('；');
+    if (/坊市|黑市|拍卖|交易会|商会/.test(threadText)) {
+      const title = uniqueText([thread.sourceEventTitle, thread.title]).find(v => /坊市|黑市|拍卖|交易会|商会/.test(v)) || thread.title;
+      facts.push({ id: worldFactId('event', title), kind: 'event', title, summary: thread.followUpHint || thread.description || thread.title, confidence: 0.64, firstSeenAge: thread.startAge ?? age, lastSeenAge: age, source: thread.sourceEventTitle || source, refIds: [thread.id], tags: ['trade', 'auction', thread.status].filter(Boolean) });
+    }
+    if (!thread.realmId && /秘境|洞府|遗迹|遗府|禁制|信物|钥/.test(threadText)) {
+      facts.push({ id: worldFactId('realm', thread.title), kind: 'realm', title: thread.title, summary: thread.followUpHint || thread.description || thread.title, confidence: 0.58, firstSeenAge: thread.startAge ?? age, lastSeenAge: age, source: thread.sourceEventTitle || source, refIds: [thread.id], tags: ['realm-hint', thread.category, thread.status].filter(Boolean) });
+    }
   }
+
   for (const realm of getDiscoveredStoryRealms(state)) {
-    facts.push({ id: worldFactId('realm', realm.id), kind: 'realm', title: realm.name, summary: realm.description, confidence: 0.8, firstSeenAge: age, lastSeenAge: age, source, refIds: [realm.id], tags: ['realm', realm.tier, realm.isStoryRealm ? 'story' : 'system'].filter(Boolean) });
+    facts.push({ id: worldFactId('realm', realm.id), kind: 'realm', title: realm.name, summary: realm.description, confidence: 0.82, firstSeenAge: age, lastSeenAge: age, source, refIds: [realm.id], tags: ['realm', realm.tier, realm.isStoryRealm ? 'story' : 'system', ...(realm.themeTags || []).slice(0, 4)].filter(Boolean) });
   }
   return facts;
 }

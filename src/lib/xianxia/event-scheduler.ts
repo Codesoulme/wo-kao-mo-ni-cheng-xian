@@ -34,6 +34,20 @@ function threadContinuityBoost(thread: { title?: string; description?: string; f
   return Math.min(45, continuityTextScore(text));
 }
 
+function worldFactPriorityBoost(fact: { kind?: string; title?: string; summary?: string; tags?: string[] }): number {
+  const tags = fact.tags || [];
+  const text = [fact.title, fact.summary, ...tags].filter(Boolean).join('；');
+  let boost = 0;
+  if (fact.kind === 'faction') boost += 10;
+  if (fact.kind === 'location') boost += 8;
+  if (tags.includes('current')) boost += 16;
+  if (tags.includes('market')) boost += 12;
+  if (tags.includes('danger')) boost += 18;
+  if (tags.includes('auction')) boost += 10;
+  boost += Math.min(24, continuityTextScore(text) * 0.35);
+  return boost;
+}
+
 export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPlan {
   const age = state.age;
   const hints: ScheduledEventHint[] = [];
@@ -106,17 +120,24 @@ export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPl
     });
   }
 
-  const recentFacts = (state.worldFacts || []).slice(-20);
+  const recentFacts = (state.worldFacts || []).slice(-30);
   for (const fact of recentFacts) {
-    if (fact.kind !== 'realm' && fact.kind !== 'npc' && fact.kind !== 'relationship') continue;
+    if (!['realm', 'npc', 'relationship', 'location', 'faction', 'event'].includes(fact.kind)) continue;
+    const boost = worldFactPriorityBoost(fact);
+    const kind = fact.kind === 'realm' ? 'realm' : fact.kind === 'npc' || fact.kind === 'relationship' ? 'npc' : 'world';
+    const reasonTail = fact.kind === 'location'
+      ? '此地可作为后续遭遇、交易、追踪、历练或休整的空间锚点。'
+      : fact.kind === 'faction'
+        ? '此势力可作为后续人情、宗门、恩怨或资源网络的背景锚点。'
+        : '';
     hints.push({
       id: hintId('fact', fact.id),
-      kind: fact.kind === 'realm' ? 'realm' : 'npc',
-      priority: 25 + Math.round((fact.confidence || 0) * 20),
+      kind,
+      priority: 25 + Math.round((fact.confidence || 0) * 20) + boost,
       title: fact.title,
-      reason: fact.summary,
+      reason: [fact.summary, reasonTail].filter(Boolean).join(' '),
       relatedFactIds: [fact.id],
-      requiredAction: 'echo_or_develop',
+      requiredAction: boost >= 18 ? 'echo_or_develop' : 'background',
     });
   }
 

@@ -1,6 +1,6 @@
 ﻿import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan } from '../src/lib/xianxia/event-scheduler';
-import { recordActionCausality } from '../src/lib/xianxia/engine';
+import { deriveWorldFactsFromState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
 import { appendStateChangeAuditEffect } from '../src/lib/xianxia/state-change-log';
 
 function assert(condition: unknown, message: string): void {
@@ -108,6 +108,51 @@ function smokeBoundaryFactChecks(): void {
   log('boundary-fact-checks', { passed: true, codes: codes.length });
 }
 
+function smokeWorldFactsLite(): void {
+  const state: any = {
+    age: 42,
+    location: '青岚坊市',
+    faction: '青岚宗',
+    npcs: [{
+      id: 'npc_shadow',
+      name: '阴鸦客',
+      description: '拍卖会中盯上旧洞府铜钥的散修。',
+      role: '竞拍失利者',
+      faction: '黑鸦会',
+      attitude: 'hostile',
+      relationshipScore: -30,
+      firstMetAge: 41,
+      lastSeenAge: 42,
+      lastKnownLocation: '青岚坊市',
+      source: 'auction',
+      memory: '因旧洞府铜钥落入角色手中而记下一笔。',
+      tags: ['auction', 'aftermath'],
+    }],
+    pendingThreads: [{
+      id: 'thread_key',
+      title: '旧洞府铜钥的旧主线索',
+      description: '旧洞府铜钥牵动一座失落洞府。',
+      category: 'mystery',
+      startAge: 41,
+      deadlineAge: 45,
+      status: 'pending',
+      progress: 20,
+      followUpHint: '可循铜钥禁制探查洞府旧主。',
+    }],
+    discoveredRealms: [],
+    worldFacts: [],
+  };
+  const facts = deriveWorldFactsFromState(state, 'smoke');
+  assert(facts.some(f => f.kind === 'location' && f.title === '青岚坊市' && f.tags?.includes('market')), 'world facts should derive market location fact');
+  assert(facts.some(f => f.kind === 'faction' && f.title === '青岚宗' && f.tags?.includes('current')), 'world facts should derive current faction fact');
+  assert(facts.some(f => f.kind === 'faction' && f.title === '黑鸦会' && f.tags?.includes('hostile')), 'world facts should derive NPC-linked faction fact');
+  assert(facts.some(f => f.kind === 'realm' && f.tags?.includes('realm-hint')), 'world facts should derive realm hint from key/thread text');
+  const refreshed: any = refreshWorldFacts(state, 'smoke');
+  const plan = buildEventSchedulerPlan({ ...refreshed, questEntries: [], causalGraph: { nodes: [], edges: [] } });
+  assert(plan.hints.some(h => h.kind === 'world' && h.title === '青岚坊市'), 'scheduler should include location world fact hint');
+  log('worldfacts-lite', { passed: true, facts: facts.length, hints: plan.hints.length });
+}
+
 function smokeActionCausality(): void {
   const state: any = {
     age: 30,
@@ -186,6 +231,7 @@ async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
+  smokeWorldFactsLite();
   smokeActionCausality();
   smokeHiddenAudit();
   if (withDb) await smokeAuctionDbRoute();
