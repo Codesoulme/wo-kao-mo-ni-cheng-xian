@@ -530,6 +530,28 @@ export interface WorldFact {
   tags?: string[];
 }
 
+export type ScheduledEventKind = 'quest' | 'deadline' | 'realm' | 'npc' | 'world' | 'downtime';
+export type ScheduledEventAction = 'advance' | 'advance_or_resolve' | 'resolve_or_fail' | 'echo_or_develop' | 'background';
+
+export interface ScheduledEventHint {
+  id: string;
+  kind: ScheduledEventKind;
+  priority: number;
+  title: string;
+  reason: string;
+  sourceThreadId?: string;
+  dueAge?: number;
+  relatedFactIds?: string[];
+  requiredAction: ScheduledEventAction;
+}
+
+export interface EventSchedulerPlan {
+  generatedAtAge: number;
+  focus?: ScheduledEventHint;
+  hints: ScheduledEventHint[];
+  warnings: string[];
+}
+
 export type InputClass = 'action' | 'dialogue' | 'overreach' | 'rule_manipulation';
 
 // AI 生成的叙事事件
@@ -780,6 +802,7 @@ export interface EngineStateContext {
   npcs: WorldNpc[];
   causalGraph: CausalGraph;
   worldFacts: WorldFact[];
+  eventSchedule: EventSchedulerPlan;
   blueprint?: EventBlueprint;
   // 未决线索列表（AI 必须保持连续性；deadlineAge 临近的标记为 urgent）
   pendingThreads: PendingThread[];

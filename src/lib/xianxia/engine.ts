@@ -55,6 +55,7 @@ import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
 import { validateAIBoundary, BoundaryValidationTrace } from './ai-boundary-validator';
 import { buildStateChangeLog, StateChangeLogEntry } from './state-change-log';
+import { buildEventSchedulerPlan } from './event-scheduler';
 import {
   registerItem,
   registerMany,
@@ -1337,6 +1338,8 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     status: (t.status === 'pending' && (t.deadlineAge - state.age) <= 3) ? 'urgent' as const : t.status,
   }));
   const questEntries = buildQuestEntriesFromThreads(threads, state.age);
+  state.questEntries = questEntries;
+  const eventSchedule = buildEventSchedulerPlan(state);
   // Task 20: 引擎根据当前处境生成角色主动意图（每岁重算）
   const intents = generateCharacterIntents(state, threads);
   state.characterIntents = intents;
@@ -1383,6 +1386,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
       updatedAtAge: safeCausalGraph.updatedAtAge,
     },
     worldFacts: safeWorldFacts.slice(-40),
+    eventSchedule,
     completedFateNodes,
     availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,

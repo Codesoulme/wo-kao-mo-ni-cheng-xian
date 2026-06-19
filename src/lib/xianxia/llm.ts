@@ -233,6 +233,9 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
   const worldFactList = ctx.worldFacts?.length
     ? ctx.worldFacts.slice(-20).map(f => `- [${f.kind}][${f.confidence}] ${f.title}：${f.summary}`).join('\n')
     : '暂无已沉淀的长期世界事实';
+  const scheduleList = ctx.eventSchedule?.hints?.length
+    ? ctx.eventSchedule.hints.slice(0, 8).map(h => `- [priority:${h.priority}][${h.kind}][${h.requiredAction}] ${h.title}：${h.reason}${h.sourceThreadId ? `（thread:${h.sourceThreadId}）` : ''}${h.dueAge ? `（期限:${h.dueAge}岁）` : ''}`).join('\n')
+    : '本年无硬性调度目标，但仍需生成具体行动和小推进';
   const mult = ctx.cultivationMultiplier || 0;
   const multDesc = mult > 0 ? `${mult.toFixed(2)}倍（已含灵根与功法加成）` : '0（无灵根，无法修炼）';
   const curInsight = ctx.cultivationInsight || '';
@@ -324,6 +327,10 @@ ${ctx.characterIntents && ctx.characterIntents.length
 【未决线索区】（必须保持连续性！urgent 与到期线索本轮必须推进或解决）
 任务索引 QuestEntry（由未决线索规范化而来，优先看 urgency/stage，再回看 pendingThreads 原文）
 ${questEntryList}
+
+本年事件调度建议（优先级越高越应承接；deadline/urgent 必须推进、完成、失败或解释无法执行）：
+${scheduleList}
+${ctx.eventSchedule?.warnings?.length ? `调度警告：${ctx.eventSchedule.warnings.join("；")}` : ""}
 
 已确认的长期世界事实（用于保持地点、宗门、人物、秘境与设定连续性；不得无故推翻）：
 ${worldFactList}
