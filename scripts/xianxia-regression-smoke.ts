@@ -1,7 +1,7 @@
 ﻿import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { deriveWorldEventConsequences, deriveWorldFactsFromState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
-import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect } from '../src/lib/xianxia/state-change-log';
+import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -369,7 +369,14 @@ function smokeHiddenAudit(): void {
   assert(audit?.focusHintId === 'seh_npc_shadow', 'narrative contract audit should persist focus hint id');
   assert(audit?.contract?.narrativeFocus === 'npc', 'narrative contract audit should persist contract focus');
   assert(audit?.warnings?.some((entry: any) => entry.code === 'top_schedule_focus_not_declared'), 'narrative contract audit should persist related boundary entries');
-  log('hidden-audit', { passed: true, effects: effects.length, narrativeAudit: Boolean(audit) });
+
+  const feedback = extractNarrativeContractFeedback([{ age: 30, title: '坊外微影', effects: JSON.stringify(narrativeEffects) }]);
+  assert(feedback.length === 1, 'narrative contract feedback should be extracted from hidden audit');
+  assert(feedback[0].narrativeFocus === 'npc', 'feedback should preserve narrative focus');
+  assert(feedback[0].topThreat === '阴鸦客', 'feedback should preserve pressure map threat');
+  assert(feedback[0].usedNpcIds.includes('npc_shadow'), 'feedback should preserve used npc ids');
+  assert(feedback[0].warningCodes.includes('top_schedule_focus_not_declared'), 'feedback should preserve contract warning codes');
+  log('hidden-audit', { passed: true, effects: effects.length, narrativeAudit: Boolean(audit), feedback: feedback.length });
 }
 
 async function smokeAuctionDbRoute(): Promise<void> {

@@ -574,6 +574,21 @@ export interface NarrativeContract {
   contractNote?: string;
 }
 
+export interface NarrativeContractFeedbackEntry {
+  age: number;
+  title: string;
+  narrativeFocus?: NarrativeFocusKind;
+  contractNote?: string;
+  focusHintId?: string;
+  focusHintTitle?: string;
+  topThreat?: string;
+  topOpportunity?: string;
+  usedScheduleHintIds: string[];
+  usedWorldFactIds: string[];
+  usedNpcIds: string[];
+  warningCodes: string[];
+}
+
 // AI 生成的叙事事件
 export interface AIEventOutput {
   // 叙事
@@ -816,6 +831,7 @@ export interface EngineStateContext {
   // 修炼速度倍率（灵根 × 功法 × 其他装备的乘法效果之和）
   cultivationMultiplier: number;
   recentEvents: { age: number; title: string; narrative: string; eventType: string }[];
+  narrativeContractFeedback: NarrativeContractFeedbackEntry[];
   longTermMemory: string[];
   completedFateNodes: number[];
   // 引擎能力告知

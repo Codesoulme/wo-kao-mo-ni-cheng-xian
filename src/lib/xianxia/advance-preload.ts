@@ -4,6 +4,7 @@ import { dbToState, buildStateContext, tickStatusDurations, tickNaturalRecovery,
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES } from '@/lib/xianxia/types';
 import { buildFallbackAgeEvent } from '@/lib/xianxia/advance-fallback';
+import { extractNarrativeContractFeedback } from '@/lib/xianxia/state-change-log';
 
 type CharacterRecord = Awaited<ReturnType<typeof db.character.findUnique>>;
 
@@ -90,8 +91,19 @@ async function getRecentEvents(characterId: string) {
   }));
 }
 
+async function getNarrativeContractFeedback(characterId: string) {
+  const auditEvents = await db.eventLog.findMany({
+    where: { characterId },
+    orderBy: { createdAt: 'desc' },
+    take: 8,
+    select: { age: true, title: true, effects: true },
+  });
+  return extractNarrativeContractFeedback(auditEvents.reverse());
+}
+
 export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>) {
   const recentEvents = await getRecentEvents(char.id);
+  const narrativeContractFeedback = await getNarrativeContractFeedback(char.id);
   let state = dbToState(char);
   const recentBlueprintCategories = (state as any)._recentBlueprintCategories || [];
   const blueprint = pickEventBlueprint(state, recentBlueprintCategories);
@@ -107,7 +119,7 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   const fateNodeIdx = checkFateNode(state);
   const referenceFateNode = fateNodeIdx !== null ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
   const isFateNode = false;
-  const ctx = buildStateContext(state, recentEvents);
+  const ctx = buildStateContext(state, recentEvents, narrativeContractFeedback);
   ctx.blueprint = blueprint;
 
   let aiOutput;

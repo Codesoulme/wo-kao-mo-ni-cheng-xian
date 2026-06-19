@@ -1424,7 +1424,11 @@ export function buildQuestEntriesFromThreads(threads: PendingThread[] | null | u
 
 // ==================== 引擎状态上下文构建 ====================
 
-export function buildStateContext(state: CharacterState, recentEvents: { age: number; title: string; narrative: string; eventType?: string }[]): EngineStateContext {
+export function buildStateContext(
+  state: CharacterState,
+  recentEvents: { age: number; title: string; narrative: string; eventType?: string }[],
+  narrativeContractFeedback: EngineStateContext['narrativeContractFeedback'] = [],
+): EngineStateContext {
   const realmInfo = getRealmInfo(state.realm);
   const completedFateNodes = Array.isArray(state.fateNodes) ? state.fateNodes : [];
   const safePendingThreads = Array.isArray(state.pendingThreads) ? state.pendingThreads : [];
@@ -1485,6 +1489,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     cultivationInsight: state.cultivationInsight,
     cultivationFactors: safeCultivationFactors,
     recentEvents: safeRecentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
+    narrativeContractFeedback: (narrativeContractFeedback || []).slice(-8),
     longTermMemory: safeLongTermMemory.slice(-10),
     npcs: safeNpcs.slice(-20),
     causalGraph: {

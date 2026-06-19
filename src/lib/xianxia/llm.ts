@@ -296,6 +296,21 @@ function buildCausalEchoList(ctx: EngineStateContext): string {
   return [...edgeLines, ...orphanNodes].join('\n') || '暂无可追踪因果。';
 }
 
+function buildNarrativeContractFeedbackList(ctx: EngineStateContext): string {
+  const feedback = (ctx.narrativeContractFeedback || []).slice(-6);
+  if (!feedback.length) return '暂无叙事契约回看。';
+  return feedback.map(entry => {
+    const used = [
+      entry.usedNpcIds?.length ? `NPC:${entry.usedNpcIds.join(',')}` : '',
+      entry.usedWorldFactIds?.length ? `事实:${entry.usedWorldFactIds.join(',')}` : '',
+      entry.usedScheduleHintIds?.length ? `调度:${entry.usedScheduleHintIds.join(',')}` : '',
+    ].filter(Boolean).join('；') || '未声明结构引用';
+    const pressure = [entry.topThreat ? `威胁:${entry.topThreat}` : '', entry.topOpportunity ? `机会:${entry.topOpportunity}` : ''].filter(Boolean).join('；') || '无明确压力/机会';
+    const warnings = entry.warningCodes?.length ? `；审计:${entry.warningCodes.join(',')}` : '';
+    return `- ${entry.age}岁《${entry.title}》：focus=${entry.narrativeFocus || '未声明'}；${pressure}；${used}${entry.contractNote ? `；说明:${textLimit(entry.contractNote, 80)}` : ''}${warnings}`;
+  }).join('\n');
+}
+
 function buildContinuityFocusBlock(ctx: EngineStateContext): string {
   return `长期连续性锚点（供叙事自然回响，严禁机械照抄；若本次承接其中任一项，必须在 newThreads/advanceThreads/completeThreadIds/failThreadIds/newNpcs 中留下结构化痕迹）：
 
@@ -311,13 +326,17 @@ ${buildNpcFocusList(ctx)}
 【因果图回响】
 ${buildCausalEchoList(ctx)}
 
+【最近叙事契约回看】
+${buildNarrativeContractFeedbackList(ctx)}
+
 连续性使用原则：
 - 高 urgency、urgent、deadline 临近的线索优先推进、完成、失败或解释暂缓，不能无故遗忘。
 - 已确认世界事实只能自然承接，不要凭空改写；若地点、宗门、NPC、秘境已存在，应沿用既有名字和关系。
 - 旧 NPC 再登场时优先沿用 npc id/name/态度/旧记忆；只有真正新人物才放入 newNpcs。
 - 因果图中的 created/continues/triggers 是后续事件种子；resolved/failed 是旧因果结论，不要反复重开，除非叙事有充分由头。
 - 若本次只是日常，也应让角色围绕上述锚点做小行动、小打听、小修补或小代价，避免空白。
-- 若存在“世界压力与机会”摘要，优先把最大威胁、最大机会、焦点地点或焦点人物/势力之一自然融入本年事件。`;
+- 若存在“世界压力与机会”摘要，优先把最大威胁、最大机会、焦点地点或焦点人物/势力之一自然融入本年事件。
+- 参考“最近叙事契约回看”：连续多次已承接的对象不要原地重复，应推进、转折、解决、失败或换角度；被审计提示忽略的压力/机会，本轮若合适应补上。`;
 }
 
 // ==================== Prompt 构建 ====================

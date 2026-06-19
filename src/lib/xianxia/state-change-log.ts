@@ -1,4 +1,4 @@
-﻿import type { AttributeChange, AIEventOutput, CharacterState, EventSchedulerPlan, NarrativeContract, WorldPressureOpportunityMap } from './types';
+﻿import type { AttributeChange, AIEventOutput, CharacterState, EventSchedulerPlan, NarrativeContract, NarrativeContractFeedbackEntry, WorldPressureOpportunityMap } from './types';
 import type { ValidationTrace } from './content-registry';
 import type { EffectResolveTrace } from './types';
 import type { BoundaryValidationTrace } from './ai-boundary-validator';
@@ -244,4 +244,47 @@ export function appendNarrativeContractAuditEffect<T>(
 ): Array<T | NarrativeContractAuditEffect> {
   const audit = buildNarrativeContractAuditEffect(args);
   return audit ? [...effects, audit] : effects;
+}
+
+export interface NarrativeContractAuditEventLike {
+  age: number;
+  title: string;
+  effects?: string | unknown[] | null;
+}
+
+function parseEffects(value: string | unknown[] | null | undefined): unknown[] {
+  if (Array.isArray(value)) return value;
+  if (!value || typeof value !== 'string') return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function extractNarrativeContractFeedback(events: NarrativeContractAuditEventLike[]): NarrativeContractFeedbackEntry[] {
+  const entries: NarrativeContractFeedbackEntry[] = [];
+  for (const event of events || []) {
+    const effects = parseEffects(event.effects);
+    for (const effect of effects) {
+      const audit = effect as Partial<NarrativeContractAuditEffect> | undefined;
+      if (!audit || audit.kind !== '__audit_narrative_contract' || audit.hidden !== true) continue;
+      entries.push({
+        age: event.age,
+        title: event.title,
+        narrativeFocus: audit.contract?.narrativeFocus,
+        contractNote: audit.contract?.contractNote,
+        focusHintId: audit.focusHintId,
+        focusHintTitle: audit.focusHintTitle,
+        topThreat: audit.pressureMap?.topThreat,
+        topOpportunity: audit.pressureMap?.topOpportunity,
+        usedScheduleHintIds: audit.usedScheduleHintIds || audit.contract?.usedScheduleHintIds || [],
+        usedWorldFactIds: audit.usedWorldFactIds || audit.contract?.usedWorldFactIds || [],
+        usedNpcIds: audit.usedNpcIds || audit.contract?.usedNpcIds || [],
+        warningCodes: (audit.warnings || []).map(entry => entry.code).filter(Boolean).slice(0, 8),
+      });
+    }
+  }
+  return entries.slice(-8);
 }
