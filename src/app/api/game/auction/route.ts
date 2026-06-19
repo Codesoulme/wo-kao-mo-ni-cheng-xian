@@ -34,6 +34,7 @@ type AuctionLot = {
   desireTags: string[];
   sold?: boolean;
   winner?: string;
+  rivalryHint?: string;
 };
 
 type AuctionBidder = {
@@ -316,6 +317,79 @@ function auctionNpcs(session: AuctionSession, age: number): Partial<WorldNpc>[] 
   }));
 }
 
+function interestedAuctionRival(session: AuctionSession, lot: AuctionLot, excludeName?: string) {
+  const temperamentRank: Record<AuctionBidder['temperament'], number> = { secretive: 5, reckless: 4, greedy: 3, proud: 2, calm: 1 };
+  return [...session.bidders]
+    .filter(bidder => bidder.name !== excludeName)
+    .map(bidder => ({
+      bidder,
+      interest: lot.desireTags.filter(tag => bidder.desireTags.includes(tag)).length,
+      rank: temperamentRank[bidder.temperament] || 0,
+    }))
+    .filter(entry => entry.interest > 0)
+    .sort((a, b) => (b.interest * 10 + b.rank + b.bidder.assets / 1000) - (a.interest * 10 + a.rank + a.bidder.assets / 1000))[0]?.bidder;
+}
+
+function auctionAftermath(session: AuctionSession, lot: AuctionLot, state: ReturnType<typeof dbToState>, playerWon: boolean) {
+  const rivalName = playerWon ? interestedAuctionRival(session, lot)?.name : lot.winner;
+  const rival = session.bidders.find(b => b.name === rivalName);
+  const highValue = ['epic', 'legendary', 'mythic'].includes(lot.item.rarity) || lot.desireTags.includes('mystery') || lot.desireTags.includes('key');
+  if (!rival || (!highValue && rival.temperament === 'calm')) {
+    return { threads: [] as Partial<PendingThread>[], npcs: [] as Partial<WorldNpc>[], narrativeLines: [] as string[] };
+  }
+  const npc: Partial<WorldNpc> = {
+    id: `auction_npc_${rival.name}`,
+    name: rival.name,
+    description: `${session.title}中对${lot.item.name}格外在意的竞拍者，${rival.realm}修为，性情${rival.temperament}。`,
+    role: playerWon ? '竞拍失利者' : '拍品得主',
+    realm: rival.realm,
+    attitude: rival.temperament === 'secretive' || rival.temperament === 'reckless' ? 'hostile' : 'neutral',
+    relationshipScore: playerWon ? -25 : -8,
+    firstMetAge: state.age,
+    lastSeenAge: state.age,
+    lastKnownLocation: session.location,
+    source: 'auction-aftermath',
+    memory: playerWon
+      ? `在${session.title}中因${lot.item.name}落入${state.name}手中而记下一笔。`
+      : `在${session.title}中拍得${lot.item.name}，此物后续或仍牵动因果。`,
+    tags: ['auction', 'aftermath', rival.temperament, playerWon ? 'rivalry' : 'winner'],
+  };
+  const thread: Partial<PendingThread> = playerWon ? {
+    id: `auction_aftermath_${session.id}_${lot.id}_rivalry`,
+    title: `${rival.name}的暗中盯梢`,
+    description: `${state.name}在${session.title}拍得${lot.item.name}后，${rival.name}神色微冷，似将此事记在心中。`,
+    category: 'quest',
+    startAge: state.age,
+    deadlineAge: state.age + 1,
+    status: 'pending',
+    progress: 10,
+    reward: '化解仇怨、反夺线索或获得额外消息',
+    failureCost: '坊市外被盯梢、截杀或被引入圈套',
+    followUpHint: `后续流年可让${rival.name}因${lot.item.name}盯上角色，低频触发盯梢、试探、劫杀或交易。`,
+    sourceEventTitle: session.title,
+  } : {
+    id: `auction_aftermath_${session.id}_${lot.id}_winner`,
+    title: `${rival.name}拍得${lot.item.name}`,
+    description: `${rival.name}在${session.title}中拍得${lot.item.name}，此物可能牵出后续秘闻、交易或争夺。`,
+    category: lot.desireTags.includes('mystery') || lot.desireTags.includes('key') ? 'mystery' : 'quest',
+    startAge: state.age,
+    deadlineAge: state.age + 2,
+    status: 'pending',
+    progress: 10,
+    reward: '追踪拍品去向或另获机缘',
+    failureCost: '拍品因果被他人先行消化',
+    followUpHint: `后续可在${rival.name}行踪、坊市传闻或${lot.item.name}相关地点中回响。`,
+    sourceEventTitle: session.title,
+  };
+  lot.rivalryHint = thread.followUpHint;
+  return {
+    threads: [thread],
+    npcs: [npc],
+    narrativeLines: playerWon
+      ? [`帘角处，${rival.name}多看了${lot.item.name}一眼，目光很快敛入袖中。`]
+      : [`${rival.name}收起${lot.item.name}时，似有意避开众人视线。`],
+  };
+}
 function recordAuctionCausality(
   state: ReturnType<typeof dbToState>,
   session: AuctionSession,
@@ -512,12 +586,50 @@ export async function POST(req: NextRequest) {
             state = addThreads(state, newThreads);
           }
         }
-        narrative = [`${state.name}举牌出价 ${offered} 灵石。`, ...rivalLines, `槌音三落，${lot.item.name}归入${state.name}手中。`].join('\n');
+        const aftermath = auctionAftermath(session, lot, state, true);
+        if (aftermath.threads.length) {
+          const registeredAftermathThreads = registerMany(aftermath.threads, registerThread, { source: 'auction-aftermath', age: state.age, existingIds: (state.pendingThreads || []).map(t => t.id) });
+          contentRegistryTrace.push(...registeredAftermathThreads.trace);
+          contentRegistryWarnings.push(...registeredAftermathThreads.warnings);
+          if (registeredAftermathThreads.accepted.length) {
+            newThreads = [...newThreads, ...registeredAftermathThreads.accepted];
+            state = addThreads(state, registeredAftermathThreads.accepted);
+          }
+        }
+        if (aftermath.npcs.length) {
+          const registeredAftermathNpcs = registerMany(aftermath.npcs, registerNpc, { source: 'auction-aftermath', age: state.age, existingIds: (state.npcs || []).map(n => n.id) });
+          contentRegistryTrace.push(...registeredAftermathNpcs.trace);
+          contentRegistryWarnings.push(...registeredAftermathNpcs.warnings);
+          if (registeredAftermathNpcs.accepted.length) {
+            newNpcs = [...newNpcs, ...registeredAftermathNpcs.accepted];
+            state = upsertNpcs(state, registeredAftermathNpcs.accepted);
+          }
+        }
+        narrative = [`${state.name}举牌出价 ${offered} 灵石。`, ...rivalLines, `槌音三落，${lot.item.name}归入${state.name}手中。`, ...aftermath.narrativeLines].join('\n');
       } else {
-        narrative = [`${state.name}举牌出价 ${offered} 灵石。`, ...rivalLines, `最终${lot.winner}以 ${lot.currentBid} 灵石压过众人，${lot.item.name}未入囊中。`].join('\n');
+        const aftermath = auctionAftermath(session, lot, state, false);
+        if (aftermath.threads.length) {
+          const registeredAftermathThreads = registerMany(aftermath.threads, registerThread, { source: 'auction-aftermath', age: state.age, existingIds: (state.pendingThreads || []).map(t => t.id) });
+          contentRegistryTrace.push(...registeredAftermathThreads.trace);
+          contentRegistryWarnings.push(...registeredAftermathThreads.warnings);
+          if (registeredAftermathThreads.accepted.length) {
+            newThreads = [...newThreads, ...registeredAftermathThreads.accepted];
+            state = addThreads(state, registeredAftermathThreads.accepted);
+          }
+        }
+        if (aftermath.npcs.length) {
+          const registeredAftermathNpcs = registerMany(aftermath.npcs, registerNpc, { source: 'auction-aftermath', age: state.age, existingIds: (state.npcs || []).map(n => n.id) });
+          contentRegistryTrace.push(...registeredAftermathNpcs.trace);
+          contentRegistryWarnings.push(...registeredAftermathNpcs.warnings);
+          if (registeredAftermathNpcs.accepted.length) {
+            newNpcs = [...newNpcs, ...registeredAftermathNpcs.accepted];
+            state = upsertNpcs(state, registeredAftermathNpcs.accepted);
+          }
+        }
+        narrative = [`${state.name}举牌出价 ${offered} 灵石。`, ...rivalLines, `最终${lot.winner}以 ${lot.currentBid} 灵石压过众人，${lot.item.name}未入囊中。`, ...aftermath.narrativeLines].join('\n');
       }
-      if (lot.winner === state.name) {
-        state = recordAuctionCausality(state, session, 'bid', lot, newThreads, []);
+      if (lot.winner === state.name || newThreads.length || newNpcs.length) {
+        state = recordAuctionCausality(state, session, 'bid', lot, newThreads, newNpcs);
       }
       state = normalizeCultivationState(refreshWorldFacts(state, 'auction-bid'));
     }
