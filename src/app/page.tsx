@@ -43,7 +43,9 @@ export default function Home() {
   // 当有 pendingChoice 时自动聚焦到故事 Tab
   const [tab, setTab] = useState('story');
   const hydrated = useHydrated();
-  const effectiveTab = pendingChoice ? 'story' : tab;
+  const combatSession = character?.combatSession;
+  const combatResultPending = Boolean(combatSession && combatSession.status !== 'ongoing');
+  const effectiveTab = pendingChoice || combatResultPending ? 'story' : tab;
   const storyScrollRef = useRef<HTMLDivElement | null>(null);
   const storyScrollTopRef = useRef(0);
 
@@ -199,7 +201,7 @@ export default function Home() {
       </main>
 
       {/* 底部干扰输入（常驻） */}
-      {character && character.alive && !pendingChoice && (
+      {character && character.alive && !pendingChoice && !combatResultPending && (
         <div className="shrink-0 max-w-md mx-auto w-full">
           <InterfereInput />
         </div>

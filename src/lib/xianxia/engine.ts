@@ -1,4 +1,4 @@
-﻿// 修仙模拟器 - 引擎核心
+// 修仙模拟器 - 引擎核心
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
@@ -9,6 +9,7 @@ import {
   ItemEntry,
   TechniqueProfile,
   TechniqueRequirement,
+  ConstitutionProfile,
   Realm,
   RealmProfile,
   REALMS,
@@ -531,6 +532,7 @@ export function normalizeCultivationState(state: CharacterState): CharacterState
   return {
     ...normalizedState,
     cultivationMultiplier: rate.multiplier,
+    activeStatuses: normalizedState.activeStatuses,
     cultivationFactors: computeCultivationFactors(normalizedState),
   };
 }
@@ -563,6 +565,7 @@ function realmIndexOf(realm?: string): number {
   return REALMS.findIndex(r => r.id === realm || r.name === realm || r.shortName === realm);
 }
 
+
 function statusTextPool(state: CharacterState): string {
   return [
     state.faction || '',
@@ -570,6 +573,60 @@ function statusTextPool(state: CharacterState): string {
     ...(state.activeStatuses || []).flatMap(st => [st.name, st.description, st.source]),
     ...(state.longTermMemory || []),
   ].join(';');
+}
+
+function activeConstitutionStatuses(state: CharacterState): StatusEntry[] {
+  return (state.activeStatuses || []).filter(status => Boolean(status.constitution));
+}
+
+function constitutionTechniqueResonance(state: CharacterState, item: ItemEntry, profile: TechniqueProfile): { bonus: number; warnings: string[] } {
+  const constitutions = activeConstitutionStatuses(state);
+  if (!constitutions.length) return { bonus: 1, warnings: [] };
+  const text = [
+    item.name,
+    item.description,
+    profile.traits?.map(t => `${t.name}${t.description}`).join(' '),
+    profile.spell ? `${profile.spell.name}${profile.spell.description}` : '',
+  ].filter(Boolean).join(' ');
+  let bonus = 1;
+  const warnings: string[] = [];
+  for (const status of constitutions) {
+    const c = status.constitution;
+    if (!c) continue;
+    const elementHit = c.elementAffinity?.some(el => profile.requirements?.minElements?.[el] || text.includes(ELEMENTS[el].name));
+    const keywordHit = c.techniqueKeywords?.some(keyword => keyword && text.includes(keyword));
+    const tagHit = c.resonanceTags?.some(tag => tag && text.toLowerCase().includes(String(tag).toLowerCase()));
+    if (elementHit || keywordHit || tagHit) {
+      const stageBonus = Math.max(0, Math.min(0.18, 0.06 * Math.max(1, c.currentStage || 1)));
+      bonus += stageBonus;
+      warnings.push(`${status.name}与${item.name}气机相合，适配略有提升。`);
+    }
+    if (c.riskType === 'heart_demon' && /火|炎|阳|魔|煞|血/.test(text)) {
+      warnings.push(`${status.name}火性或煞性相激，强行催动时更容易牵动心魔。`);
+    }
+    if (c.riskType === 'backlash' && safeRarityIndex(item.rarity) >= 3) {
+      warnings.push(`${status.name}能容纳高阶法门，但错纳异力时反噬也更重。`);
+    }
+  }
+  return { bonus: Number(Math.min(1.25, bonus).toFixed(2)), warnings };
+}
+
+export function summarizeConstitutionProfiles(state: CharacterState): { name: string; category: string; stage: number; maxStage: number; resonance: string[]; riskHint?: string; hooks: string[] }[] {
+  return activeConstitutionStatuses(state).map(status => {
+    const c = status.constitution as ConstitutionProfile;
+    return {
+      name: status.name,
+      category: c.category,
+      stage: c.currentStage || 1,
+      maxStage: c.maxStage || 1,
+      resonance: [
+        ...(c.elementAffinity || []).map(el => `${ELEMENTS[el]?.name || el}?`),
+        ...(c.techniqueKeywords || []).slice(0, 4),
+      ].filter(Boolean),
+      riskHint: c.riskHint,
+      hooks: (c.narrativeHooks || []).slice(0, 3),
+    };
+  });
 }
 
 function inferTechniqueProfile(item: ItemEntry): TechniqueProfile | undefined {
@@ -666,6 +723,12 @@ export function evaluateTechniqueCompatibility(state: CharacterState, item: Item
       warnings.push(`${ELEMENTS[el].name}\u884c\u611f\u5e94\u4e0d\u8db3\uff0c\u672f\u8def\u4e0d\u987a\u3002`);
     }
   }
+  const resonance = constitutionTechniqueResonance(state, item, profile);
+  if (resonance.bonus > 1 && adaptation > 0) {
+    adaptation *= resonance.bonus;
+    warnings.push(...resonance.warnings);
+  }
+
   if (req.requiredStatuses?.length) {
     const pool = statusTextPool(state);
     const missing = req.requiredStatuses.filter(k => k && !pool.includes(k));
@@ -1697,6 +1760,7 @@ export function buildStateContext(
   const safeInventory = Array.isArray(state.inventory) ? state.inventory : [];
   const safeEquipped = Array.isArray(state.equipped) ? state.equipped : [];
   const safeCultivationFactors = Array.isArray(state.cultivationFactors) ? state.cultivationFactors : [];
+  const constitutionProfiles = summarizeConstitutionProfiles(state);
   const safeLongTermMemory = Array.isArray(state.longTermMemory) ? state.longTermMemory : [];
   const safeNpcs = Array.isArray(state.npcs) ? state.npcs : [];
   const safeWorldFacts = Array.isArray(state.worldFacts) ? state.worldFacts : [];
@@ -1743,6 +1807,7 @@ export function buildStateContext(
       heartDemon: state.heartDemon ?? 0,
     },
     activeStatuses: safeActiveStatuses,
+    constitutionProfiles,
     inventory: safeInventory,
     equipped: safeEquipped,
     storageCapacity: state.storageCapacity,

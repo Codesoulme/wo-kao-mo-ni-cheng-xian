@@ -187,6 +187,34 @@ export type StatusCategory =
   | 'attribute' | 'skill' | 'buff' | 'debuff'
   | 'special' | 'identity' | 'quest' | 'environment';
 
+export type ConstitutionCategory = 'element' | 'combat' | 'social' | 'fate' | 'body' | 'dao';
+export type ConstitutionRiskType = 'none' | 'heart_demon' | 'backlash' | 'attention' | 'conflict';
+
+export interface ConstitutionAwakeningStage {
+  stage: number;
+  name: string;
+  minRealm?: Realm;
+  minAge?: number;
+  triggerHint: string;
+  description: string;
+  effects?: StatusEffect[];
+}
+
+export interface ConstitutionProfile {
+  id: string;
+  category: ConstitutionCategory;
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  elementAffinity?: Element[];
+  techniqueKeywords?: string[];
+  resonanceTags?: string[];
+  currentStage: number;
+  maxStage: number;
+  awakening?: ConstitutionAwakeningStage[];
+  riskType?: ConstitutionRiskType;
+  riskHint?: string;
+  narrativeHooks?: string[];
+}
+
 export interface StatusEntry {
   id: string;
   name: string;
@@ -196,6 +224,7 @@ export interface StatusEntry {
   duration: number;  // -1 = 永久, >0 = 剩余年龄数
   source: string;    // 来源描述
   effects: StatusEffect[];
+  constitution?: ConstitutionProfile;
 }
 
 export type EffectOperation = 'add' | 'multiply' | 'override' | 'cap' | 'floor' | 'trigger';
@@ -879,6 +908,7 @@ export interface EngineStateContext {
   // 修炼速度来源结构化列表（AI 可读取上一轮的来源条目，本轮可调整）
   cultivationFactors: CultivationFactor[];
   activeStatuses: StatusEntry[];
+  constitutionProfiles?: { name: string; category: string; stage: number; maxStage: number; resonance: string[]; riskHint?: string; hooks: string[] }[];
   inventory: ItemEntry[];
   // 已装备物品数组（无槽位上限，AI 可创造性装备：项链·储物戒指串、十指皆戴戒指等）
   equipped: ItemEntry[];

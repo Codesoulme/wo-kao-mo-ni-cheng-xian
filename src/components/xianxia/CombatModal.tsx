@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { generateSettlementResult } from '@/lib/xianxia/settlement';
 
 // 战斗动作类型
 type CombatAction = 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee';
@@ -30,7 +31,7 @@ interface FloatNumber {
 }
 
 export function CombatModal() {
-  const { character, setCharacter, addEvent, setLoading, setError } = useGameStore();
+  const { character, setCharacter, addEvent, setLoading, setError, setSettlementResult } = useGameStore();
   const [busy, setBusy] = useState(false);
   const [contextCollapsed, setContextCollapsed] = useState(false);
   // 战斗结束后短暂展示结果界面（玩家点"了结"按钮关闭）
@@ -162,23 +163,28 @@ export function CombatModal() {
       // 更新角色（combatSession 已被清空；可能含新物品、新线索）
       setCharacter({ ...character, ...data.state });
 
-      // 显示战后叙事
+      // 显示战后叙事；终局战斗直接交给轮回结算，避免战斗内小窗与全局结算重复弹出。
       const narrative = data.narrative || '';
-      setEndResult({ status, narrative });
-
-      // 写入事件日志（让史册可查）
-      if (narrative) {
-        addEvent({
-          id: `combat-${Date.now()}`,
-          age: character.age,
-          title: status === 'victory' ? '战斗·胜' : status === 'defeat' ? '战斗·陨' : '战斗·遁',
-          narrative,
-          eventType: 'combat',
-          effects: data.drops?.length
-            ? data.drops.map((d: any) => ({ kind: 'item', label: '获得', name: d.name, tone: 'positive' }))
-            : [],
-          createdAt: new Date().toISOString(),
-        });
+      const combatEvent = narrative ? {
+        id: `combat-${Date.now()}`,
+        age: character.age,
+        title: status === 'victory' ? '战斗·胜' : status === 'defeat' ? '战斗·陨' : '战斗·遁',
+        narrative,
+        eventType: 'combat',
+        effects: data.drops?.length
+          ? data.drops.map((d: any) => ({ kind: 'item', label: '获得', name: d.name, tone: 'positive' }))
+          : [],
+        createdAt: new Date().toISOString(),
+      } : null;
+      const nextCharacter = { ...character, ...data.state };
+      const nextEvents = combatEvent ? [...(useGameStore.getState().events || []), combatEvent] : (useGameStore.getState().events || []);
+      const isTerminal = !nextCharacter.alive || nextCharacter.ascended;
+      if (combatEvent) addEvent(combatEvent);
+      if (isTerminal) {
+        setSettlementResult(generateSettlementResult(nextCharacter as any, nextEvents as any));
+        setEndResult(null);
+      } else {
+        setEndResult({ status, narrative });
       }
 
       // toast 提示
@@ -200,6 +206,12 @@ export function CombatModal() {
   };
 
   const closeEndResult = () => {
+    if (character && (!character.alive || character.ascended)) {
+      const store = useGameStore.getState() as any;
+      if (!store.settlementResult || store.settlementResult.characterId !== character.id) {
+        setSettlementResult(generateSettlementResult(character as any, store.events || []));
+      }
+    }
     setEndResult(null);
   };
 

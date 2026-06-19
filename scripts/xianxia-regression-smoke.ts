@@ -1,7 +1,8 @@
-﻿import { readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
+import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
 function assert(condition: unknown, message: string): void {
@@ -713,6 +714,51 @@ async function smokeAuctionDbRoute(): Promise<void> {
   log('auction-db-route', { passed: true, characterId: char.id, lot: keyLot.item?.name, wonItems: bid.wonItems?.length || 0, threads: threads.length, npcs: npcs.length, graphNodes: graph.nodes.length, graphEdges: graph.edges.length });
 }
 
+
+function smokeConstitutionProfiles(): void {
+  const swordBody = constitutionToStatus(CONSTITUTIONS.find(c => c.id === 'sword_body')!);
+  const rawState: any = {
+    id: 'smoke_constitution', name: 'Sword Tester', gender: 'male', age: 18, lifespan: 80,
+    spiritualRoot: 'pure', rootDetail: 'metal root', rootMultiplier: 1.1,
+    realm: 'qi_refining', realmLevel: 1,
+    cultivationExp: 0, expToBreak: 100,
+    elements: { metal: 80, wood: 10, water: 10, fire: 10, earth: 10 },
+    hp: 100, maxHp: 100, mp: 80, maxMp: 80, attack: 10, defense: 8, speed: 8,
+    luck: 5, comprehension: 16, spiritStones: 0, reputation: 0,
+    alive: true, ascended: false, causeOfDeath: '', faction: '', master: '', location: '', fateNodes: [], isAtChoice: false,
+    activeStatuses: [swordBody], inventory: [], equipped: [], storageCapacity: 5,
+    cultivationMultiplier: 1, longTermMemory: [], completedFateNodes: [], pendingThreads: [], characterIntents: [], recentEventTypes: [],
+    npcs: [], causalGraph: { nodes: [], edges: [] }, worldFacts: [], pets: [], exploredRealms: [],
+  };
+  const state: any = normalizeCultivationState(rawState);
+  const swordManual: any = {
+    id: 'item_sword_manual', name: 'Metal Sword Manual', item_type: 'scripture', rarity: 'rare', description: 'Sword method with metal edge.',
+    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.2, description: '????' }],
+    technique: {
+      kind: 'spell', spell: { name: 'Metal Sword Qi', description: 'Metal sword energy.', mpCost: 10, power: 18, element: 'metal' },
+      requirements: { spiritualRoots: ['pure'], minElements: { metal: 40 }, minComprehension: 8 },
+      traits: [{ name: 'Sword Intent', description: 'sword edge' }],
+    },
+  };
+  const compat = evaluateTechniqueCompatibility(state, swordManual);
+  const baselineCompat = evaluateTechniqueCompatibility({ ...state, activeStatuses: [] }, swordManual);
+  const ctx = buildStateContext(state, []);
+  assert(Boolean(swordBody.constitution), 'constitution status should carry structured profile');
+  assert(swordBody.constitution?.awakening?.length, 'constitution profile should expose awakening stages');
+  assert(compat.adaptation > baselineCompat.adaptation, 'matching constitution should raise sword technique adaptation against baseline');
+  assert(compat.warnings.length > baselineCompat.warnings.length, 'matching constitution should emit resonance warning');
+  assert(Boolean(ctx.constitutionProfiles?.[0]) && ctx.constitutionProfiles![0].resonance.length > 0, 'state context should include constitution profile summary');
+  log('constitution-profiles', { passed: true, baseline: baselineCompat.adaptation, adaptation: compat.adaptation, profile: ctx.constitutionProfiles?.[0]?.name });
+}
+
+function smokeCombatSettlementSingleFlow(): void {
+  const source = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf8');
+  assert(source.includes('const isTerminal = !nextCharacter.alive || nextCharacter.ascended;'), 'combat modal should detect terminal combat result');
+  assert(source.includes('setSettlementResult(generateSettlementResult(nextCharacter as any, nextEvents as any));'), 'terminal combat should enter global settlement directly');
+  assert(source.includes('setEndResult({ status, narrative });'), 'non-terminal combat should keep local battle aftermath only');
+  log('combat-settlement-single-flow', { passed: true });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeSchedulerContinuity();
@@ -729,6 +775,8 @@ async function main(): Promise<void> {
   smokeAnnualNarrativePrompt();
   smokeTechniqueRequirements();
   smokeNoProtagonistShieldPrompt();
+  smokeConstitutionProfiles();
+  smokeCombatSettlementSingleFlow();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();

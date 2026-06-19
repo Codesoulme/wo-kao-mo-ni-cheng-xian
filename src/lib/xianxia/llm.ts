@@ -346,7 +346,10 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
   const sc = ctx.character;
   const elements = `金${sc.elements.metal}/木${sc.elements.wood}/水${sc.elements.water}/火${sc.elements.fire}/土${sc.elements.earth}`;
   const statusList = ctx.activeStatuses.length
-    ? ctx.activeStatuses.map(s => `- ${s.name}（${s.category}，${s.rarity}）：${s.description}`).join('\n')
+    ? ctx.activeStatuses.map(s => `- ${s.name}（${s.category}，${s.rarity}）：${s.description}${s.constitution ? `；体质阶段：${s.constitution.currentStage || 1}/${s.constitution.maxStage || 1}；风险：${s.constitution.riskHint || '暂无显著反噬'}` : ''}`).join('\n')
+    : '无';
+  const constitutionList = ctx.constitutionProfiles?.length
+    ? ctx.constitutionProfiles.map(c => `- ${c.name}：${c.stage}/${c.maxStage}阶；共鸣：${c.resonance.join('、') || '未显'}；风险：${c.riskHint || '暂无显著反噬'}；线索：${c.hooks.join('；') || '低频自然回响'}`).join('\n')
     : '无';
   const invList = ctx.inventory.length
     ? ctx.inventory.map(i => `- [id:${i.id}] ${i.name}（${i.rarity}/${i.item_type}）：${i.description}${i.equipNote ? `；装备位置：${i.equipNote}` : ''}${i.effects?.length ? '；效果：' + i.effects.map(e => `${e.operation === 'add' ? '+' : '×'}${e.value} ${e.target_attribute}`).join('，') : ''}`).join('\n')
