@@ -380,8 +380,8 @@ function isVisibleEffect(eff: any): boolean {
 
 function formatEffectLabel(eff: any): React.ReactNode {
   const label = formatEventEffectLabel(eff);
-  const match = label.match(/^(获得|装备|获得状态|收服灵宠|失去|得|售)(.+)$/);
-  if (match) return <>{match[1]}<span className="ml-0.5 font-medium">{match[2]}</span></>;
+  const match = label.match(/^(获得状态|收服灵宠|获得|装备|失去|得|售)([：:]?)(.+)$/);
+  if (match) return <>{match[1]}{match[2]}<span className="ml-0.5 font-medium">{match[3]}</span></>;
   return <>{label}</>;
 }
 

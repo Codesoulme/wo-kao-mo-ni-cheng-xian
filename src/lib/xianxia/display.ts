@@ -64,7 +64,9 @@ export function formatEventEffectLabel(eff: any): string {
   if (eff.kind) {
     const label = String(eff.label || '获得');
     const name = String(eff.name || '').trim();
-    return name ? `${label}${name}` : label;
+    if (!name) return label;
+    if (label === '获得状态' || label === '收服灵宠') return `${label}：${name}`;
+    return `${label}${name}`;
   }
   const attr = String(eff.attribute || '');
   const reason = String(eff.reason || '').trim();
