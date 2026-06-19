@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
@@ -177,6 +177,29 @@ export async function POST(req: NextRequest) {
 
     // 若结果还需要继续抉择（如拍卖会继续出价），保留选择态；否则退出选择态。
     state.isAtChoice = !!nextChoice;
+    const removedItems = (result.removedItemIds || [])
+      .map(id => stateBeforeChoice.inventory.find(item => item.id === id))
+      .filter(Boolean) as any[];
+    const equippedItems = (result.equipItemIds || [])
+      .map(id => state.equipped.find(item => item.id === id) || stateBeforeChoice.inventory.find(item => item.id === id))
+      .filter(Boolean) as any[];
+    const unequippedItems = (result.unequipItemIds || [])
+      .map(id => state.inventory.find(item => item.id === id) || stateBeforeChoice.equipped.find(item => item.id === id))
+      .filter(Boolean) as any[];
+    state = recordActionCausality(state, {
+      actionId: `choice_${state.age}_${chosenIndex}_${chosenOption.text.slice(0, 16)}`,
+      actionType: 'choice',
+      title: `抉择：${chosenOption.text.slice(0, 18)}`,
+      summary: result.narrative,
+      tags: ['choice'],
+      newItems: result.newItems || [],
+      removedItems,
+      equippedItems: [...(result.newEquippedItems || []), ...equippedItems],
+      unequippedItems,
+      threads: result.newThreads || [],
+      statuses: result.newStatuses || [],
+      pets: (result as any).newPets || [],
+    });
     const stateChangeLog = buildStateChangeLog({
       before: stateBeforeChoice,
       after: state,

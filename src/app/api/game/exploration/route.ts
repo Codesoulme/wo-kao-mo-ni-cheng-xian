@@ -21,6 +21,7 @@ import {
   canExploreRealm,
   startExploration,
   recordExploration,
+  recordActionCausality,
 } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
@@ -182,6 +183,23 @@ export async function POST(req: NextRequest) {
           : undefined);
 
     // 记录探索（更新 exploredRealms + 清除 _currentExploration）
+    finalState = recordActionCausality(finalState, {
+      actionId: `exploration_${finalState.age}_${realm.id}`,
+      actionType: 'exploration',
+      title: `探入${realm.name}`,
+      summary: aiOutput.narrative,
+      tags: ['exploration', realm.tier, ...(realm.themeTags || [])],
+      newItems: aiOutput.newItems || [],
+      removedItems: (aiOutput.removedItemIds || [])
+        .map(id => stateBeforeExploration.inventory.find(item => item.id === id))
+        .filter(Boolean) as any[],
+      equippedItems: aiOutput.newEquippedItems || [],
+      threads: aiOutput.newThreads || [],
+      statuses: aiOutput.newStatuses || [],
+      pets: (aiOutput as any).newPets || [],
+      realms: [realm],
+    });
+
     finalState = recordExploration(finalState, realm.id, bestReward);
 
     // 持久化（不推进年龄，不修改 fateNodes/lastEventAge）

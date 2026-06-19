@@ -1782,6 +1782,7 @@ export function appendCausalGraph(state: CharacterState, nodes: CausalNode[], ed
   statuses?: StatusEntry[];
   pets?: Pet[];
   removedPets?: Pet[];
+  realms?: SecretRealm[];
 };
 
 export function recordActionCausality(state: CharacterState, opts: ActionCausalityOptions): CharacterState {
@@ -1895,6 +1896,28 @@ export function recordActionCausality(state: CharacterState, opts: ActionCausali
 
   for (const pet of opts.pets || []) addPetNode(pet, 'created', '本次行动结缘或照料灵宠');
   for (const pet of opts.removedPets || []) addPetNode(pet, 'updated', '本次行动放归或离散灵宠');
+
+  for (const realm of opts.realms || []) {
+    if (!realm?.id || !realm?.name) continue;
+    const nodeId = causalId('realm', realm.id);
+    nodes.push({
+      id: nodeId,
+      type: 'realm',
+      label: realm.name,
+      age,
+      refId: realm.id,
+      summary: realm.description?.slice(0, 140),
+      tags: [realm.tier, ...(realm.themeTags || [])].filter(Boolean),
+    });
+    edges.push({
+      id: causalId('edge', actionNodeId + '_triggers_' + nodeId),
+      from: actionNodeId,
+      to: nodeId,
+      type: 'triggers',
+      age,
+      summary: '本次行动探入或牵动此处秘境',
+    });
+  }
 
   return appendCausalGraph(state, nodes, edges);
 }

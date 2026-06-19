@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
@@ -169,6 +169,31 @@ export async function POST(req: NextRequest) {
           deathReason = life.reason;
         }
       }
+    }
+    if (result.accepted) {
+      const removedItems = (result.removedItemIds || [])
+        .map(id => stateBeforeInterfere.inventory.find(item => item.id === id))
+        .filter(Boolean) as any[];
+      const equippedItems = (result.equipItemIds || [])
+        .map(id => state.equipped.find(item => item.id === id) || stateBeforeInterfere.inventory.find(item => item.id === id))
+        .filter(Boolean) as any[];
+      const unequippedItems = (result.unequipItemIds || [])
+        .map(id => state.inventory.find(item => item.id === id) || stateBeforeInterfere.equipped.find(item => item.id === id))
+        .filter(Boolean) as any[];
+      state = recordActionCausality(state, {
+        actionId: `interference_${state.age}_${Date.now().toString(36)}`,
+        actionType: 'interference',
+        title: '干扰·天道回响',
+        summary: result.narrative,
+        tags: ['interference', result.classification || 'unknown'],
+        newItems: result.newItems || [],
+        removedItems,
+        equippedItems: [...(result.newEquippedItems || []), ...equippedItems],
+        unequippedItems,
+        threads: result.newThreads || [],
+        statuses: result.newStatuses || [],
+        pets: (result as any).newPets || [],
+      });
     }
     const stateChangeLog = result.accepted ? buildStateChangeLog({
       before: stateBeforeInterfere,
