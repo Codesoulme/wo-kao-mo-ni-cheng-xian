@@ -777,6 +777,9 @@ export interface AIEventOutput {
   // AI 只需在 cultivationInsight 文本中引用 prompt 注入的准确数字即可
   cultivationInsight?: string;
 
+  // AI/事件生成的非常规属性投影（引擎校验后展示；持久化仍建议通过 newStatuses category='attribute' 落库）
+  cultivationAttributes?: CultivationAttributeEntry[];
+
   // 是否触发选择节点
   hasChoice: boolean;
   choice?: ChoicePrompt;
@@ -895,6 +898,7 @@ export interface ChoiceResultOutput {
   memory: string;
   // 修炼心得（同 AIEventOutput；引擎权威计算来源条目，AI 只输出文本）
   cultivationInsight?: string;
+  cultivationAttributes?: CultivationAttributeEntry[];
   causedDeath?: boolean;
   deathReason?: string;
   // ===== Task 20 新增 =====
@@ -930,6 +934,7 @@ export interface InterfereOutput {
   memory: string;
   // 修炼心得（同 AIEventOutput；accepted=false 时可留空，引擎将保留旧文本；引擎权威计算来源条目）
   cultivationInsight?: string;
+  cultivationAttributes?: CultivationAttributeEntry[];
   // 干扰可能延迟年龄推进
   ageAdvance?: number;            // 干扰消耗的时间（岁），默认 0
   // ===== Task 20 新增 =====

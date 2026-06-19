@@ -40,6 +40,9 @@ export function StatusPanel({ character }: StatusPanelProps) {
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
     .sort((a: any, b: any) => b.__idx - a.__idx)
     .slice(0, 4);
+  const dynamicAttributes = (character.cultivationAttributes || [])
+    .filter((attr: any) => attr && attr.visible !== false && attr.name)
+    .slice(0, 3);
 
   return (
     <>
@@ -206,6 +209,24 @@ export function StatusPanel({ character }: StatusPanelProps) {
                   </div>
                 ))}
               </div>
+
+              {dynamicAttributes.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {dynamicAttributes.map((attr: any, idx: number) => (
+                    <span
+                      key={attr.id || `${attr.name}-${idx}`}
+                      className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary shadow-sm"
+                      title={`${attr.name}：${attr.description || attr.value || ''}`}
+                    >
+                      <Sparkles className="h-2.5 w-2.5 shrink-0" />
+                      <span className="max-w-[88px] truncate font-serif-cn">{attr.name}</span>
+                      {attr.value !== undefined && attr.value !== '' && (
+                        <span className="shrink-0 opacity-75">{attr.value}</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
 
               {/* 生命、灵力、修为 三进度条（寿元仅保留文字显示） */}
               <div className="mt-1.5 space-y-1">

@@ -61,6 +61,7 @@ import {
   CausalNode,
   CausalEdge,
   EffectResolveTrace,
+  CultivationAttributeEntry,
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
@@ -198,7 +199,35 @@ export function dbToState(c: DBCharacter): CharacterState {
   state.cultivationMultiplier = rate.multiplier;
   state.cultivationFactors = computeCultivationFactors(state);
   state.realmProfile = getRealmProfile(state);
+  state.cultivationAttributes = deriveCultivationAttributes(state);
   return state;
+}
+function cultivationAttributeCategory(category?: string): CultivationAttributeEntry['category'] {
+  if (category === 'body' || category === 'spirit' || category === 'dao' || category === 'combat' || category === 'fate' || category === 'custom') return category;
+  return 'custom';
+}
+
+export function deriveCultivationAttributes(state: CharacterState): CultivationAttributeEntry[] {
+  const byId = new Map<string, CultivationAttributeEntry>();
+  for (const attr of state.cultivationAttributes || []) {
+    if (!attr || !attr.name || attr.visible === false) continue;
+    byId.set(attr.id || attr.name, { ...attr, id: attr.id || attr.name });
+  }
+  for (const status of state.activeStatuses || []) {
+    if (!status || status.category !== 'attribute' || !status.name) continue;
+    const firstEffect = Array.isArray(status.effects) ? status.effects.find(e => e && e.value !== undefined) : undefined;
+    const id = status.id || `attr-${status.name}`;
+    byId.set(id, {
+      id,
+      name: status.name,
+      value: firstEffect?.description || firstEffect?.value,
+      description: status.description || firstEffect?.description || status.name,
+      source: status.source,
+      category: cultivationAttributeCategory((status as any).attributeCategory),
+      visible: true,
+    });
+  }
+  return [...byId.values()].slice(0, 24);
 }
 
 function safeParse<T>(s: string, fallback: T): T {
@@ -1854,6 +1883,7 @@ export function buildStateContext(
       hp: state.hp, maxHp: state.maxHp,
       mp: state.mp, maxMp: state.maxMp,
       attack: state.attack, defense: state.defense, speed: state.speed,
+      cultivationAttributes: deriveCultivationAttributes(state),
       luck: state.luck, comprehension: state.comprehension,
       spiritStones: state.spiritStones, reputation: state.reputation,
       faction: state.faction, master: state.master, location: state.location,
@@ -3553,6 +3583,13 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     contentRegistryTrace.push(...registered.trace);
     contentRegistryWarnings.push(...registered.warnings);
     next = addStatuses(next, registered.accepted);
+    const explicitAttributes = (aiOutput.cultivationAttributes || [])
+      .filter(attr => attr && attr.name && attr.visible !== false)
+      .map(attr => ({ ...attr, id: attr.id || attr.name }));
+    next.cultivationAttributes = [
+      ...deriveCultivationAttributes(next),
+      ...explicitAttributes,
+    ].slice(0, 24);
   }
 
   // 3. 新物品先经过 ContentRegistry Lite 统一校验/补全，再进入背包系统
@@ -3840,6 +3877,7 @@ export function stateToResponse(s: CharacterState) {
     cultivationFlatBonus: rate.flatBonus,
     cultivationInsight: s.cultivationInsight,
     cultivationFactors: computeCultivationFactors(s),
+    cultivationAttributes: deriveCultivationAttributes(s),
     storageCapacity: s.storageCapacity,
     activeStatuses: s.activeStatuses,
     inventory: s.inventory,

@@ -22,6 +22,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
   const lifespanLeft = current.lifespan - current.age;
   const genderLabel = current.gender === 'male' ? '男' : current.gender === 'female' ? '女' : current.gender || '未知';
   const visibleStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
+  const dynamicAttributes = (current.cultivationAttributes || []).filter((attr: any) => attr && attr.visible !== false && attr.name);
   const [selectedAttr, setSelectedAttr] = useState<AttributeInfo | null>(null);
 
   return (

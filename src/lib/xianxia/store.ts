@@ -92,6 +92,8 @@ export interface CharacterState {
   cultivationInsight?: string;
   // 修炼速度来源条目（引擎权威计算：灵根 + 已装备功法 + 状态词条；前端按 rarity 给来源名称上色 + 具体数字）
   cultivationFactors?: { name: string; value: number; operation: 'multiply' | 'add'; rarity?: string; note?: string }[];
+  // AI/事件生成的非常规属性，由引擎从状态与事件投影而来，面板自动展示。
+  cultivationAttributes?: any[];
   // ===== Task 20 新增（前端方便访问，也放在 character 上；advance/choose/interfere 返回的 state 已包含这些字段） =====
   // 未决线索（重要剧情线索，会在后续推进/到期触发）
   pendingThreads?: any[];

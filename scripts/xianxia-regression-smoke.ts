@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, deriveCultivationAttributes } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
@@ -796,6 +796,26 @@ function smokeCombatSettlementSingleFlow(): void {
 }
 
 
+
+function smokeDynamicCultivationAttributes(): void {
+  const state: any = {
+    activeStatuses: [{
+      id: 'attr_starfire_bone',
+      name: '\u661f\u706b\u5251\u9aa8',
+      description: '\u5251\u9aa8\u4e2d\u9690\u6709\u661f\u706b\u9e23\u54cd\uff0c\u9047\u91d1\u706b\u4e4b\u6cd5\u66f4\u6613\u751f\u53d8\u3002',
+      category: 'attribute',
+      rarity: 'epic',
+      duration: -1,
+      source: '\u9668\u661f\u609f\u5251',
+      effects: [{ target_attribute: 'custom_sword_bone', operation: 'add', value: 1, description: '\u5251\u9aa8\u521d\u9e23' }],
+    }],
+    cultivationAttributes: [],
+  };
+  const attrs = deriveCultivationAttributes(state);
+  assert(attrs.some(attr => attr.name === '\u661f\u706b\u5251\u9aa8' && attr.source === '\u9668\u661f\u609f\u5251'), 'attribute statuses should project into cultivation attributes');
+  log('dynamic-cultivation-attributes', { passed: true, count: attrs.length, first: attrs[0]?.name });
+}
+
 function smokeAiDrivenCombatActionPalette(): void {
   const state: any = {
     id: 'c-palette',
@@ -851,6 +871,7 @@ async function main(): Promise<void> {
   smokeNoProtagonistShieldPrompt();
   smokeConstitutionProfiles();
   smokeCombatSettlementSingleFlow();
+  smokeDynamicCultivationAttributes();
   smokeAiDrivenCombatActionPalette();
   smokeTechniqueSpellNaming();
   smokeWorldEventConsequences();
