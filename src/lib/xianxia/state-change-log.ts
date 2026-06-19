@@ -78,6 +78,18 @@ function summarizeStructuralDiff(before: CharacterState, after: CharacterState, 
   if (afterNpcCount > beforeNpcCount) {
     push(out, age, 'npc', 'info', 'npc_registered', `NPC registry gained ${afterNpcCount - beforeNpcCount} record(s).`, { before: beforeNpcCount, after: afterNpcCount });
   }
+  const beforeStatusMap = new Map((before.activeStatuses || []).map(status => [status.id, status]));
+  const afterStatusMap = new Map((after.activeStatuses || []).map(status => [status.id, status]));
+  for (const status of after.activeStatuses || []) {
+    if (!beforeStatusMap.has(status.id)) {
+      push(out, age, 'effect', 'info', 'status_added', `Status added: ${status.name}`, { refId: status.id, meta: { category: status.category, rarity: status.rarity } });
+    }
+  }
+  for (const status of before.activeStatuses || []) {
+    if (!afterStatusMap.has(status.id)) {
+      push(out, age, 'effect', 'info', 'status_removed', `Status removed: ${status.name}`, { refId: status.id, meta: { category: status.category, rarity: status.rarity } });
+    }
+  }
   if (!before.combatSession && after.combatSession) {
     push(out, age, 'combat', 'info', 'combat_started', `Combat started: ${after.combatSession.contextTitle}`, { refId: after.combatSession.id });
   }
