@@ -707,6 +707,7 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
   * artifact(法宝)：effects 用 add 或 multiply，target 为 attack/defense/speed/cultivationExp 等；高阶法宝可有 multiply 效果
     若法宝可施展法术，必须尽量给 technique.spell（name/description/mpCost/power/element）和 technique.requirements；法术也应受境界、灵根、五行、悟性或传承适配影响。
     法宝可以自带器物灵禁/被动神通/主动攻击术，这不等于角色学会法术。自带法术的法宝算稀有品，应根据品质判断；可用 technique.artifactAbilities 描述如水中呼吸、自动护体、自动恢复耐久、提高修炼速度、主动攻击术等能力。
+    technique.spell.name 与 artifactAbilities[].name 必须是“术式/灵禁/神通”的独立名称，不能直接复用法宝名或功法名；description 也必须描述该术式如何生效，不能直接复用物品外观/来历简介。例如“某某剑”可附带另一个剑诀、花影、雷火或护身类术式名，具体名字由你根据五行、材质、来历和叙事因果生成。
   * consumable(丹药)：effects 用 add，target 为 hp/mp/cultivationExp/lifespan 等；服用后消失
   * scripture(功法)：effects 必含一条 multiply cultivationExp（修炼倍率，凡品×1.2~1.5、良品×1.5~2.0、稀有×2.0~3.0、史诗×3.0~4.0、传说×4.0~5.0、神话×5.0~6.0）；必须尽量给 technique.requirements 与 technique.traits，写清灵根/境界/悟性/五行/传承门槛、适配风险和功法特性，不能只给白板修炼速度。
   * tool(器具)：可以是储物袋——effects 用 add，target 为 storageCapacity（如 +10 storageCapacity 表示增加 10 格容量）；储物袋获得即扩容，无需装备
@@ -719,6 +720,7 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
     阵盘激活后作为 statusEntry 持久生效，每岁消耗灵石维持。
   * material：通常无 effects，仅作剧情道具或炼丹材料
 - 功法/法术 technique 字段示例：
+  technique.spell.name 也必须是独立法术名，不要等于 scripture 的 name；description 写法术效果，不要复制功法简介。
   technique:{kind:"cultivation",requirements:{spiritualRoots:["pure","heavenly"],minRealm:"foundation",minComprehension:55,minElements:{fire:40},requiredStatuses:["九阳"]},traits:[{name:"纯阳炼息",description:"火行灵气入脉更顺，寒水根性者易逆行",risk:"不合根性则修炼效率折减"}],spell:{name:"赤阳指",description:"聚阳火于指端",mpCost:18,power:1.8,element:"fire"},mismatchRisk:"根性不合时进境迟滞，严重者心魔暗生"}
   spiritualRoots 是严格门槛，缺对应灵根原则上几乎不能修习；preferredRoots 是最佳适配，未达会低效。除非剧情给出洗髓、传承、改命等强因果，不要让角色无视灵根门槛。
 - id 格式：item_<类型缩写>_<4位随机>，如 item_wpn_a3f2、item_scr_b8c1、item_pil_d2e4、item_bag_f0a1。同一事件多个物品 id 不可重复。

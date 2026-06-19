@@ -633,6 +633,7 @@ export function summarizeConstitutionProfiles(state: CharacterState): { name: st
 
 
 
+
 function inferDominantElementFromText(text: string): ElementType | 'none' {
   if (/金|剑|刃|锋|metal|sword|blade|sharp|jin/i.test(text)) return 'metal';
   if (/木|花|草|藤|青|生|药|wood|flower|plant|green|life|mu/i.test(text)) return 'wood';
@@ -642,54 +643,48 @@ function inferDominantElementFromText(text: string): ElementType | 'none' {
   return 'none';
 }
 
-function deriveSpellLikeAbility(item: ItemEntry, source: 'scripture' | 'artifact'): { name: string; description: string; element: ElementType | 'none'; trigger?: ArtifactAbility['trigger'] } {
+function fallbackTechniqueAbility(item: ItemEntry, source: 'scripture' | 'artifact'): { name: string; description: string; element: ElementType | 'none'; trigger?: ArtifactAbility['trigger'] } {
   const text = `${item.name || ''}${item.description || ''}`;
   const element = inferDominantElementFromText(text);
   const isSword = /剑|sword|blade/i.test(text);
-  const isFlower = /花|flower|petal/i.test(text);
-  const isThunder = /雷|thunder/i.test(text);
   const isWater = /水|冰|潮|water|ice|tide/i.test(text);
   const isProtect = /护|盾|守|罩|protect|shield|guard/i.test(text);
-  const isFire = /火|炎|焰|阳|fire|flame|sun/i.test(text);
-  const isWood = /木|花|草|藤|青|生|药|wood|flower|plant|green|life/i.test(text);
   const trigger: ArtifactAbility['trigger'] = isWater ? 'underwater' : isProtect ? 'auto' : 'active';
-  if (isFlower && isSword) {
-    return {
-      name: '千灵花绽',
-      description: source === 'artifact'
-        ? '法宝灵纹催开万千花影，花瓣如剑气迸散，攻敌神魂与护体灵光。'
-        : '以剑诀引动花影灵机，剑气如花绽放，兼具迷眼与破体之势。',
-      element: 'wood',
-      trigger,
+  const name = source === 'artifact'
+    ? (isProtect ? '护身灵禁' : isWater ? '避水灵禁' : isSword ? '剑纹灵禁' : '器物灵禁')
+    : (isSword ? '剑意术式' : '行气术式');
+  const description = source === 'artifact'
+    ? '法宝内藏灵禁被催动，形成一道独立于器物本名的器术效果。'
+    : '依功法行气脉络凝成的基础斗法术式，不等同于功法本名。';
+  return { name, description, element, trigger };
+}
+
+function normalizeTechniqueProfile(item: ItemEntry, profile: TechniqueProfile): TechniqueProfile {
+  const source = item.item_type === 'artifact' ? 'artifact' : 'scripture';
+  const fallback = fallbackTechniqueAbility(item, source);
+  const next: TechniqueProfile = { ...profile };
+  if (next.spell && (!next.spell.name || next.spell.name === item.name || !next.spell.description || next.spell.description === item.description)) {
+    next.spell = {
+      ...next.spell,
+      name: next.spell.name && next.spell.name !== item.name ? next.spell.name : fallback.name,
+      description: next.spell.description && next.spell.description !== item.description ? next.spell.description : fallback.description,
+      element: next.spell.element || fallback.element,
     };
   }
-  if (isSword) {
-    return {
-      name: element === 'metal' ? '庚金剑气' : element === 'fire' ? '炎华剑芒' : element === 'water' ? '寒潮剑影' : element === 'wood' ? '青藤剑影' : '流光剑诀',
-      description: source === 'artifact'
-        ? '器中剑纹被灵力催动，化出一道不等同于法宝本体的攻伐术式。'
-        : '依功法行气凝出剑意，化为可用于斗法的独立术式。',
-      element,
-      trigger,
-    };
+  if (next.artifactAbilities?.length) {
+    next.artifactAbilities = next.artifactAbilities.map(ability => ({
+      ...ability,
+      name: ability.name && ability.name !== item.name ? ability.name : fallback.name,
+      description: ability.description && ability.description !== item.description ? ability.description : fallback.description,
+      element: ability.element || fallback.element,
+      trigger: ability.trigger || fallback.trigger,
+    }));
   }
-  if (isThunder) return { name: '惊雷指', description: '聚灵成雷，霎时点破敌方气机。', element: 'fire', trigger };
-  if (isFire) return { name: '离火灼心', description: '引火性灵力灼烧敌势，逼散护体灵光。', element: 'fire', trigger };
-  if (isWater) return { name: source === 'artifact' ? '避水灵禁' : '寒潮缚影', description: source === 'artifact' ? '器物灵禁自行张开，避水、分波，并可短促压制水中敌势。' : '以水寒之气缠住敌影，迟滞其身法。', element: 'water', trigger };
-  if (isProtect) return { name: '玄光护身', description: '灵光绕身而起，抵消部分伤势与冲击。', element, trigger };
-  if (isWood) return { name: '青华生息', description: '引草木生机护持经脉，也可化作缠束敌身的青华灵机。', element: 'wood', trigger };
-  return {
-    name: source === 'artifact' ? '器灵一击' : '运气成术',
-    description: source === 'artifact'
-      ? '法宝深处的灵禁被短促催发，形成一式独立于器物名称之外的器术。'
-      : '依功法行气脉络凝成的基础斗法术式，不等同于功法本名。',
-    element,
-    trigger,
-  };
+  return next;
 }
 
 function inferTechniqueProfile(item: ItemEntry): TechniqueProfile | undefined {
-  if (item.technique) return item.technique;
+  if (item.technique) return normalizeTechniqueProfile(item, item.technique);
   if (item.item_type !== 'scripture' && item.item_type !== 'artifact') return undefined;
   const text = `${item.name || ''}${item.description || ''}`;
   const requirements: TechniqueRequirement = {};
@@ -715,7 +710,7 @@ function inferTechniqueProfile(item: ItemEntry): TechniqueProfile | undefined {
     else if (ri >= 2) requirements.minRealm = 'qi_refining';
     requirements.minComprehension = ri >= 4 ? 55 : ri >= 3 ? 40 : undefined;
   }
-  const derivedAbility = deriveSpellLikeAbility(item, item.item_type === 'artifact' ? 'artifact' : 'scripture');
+  const derivedAbility = fallbackTechniqueAbility(item, item.item_type === 'artifact' ? 'artifact' : 'scripture');
   const artifactAbilities = item.item_type === 'artifact'
     ? [{
       name: derivedAbility.name,
@@ -835,7 +830,7 @@ export function buildLearnedCombatArts(state: CharacterState): { itemId: string;
       const profile = compat.profile;
       const rarityCost = it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10;
       if (it.item_type === 'artifact') {
-        const fallbackAbility = deriveSpellLikeAbility(it, 'artifact');
+        const fallbackAbility = fallbackTechniqueAbility(it, 'artifact');
         const abilities = profile?.artifactAbilities?.length
           ? profile.artifactAbilities
           : [{ name: fallbackAbility.name, description: fallbackAbility.description, trigger: fallbackAbility.trigger, mpCost: rarityCost, power: 1 + safeRarityIndex(it.rarity) * 0.35, element: fallbackAbility.element }];
@@ -856,8 +851,8 @@ export function buildLearnedCombatArts(state: CharacterState): { itemId: string;
       if (!spell && !(profile?.traits || []).length) return [];
       return [{
         itemId: it.id,
-        name: spell?.name || deriveSpellLikeAbility(it, 'scripture').name,
-        description: spell?.description || deriveSpellLikeAbility(it, 'scripture').description,
+        name: spell?.name || fallbackTechniqueAbility(it, 'scripture').name,
+        description: spell?.description || fallbackTechniqueAbility(it, 'scripture').description,
         mpCost: Math.max(5, Math.floor(spell?.mpCost || rarityCost)),
         power: Number(((spell?.power || (1 + safeRarityIndex(it.rarity) * 0.5)) * Math.max(0.25, compat.adaptation)).toFixed(2)),
         rarity: it.rarity,

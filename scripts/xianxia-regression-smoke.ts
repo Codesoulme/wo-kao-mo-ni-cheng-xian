@@ -767,8 +767,14 @@ function smokeTechniqueSpellNaming(): void {
     npcs: [], causalGraph: { nodes: [], edges: [] }, worldFacts: [], pets: [], exploredRealms: [],
   };
   const baseState: any = normalizeCultivationState(rawSpellNameState);
-  const artifact: any = { id: 'artifact_flower_sword', name: 'Hundred Flower Sword', item_type: 'artifact', rarity: 'rare', description: 'A flower sword with petal shadows.', effects: [], source: 'smoke' };
-  const scripture: any = { id: 'scripture_flower_sword', name: 'Hundred Flower Sword Manual', item_type: 'scripture', rarity: 'rare', description: 'A flower sword method with petal shadows.', effects: [], source: 'smoke' };
+  const artifact: any = {
+    id: 'artifact_flower_sword', name: 'Hundred Flower Sword', item_type: 'artifact', rarity: 'rare', description: 'A flower sword with petal shadows.', effects: [], source: 'smoke',
+    technique: { kind: 'artifact', artifactAbilities: [{ name: 'Hundred Flower Sword', description: 'A flower sword with petal shadows.', power: 1.5 }] },
+  };
+  const scripture: any = {
+    id: 'scripture_flower_sword', name: 'Hundred Flower Sword Manual', item_type: 'scripture', rarity: 'rare', description: 'A flower sword method with petal shadows.', effects: [], source: 'smoke',
+    technique: { kind: 'combat', requirements: { preferredRoots: ['pure'] }, spell: { name: 'Hundred Flower Sword Manual', description: 'A flower sword method with petal shadows.', power: 1.4 } },
+  };
   const arts = buildLearnedCombatArts({ ...baseState, equipped: [artifact, scripture] });
   const artifactArt = arts.find((a: any) => a.itemId === artifact.id);
   const scriptureArt = arts.find((a: any) => a.itemId === scripture.id);
@@ -776,8 +782,8 @@ function smokeTechniqueSpellNaming(): void {
   assert(artifactArt?.description && artifactArt.description !== artifact.description, 'artifact innate ability should not reuse artifact description');
   assert(scriptureArt?.name && scriptureArt.name !== scripture.name, 'scripture spell should not reuse scripture name');
   assert(scriptureArt?.description && scriptureArt.description !== scripture.description, 'scripture spell should not reuse scripture description');
-  const expectedFlowerSpell = '\u5343\u7075\u82b1\u7efd'.replace(/\\u([0-9a-fA-F]{4})/g, (_m, code) => String.fromCharCode(parseInt(code, 16)));
-  assert(artifactArt?.name === expectedFlowerSpell || scriptureArt?.name === expectedFlowerSpell, 'flower sword should derive a distinct spell-like name');
+  assert(!['Hundred Flower Sword', 'Hundred Flower Sword Manual'].includes(String(artifactArt?.name)), 'artifact fallback should be generic validation, not a hard-coded creative name');
+  assert(!['Hundred Flower Sword', 'Hundred Flower Sword Manual'].includes(String(scriptureArt?.name)), 'scripture fallback should be generic validation, not a hard-coded creative name');
   log('technique-spell-naming', { passed: true, artifact: artifactArt?.name, scripture: scriptureArt?.name });
 }
 
