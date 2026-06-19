@@ -1732,12 +1732,12 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
 
 // ==================== CausalGraph Lite ====================
 
-function causalId(prefix: string, seed: string): string {
+export function causalId(prefix: string, seed: string): string {
   const safe = String(seed || '').replace(/[^a-zA-Z0-9_\u4e00-\u9fa5-]/g, '_').slice(0, 48);
   return prefix + '_' + (safe || Date.now().toString(36));
 }
 
-function normalizeCausalGraph(graph?: CausalGraph): CausalGraph {
+export function normalizeCausalGraph(graph?: CausalGraph): CausalGraph {
   return {
     nodes: Array.isArray(graph?.nodes) ? graph!.nodes : [],
     edges: Array.isArray(graph?.edges) ? graph!.edges : [],
@@ -1745,7 +1745,7 @@ function normalizeCausalGraph(graph?: CausalGraph): CausalGraph {
   };
 }
 
-function appendCausalGraph(state: CharacterState, nodes: CausalNode[], edges: CausalEdge[]): CharacterState {
+export function appendCausalGraph(state: CharacterState, nodes: CausalNode[], edges: CausalEdge[]): CharacterState {
   if (!nodes.length && !edges.length) return state;
   const graph = normalizeCausalGraph(state.causalGraph);
   const nodeMap = new Map<string, CausalNode>();
