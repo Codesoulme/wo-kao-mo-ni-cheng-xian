@@ -81,6 +81,7 @@ export async function GET(req: NextRequest) {
         cultivationFactors: state.cultivationFactors || [],
         // Task 20 新字段
         pendingThreads: state.pendingThreads || [],
+        questEntries: responseState.questEntries || [],
         characterIntents: state.characterIntents || [],
         combatSession: state.combatSession || null,
         // World continuity internals

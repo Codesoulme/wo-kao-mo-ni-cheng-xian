@@ -1,4 +1,4 @@
-﻿// 修仙模拟器 - LLM 服务
+// 修仙模拟器 - LLM 服务
 // 6-zone prompt: Identity / Scene / Classification / State / Memory / Recent
 // 强制 JSON 输出，引擎校验后应用
 
@@ -227,6 +227,9 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
   const memory = ctx.longTermMemory.length
     ? ctx.longTermMemory.map(m => `- ${m}`).join('\n')
     : '无';
+  const questEntryList = ctx.questEntries?.length
+    ? ctx.questEntries.slice(0, 12).map(q => `- [${q.stage}][urgency:${q.urgency}][thread:${q.sourceThreadId}] ${q.title}：${q.summary}${q.currentHook ? `；钩子：${q.currentHook}` : ''}${q.dueAge ? `；期限${q.dueAge}岁` : ''}`).join('\n')
+    : '暂无任务索引';
   const mult = ctx.cultivationMultiplier || 0;
   const multDesc = mult > 0 ? `${mult.toFixed(2)}倍（已含灵根与功法加成）` : '0（无灵根，无法修炼）';
   const curInsight = ctx.cultivationInsight || '';
@@ -316,6 +319,9 @@ ${ctx.characterIntents && ctx.characterIntents.length
 - 优先级 1-3：低频牵挂，可带过、托人、写信、购买调养丹药、回乡探望，或说明暂不能成行。
 
 【未决线索区】（必须保持连续性！urgent 与到期线索本轮必须推进或解决）
+任务索引 QuestEntry（由未决线索规范化而来，优先看 urgency/stage，再回看 pendingThreads 原文）
+${questEntryList}
+
 ${ctx.pendingThreads && ctx.pendingThreads.length
   ? ctx.pendingThreads.map(t => `- [id:${t.id}][${t.status}] ${t.title}（截止 ${t.deadlineAge} 岁，剩 ${t.deadlineAge - sc.age} 岁，进度 ${t.progress}%${t.dueInSameYear ? '，同年后续' : ''}）：${t.description}${t.followUpHint ? `；后续关窍：${t.followUpHint}` : ''}${t.reward ? `；奖励：${t.reward}` : ''}${t.failureCost ? `；失败代价：${t.failureCost}` : ''}`).join('\n')
   : '（无未决线索）'}

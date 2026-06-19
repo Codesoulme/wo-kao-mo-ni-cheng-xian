@@ -95,6 +95,7 @@ export interface CharacterState {
   // ===== Task 20 新增（前端方便访问，也放在 character 上；advance/choose/interfere 返回的 state 已包含这些字段） =====
   // 未决线索（重要剧情线索，会在后续推进/到期触发）
   pendingThreads?: any[];
+  questEntries?: any[];
   // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）
   characterIntents?: any[];
   // 进行中的战斗（若有；combatSession.status='ongoing' 时 CombatModal 全屏显示）

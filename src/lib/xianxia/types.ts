@@ -358,6 +358,30 @@ export interface PendingThread {
   realmId?: string;          // 若该线索指向秘境，填秘境 id
 }
 
+export type QuestEntryStage = 'open' | 'urgent' | 'completed' | 'failed';
+export type QuestEntryKind = PendingThread['category'];
+
+// QuestEntry Lite: normalized internal quest index derived from pendingThreads.
+// It is a trace/context layer, not a new player-facing UI yet.
+export interface QuestEntry {
+  id: string;
+  title: string;
+  summary: string;
+  kind: QuestEntryKind;
+  stage: QuestEntryStage;
+  progress: number;
+  startedAtAge: number;
+  dueAge?: number;
+  urgency: number;
+  sourceThreadId: string;
+  sourceEventTitle?: string;
+  currentHook?: string;
+  rewardHint?: string;
+  failureHint?: string;
+  realmId?: string;
+  tags: string[];
+}
+
 // ==================== 战斗系统 (Task 20) ====================
 
 export interface CombatEnemy {
@@ -743,6 +767,7 @@ export interface EngineStateContext {
   blueprint?: EventBlueprint;
   // 未决线索列表（AI 必须保持连续性；deadlineAge 临近的标记为 urgent）
   pendingThreads: PendingThread[];
+  questEntries: QuestEntry[];
   // 角色主动意图（AI 应在事件中体现意图的执行）
   characterIntents: CharacterIntent[];
   // 最近 5 次事件类型（用于避免重复，AI 不得连续生成同类事件）
@@ -834,6 +859,7 @@ export interface CharacterState {
   npcs: WorldNpc[];
   causalGraph: CausalGraph;
   pendingThreads: PendingThread[];
+  questEntries: QuestEntry[];
   // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）
   characterIntents: CharacterIntent[];
   // 进行中的战斗（若有；持久化以支持页面刷新恢复）

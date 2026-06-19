@@ -28,6 +28,8 @@ import {
   BlueprintCategory,
   CharacterIntent,
   PendingThread,
+  QuestEntry,
+  QuestEntryStage,
   CombatEnemy,
   CombatRound,
   CombatSession,
@@ -158,6 +160,7 @@ export function dbToState(c: DBCharacter): CharacterState {
     longTermMemory: safeParse<string[]>(c.memoryJson, []),
     // Task 20 新字段
     pendingThreads,
+    questEntries: buildQuestEntriesFromThreads(pendingThreads, c.age),
     characterIntents,
     combatSession,
     // Task 22 新字段
@@ -1260,6 +1263,51 @@ export function markFateNodeDone(state: CharacterState, nodeIndex: number): Char
   return { ...state, fateNodes: [...state.fateNodes, nodeIndex] };
 }
 
+function threadStatusToQuestStage(status: PendingThread['status']): QuestEntryStage {
+  if (status === 'resolved') return 'completed';
+  if (status === 'failed') return 'failed';
+  if (status === 'urgent') return 'urgent';
+  return 'open';
+}
+
+function questUrgency(thread: PendingThread, currentAge: number): number {
+  if (thread.status === 'resolved' || thread.status === 'failed') return 0;
+  const remaining = Number(thread.deadlineAge ?? currentAge) - currentAge;
+  let urgency = 1;
+  if (thread.status === 'urgent' || remaining <= 1 || thread.dueInSameYear) urgency = 10;
+  else if (remaining <= 3) urgency = 8;
+  else if (remaining <= 8) urgency = 5;
+  else urgency = 3;
+  if ((thread.progress || 0) >= 75) urgency = Math.max(urgency, 6);
+  return urgency;
+}
+
+export function buildQuestEntriesFromThreads(threads: PendingThread[] | null | undefined, currentAge: number): QuestEntry[] {
+  const safeThreads = Array.isArray(threads) ? threads : [];
+  return safeThreads
+    .filter(t => t && t.id && t.title)
+    .map(t => ({
+      id: `quest_${t.id}`,
+      title: t.title,
+      summary: t.description || t.followUpHint || t.title,
+      kind: t.category,
+      stage: threadStatusToQuestStage(t.status),
+      progress: Math.max(0, Math.min(100, Number(t.progress || 0))),
+      startedAtAge: Number(t.startAge ?? currentAge),
+      dueAge: Number.isFinite(Number(t.deadlineAge)) ? Number(t.deadlineAge) : undefined,
+      urgency: questUrgency(t, currentAge),
+      sourceThreadId: t.id,
+      sourceEventTitle: t.sourceEventTitle,
+      currentHook: t.followUpHint,
+      rewardHint: t.reward,
+      failureHint: t.failureCost,
+      realmId: t.realmId,
+      tags: [t.category, t.status, t.dueInSameYear ? 'same-year' : '', t.realmId ? 'realm' : ''].filter(Boolean),
+    }))
+    .sort((a, b) => b.urgency - a.urgency || (a.dueAge ?? 999999) - (b.dueAge ?? 999999))
+    .slice(0, 80);
+}
+
 // ==================== 引擎状态上下文构建 ====================
 
 export function buildStateContext(state: CharacterState, recentEvents: { age: number; title: string; narrative: string; eventType?: string }[]): EngineStateContext {
@@ -1281,6 +1329,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     ...t,
     status: (t.status === 'pending' && (t.deadlineAge - state.age) <= 3) ? 'urgent' as const : t.status,
   }));
+  const questEntries = buildQuestEntriesFromThreads(threads, state.age);
   // Task 20: 引擎根据当前处境生成角色主动意图（每岁重算）
   const intents = generateCharacterIntents(state, threads);
   state.characterIntents = intents;
@@ -1331,6 +1380,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
     // Task 20 新字段
     pendingThreads: threads,
+    questEntries,
     characterIntents: intents,
     recentEventTypes,
     recentBlueprintCategories,
@@ -1710,7 +1760,8 @@ export function addThreads(state: CharacterState, threads: PendingThread[]): Cha
     progress: t.progress || 0,
   }));
   if (!newThreads.length) return state;
-  return { ...state, pendingThreads: [...(state.pendingThreads || []), ...newThreads] };
+  const pendingThreads = [...(state.pendingThreads || []), ...newThreads];
+  return { ...state, pendingThreads, questEntries: buildQuestEntriesFromThreads(pendingThreads, state.age) };
 }
 
 export function advanceThread(state: CharacterState, threadId: string, progressDelta: number, note?: string): CharacterState {
@@ -1719,21 +1770,21 @@ export function advanceThread(state: CharacterState, threadId: string, progressD
     const progress = Math.max(0, Math.min(100, (t.progress || 0) + progressDelta));
     return { ...t, progress };
   });
-  return { ...state, pendingThreads: threads };
+  return { ...state, pendingThreads: threads, questEntries: buildQuestEntriesFromThreads(threads, state.age) };
 }
 
 export function completeThread(state: CharacterState, threadId: string): CharacterState {
   const threads = (state.pendingThreads || []).map(t =>
     t.id === threadId ? { ...t, status: 'resolved' as const, progress: 100 } : t
   );
-  return { ...state, pendingThreads: threads };
+  return { ...state, pendingThreads: threads, questEntries: buildQuestEntriesFromThreads(threads, state.age) };
 }
 
 export function failThread(state: CharacterState, threadId: string): CharacterState {
   const threads = (state.pendingThreads || []).map(t =>
     t.id === threadId ? { ...t, status: 'failed' as const } : t
   );
-  return { ...state, pendingThreads: threads };
+  return { ...state, pendingThreads: threads, questEntries: buildQuestEntriesFromThreads(threads, state.age) };
 }
 
 // 检查线索 deadline —— 若有线索已过期（age > deadlineAge）且未完成，标记为 failed
@@ -1749,7 +1800,7 @@ export function checkThreadDeadlines(state: CharacterState): { state: CharacterS
     return t;
   });
   if (!changed) return { state, failed: [] };
-  return { state: { ...state, pendingThreads: threads }, failed };
+  return { state: { ...state, pendingThreads: threads, questEntries: buildQuestEntriesFromThreads(threads, state.age) }, failed };
 }
 
 // ==================== Task 20: 战斗系统 ====================
@@ -2397,6 +2448,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   }
 
   // 8. 角色主动意图重新生成（每岁重算）
+  next.questEntries = buildQuestEntriesFromThreads(next.pendingThreads, next.age);
   next.characterIntents = generateCharacterIntents(next, next.pendingThreads);
 
   next = recordEventCausality(next, aiOutput);
@@ -2468,6 +2520,7 @@ export function stateToResponse(s: CharacterState) {
     equipped: s.equipped,
     // Task 20 新字段
     pendingThreads: s.pendingThreads || [],
+    questEntries: buildQuestEntriesFromThreads(s.pendingThreads || [], s.age),
     characterIntents: s.characterIntents || [],
     combatSession: s.combatSession || null,
     npcs: s.npcs || [],
