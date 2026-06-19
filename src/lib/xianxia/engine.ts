@@ -9,7 +9,9 @@ import {
   ItemEntry,
   TechniqueProfile,
   TechniqueRequirement,
+  ArtifactAbility,
   ConstitutionProfile,
+  ElementType,
   Realm,
   RealmProfile,
   REALMS,
@@ -324,7 +326,7 @@ export function resolveItemEffects(state: CharacterState, item: ItemEntry, sign:
       state,
       appliedChanges: [],
       rejectedChanges: [],
-      effectResolveTrace: [{ severity: 'warning', code: 'technique_requirement_unmet', source: label || item.name, message: `${item.name}?????${compat.reasons.join('?') || '???????'}` }],
+      effectResolveTrace: [{ severity: 'warning', code: 'technique_requirement_unmet', source: label || item.name, message: `${item.name}\u672a\u6ee1\u8db3\u4fee\u4e60\u6761\u4ef6\uff1a${compat.reasons.join('\uff1b') || '\u6839\u57fa\u4e0d\u5408'}` }],
       effectResolveWarnings: compat.warnings,
     };
   }
@@ -335,7 +337,7 @@ export function resolveItemEffects(state: CharacterState, item: ItemEntry, sign:
       changes.push({
         attribute: eff.target_attribute,
         delta: sign * eff.value,
-        reason: label || (sign > 0 ? `?? ${item.name}` : `?? ${item.name}`),
+        reason: label || (sign > 0 ? `\u83b7\u5f97 ${item.name}` : `\u5931\u53bb ${item.name}`),
       });
     }
   }
@@ -346,7 +348,7 @@ export function resolveItemEffects(state: CharacterState, item: ItemEntry, sign:
   });
   const extraTrace: EffectResolveTrace[] = [];
   if (sign > 0 && compat.profile && compat.adaptation < 0.98) {
-    extraTrace.push({ severity: 'warning', code: 'technique_adaptation_reduced', source: label || item.name, message: `${item.name}?????${compat.warnings.join('?')}` });
+    extraTrace.push({ severity: 'warning', code: 'technique_adaptation_reduced', source: label || item.name, message: `${item.name}\u9002\u914d\u4e0d\u8db3\uff1a${compat.warnings.join('\uff1b')}` });
   }
   return {
     state: resolved.state,
@@ -392,7 +394,7 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
   for (const it of state.equipped || []) {
     const compat = evaluateTechniqueCompatibility(state, it);
     if (!compat.usable) {
-      factors.push({ name: it.name, value: 0, operation: 'multiply', rarity: it.rarity as any, note: compat.reasons[0] || '???????' });
+      factors.push({ name: it.name, value: 0, operation: 'multiply', rarity: it.rarity as any, note: compat.reasons[0] || '\u6839\u57fa\u4e0d\u5408\uff0c\u6682\u96be\u4fee\u4e60' });
       continue;
     }
     for (const rawEff of it.effects || []) {
@@ -629,6 +631,63 @@ export function summarizeConstitutionProfiles(state: CharacterState): { name: st
   });
 }
 
+
+
+function inferDominantElementFromText(text: string): ElementType | 'none' {
+  if (/金|剑|刃|锋|metal|sword|blade|sharp|jin/i.test(text)) return 'metal';
+  if (/木|花|草|藤|青|生|药|wood|flower|plant|green|life|mu/i.test(text)) return 'wood';
+  if (/水|冰|寒|潮|water|ice|cold|tide|shui/i.test(text)) return 'water';
+  if (/火|炎|阳|焰|fire|flame|sun|yang|huo/i.test(text)) return 'fire';
+  if (/土|山|岩|岳|earth|mountain|rock|tu/i.test(text)) return 'earth';
+  return 'none';
+}
+
+function deriveSpellLikeAbility(item: ItemEntry, source: 'scripture' | 'artifact'): { name: string; description: string; element: ElementType | 'none'; trigger?: ArtifactAbility['trigger'] } {
+  const text = `${item.name || ''}${item.description || ''}`;
+  const element = inferDominantElementFromText(text);
+  const isSword = /剑|sword|blade/i.test(text);
+  const isFlower = /花|flower|petal/i.test(text);
+  const isThunder = /雷|thunder/i.test(text);
+  const isWater = /水|冰|潮|water|ice|tide/i.test(text);
+  const isProtect = /护|盾|守|罩|protect|shield|guard/i.test(text);
+  const isFire = /火|炎|焰|阳|fire|flame|sun/i.test(text);
+  const isWood = /木|花|草|藤|青|生|药|wood|flower|plant|green|life/i.test(text);
+  const trigger: ArtifactAbility['trigger'] = isWater ? 'underwater' : isProtect ? 'auto' : 'active';
+  if (isFlower && isSword) {
+    return {
+      name: '千灵花绽',
+      description: source === 'artifact'
+        ? '法宝灵纹催开万千花影，花瓣如剑气迸散，攻敌神魂与护体灵光。'
+        : '以剑诀引动花影灵机，剑气如花绽放，兼具迷眼与破体之势。',
+      element: 'wood',
+      trigger,
+    };
+  }
+  if (isSword) {
+    return {
+      name: element === 'metal' ? '庚金剑气' : element === 'fire' ? '炎华剑芒' : element === 'water' ? '寒潮剑影' : element === 'wood' ? '青藤剑影' : '流光剑诀',
+      description: source === 'artifact'
+        ? '器中剑纹被灵力催动，化出一道不等同于法宝本体的攻伐术式。'
+        : '依功法行气凝出剑意，化为可用于斗法的独立术式。',
+      element,
+      trigger,
+    };
+  }
+  if (isThunder) return { name: '惊雷指', description: '聚灵成雷，霎时点破敌方气机。', element: 'fire', trigger };
+  if (isFire) return { name: '离火灼心', description: '引火性灵力灼烧敌势，逼散护体灵光。', element: 'fire', trigger };
+  if (isWater) return { name: source === 'artifact' ? '避水灵禁' : '寒潮缚影', description: source === 'artifact' ? '器物灵禁自行张开，避水、分波，并可短促压制水中敌势。' : '以水寒之气缠住敌影，迟滞其身法。', element: 'water', trigger };
+  if (isProtect) return { name: '玄光护身', description: '灵光绕身而起，抵消部分伤势与冲击。', element, trigger };
+  if (isWood) return { name: '青华生息', description: '引草木生机护持经脉，也可化作缠束敌身的青华灵机。', element: 'wood', trigger };
+  return {
+    name: source === 'artifact' ? '器灵一击' : '运气成术',
+    description: source === 'artifact'
+      ? '法宝深处的灵禁被短促催发，形成一式独立于器物名称之外的器术。'
+      : '依功法行气脉络凝成的基础斗法术式，不等同于功法本名。',
+    element,
+    trigger,
+  };
+}
+
 function inferTechniqueProfile(item: ItemEntry): TechniqueProfile | undefined {
   if (item.technique) return item.technique;
   if (item.item_type !== 'scripture' && item.item_type !== 'artifact') return undefined;
@@ -656,18 +715,15 @@ function inferTechniqueProfile(item: ItemEntry): TechniqueProfile | undefined {
     else if (ri >= 2) requirements.minRealm = 'qi_refining';
     requirements.minComprehension = ri >= 4 ? 55 : ri >= 3 ? 40 : undefined;
   }
-  const artifactTrigger: 'active' | 'auto' | 'underwater' = text.includes('\u6c34') || text.includes('water') ? 'underwater' : text.includes('\u62a4') ? 'auto' : 'active';
+  const derivedAbility = deriveSpellLikeAbility(item, item.item_type === 'artifact' ? 'artifact' : 'scripture');
   const artifactAbilities = item.item_type === 'artifact'
     ? [{
-      name: text.includes('\u6c34') || text.includes('water') ? '\u907f\u6c34\u7075\u7981' : text.includes('\u62a4') ? '\u81ea\u52a8\u62a4\u4f53' : item.name,
-      description: text.includes('\u6c34') || text.includes('water')
-        ? '\u4f69\u6234\u540e\u7075\u7981\u81ea\u884c\u5f20\u5f00\uff0c\u53ef\u5728\u6c34\u4e2d\u547c\u5438\u5e76\u51cf\u8f7b\u6c34\u538b\u3002'
-        : text.includes('\u62a4')
-          ? '\u9047\u9669\u65f6\u6cd5\u5b9d\u81ea\u884c\u62a4\u4f53\uff0c\u62b5\u6d88\u4e00\u90e8\u5206\u4f24\u52bf\u3002'
-          : '\u6cd5\u5b9d\u5185\u85cf\u4e00\u9053\u7075\u7981\uff0c\u4f69\u6234\u6216\u50ac\u52a8\u65f6\u53ef\u53d1\u6325\u5668\u7269\u795e\u5f02\u3002',
-      trigger: artifactTrigger,
+      name: derivedAbility.name,
+      description: derivedAbility.description,
+      trigger: derivedAbility.trigger,
+      element: derivedAbility.element,
       power: 1 + ri * 0.35,
-      permanentBuff: text.includes('\u6c34') || text.includes('water') || text.includes('\u62a4'),
+      permanentBuff: derivedAbility.trigger === 'underwater' || derivedAbility.trigger === 'auto',
       rarityNote: ri >= 2 ? '\u6cd5\u5b9d\u54c1\u8d28\u8f83\u9ad8\uff0c\u81ea\u5e26\u53ef\u89e6\u53d1\u7684\u5668\u7269\u7075\u7981\u3002' : '\u53ea\u6709\u5c11\u6570\u51e1\u54c1\u6cd5\u5b9d\u4f1a\u7559\u6709\u7c97\u6d45\u7075\u7981\u3002',
     }]
     : undefined;
@@ -678,7 +734,7 @@ function inferTechniqueProfile(item: ItemEntry): TechniqueProfile | undefined {
       ? [{ name: '\u884c\u529f\u8def\u7ebf', description: '\u4fee\u70bc\u65f6\u6539\u53d8\u5410\u7eb3\u8282\u5f8b\u4e0e\u7075\u6c14\u8fd0\u8f6c\uff0c\u5f71\u54cd\u957f\u671f\u4fee\u4e3a\u79ef\u7d2f\u3002' }]
       : [{ name: '\u5668\u7269\u7075\u7981', description: '\u6cd5\u5b9d\u7684\u7075\u7981\u968f\u4f69\u6234\u6216\u50ac\u52a8\u751f\u6548\uff0c\u4e0d\u7b49\u540c\u4e8e\u89d2\u8272\u5b66\u4f1a\u6b64\u6cd5\u672f\u3002' }],
     spell: item.item_type === 'scripture' && ['\u672f','\u8bc0','\u5251','\u706b','\u96f7','\u51b0','\u98ce','\u5370','\u638c','\u6307'].some(k => text.includes(k))
-      ? { name: item.name, description: item.description || `${item.name}\u6240\u8f7d\u672f\u5f0f`, power: 1 + safeRarityIndex(item.rarity) * 0.45 }
+      ? { name: derivedAbility.name, description: derivedAbility.description, element: derivedAbility.element, power: 1 + safeRarityIndex(item.rarity) * 0.45 }
       : undefined,
     artifactAbilities,
     mismatchRisk: item.item_type === 'scripture'
@@ -779,9 +835,10 @@ export function buildLearnedCombatArts(state: CharacterState): { itemId: string;
       const profile = compat.profile;
       const rarityCost = it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10;
       if (it.item_type === 'artifact') {
+        const fallbackAbility = deriveSpellLikeAbility(it, 'artifact');
         const abilities = profile?.artifactAbilities?.length
           ? profile.artifactAbilities
-          : [{ name: it.name, description: it.description, mpCost: rarityCost, power: 1 + safeRarityIndex(it.rarity) * 0.35, element: 'none' as const }];
+          : [{ name: fallbackAbility.name, description: fallbackAbility.description, trigger: fallbackAbility.trigger, mpCost: rarityCost, power: 1 + safeRarityIndex(it.rarity) * 0.35, element: fallbackAbility.element }];
         return abilities.map(ability => ({
           itemId: it.id,
           name: ability.name,
@@ -799,8 +856,8 @@ export function buildLearnedCombatArts(state: CharacterState): { itemId: string;
       if (!spell && !(profile?.traits || []).length) return [];
       return [{
         itemId: it.id,
-        name: spell?.name || it.name,
-        description: spell?.description || it.description,
+        name: spell?.name || deriveSpellLikeAbility(it, 'scripture').name,
+        description: spell?.description || deriveSpellLikeAbility(it, 'scripture').description,
         mpCost: Math.max(5, Math.floor(spell?.mpCost || rarityCost)),
         power: Number(((spell?.power || (1 + safeRarityIndex(it.rarity) * 0.5)) * Math.max(0.25, compat.adaptation)).toFixed(2)),
         rarity: it.rarity,

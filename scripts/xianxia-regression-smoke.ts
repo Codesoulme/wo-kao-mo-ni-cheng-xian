@@ -624,23 +624,23 @@ function smokeAnnualNarrativePrompt(): void {
 
 function smokeTechniqueRequirements(): void {
   const baseState: any = {
-    name: '????', age: 20, lifespan: 100, realm: 'qi_refining', realmLevel: 1,
+    name: 'Root Tester', age: 20, lifespan: 100, realm: 'qi_refining', realmLevel: 1,
     spiritualRoot: 'mixed', rootDetail: '???', rootMultiplier: 0.3,
     elements: { metal: 10, wood: 10, water: 10, fire: 10, earth: 10 },
     comprehension: 30, activeStatuses: [], longTermMemory: [], equipped: [], inventory: [], pets: [],
     hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 8, speed: 10,
   };
   const strictScripture: any = {
-    id: 'item_scr_strict', name: '???????', description: '???????????', item_type: 'scripture', rarity: 'rare', source: 'smoke',
-    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 3, description: '????' }],
-    technique: { kind: 'cultivation', requirements: { spiritualRoots: ['heavenly', 'pure'], minRealm: 'foundation' }, traits: [{ name: '????', description: '????' }] },
+    id: 'item_scr_strict', name: 'Strict Heavenly Manual', description: 'Strict root manual', item_type: 'scripture', rarity: 'rare', source: 'smoke',
+    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 3, description: 'cultivation test' }],
+    technique: { kind: 'cultivation', requirements: { spiritualRoots: ['heavenly', 'pure'], minRealm: 'foundation' }, traits: [{ name: 'Strict Path', description: 'cultivation test' }] },
   };
   const rejected = evaluateTechniqueCompatibility(baseState, strictScripture);
   assert(!rejected.usable && rejected.adaptation === 0, 'strict spiritual root requirement should reject mismatched root');
   const looseScripture: any = {
-    id: 'item_scr_loose', name: '?????', description: '???????', item_type: 'scripture', rarity: 'rare', source: 'smoke',
-    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 3, description: '????' }],
-    technique: { kind: 'cultivation', requirements: { preferredRoots: ['pure'], minRealm: 'foundation', minComprehension: 60 }, traits: [{ name: '????', description: '????' }] },
+    id: 'item_scr_loose', name: 'Loose Root Manual', description: 'loose root manual', item_type: 'scripture', rarity: 'rare', source: 'smoke',
+    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 3, description: 'cultivation test' }],
+    technique: { kind: 'cultivation', requirements: { preferredRoots: ['pure'], minRealm: 'foundation', minComprehension: 60 }, traits: [{ name: 'Loose Path', description: 'cultivation test' }] },
   };
   const adapted = evaluateTechniqueCompatibility(baseState, looseScripture);
   assert(adapted.usable && adapted.adaptation > 0 && adapted.adaptation < 1, 'soft requirements should reduce adaptation, not reject');
@@ -733,7 +733,7 @@ function smokeConstitutionProfiles(): void {
   const state: any = normalizeCultivationState(rawState);
   const swordManual: any = {
     id: 'item_sword_manual', name: 'Metal Sword Manual', item_type: 'scripture', rarity: 'rare', description: 'Sword method with metal edge.',
-    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.2, description: '????' }],
+    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.2, description: 'cultivation test' }],
     technique: {
       kind: 'spell', spell: { name: 'Metal Sword Qi', description: 'Metal sword energy.', mpCost: 10, power: 18, element: 'metal' },
       requirements: { spiritualRoots: ['pure'], minElements: { metal: 40 }, minComprehension: 8 },
@@ -749,6 +749,36 @@ function smokeConstitutionProfiles(): void {
   assert(compat.warnings.length > baselineCompat.warnings.length, 'matching constitution should emit resonance warning');
   assert(Boolean(ctx.constitutionProfiles?.[0]) && ctx.constitutionProfiles![0].resonance.length > 0, 'state context should include constitution profile summary');
   log('constitution-profiles', { passed: true, baseline: baselineCompat.adaptation, adaptation: compat.adaptation, profile: ctx.constitutionProfiles?.[0]?.name });
+}
+
+
+function smokeTechniqueSpellNaming(): void {
+  const rawSpellNameState: any = {
+    id: 'smoke_spell_name', name: 'Spell Tester', gender: 'female', age: 20, lifespan: 90,
+    spiritualRoot: 'pure', rootDetail: 'wood root', rootMultiplier: 1.2,
+    realm: 'qi_refining', realmLevel: 3,
+    cultivationExp: 0, expToBreak: 100,
+    elements: { metal: 40, wood: 80, water: 20, fire: 10, earth: 10 },
+    hp: 100, maxHp: 100, mp: 100, maxMp: 100, attack: 12, defense: 8, speed: 10,
+    luck: 5, comprehension: 20, spiritStones: 0, reputation: 0,
+    alive: true, ascended: false, causeOfDeath: '', faction: '', master: '', location: '', fateNodes: [], isAtChoice: false,
+    activeStatuses: [], inventory: [], equipped: [], storageCapacity: 5,
+    cultivationMultiplier: 1, longTermMemory: [], completedFateNodes: [], pendingThreads: [], characterIntents: [], recentEventTypes: [],
+    npcs: [], causalGraph: { nodes: [], edges: [] }, worldFacts: [], pets: [], exploredRealms: [],
+  };
+  const baseState: any = normalizeCultivationState(rawSpellNameState);
+  const artifact: any = { id: 'artifact_flower_sword', name: 'Hundred Flower Sword', item_type: 'artifact', rarity: 'rare', description: 'A flower sword with petal shadows.', effects: [], source: 'smoke' };
+  const scripture: any = { id: 'scripture_flower_sword', name: 'Hundred Flower Sword Manual', item_type: 'scripture', rarity: 'rare', description: 'A flower sword method with petal shadows.', effects: [], source: 'smoke' };
+  const arts = buildLearnedCombatArts({ ...baseState, equipped: [artifact, scripture] });
+  const artifactArt = arts.find((a: any) => a.itemId === artifact.id);
+  const scriptureArt = arts.find((a: any) => a.itemId === scripture.id);
+  assert(artifactArt?.name && artifactArt.name !== artifact.name, 'artifact innate ability should not reuse artifact name');
+  assert(artifactArt?.description && artifactArt.description !== artifact.description, 'artifact innate ability should not reuse artifact description');
+  assert(scriptureArt?.name && scriptureArt.name !== scripture.name, 'scripture spell should not reuse scripture name');
+  assert(scriptureArt?.description && scriptureArt.description !== scripture.description, 'scripture spell should not reuse scripture description');
+  const expectedFlowerSpell = '\u5343\u7075\u82b1\u7efd'.replace(/\\u([0-9a-fA-F]{4})/g, (_m, code) => String.fromCharCode(parseInt(code, 16)));
+  assert(artifactArt?.name === expectedFlowerSpell || scriptureArt?.name === expectedFlowerSpell, 'flower sword should derive a distinct spell-like name');
+  log('technique-spell-naming', { passed: true, artifact: artifactArt?.name, scripture: scriptureArt?.name });
 }
 
 function smokeCombatSettlementSingleFlow(): void {
@@ -777,6 +807,7 @@ async function main(): Promise<void> {
   smokeNoProtagonistShieldPrompt();
   smokeConstitutionProfiles();
   smokeCombatSettlementSingleFlow();
+  smokeTechniqueSpellNaming();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();
