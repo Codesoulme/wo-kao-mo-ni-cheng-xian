@@ -42,6 +42,7 @@ import {
   SECRET_REALMS,
   ExplorationRecord,
 } from './types';
+import { hasRealmEntryRequirement } from './secret-realm-utils';
 
 // ==================== 角色状态序列化 ====================
 
@@ -2747,22 +2748,36 @@ function slugifyRealmName(name: string): string {
   return `story_${hash.toString(36)}`;
 }
 
+function cleanStoryRealmName(name: string): string {
+  return String(name || '')
+    .replace(/^(?:或可|可|可以|尚可|似可|若要|若想|前往|进入|探入|探明|探得|发现|得见|显出|现出|浮出|露出|通往|指向|开启)+/, '')
+    .replace(/^(?:的|之|其|一处|此处)+/, '')
+    .replace(/[，。；、：:！!？?].*$/, '')
+    .trim();
+}
+
 function inferStoryRealmName(text: string): string | null {
   const source = String(text || '');
-  const quoted = source.match(/[「『“\"]([^」』”\"]{2,12}(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|楼|谷|府|墟|宫|殿))[^」』”\"]*[」』”\"]/);
-  if (quoted?.[1]) return quoted[1];
-  const named = source.match(/([\u4e00-\u9fa5]{2,12}(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|楼|谷|府|墟|宫|殿))/);
-  if (named?.[1]) return named[1];
+  const suffix = '(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|钟楼|雾楼|楼|谷|府|墟|宫|殿)';
+  const composite = source.match(new RegExp(`([\\u4e00-\\u9fa5]{2,8}(?:江|溪|河|湾|湖|山|岭|渡|岸|洲|峰|林|泽|城))[\\u4e00-\\u9fa5]{0,4}(?:显出|现出|浮出|露出|探明|探得|发现|得见|可见|藏着|藏有|通往|开启|指向)([\\u4e00-\\u9fa5]{2,8}${suffix})`));
+  if (composite?.[1] && composite?.[2]) {
+    const loc = cleanStoryRealmName(composite[1]);
+    const site = cleanStoryRealmName(composite[2]);
+    if (loc && site && !site.startsWith(loc)) return `${loc}${site}`.slice(0, 14);
+    if (site) return site;
+  }
+  const quoted = source.match(/[「『“\"]([^」』”\"]{2,14}(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|钟楼|雾楼|楼|谷|府|墟|宫|殿))[^」』”\"]*[」』”\"]/);
+  if (quoted?.[1]) return cleanStoryRealmName(quoted[1]);
+  const named = source.match(/([\u4e00-\u9fa5]{2,14}(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|钟楼|雾楼|楼|谷|府|墟|宫|殿))/);
+  if (named?.[1]) return cleanStoryRealmName(named[1]);
   return null;
 }
 
 function inferRealmRequirement(text: string): string | undefined {
   const source = String(text || '');
-  if (/潮湿玉片|玉片/.test(source)) return '潮湿玉片';
-  if (/钥|钥匙|钥纹|禁制|破禁|残图|令牌|符令/.test(source)) {
-    const m = source.match(/([\u4e00-\u9fa5]{2,10}(?:玉片|钥匙|钥纹|残图|令牌|符令|禁制手法|破禁法))/);
-    return m?.[1] || '入境信物';
-  }
+  const specific = source.match(/([\u4e00-\u9fa5]{1,10}(?:玉片|钥匙|钥纹|残图|令牌|符令|禁制手法|破禁法))/);
+  if (specific?.[1]) return specific[1];
+  if (/钥|钥匙|钥纹|禁制|破禁|残图|令牌|符令|玉片|信物/.test(source)) return '入境信物';
   return undefined;
 }
 
@@ -2816,7 +2831,10 @@ export function getDiscoveredStoryRealms(state: CharacterState): SecretRealm[] {
     const realm = buildStoryRealmFromText(invName, inventoryText, state);
     realms.set(realm.id, realm);
   }
-  return [...realms.values()].slice(0, 5);
+  const list = [...realms.values()];
+  return list
+    .filter((realm, idx, arr) => !arr.some((other, j) => j !== idx && other.name.includes(realm.name) && other.name.length > realm.name.length))
+    .slice(0, 5);
 }
 
 export function getSameYearThreads(state: CharacterState): PendingThread[] {
@@ -2910,14 +2928,13 @@ export function canExploreRealm(state: CharacterState, realmId: string): { ok: b
   if (state.age < realm.minAge) return { ok: false, error: `年龄不足，需${realm.minAge}岁以上` };
   const cost = realm.isStoryRealm ? 0 : realm.spiritStoneCost;
   if (realm.entryRequirement) {
-    const hasRequirement = [...(state.inventory || []), ...(state.equipped || []), ...(state.activeStatuses || [])]
-      .some((it: any) => `${it.name || ''}${it.description || ''}${it.source || ''}`.includes(realm.entryRequirement!));
+    const hasRequirement = hasRealmEntryRequirement(state, realm.entryRequirement);
     if (!hasRequirement) {
       return { ok: false, error: `尚未掌握入境关窍：需${realm.entryRequirement}，或另寻${(realm.entryAlternatives || ['破禁之法']).join('、')}` };
     }
   }
   if (state.spiritStones < cost) {
-    return { ok: false, error: `灵石不足，需${cost}灵石（路费+护身符）` };
+    return { ok: false, error: `灵石不足，需${cost}灵石` };
   }
   // 冷却检查
   const rec = (state.exploredRealms || []).find(rec => rec.realmId === realmId);

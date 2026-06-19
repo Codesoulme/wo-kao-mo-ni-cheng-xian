@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  MapPin, X, Coins, Loader2, Skull, Sparkles, Clock, Zap, AlertTriangle,
-  Compass, ChevronRight, Trophy, Shield, Ghost, CloudLightning, Droplet, ScrollText,
+  MapPin, X, Loader2, Skull, Sparkles, Clock, Zap, AlertTriangle, Trophy,
+  Compass, ChevronRight, Ghost, CloudLightning, Droplet, ScrollText,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { REALMS, SECRET_REALMS, type SecretRealm, type SecretRealmTier } from '@/lib/xianxia/types';
+import { type SecretRealm, type SecretRealmTier } from '@/lib/xianxia/types';
+import { hasRealmEntryRequirement } from '@/lib/xianxia/secret-realm-utils';
 
 const TIER_LABEL: Record<SecretRealmTier, string> = {
   common: '凡境',
@@ -94,8 +95,6 @@ function RealmCard({
 }: RealmCardProps) {
   const [expanded, setExpanded] = useState(false);
   const tierColor = TIER_COLOR[realm.tier];
-  const spiritStones = useGameStore(s => s.character?.spiritStones || 0);
-  const canAfford = spiritStones >= realm.spiritStoneCost;
   const disabled = !canExplore || onCooldown || busy;
 
   return (
@@ -182,17 +181,10 @@ function RealmCard({
         })}
       </div>
 
-      {/* 危险度 + 奖励倍率 */}
-      <div className="px-3 pb-1.5 flex items-center justify-between text-[10px]">
-        <div className="flex items-center gap-1">
-          <span className="text-muted-foreground font-serif-cn">危险</span>
-          <DangerMeter level={realm.dangerLevel} />
-        </div>
-        <div className="flex items-center gap-0.5 text-amber-700 dark:text-amber-400">
-          <Trophy className="w-2.5 h-2.5" />
-          <span className="font-bold tabular-nums">{realm.rewardMultiplier.toFixed(1)}×</span>
-          <span className="text-[9px] text-muted-foreground font-serif-cn">奖励</span>
-        </div>
+      {/* 危险度 */}
+      <div className="px-3 pb-1.5 flex items-center gap-1 text-[10px]">
+        <span className="text-muted-foreground font-serif-cn">危险</span>
+        <DangerMeter level={realm.dangerLevel} />
       </div>
 
       {/* 历史探索记录 */}
@@ -206,13 +198,8 @@ function RealmCard({
         </div>
       )}
 
-      {/* 底部：灵石消耗 + 探索按钮 */}
-      <div className="px-3 py-2 flex items-center justify-between border-t border-border/30 bg-muted/10">
-        <div className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
-          <Coins className="w-3 h-3" />
-          <span className="text-xs font-bold tabular-nums">{realm.spiritStoneCost}</span>
-          <span className="text-[9px] text-muted-foreground font-serif-cn ml-0.5">路费</span>
-        </div>
+      {/* 底部：探索按钮 */}
+      <div className="px-3 py-2 flex items-center justify-end border-t border-border/30 bg-muted/10">
         {onCooldown ? (
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground font-serif-cn">
             <Clock className="w-3 h-3 animate-pulse" />
@@ -232,10 +219,10 @@ function RealmCard({
           >
             {busy ? (
               <><Loader2 className="w-3 h-3 animate-spin" />探索中</>
-            ) : !canAfford ? (
-              '灵石不足'
+            ) : disabled ? (
+              cannotExploreReason?.includes('缺') ? '关窍未明' : (cannotExploreReason || '暂不可入')
             ) : (
-              <><Compass className="w-3 h-3" />探索</>
+              <><Compass className="w-3 h-3" />探入</>
             )}
           </button>
         )}
@@ -264,7 +251,7 @@ function ExplorationResult() {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
       <Card
-        className="w-full max-w-md paper-texture border-amber-500/50 shadow-2xl animate-in zoom-in-95 duration-300 realm-result-enter realm-glow"
+        className="w-full max-w-md max-h-[90dvh] paper-texture border-amber-500/50 shadow-2xl animate-in zoom-in-95 duration-300 realm-result-enter realm-glow flex flex-col overflow-hidden"
         style={{
           background: `linear-gradient(180deg, ${tierColor}15, var(--background) 30%)`,
         }}
@@ -285,16 +272,16 @@ function ExplorationResult() {
               size="icon"
               variant="ghost"
               onClick={() => setLastExploration(null)}
-              className="w-7 h-7 shrink-0"
+              className="w-7 h-7 shrink-0 ml-auto"
               aria-label="关闭"
             >
               <X className="w-4 h-4" />
             </Button>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-3 pb-4">
+        <CardContent className="pt-3 pb-4 flex-1 min-h-0 overflow-hidden flex flex-col">
           <div
-            className="text-[12px] font-serif-cn leading-relaxed text-foreground/90 whitespace-pre-wrap max-h-[50vh] overflow-y-auto xianxia-scroll pr-1"
+            className="text-[12px] font-serif-cn leading-relaxed text-foreground/90 whitespace-pre-wrap flex-1 min-h-0 overflow-y-auto xianxia-scroll pr-1"
             style={{
               borderLeft: `2px solid ${tierColor}50`,
               paddingLeft: '0.75rem',
@@ -347,27 +334,22 @@ export function SecretRealmPanel() {
   if (!character || !explorationOpen) return null;
 
   // 计算每个秘境的状态：因果中显露的秘境优先。若有“潮隙浮阁”这类线索，不再混入无关收费秘境。
-  const realmIdx = REALMS.findIndex(r => r.id === character.realm);
   const records = character.exploredRealms || [];
   const storyRealms = (character.discoveredRealms || []) as SecretRealm[];
-  const realmPool = storyRealms.length > 0 ? storyRealms : SECRET_REALMS;
+  const realmPool = storyRealms;
   const availableRealms = realmPool
-    .filter(r => realmIdx >= r.minRealm && character.age >= r.minAge)
+    .filter(r => character.age >= r.minAge)
     .map(r => {
       const rec = records.find((rec: any) => rec.realmId === r.id);
       const lastAge = rec?.lastExploredAge ?? -999;
       const elapsed = character.age - lastAge;
       const onCooldown = elapsed < r.cooldownYears;
       const cooldownRemaining = onCooldown ? (r.cooldownYears - elapsed) : 0;
-      const cost = r.isStoryRealm ? 0 : r.spiritStoneCost;
       const requirement = r.entryRequirement;
-      const bagText = [...(character.inventory || []), ...(character.equipped || []), ...(character.activeStatuses || [])]
-        .map((it: any) => `${it.name || ''}${it.description || ''}${it.source || ''}`).join(' ');
-      const hasRequirement = !requirement || bagText.includes(requirement);
-      const canExplore = character.spiritStones >= cost && !onCooldown && hasRequirement;
+      const hasRequirement = hasRealmEntryRequirement(character, requirement);
+      const canExplore = !onCooldown && hasRequirement;
       let cannotExploreReason: string | undefined;
       if (!hasRequirement) cannotExploreReason = `缺${requirement}`;
-      else if (character.spiritStones < cost) cannotExploreReason = '灵石不足';
       else if (onCooldown) cannotExploreReason = `冷却中（剩 ${cooldownRemaining} 载）`;
       return {
         realm: r,
@@ -381,15 +363,6 @@ export function SecretRealmPanel() {
       };
     });
 
-  const lockedRealms = storyRealms.length > 0 ? [] : SECRET_REALMS
-    .filter(r => realmIdx < r.minRealm || character.age < r.minAge)
-    .map(r => ({
-      realm: r,
-      reason: realmIdx < r.minRealm
-        ? `需${REALMS[r.minRealm].name}以上`
-        : `需${r.minAge}岁以上`,
-    }));
-
   const close = () => {
     if (busyRealmId) return; // 探索中不可关闭
     setExplorationOpen(false);
@@ -397,16 +370,9 @@ export function SecretRealmPanel() {
 
   const explore = async (realm: SecretRealm) => {
     if (busyRealmId || !character) return;
-    const cost = realm.isStoryRealm ? 0 : realm.spiritStoneCost;
     const requirement = realm.entryRequirement;
-    const bagText = [...(character.inventory || []), ...(character.equipped || []), ...(character.activeStatuses || [])]
-      .map((it: any) => `${it.name || ''}${it.description || ''}${it.source || ''}`).join(' ');
-    if (requirement && !bagText.includes(requirement)) {
+    if (requirement && !hasRealmEntryRequirement(character, requirement)) {
       toast.error('关窍未明', { description: `尚缺${requirement}，也可另寻破禁之法。` });
-      return;
-    }
-    if (character.spiritStones < cost) {
-      toast.error('灵石不足', { description: `需 ${cost} 灵石作路费` });
       return;
     }
     // 二次确认（高危险度秘境）
@@ -505,20 +471,12 @@ export function SecretRealmPanel() {
             <CardTitle className="text-base flex items-center gap-2 font-serif-cn">
               <Compass className="w-4 h-4 text-amber-600" />
               <span>秘境探索</span>
-              <Badge
-                variant="outline"
-                className="ml-auto text-[11px] flex items-center gap-1 border-amber-500/50 text-amber-700 bg-amber-500/10"
-              >
-                <Coins className="w-3 h-3" />
-                <span className="tabular-nums font-semibold">{character.spiritStones || 0}</span>
-                <span className="text-[9px] opacity-70">灵石</span>
-              </Badge>
               <Button
                 size="icon"
                 variant="ghost"
                 onClick={close}
                 disabled={!!busyRealmId}
-                className="w-7 h-7 shrink-0"
+                className="w-7 h-7 shrink-0 ml-auto"
                 aria-label="关闭"
               >
                 <X className="w-4 h-4" />
@@ -528,23 +486,18 @@ export function SecretRealmPanel() {
               <MapPin className="w-3 h-3" />
               <span>{character.realmName} · {character.age}载</span>
               <span className="opacity-50">·</span>
-              <span>{storyRealms.length > 0 ? `已现 ${availableRealms.length} 处` : `共 ${availableRealms.length + lockedRealms.length} 处`}</span>
+              <span>已现 {availableRealms.length} 处</span>
             </div>
-            <p className="mt-2 text-[10.5px] leading-relaxed text-muted-foreground font-serif-cn">
-              {storyRealms.length > 0
-                ? '此处只列当前当前因果中显露的秘境入口；入境需承接前文线索、信物与禁制关窍。'
-                : '未有明确秘境线索时，此处只作外出游历；真正的秘境会从事件因果中显露。'}
-            </p>
           </CardHeader>
 
           <CardContent className="flex-1 overflow-hidden p-0 flex flex-col">
             {/* 可探索秘境列表 */}
             <div className="flex-1 overflow-y-auto xianxia-scroll px-3 py-3">
-              {availableRealms.length === 0 && lockedRealms.length === 0 ? (
+              {availableRealms.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Compass className="w-8 h-8 mb-2 opacity-40" />
                     <p className="text-xs font-serif-cn">暂无秘境因缘</p>
-                  <p className="text-[10px] opacity-70 mt-1 font-serif-cn">等待史册中出现秘境线索，或提升境界后外出游历</p>
+                  <p className="text-[10px] opacity-70 mt-1 font-serif-cn">待史册中现出可循之处</p>
                 </div>
               ) : (
                 <>
@@ -574,53 +527,10 @@ export function SecretRealmPanel() {
                     </div>
                   )}
 
-                  {/* 锁定秘境 */}
-                  {lockedRealms.length > 0 && (
-                    <div>
-                      <div className="text-[10px] text-muted-foreground font-serif-cn mb-1.5 flex items-center gap-1 px-1">
-                        <Shield className="w-2.5 h-2.5 text-muted-foreground/60" />
-                        <span>未启秘境（{lockedRealms.length}）</span>
-                      </div>
-                      <div className="grid grid-cols-1 gap-1.5">
-                        {lockedRealms.map(({ realm, reason }) => {
-                          const tierColor = TIER_COLOR[realm.tier];
-                          return (
-                            <div
-                              key={realm.id}
-                              className="rounded-lg border border-dashed border-border/40 bg-muted/10 px-3 py-2 flex items-center gap-2 opacity-70"
-                            >
-                              <div
-                                className="shrink-0 w-7 h-7 rounded-md flex items-center justify-center text-base grayscale"
-                                style={{ background: `${tierColor}10` }}
-                              >
-                                {realm.icon}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-[11px] font-serif-cn font-bold text-muted-foreground truncate">
-                                  {realm.name}
-                                </div>
-                                <div className="text-[9px] text-muted-foreground/70 font-serif-cn">
-                                  {TIER_LABEL[realm.tier]} · {reason}
-                                </div>
-                              </div>
-                              <Shield className="w-3 h-3 text-muted-foreground/40" />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </>
               )}
             </div>
 
-            {/* 底部说明 */}
-            <div className="shrink-0 px-3 py-2 border-t border-amber-500/20 bg-amber-500/5 text-[10px] text-muted-foreground font-serif-cn leading-relaxed">
-              <p className="flex items-center gap-1">
-                <AlertTriangle className="w-2.5 h-2.5 text-amber-600" />
-                因缘秘境不收莫名其妙的门票；若缺信物，可另寻破禁之法后再入。
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
