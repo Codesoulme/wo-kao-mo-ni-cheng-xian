@@ -52,6 +52,7 @@ import {
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
 import { validateAIBoundary, BoundaryValidationTrace } from './ai-boundary-validator';
+import { buildStateChangeLog, StateChangeLogEntry } from './state-change-log';
 import {
   registerItem,
   registerMany,
@@ -2225,6 +2226,7 @@ export interface EngineExecutionResult {
   effectResolveWarnings: string[];
   aiBoundaryTrace: BoundaryValidationTrace[];
   aiBoundaryWarnings: string[];
+  stateChangeLog: StateChangeLogEntry[];
   breakthroughHappened: boolean;
   newRealm?: Realm;
   breakthroughMajor?: boolean;
@@ -2458,6 +2460,15 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   next = recordEventCausality(next, aiOutput);
 
   const appliedChanges = resolvedChanges.appliedChanges;
+  const stateChangeLog = buildStateChangeLog({
+    before: state,
+    after: next,
+    appliedChanges,
+    rejectedChanges: rejected,
+    contentRegistryTrace,
+    effectResolveTrace,
+    aiBoundaryTrace: boundaryValidation.trace,
+  });
 
   return {
     state: next,
@@ -2469,6 +2480,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     effectResolveWarnings,
     aiBoundaryTrace: boundaryValidation.trace,
     aiBoundaryWarnings: boundaryValidation.warnings,
+    stateChangeLog,
     breakthroughHappened,
     newRealm,
     breakthroughMajor,
