@@ -60,21 +60,21 @@ export function CustomSimulationDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" className="h-10 font-serif-cn border-primary/30 text-primary hover:bg-primary/10">
           <SlidersHorizontal className="w-4 h-4 mr-2" />
-          定制模拟
+          {'\u4f20\u627f\u6c60'}
           {selectedCount > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">{selectedCount}</Badge>}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[86dvh] overflow-y-auto paper-texture">
         <DialogHeader>
-          <DialogTitle className="font-serif-cn">定制下一世</DialogTitle>
+          <DialogTitle className="font-serif-cn">{'\u4f20\u627f\u6c60'}</DialogTitle>
           <DialogDescription className="font-serif-cn leading-relaxed">
-            从传承池中挑选旧缘，下一次新开局会将这些因缘交给后端。它们只是开局伏笔，不直接给予修为。
+            {'\u6b64\u5904\u6c89\u6dc0\u524d\u4e16\u4f59\u54cd\u3001\u65e7\u7f18\u9057\u7269\u4e0e\u672a\u5c3d\u56e0\u679c\u3002\u5165\u4e16\u4e4b\u524d\uff0c\u53ef\u62e9\u5176\u4e00\u4e8c\u968f\u8eab\u800c\u884c\uff1b\u5b83\u4eec\u53ea\u662f\u56e0\u7f18\u7275\u5f15\uff0c\u4e0d\u4fdd\u8bc1\u6b64\u4e16\u987a\u9042\u3002'}
           </DialogDescription>
         </DialogHeader>
 
         {heritageVault.length === 0 ? (
           <div className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground leading-relaxed">
-            传承池尚空。待一位角色死亡或飞升后完成轮回结算，旧物与因缘便会沉入此池。
+            {'\u4f20\u627f\u6c60\u5c1a\u7a7a\u3002\u5f85\u4e00\u4e16\u5c18\u7f18\u843d\u5b9a\uff0c\u53ef\u627f\u4e4b\u7269\u81ea\u4f1a\u5f52\u5165\u6b64\u5904\u3002'}
           </div>
         ) : (
           <Tabs defaultValue={activeCategory} className="w-full">
@@ -92,7 +92,7 @@ export function CustomSimulationDialog() {
                 <TabsContent key={category} value={category} className="mt-3 space-y-2">
                   {grouped[category].length === 0 ? (
                     <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-                      暂无{CATEGORY_LABEL[category]}类传承。
+                      {'\u6b64\u7c7b\u6682\u65e0\u53ef\u627f\u4e4b\u7269\u3002'}
                     </div>
                   ) : grouped[category].map((item) => {
                     const checked = isSelected(item, selected);
@@ -111,7 +111,7 @@ export function CustomSimulationDialog() {
                               <Badge variant="outline" className="text-[10px]">{RARITY_LABEL[item.rarity] || item.rarity}</Badge>
                             </div>
                             <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{item.description}</p>
-                            <p className="text-[10px] text-muted-foreground/80">源自：{item.source}</p>
+                            <p className="text-[10px] text-muted-foreground/80">{'\u6765\u6e90\uff1a'}{item.source}</p>
                           </div>
                         </div>
                       </button>
@@ -126,10 +126,10 @@ export function CustomSimulationDialog() {
         <Card className="border-primary/15 bg-primary/5">
           <CardContent className="pt-4 flex items-center justify-between gap-3">
             <div className="text-xs text-muted-foreground leading-relaxed">
-              已选 <span className="font-semibold text-primary">{selectedCount}</span> 项。再次点击可取消。
+              {'\u5df2\u62e9'} <span className="font-semibold text-primary">{selectedCount}</span> {'\u4ef6\u4f20\u627f\u3002\u518d\u70b9\u4e00\u6b21\u53ef\u653e\u56de\u6c60\u4e2d\u3002'}
             </div>
             <Button size="sm" variant="ghost" onClick={clearSelectedHeritage} disabled={selectedCount === 0}>
-              清空
+              {'\u4e00\u5e76\u653e\u56de'}
             </Button>
           </CardContent>
         </Card>

@@ -22,22 +22,22 @@ export function SimulationHallDialog() {
       <DialogTrigger asChild>
         <Button variant="outline" className="h-10 font-serif-cn border-amber-500/30 text-amber-700 hover:bg-amber-500/10">
           <Landmark className="w-4 h-4 mr-2" />
-          模拟殿堂
+          {'\u4ed9\u8def\u6bbf\u5802'}
           {hallOfSimulations.length > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">{hallOfSimulations.length}</Badge>}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md max-h-[86dvh] overflow-y-auto paper-texture">
         <DialogHeader>
-          <DialogTitle className="font-serif-cn">模拟殿堂</DialogTitle>
+          <DialogTitle className="font-serif-cn">{'\u4ed9\u8def\u6bbf\u5802'}</DialogTitle>
           <DialogDescription className="font-serif-cn leading-relaxed">
-            此处供奉历次轮回的名字、境界与带出的旧缘。重开不会抹去殿堂记录。
+            {'\u6b64\u6bbf\u8bb0\u4e0b\u6bcf\u4e00\u6761\u8d70\u5230\u7ec8\u5904\u7684\u4ed9\u8def\u3002\u6709\u4e9b\u6b62\u4e8e\u5c18\u52ab\uff0c\u6709\u4e9b\u7a7f\u8fc7\u957f\u751f\uff1b\u5176\u9057\u54cd\u53ef\u5316\u4f5c\u540e\u4e16\u4f20\u627f\u3002'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
           {hallOfSimulations.length === 0 ? (
             <div className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground leading-relaxed">
-              殿堂尚空。待一世落幕，第一盏魂灯便会在此点亮。
+              {'\u4ed9\u8def\u6bbf\u5802\u5c1a\u65e0\u7559\u540d\u3002\u5f85\u4e00\u4e16\u7ec8\u5c40\u843d\u5b9a\uff0c\u6b64\u5904\u4fbf\u4f1a\u8bb0\u4e0b\u5176\u9053\u9014\u3002'}
             </div>
           ) : (
             hallOfSimulations.map((record) => (
@@ -47,7 +47,7 @@ export function SimulationHallDialog() {
                     <div>
                       <div className="font-serif-cn font-semibold text-base">{record.characterName}</div>
                       <div className="text-xs text-muted-foreground">
-                        {record.gender || '未知'} · {record.age}岁 · {record.highestRealm}
+                        {record.gender || '\u672a\u77e5'} {'\u00b7'} {record.age}{'\u5c81'} {'\u00b7'} {record.highestRealm}
                       </div>
                     </div>
                     <Badge variant={record.ending === 'ascension' ? 'default' : 'secondary'} className="font-serif-cn">
@@ -56,7 +56,7 @@ export function SimulationHallDialog() {
                   </div>
 
                   <div className="space-y-1">
-                    <div className="text-[11px] text-muted-foreground">突出战绩</div>
+                    <div className="text-[11px] text-muted-foreground">{'\u7559\u540d\u4e8b\u8ff9'}</div>
                     <div className="flex flex-wrap gap-1.5">
                       {record.notableDeeds.map((deed, index) => (
                         <span key={`${record.id}-deed-${index}`} className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px]">
@@ -67,9 +67,9 @@ export function SimulationHallDialog() {
                   </div>
 
                   <div className="space-y-1">
-                    <div className="text-[11px] text-muted-foreground">带出物</div>
+                    <div className="text-[11px] text-muted-foreground">{'\u5e26\u51fa\u4f20\u627f'}</div>
                     {record.carriedOut.length === 0 ? (
-                      <div className="text-xs text-muted-foreground/80">未带出传承，仅留魂灯一盏。</div>
+                      <div className="text-xs text-muted-foreground/80">{'\u672a\u7559\u4e0b\u53ef\u4f20\u4e4b\u7269\u3002'}</div>
                     ) : (
                       <div className="flex flex-wrap gap-1.5">
                         {record.carriedOut.map((item) => (
