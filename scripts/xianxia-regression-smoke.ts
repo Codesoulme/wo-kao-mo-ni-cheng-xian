@@ -1,6 +1,6 @@
 ﻿import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan } from '../src/lib/xianxia/event-scheduler';
-import { deriveWorldFactsFromState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
+import { deriveWorldEventConsequences, deriveWorldFactsFromState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
 import { appendStateChangeAuditEffect } from '../src/lib/xianxia/state-change-log';
 
 function assert(condition: unknown, message: string): void {
@@ -154,6 +154,38 @@ function smokeWorldFactsLite(): void {
   log('worldfacts-lite', { passed: true, facts: facts.length, hints: plan.hints.length });
 }
 
+function smokeWorldEventConsequences(): void {
+  const state: any = {
+    age: 45,
+    location: '青岚坊市',
+    npcs: [{
+      id: 'npc_shadow',
+      name: '阴鸦客',
+      faction: '黑鸦会',
+      attitude: 'hostile',
+      relationshipScore: -30,
+      firstMetAge: 44,
+      lastSeenAge: 45,
+      source: 'auction',
+    }],
+    pendingThreads: [],
+    discoveredRealms: [],
+    worldFacts: [],
+    causalGraph: {
+      nodes: [{ id: 'event_auction', type: 'event', label: '旧洞府铜钥落槌', age: 45, summary: '拍卖会上旧洞府铜钥落入角色手中，阴鸦客记下一笔。', tags: ['auction', 'trade'] }],
+      edges: [],
+    },
+  };
+  const facts = deriveWorldEventConsequences(state, 'auction-bid');
+  assert(facts.some(f => f.kind === 'event' && f.tags?.includes('consequence') && f.tags?.includes('auction')), 'event consequence should derive auction aftermath fact');
+  assert(facts.some(f => f.kind === 'location' && f.title === '青岚坊市' && f.tags?.includes('event-consequence')), 'event consequence should enrich location fact');
+  assert(facts.some(f => f.kind === 'faction' && f.title === '黑鸦会' && f.tags?.includes('hostile')), 'event consequence should derive hostile faction pressure');
+  const refreshed: any = refreshWorldFacts(state, 'auction-bid');
+  const plan = buildEventSchedulerPlan({ ...refreshed, questEntries: [] });
+  assert(plan.hints.some(h => h.kind === 'world' && h.reason.includes('余波')), 'scheduler should include world event consequence hint');
+  log('world-event-consequences', { passed: true, facts: facts.length, hints: plan.hints.length });
+}
+
 function smokeActionCausality(): void {
   const state: any = {
     age: 30,
@@ -233,6 +265,7 @@ async function main(): Promise<void> {
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
   smokeWorldFactsLite();
+  smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();
   if (withDb) await smokeAuctionDbRoute();

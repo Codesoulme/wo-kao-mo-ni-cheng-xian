@@ -2021,6 +2021,74 @@ function factFromFaction(name: string, age: number, source: string, summary?: st
   };
 }
 
+function consequenceTags(text: string, source: string): string[] {
+  const value = [text, source].filter(Boolean).join('；');
+  const tags = ['consequence'];
+  if (/拍卖|竞拍|拍品|auction/i.test(value)) tags.push('auction', 'trade', 'resource');
+  if (/坊市|黑市|交易|买|卖|market|trade/i.test(value)) tags.push('market', 'trade', 'resource');
+  if (/战斗|截杀|劫杀|击败|combat|enemy|hostile/i.test(value)) tags.push('conflict', 'danger');
+  if (/秘境|洞府|遗迹|遗府|探索|exploration|realm/i.test(value)) tags.push('realm', 'exploration');
+  if (/宗门|势力|追责|通缉|悬赏|faction/i.test(value)) tags.push('faction');
+  if (/灵石|资源|材料|丹|法宝|玉简|resource/i.test(value)) tags.push('resource');
+  return Array.from(new Set(tags));
+}
+
+function consequenceSummary(title: string, tags: string[], fallback: string): string {
+  if (tags.includes('auction')) return title + '留下交易与人情余波，可能牵动拍品去向、竞拍者报复、黑市传闻或后续谈判。';
+  if (tags.includes('market')) return title + '改变了近期资源流向，可低频回响为坊市传闻、价格波动、商贩试探或买卖线索。';
+  if (tags.includes('conflict')) return title + '留下冲突余波，可能牵动追踪、报复、同伙试探、伤势疗养或名声变化。';
+  if (tags.includes('realm')) return title + '牵动秘境与遗迹余波，可能带来禁制变化、旧主线索、危险升高或传承传闻。';
+  return fallback || title + '已成为世界中的一段余波，可在后续流年自然回响。';
+}
+
+export function deriveWorldEventConsequences(state: CharacterState, source: string): WorldFact[] {
+  const age = state.age;
+  const facts: WorldFact[] = [];
+  const graph = state.causalGraph && Array.isArray(state.causalGraph.nodes) ? state.causalGraph : { nodes: [], edges: [] };
+  const nodes = [...(graph.nodes || [])].slice(-50);
+  const actionNodes = nodes.filter(node => ['event', 'combat', 'choice'].includes(node.type));
+  for (const node of actionNodes) {
+    const text = [node.label, node.summary, ...(node.tags || [])].filter(Boolean).join('；');
+    const tags = consequenceTags(text, source);
+    if (tags.length <= 1) continue;
+    const title = node.label || '旧事余波';
+    facts.push({
+      id: worldFactId('event', node.refId || node.id || title),
+      kind: 'event',
+      title,
+      summary: consequenceSummary(title, tags, node.summary || ''),
+      confidence: 0.66,
+      firstSeenAge: node.age ?? age,
+      lastSeenAge: age,
+      source,
+      refIds: [node.refId || node.id].filter(Boolean),
+      tags,
+    });
+  }
+
+  const sourceTags = consequenceTags(source, source);
+  if (state.location && sourceTags.some(tag => ['auction', 'market', 'trade', 'conflict', 'danger', 'realm', 'exploration'].includes(tag))) {
+    const locationSummary = sourceTags.includes('auction') || sourceTags.includes('market') || sourceTags.includes('trade')
+      ? state.location + '近期有交易与资源流转余波，坊市传闻、竞价旧怨或商贩试探可能继续发酵。'
+      : sourceTags.includes('conflict') || sourceTags.includes('danger')
+        ? state.location + '附近近期牵动冲突余波，可能出现追踪、报复、伏击或避险传闻。'
+        : state.location + '附近近期牵动秘境或遗迹余波，可能出现旧主线索、禁制变化或寻宝传闻。';
+    facts.push({
+      ...factFromLocation(state.location, age, source, locationSummary, [], 0.72),
+      tags: Array.from(new Set([...locationTags(state.location), ...sourceTags, 'event-consequence'])),
+    });
+  }
+
+  const recentHostileFactions = uniqueText((state.npcs || [])
+    .filter(n => ['enemy', 'hostile'].includes(n.attitude) && n.faction)
+    .map(n => n.faction));
+  if (sourceTags.includes('conflict') || sourceTags.includes('auction')) {
+    for (const faction of recentHostileFactions.slice(0, 4)) {
+      facts.push(factFromFaction(faction, age, source, faction + '与近期冲突或拍卖余波相连，可能借人情、通缉、压价、追踪或截杀继续施压。', [], 'hostile', 0.68));
+    }
+  }
+  return facts;
+}
 function mergeWorldFact(existing: WorldFact, incoming: WorldFact): WorldFact {
   return {
     ...existing,
@@ -2080,7 +2148,10 @@ export function deriveWorldFactsFromState(state: CharacterState, source: string)
 }
 
 export function refreshWorldFacts(state: CharacterState, source: string): CharacterState {
-  return upsertWorldFacts(state, deriveWorldFactsFromState(state, source));
+  return upsertWorldFacts(state, [
+    ...deriveWorldFactsFromState(state, source),
+    ...deriveWorldEventConsequences(state, source),
+  ]);
 }
 
 // ==================== NPC Persistence Lite ====================
