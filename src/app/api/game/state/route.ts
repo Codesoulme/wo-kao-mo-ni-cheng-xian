@@ -87,6 +87,7 @@ export async function GET(req: NextRequest) {
         // World continuity internals
         npcs: responseState.npcs || [],
         causalGraph: responseState.causalGraph || { nodes: [], edges: [] },
+        worldFacts: responseState.worldFacts || [],
         // Task 22: 心魔值
         heartDemon: state.heartDemon ?? 0,
         // Task 23: 灵宠

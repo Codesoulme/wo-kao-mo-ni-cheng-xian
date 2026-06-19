@@ -96,6 +96,8 @@ model Character {
   npcsJson String @default("[]")
   // 因果图 Lite：CausalGraph，记录事件/线索/NPC/奖励之间的可追踪关系。
   causalGraphJson String @default("{\"nodes\":[],\"edges\":[]}")
+  // WorldFacts Lite: long-term confirmed world facts distilled from state/NPC/thread/realm continuity.
+  worldFactsJson String @default("[]")
   // 最近蓝图分类列表（用于反重复机制）
   recentBlueprintCategoriesJson String @default("[]")
   // ===== Task 22 新增 =====

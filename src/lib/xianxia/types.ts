@@ -515,6 +515,21 @@ export interface CausalGraph {
   updatedAtAge?: number;
 }
 
+export type WorldFactKind = 'location' | 'faction' | 'realm' | 'npc' | 'relationship' | 'rule' | 'lore' | 'resource' | 'event';
+
+export interface WorldFact {
+  id: string;
+  kind: WorldFactKind;
+  title: string;
+  summary: string;
+  confidence: number;
+  firstSeenAge: number;
+  lastSeenAge: number;
+  source: string;
+  refIds?: string[];
+  tags?: string[];
+}
+
 export type InputClass = 'action' | 'dialogue' | 'overreach' | 'rule_manipulation';
 
 // AI 生成的叙事事件
@@ -764,6 +779,7 @@ export interface EngineStateContext {
   // 本轮事件蓝图主题（引擎抽取，AI 必须围绕此主题生成事件）
   npcs: WorldNpc[];
   causalGraph: CausalGraph;
+  worldFacts: WorldFact[];
   blueprint?: EventBlueprint;
   // 未决线索列表（AI 必须保持连续性；deadlineAge 临近的标记为 urgent）
   pendingThreads: PendingThread[];
@@ -858,6 +874,7 @@ export interface CharacterState {
   // 未决线索列表（重要剧情线索，会在后续推进/到期触发）
   npcs: WorldNpc[];
   causalGraph: CausalGraph;
+  worldFacts: WorldFact[];
   pendingThreads: PendingThread[];
   questEntries: QuestEntry[];
   // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）

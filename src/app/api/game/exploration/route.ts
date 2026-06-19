@@ -213,6 +213,7 @@ export async function POST(req: NextRequest) {
         combatStateJson: finalState.combatSession ? JSON.stringify(finalState.combatSession) : '',
         npcsJson: JSON.stringify(finalState.npcs || []),
         causalGraphJson: JSON.stringify(finalState.causalGraph || { nodes: [], edges: [] }),
+        worldFactsJson: JSON.stringify(finalState.worldFacts || []),
         heartDemon: finalState.heartDemon ?? 0,
         petsJson: JSON.stringify(finalState.pets || []),
         exploredRealmsJson: JSON.stringify(finalState.exploredRealms || []),

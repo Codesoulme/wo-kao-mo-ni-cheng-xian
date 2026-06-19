@@ -230,6 +230,9 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): strin
   const questEntryList = ctx.questEntries?.length
     ? ctx.questEntries.slice(0, 12).map(q => `- [${q.stage}][urgency:${q.urgency}][thread:${q.sourceThreadId}] ${q.title}：${q.summary}${q.currentHook ? `；钩子：${q.currentHook}` : ''}${q.dueAge ? `；期限${q.dueAge}岁` : ''}`).join('\n')
     : '暂无任务索引';
+  const worldFactList = ctx.worldFacts?.length
+    ? ctx.worldFacts.slice(-20).map(f => `- [${f.kind}][${f.confidence}] ${f.title}：${f.summary}`).join('\n')
+    : '暂无已沉淀的长期世界事实';
   const mult = ctx.cultivationMultiplier || 0;
   const multDesc = mult > 0 ? `${mult.toFixed(2)}倍（已含灵根与功法加成）` : '0（无灵根，无法修炼）';
   const curInsight = ctx.cultivationInsight || '';
@@ -321,6 +324,9 @@ ${ctx.characterIntents && ctx.characterIntents.length
 【未决线索区】（必须保持连续性！urgent 与到期线索本轮必须推进或解决）
 任务索引 QuestEntry（由未决线索规范化而来，优先看 urgency/stage，再回看 pendingThreads 原文）
 ${questEntryList}
+
+已确认的长期世界事实（用于保持地点、宗门、人物、秘境与设定连续性；不得无故推翻）：
+${worldFactList}
 
 ${ctx.pendingThreads && ctx.pendingThreads.length
   ? ctx.pendingThreads.map(t => `- [id:${t.id}][${t.status}] ${t.title}（截止 ${t.deadlineAge} 岁，剩 ${t.deadlineAge - sc.age} 岁，进度 ${t.progress}%${t.dueInSameYear ? '，同年后续' : ''}）：${t.description}${t.followUpHint ? `；后续关窍：${t.followUpHint}` : ''}${t.reward ? `；奖励：${t.reward}` : ''}${t.failureCost ? `；失败代价：${t.failureCost}` : ''}`).join('\n')

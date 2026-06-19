@@ -44,6 +44,8 @@ import {
   SECRET_REALMS,
   ExplorationRecord,
   WorldNpc,
+  WorldFact,
+  WorldFactKind,
   CausalGraph,
   CausalNode,
   CausalEdge,
@@ -92,6 +94,7 @@ export interface DBCharacter {
   exploredRealmsJson?: string;
   npcsJson?: string;
   causalGraphJson?: string;
+  worldFactsJson?: string;
 }
 
 // 旧存档 equippedJson 可能是 slot-map（{weapon: {...}}）或已是数组（[{...}]）
@@ -173,6 +176,7 @@ export function dbToState(c: DBCharacter): CharacterState {
     exploredRealms: safeParse<ExplorationRecord[]>((c as any).exploredRealmsJson || '[]', []),
     npcs: safeParse<WorldNpc[]>((c as any).npcsJson || '[]', []),
     causalGraph: safeParse<CausalGraph>((c as any).causalGraphJson || '{ "nodes": [], "edges": [] }', { nodes: [], edges: [] }),
+    worldFacts: safeParse<WorldFact[]>((c as any).worldFactsJson || '[]', []),
   };
   // 持久化的 recentEventTypes / recentBlueprintCategories 不进 state（仅 ctx 用），但需要保留
   // 这里通过闭包变量传给 buildStateContext（在 advance route 中调用）
@@ -1323,6 +1327,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
   const safeCultivationFactors = Array.isArray(state.cultivationFactors) ? state.cultivationFactors : [];
   const safeLongTermMemory = Array.isArray(state.longTermMemory) ? state.longTermMemory : [];
   const safeNpcs = Array.isArray(state.npcs) ? state.npcs : [];
+  const safeWorldFacts = Array.isArray(state.worldFacts) ? state.worldFacts : [];
   const safeCausalGraph = state.causalGraph && Array.isArray(state.causalGraph.nodes) && Array.isArray(state.causalGraph.edges) ? state.causalGraph : { nodes: [], edges: [] };
   // 找下一个未完成的命节点
   const nextNode = FATE_NODES.find(n => !completedFateNodes.includes(n.index));
@@ -1377,6 +1382,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
       edges: safeCausalGraph.edges.slice(-50),
       updatedAtAge: safeCausalGraph.updatedAtAge,
     },
+    worldFacts: safeWorldFacts.slice(-40),
     completedFateNodes,
     availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
@@ -1697,6 +1703,62 @@ function recordEventCausality(state: CharacterState, aiOutput: AIEventOutput): C
 
   return appendCausalGraph(state, nodes, edges);
 }
+// ==================== WorldFacts Lite ====================
+
+function worldFactId(kind: WorldFactKind, raw: string): string {
+  return `wf_${kind}_${String(raw || 'unknown').trim().toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, '_').slice(0, 48)}`;
+}
+
+function mergeWorldFact(existing: WorldFact, incoming: WorldFact): WorldFact {
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    firstSeenAge: Math.min(existing.firstSeenAge ?? incoming.firstSeenAge, incoming.firstSeenAge ?? existing.firstSeenAge),
+    lastSeenAge: Math.max(existing.lastSeenAge ?? incoming.lastSeenAge, incoming.lastSeenAge ?? existing.lastSeenAge),
+    confidence: Math.max(existing.confidence ?? 0, incoming.confidence ?? 0),
+    summary: incoming.summary || existing.summary,
+    source: incoming.source || existing.source,
+    refIds: Array.from(new Set([...(existing.refIds || []), ...(incoming.refIds || [])])).slice(0, 16),
+    tags: Array.from(new Set([...(existing.tags || []), ...(incoming.tags || [])])).slice(0, 16),
+  };
+}
+
+export function upsertWorldFacts(state: CharacterState, facts: WorldFact[]): CharacterState {
+  if (!facts.length) return state;
+  const current = Array.isArray(state.worldFacts) ? state.worldFacts : [];
+  const byId = new Map<string, WorldFact>();
+  for (const fact of current) if (fact?.id) byId.set(fact.id, fact);
+  for (const fact of facts) {
+    if (!fact?.id || !fact.title) continue;
+    const existing = byId.get(fact.id);
+    byId.set(fact.id, existing ? mergeWorldFact(existing, fact) : fact);
+  }
+  return { ...state, worldFacts: Array.from(byId.values()).sort((a, b) => a.lastSeenAge - b.lastSeenAge).slice(-160) };
+}
+
+function deriveWorldFactsFromState(state: CharacterState, source: string): WorldFact[] {
+  const age = state.age;
+  const facts: WorldFact[] = [];
+  if (state.location) facts.push({ id: worldFactId('location', state.location), kind: 'location', title: state.location, summary: `角色曾在${state.location}活动。`, confidence: 0.8, firstSeenAge: age, lastSeenAge: age, source, tags: ['location'] });
+  if (state.faction) facts.push({ id: worldFactId('faction', state.faction), kind: 'faction', title: state.faction, summary: `角色与${state.faction}存在联系。`, confidence: 0.8, firstSeenAge: age, lastSeenAge: age, source, tags: ['faction'] });
+  for (const npc of state.npcs || []) {
+    facts.push({ id: worldFactId('npc', npc.id || npc.name), kind: 'npc', title: npc.name, summary: npc.memory || npc.description || npc.name, confidence: 0.75, firstSeenAge: npc.firstMetAge ?? age, lastSeenAge: npc.lastSeenAge ?? age, source: npc.source || source, refIds: [npc.id], tags: ['npc', npc.attitude, npc.faction || '', npc.realm || ''].filter(Boolean) });
+    if (npc.faction) facts.push({ id: worldFactId('faction', npc.faction), kind: 'faction', title: npc.faction, summary: `${npc.name}与${npc.faction}有关。`, confidence: 0.65, firstSeenAge: npc.firstMetAge ?? age, lastSeenAge: npc.lastSeenAge ?? age, source: npc.source || source, refIds: [npc.id], tags: ['faction', 'npc-linked'] });
+  }
+  for (const thread of state.pendingThreads || []) {
+    if (thread.realmId) facts.push({ id: worldFactId('realm', thread.realmId), kind: 'realm', title: thread.title, summary: thread.followUpHint || thread.description || thread.title, confidence: 0.7, firstSeenAge: thread.startAge ?? age, lastSeenAge: age, source: thread.sourceEventTitle || source, refIds: [thread.id, thread.realmId], tags: ['realm', thread.category, thread.status] });
+  }
+  for (const realm of getDiscoveredStoryRealms(state)) {
+    facts.push({ id: worldFactId('realm', realm.id), kind: 'realm', title: realm.name, summary: realm.description, confidence: 0.8, firstSeenAge: age, lastSeenAge: age, source, refIds: [realm.id], tags: ['realm', realm.tier, realm.isStoryRealm ? 'story' : 'system'].filter(Boolean) });
+  }
+  return facts;
+}
+
+function refreshWorldFacts(state: CharacterState, source: string): CharacterState {
+  return upsertWorldFacts(state, deriveWorldFactsFromState(state, source));
+}
+
 // ==================== NPC Persistence Lite ====================
 
 function mergeNpc(existing: WorldNpc, incoming: WorldNpc): WorldNpc {
@@ -1729,7 +1791,8 @@ export function upsertNpcs(state: CharacterState, npcs: WorldNpc[]): CharacterSt
     const existing = byId.get(npc.id);
     byId.set(npc.id, existing ? mergeNpc(existing, npc) : npc);
   }
-  return { ...state, npcs: Array.from(byId.values()).slice(-80) };
+  const next = { ...state, npcs: Array.from(byId.values()).slice(-80) };
+  return refreshWorldFacts(next, 'npc-registry');
 }
 
 function combatEnemiesToNpcs(enemies: CombatEnemy[] | undefined, aiOutput: AIEventOutput, state: CharacterState): Partial<WorldNpc>[] {
@@ -2456,6 +2519,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   // 8. 角色主动意图重新生成（每岁重算）
   next.questEntries = buildQuestEntriesFromThreads(next.pendingThreads, next.age);
   next.characterIntents = generateCharacterIntents(next, next.pendingThreads);
+  next = refreshWorldFacts(next, aiOutput.title || 'ai-event');
 
   next = recordEventCausality(next, aiOutput);
 
@@ -2543,6 +2607,7 @@ export function stateToResponse(s: CharacterState) {
     combatSession: s.combatSession || null,
     npcs: s.npcs || [],
     causalGraph: s.causalGraph || { nodes: [], edges: [] },
+    worldFacts: s.worldFacts || [],
     // Task 22 新字段
     heartDemon: s.heartDemon ?? 0,
     // Task 23 新字段
