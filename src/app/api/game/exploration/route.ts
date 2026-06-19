@@ -24,6 +24,7 @@ import {
 } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { appendStateChangeAuditEffect } from '@/lib/xianxia/state-change-log';
 import type { SecretRealm } from '@/lib/xianxia/types';
 
 export const runtime = 'nodejs';
@@ -239,7 +240,7 @@ export async function POST(req: NextRequest) {
         title: aiOutput.title,
         narrative: aiOutput.narrative,
         eventType: 'exploration',
-        effects: JSON.stringify(displayEffects),
+        effects: JSON.stringify(appendStateChangeAuditEffect(displayEffects, result.stateChangeLog)),
       },
     });
 

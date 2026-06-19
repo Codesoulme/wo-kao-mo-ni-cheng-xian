@@ -132,3 +132,27 @@ export function buildStateChangeLog(args: BuildStateChangeLogArgs): StateChangeL
 
   return out.slice(-120);
 }
+
+
+export interface StateChangeAuditEffect {
+  kind: '__audit_state_change_log';
+  hidden: true;
+  version: 1;
+  entries: StateChangeLogEntry[];
+}
+
+export function buildStateChangeAuditEffect(entries: StateChangeLogEntry[] | undefined): StateChangeAuditEffect | null {
+  const safeEntries = (entries || []).slice(-120);
+  if (!safeEntries.length) return null;
+  return {
+    kind: '__audit_state_change_log',
+    hidden: true,
+    version: 1,
+    entries: safeEntries,
+  };
+}
+
+export function appendStateChangeAuditEffect<T>(effects: T[], entries: StateChangeLogEntry[] | undefined): Array<T | StateChangeAuditEffect> {
+  const audit = buildStateChangeAuditEffect(entries);
+  return audit ? [...effects, audit] : effects;
+}

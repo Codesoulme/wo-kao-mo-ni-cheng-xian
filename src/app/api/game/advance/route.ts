@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { executeAIEvent, checkLifespan, applyChanges, stateToResponse, tryBreakthrough, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tryHeartDemonTrial, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { appendStateChangeAuditEffect } from '@/lib/xianxia/state-change-log';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 
 export const runtime = 'nodejs';
