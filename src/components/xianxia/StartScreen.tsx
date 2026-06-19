@@ -143,6 +143,20 @@ export function StartScreen() {
               <><Sparkles className="w-4 h-4 mr-2" />入道开局</>
             )}
           </Button>
+          {latestSave && (
+            <Button
+              onClick={continueLatest}
+              disabled={busy}
+              variant="outline"
+              className="w-full h-10 font-serif-cn tracking-wider"
+            >
+              <RotateCcw className="w-4 h-4 mr-2" />
+              {'\u7eed\u5165\u65e7\u9014'}
+              <span className="ml-2 text-[10px] text-muted-foreground font-normal truncate">
+                {latestSave.name} ? {latestSave.age}{'\u5c81'}
+              </span>
+            </Button>
+          )}
           <div className="text-[10px] text-muted-foreground text-center leading-relaxed">
             灵根随机 · 命运无常 · 天道不佑
           </div>
