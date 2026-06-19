@@ -36,7 +36,9 @@ export function StatusPanel({ character }: StatusPanelProps) {
   ];
   const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
   const topStatuses = visibleStatuses
+    .map((s: any, __idx: number) => ({ ...s, __idx }))
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
+    .sort((a: any, b: any) => b.__idx - a.__idx)
     .slice(0, 4);
 
   return (
