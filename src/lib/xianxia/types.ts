@@ -604,6 +604,16 @@ export interface CombatSession {
   // Task 23: 符箓效果临时状态（本回合减伤、本回合敌人眩晕等）
   talismanDefenseActive?: number;  // 本回合减伤数值
   enemyStunned?: boolean;          // 敌人本回合是否被镇符眩晕
+  tacticalInsights?: {
+    id: string;
+    enemyIdx: number;
+    kind: 'weakness';
+    stacks: number;
+    bonusPct: number;
+    expiresRound: number;
+    source: string;
+    note: string;
+  }[];
 }
 
 // ==================== AI 输出结构 (EngineCommand) ====================

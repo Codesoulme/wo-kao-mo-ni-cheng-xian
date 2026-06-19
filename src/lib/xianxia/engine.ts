@@ -2794,6 +2794,7 @@ export function startCombat(state: CharacterState, trigger: NonNullable<AIEventO
       };
     }
   }
+  session.playerSkills = repairCombatArtsFromState(state, session.playerSkills);
   session.actionPalette = buildCombatActionPalette(state, session);
   return { ...state, combatSession: session };
 }
@@ -2852,7 +2853,8 @@ export function buildCombatActionPalette(state: CharacterState, session: CombatS
   const sealed = hasSealedSpiritStatus(state, session);
   const weapons = weaponLikeItems(state);
   const armors = armorLikeItems(state);
-  const skills = session.playerSkills || buildLearnedCombatArts(state).slice(0, 6);
+  const skills = repairCombatArtsFromState(state, session.playerSkills).slice(0, 8);
+  session.playerSkills = skills;
   const items = session.playerItems || [];
   const basicOptions: CombatActionOption[] = [];
 
@@ -3003,6 +3005,55 @@ function computeDamage(attack: number, defense: number, power: number = 1, varia
   return Math.max(1, Math.floor(dmg));
 }
 
+function isGenericCombatArtName(name?: string): boolean {
+  const text = String(name || '').trim();
+  if (!text) return true;
+  return /行动.*气术|气术式|未名术|^术法$/.test(text);
+}
+
+function repairCombatArtsFromState(state: CharacterState, arts?: CombatSession['playerSkills']): NonNullable<CombatSession['playerSkills']> {
+  const learned = buildLearnedCombatArts(state).slice(0, 8);
+  const firstByItem = new Map<string, typeof learned[number]>();
+  for (const art of learned) if (!firstByItem.has(art.itemId)) firstByItem.set(art.itemId, art);
+  const source = arts?.length ? arts : learned;
+  const repaired = source.map((art, idx) => {
+    const learnedMatch = (art.itemId ? firstByItem.get(art.itemId) : undefined) || learned[idx];
+    if (!learnedMatch) return art;
+    const desc = String(art.description || '');
+    if (!isGenericCombatArtName(art.name) && desc && !/行动.*气术|气术式/.test(desc)) return art;
+    return { ...art, name: learnedMatch.name, description: learnedMatch.description, mpCost: art.mpCost ?? learnedMatch.mpCost, power: art.power || learnedMatch.power, element: art.element || learnedMatch.element, adaptation: art.adaptation ?? learnedMatch.adaptation, sourceType: art.sourceType || learnedMatch.sourceType };
+  });
+  return (repaired.length ? repaired : learned) as NonNullable<CombatSession['playerSkills']>;
+}
+
+function addCombatWeaknessInsight(session: CombatSession, enemyIdx: number, source: string): void {
+  const insights = (session.tacticalInsights || []).filter(x => x.expiresRound >= session.round && x.stacks > 0);
+  const existing = insights.find(x => x.kind === 'weakness' && x.enemyIdx === enemyIdx);
+  if (existing) {
+    existing.stacks = Math.min(3, existing.stacks + 1);
+    existing.expiresRound = Math.max(existing.expiresRound, session.round + 3);
+    existing.note = '已记下对手气机间一处破绽，下次攻伐更容易命中要害。';
+  } else {
+    insights.push({ id: 'weak_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6), enemyIdx, kind: 'weakness', stacks: 1, bonusPct: 0.35, expiresRound: session.round + 3, source, note: '已记下对手气机间一处破绽，下次攻伐更容易命中要害。' });
+  }
+  session.tacticalInsights = insights;
+}
+
+function consumeCombatWeaknessInsight(session: CombatSession, enemyIdx: number): { bonusPct: number; note: string } | null {
+  const insights = (session.tacticalInsights || []).filter(x => x.expiresRound >= session.round && x.stacks > 0);
+  const insight = insights.find(x => x.kind === 'weakness' && x.enemyIdx === enemyIdx);
+  if (!insight) { session.tacticalInsights = insights; return null; }
+  insight.stacks -= 1;
+  const bonusPct = Math.max(0.15, Math.min(0.75, insight.bonusPct || 0.35));
+  const note = insight.note || '先前窥见的破绽在此刻应验。';
+  session.tacticalInsights = insights.filter(x => x.stacks > 0 && x.expiresRound >= session.round);
+  return { bonusPct, note };
+}
+
+function hasActiveWeaknessInsight(session: CombatSession, enemyIdx: number): boolean {
+  return (session.tacticalInsights || []).some(x => x.kind === 'weakness' && x.enemyIdx === enemyIdx && x.stacks > 0 && x.expiresRound >= session.round);
+}
+
 // 执行一回合战斗
 // action: 'attack' | 'skill' | 'item' | 'defend' | 'flee' | 'scripture'
 // payload: skillIdx | itemId 等
@@ -3036,6 +3087,7 @@ export function executeCombatRound(
       endStatus: 'victory',
     };
   }
+  session.playerSkills = repairCombatArtsFromState(state, session.playerSkills);
   session.actionPalette = buildCombatActionPalette(state, session);
   const selectedOption = optionById(session.actionPalette, payload?.optionId);
   const validation = validateCombatActionOption(state, session, selectedOption);
@@ -3062,6 +3114,12 @@ export function executeCombatRound(
     playerActionType = 'attack';
     playerActionDesc = '挥出攻招';
     playerDamageDealt = computeDamage(session.playerAttack, enemy.defense);
+    const weakness = consumeCombatWeaknessInsight(session, session.currentEnemyIdx);
+    if (weakness) {
+      const bonus = Math.max(1, Math.floor(playerDamageDealt * weakness.bonusPct));
+      playerDamageDealt += bonus;
+      narrative += '先前窥见的破绽在此刻应验，';
+    }
     enemyHp -= playerDamageDealt;
     narrative += `你出招攻向${enemy.name}，造成 ${playerDamageDealt} 点伤害。`;
   } else if (action === 'skill' && payload?.skillIdx != null) {
@@ -3085,6 +3143,12 @@ export function executeCombatRound(
     playerMp -= skill.mpCost;
     playerActionDesc = `施展${skill.name}`;
     playerDamageDealt = computeDamage(session.playerAttack, enemy.defense, skill.power, 0.3);
+    const weakness = consumeCombatWeaknessInsight(session, session.currentEnemyIdx);
+    if (weakness) {
+      const bonus = Math.max(1, Math.floor(playerDamageDealt * weakness.bonusPct));
+      playerDamageDealt += bonus;
+      narrative += '你循着先前记下的破绽催动术法，';
+    }
     enemyHp -= playerDamageDealt;
     narrative += `你催动${skill.name}，灵力化为攻伐之力，造成 ${playerDamageDealt} 点伤害。`;
   } else if (action === 'other') {
@@ -3095,8 +3159,9 @@ export function executeCombatRound(
     if (option?.id === 'other-break-binding') {
       playerActionDesc = option.name;
       narrative += `你以${option.name}应对战局，稳住当前险势。`;
-    } else if (option?.id === 'other-observe-opening') {
+    } else if (option?.id === 'other-observe-opening' || option?.id === 'defense-focus') {
       playerActionDesc = option.name;
+      addCombatWeaknessInsight(session, session.currentEnemyIdx, option.id);
       narrative += `你暂缓强攻，凝神观察${enemy.name}的气机流转，记下一处可乘破绽。`;
     } else if (option?.id === 'other-flee') {
       playerActionType = 'flee';
@@ -3411,6 +3476,10 @@ function maxFactBoundedPlayerDamage(
     playerActionDesc = selectedOption?.name || '出手试探';
     maxDamage = Math.floor(session.playerAttack * 0.75);
   }
+  if ((action === 'attack' || action === 'skill') && hasActiveWeaknessInsight(session, session.currentEnemyIdx)) {
+    maxDamage = Math.floor(maxDamage * 1.45);
+    audit.push('先前观得破绽，本次攻伐上限已按战术因果放宽。');
+  }
   if (mpCost > session.playerMp) {
     audit.push('AI裁决消耗法力超过当前余量，引擎按当前法力上限截断。');
     mpCost = session.playerMp;
@@ -3429,6 +3498,7 @@ export function executeCombatRoundWithProposal(
   const session: CombatSession = { ...state.combatSession, log: [...(state.combatSession.log || [])] };
   const enemy = session.enemies[session.currentEnemyIdx];
   if (!enemy) return executeCombatRound(state, action, payload);
+  session.playerSkills = repairCombatArtsFromState(nextState, session.playerSkills);
   session.actionPalette = buildCombatActionPalette(nextState, session);
   const selectedOption = optionById(session.actionPalette, payload?.optionId);
   const validation = validateCombatActionOption(nextState, session, selectedOption);
@@ -3442,7 +3512,22 @@ export function executeCombatRoundWithProposal(
   let playerMp = Math.max(0, session.playerMp - bound.mpCost);
   let enemyHp = enemy.hp;
   const playerActionType = combatPlayerActionTypeFromAction(action);
-  const playerDamageDealt = clampCombatNumber(proposal.playerDamage, 0, bound.maxDamage);
+  const observeWeakness = action === 'other' && (selectedOption?.id === 'other-observe-opening' || selectedOption?.id === 'defense-focus' || (selectedOption?.tags || []).includes('observe'));
+  if (observeWeakness) {
+    addCombatWeaknessInsight(session, session.currentEnemyIdx, selectedOption?.id || 'observe');
+    audit.push('本回合应变已转化为可持续的破绽记忆，后续攻伐可消耗。');
+  }
+  let playerDamageDealt = clampCombatNumber(proposal.playerDamage, 0, bound.maxDamage);
+  let weaknessNote = '';
+  if ((action === 'attack' || action === 'skill') && playerDamageDealt > 0) {
+    const weakness = consumeCombatWeaknessInsight(session, session.currentEnemyIdx);
+    if (weakness) {
+      const bonus = Math.max(1, Math.floor(playerDamageDealt * weakness.bonusPct));
+      playerDamageDealt = Math.min(bound.maxDamage, playerDamageDealt + bonus);
+      weaknessNote = '先前窥见的破绽在此刻应验，攻势更深一层。';
+      audit.push('已消耗一层破绽记忆，本次攻伐获得事实加成。');
+    }
+  }
   if (Number(proposal.playerDamage || 0) > bound.maxDamage) audit.push('AI裁决伤害 ' + proposal.playerDamage + ' 超过事实上限 ' + bound.maxDamage + '，已截断。');
   let playerHeal = 0;
   if (action === 'item' || action === 'talisman') {
@@ -3500,7 +3585,8 @@ export function executeCombatRoundWithProposal(
     if (nextIdx >= 0) { currentEnemyIdx = nextIdx; audit.push('当前敌手倒下，引擎切换到 ' + updatedEnemies[nextIdx].name + '。'); }
     else endStatus = 'victory';
   }
-  const narrative = String(proposal.narrative || '').trim().slice(0, 320) || (bound.playerActionDesc + '，与' + enemy.name + '交错一合。');
+  const narrativeBase = String(proposal.narrative || '').trim().slice(0, 320) || (bound.playerActionDesc + '，与' + enemy.name + '交错一合。');
+  const narrative = weaknessNote ? (weaknessNote + narrativeBase).slice(0, 380) : narrativeBase;
   const round: CombatRound = { round: session.round, playerAction: String(proposal.playerActionLabel || bound.playerActionDesc).slice(0, 40), playerActionType, playerDamage: playerDamageDealt, playerHeal, enemyAction: proposal.enemyAction ? String(proposal.enemyAction).slice(0, 40) : undefined, enemyActionType: proposal.enemyActionType ? String(proposal.enemyActionType).slice(0, 24) : undefined, enemyDamage: enemyDamageDealt, narrative, playerHpAfter: playerHp, enemyHpAfter: enemyHp, playerMpAfter: playerMp, aiAudit: audit.length ? audit.slice(0, 8) : ['AI裁决已通过引擎硬事实审计。'] };
   const newSession: CombatSession = { ...session, enemies: updatedEnemies, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp };
   if (endStatus === 'defeat') return { state: { ...nextState, combatSession: newSession, hp: 0, mp: playerMp, alive: false, causeOfDeath: '战斗中为' + enemy.name + '所败' }, round, ended: true, endStatus };

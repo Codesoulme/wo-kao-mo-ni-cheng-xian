@@ -257,9 +257,22 @@ export function CombatModal() {
     return !(item.effects || []).some((e: any) => talismanTargets.has(getEffectTarget(e)));
   });
 
+  const isGenericSkillName = (name?: string) => /行动.*气术|气术式|未名术|^术法$/.test(String(name || '').trim());
+  const sourceItems = [...((character as any)?.equipped || []), ...((character as any)?.inventory || [])];
+  const repairSkillForDisplay = (sk: any, idx: number) => {
+    const item = sourceItems.find((it: any) => it.id && it.id === sk?.itemId);
+    const spell = item?.technique?.spell;
+    const ability = item?.technique?.artifactAbilities?.[idx] || item?.technique?.artifactAbilities?.[0];
+    const replacement = spell || ability;
+    if (!replacement || (!isGenericSkillName(sk?.name) && !/行动.*气术|气术式/.test(String(sk?.description || '')))) return sk;
+    return { ...sk, name: replacement.name || item?.name || sk?.name, description: replacement.description || item?.description || sk?.description };
+  };
+
   const makeFallbackCombatPalette = () => {
     if (!session) return null;
-    const skillOptions = (session.playerSkills || []).slice(0, 8).map((sk: any, idx: number) => ({
+    const skillOptions = (session.playerSkills || []).slice(0, 8).map((rawSkill: any, idx: number) => {
+      const sk = repairSkillForDisplay(rawSkill, idx);
+      return {
       id: 'skill-' + idx,
       name: sk.name || '\u672a\u540d\u672f',
       description: sk.description || '\u8c03\u52a8\u5df2\u4f1a\u672f\u6cd5\u5e94\u6218\u3002',
@@ -270,7 +283,8 @@ export function CombatModal() {
       skillIdx: idx,
       itemId: sk.itemId,
       mpCost: sk.mpCost || 0,
-    }));
+    };
+    });
     const itemOptions = (session.playerItems || []).map((it: any) => ({
       id: 'item-' + it.itemId,
       name: it.name || '\u968f\u8eab\u7269',
@@ -307,11 +321,23 @@ export function CombatModal() {
     const storedGroup = storedPalette?.[key];
     const fallbackGroup = fallbackPalette?.[key];
     const storedOptions = storedGroup?.options || [];
-    const hasUsableStoredOption = storedOptions.some((option: any) => option?.enabled);
-    if (!storedGroup || !storedOptions.length || !hasUsableStoredOption) {
+    const repairedStoredOptions = key === 'spell'
+      ? storedOptions.map((option: any) => {
+          const idx = typeof option?.skillIdx === 'number'
+            ? option.skillIdx
+            : typeof option?.id === 'string' && option.id.startsWith('skill-')
+              ? Number(option.id.slice('skill-'.length))
+              : -1;
+          const skill = idx >= 0 ? repairSkillForDisplay(session?.playerSkills?.[idx], idx) : null;
+          if (!skill || (!isGenericSkillName(option?.name) && !/行动.*气术|气术式/.test(String(option?.description || '')))) return option;
+          return { ...option, name: skill.name || option.name, description: skill.description || option.description };
+        })
+      : storedOptions;
+    const hasUsableStoredOption = repairedStoredOptions.some((option: any) => option?.enabled);
+    if (!storedGroup || !repairedStoredOptions.length || !hasUsableStoredOption) {
       return fallbackGroup || storedGroup || { enabled: false, label: key, options: [] };
     }
-    return storedGroup;
+    return key === 'spell' ? { ...storedGroup, options: repairedStoredOptions } : storedGroup;
   };
   const palette: any = {
     ...(fallbackPalette || {}),
@@ -554,22 +580,22 @@ export function CombatModal() {
           {/* 战斗日志（session 可能为 null——endResult 显示场景跳过） */}
           {session && (
           <div className="flex-1 min-h-0 flex flex-col">
-            <div className="shrink-0 text-[10px] text-muted-foreground mb-1 px-1 font-serif-cn">
+            <div className="shrink-0 text-xs text-muted-foreground mb-1 px-1 font-serif-cn">
               战斗记录
             </div>
-            <div ref={logScrollRef} className="flex-1 min-h-[96px] rounded-lg border border-border/60 bg-card/40 p-2 overflow-y-auto xianxia-scroll space-y-1.5 overscroll-contain">
+            <div ref={logScrollRef} className="flex-1 min-h-[112px] rounded-lg border border-border/60 bg-card/40 p-2.5 overflow-y-auto xianxia-scroll space-y-2 overscroll-contain">
               {recentLog.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground text-center py-3 font-serif-cn">
                   战端初启，尚未交锋...
                 </p>
               ) : (
                 recentLog.map((r: any, i: number) => (
-                  <div key={i} className="rounded-md border border-border/50 bg-background/35 px-2 py-1.5 space-y-1">
-                    <div className="text-[9px] text-muted-foreground font-serif-cn">
+                  <div key={i} className="rounded-md border border-border/50 bg-background/35 px-2.5 py-2 space-y-1.5">
+                    <div className="text-[11px] text-muted-foreground font-serif-cn">
                       第{r.round}回合 · {r.playerAction || '交锋'}
                     </div>
                     {r.narrative && (
-                      <p className="text-[11px] leading-relaxed text-foreground/85 font-serif-cn xianxia-prose">
+                      <p className="text-sm leading-6 text-foreground/90 font-serif-cn xianxia-prose">
                         {r.narrative}
                       </p>
                     )}

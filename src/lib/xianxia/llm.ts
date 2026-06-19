@@ -1445,6 +1445,10 @@ export async function generateCombatRoundProposal(args: {
   const skill = option?.skillIdx != null ? sessionBefore.playerSkills?.[option.skillIdx] : payload?.skillIdx != null ? sessionBefore.playerSkills?.[payload.skillIdx] : undefined;
   const item = payload?.itemId ? (sessionBefore.playerItems || []).find(it => it.itemId === payload.itemId) : undefined;
   const recentLog = (sessionBefore.log || []).slice(-3).map(r => `第${r.round}合：${r.narrative}`).join('\n') || '尚无旧回合。';
+  const tacticMemory = (sessionBefore.tacticalInsights || [])
+    .filter((x: any) => x.enemyIdx === sessionBefore.currentEnemyIdx && x.stacks > 0 && x.expiresRound >= sessionBefore.round)
+    .map((x: any) => `${x.kind === 'weakness' ? '破绽' : x.kind}x${x.stacks}：${x.note || ''}（至第${x.expiresRound}合）`)
+    .join('\n') || '暂无战术记忆。';
 
   const system = `${IDENTITY_PROMPT}
 
@@ -1472,6 +1476,8 @@ ${sessionBefore.contextNarrative || ''}
 动作选项：${option ? `${option.name}：${option.description}；意图：${option.intent || '无'}` : '未指定动作选项'}
 术法：${skill ? `${skill.name}，法力消耗${skill.mpCost}，威力${skill.power}。${skill.description}` : '无'}
 物品：${item ? `${item.name}：${item.effect}` : '无'}
+战术记忆：
+${tacticMemory}
 
 近三回合：
 ${recentLog}
