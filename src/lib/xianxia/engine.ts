@@ -43,6 +43,13 @@ import {
   ExplorationRecord,
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
+import {
+  registerItem,
+  registerMany,
+  registerStatus,
+  registerThread,
+  ValidationTrace,
+} from './content-registry';
 
 // ==================== 角色状态序列化 ====================
 
@@ -2029,6 +2036,8 @@ export interface EngineExecutionResult {
   state: CharacterState;
   appliedChanges: AttributeChange[];
   rejectedChanges: AttributeChange[];
+  contentRegistryTrace: ValidationTrace[];
+  contentRegistryWarnings: string[];
   breakthroughHappened: boolean;
   newRealm?: Realm;
   breakthroughMajor?: boolean;
@@ -2041,6 +2050,8 @@ export interface EngineExecutionResult {
 export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): EngineExecutionResult {
   let next = { ...state };
   const rejected: AttributeChange[] = [];
+  const contentRegistryTrace: ValidationTrace[] = [];
+  const contentRegistryWarnings: string[] = [];
 
   // 1. 应用属性变更
   const before = next;
@@ -2050,24 +2061,30 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     if (!ATTRIBUTE_BOUNDS[ch.attribute]) rejected.push(ch);
   }
 
-  // 2. 添加新状态词条
-  next = addStatuses(next, aiOutput.newStatuses || []);
+  // 2. 新状态先经过 ContentRegistry Lite 统一校验/补全，再进入状态系统
+  {
+    const registered = registerMany(aiOutput.newStatuses || [], registerStatus, {
+      source: aiOutput.title,
+      age: next.age,
+      existingIds: next.activeStatuses.map(s => s.id),
+    });
+    contentRegistryTrace.push(...registered.trace);
+    contentRegistryWarnings.push(...registered.warnings);
+    next = addStatuses(next, registered.accepted);
+  }
 
-  // 3. 添加新物品
-  // Task 22: 修复 AI 生成重复 ID 的问题——确保新物品 ID 与现有 inventory/equipped 不冲突
+  // 3. 新物品先经过 ContentRegistry Lite 统一校验/补全，再进入背包系统
   {
     const rawNew = aiOutput.newItems || [];
     if (rawNew.length) {
-      const existing = new Set<string>();
-      for (const it of next.inventory) existing.add(it.id);
-      for (const it of (next.equipped || [])) existing.add(it.id);
-      const deduped = rawNew.map(it => {
-        let id = it.id || `i_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        while (existing.has(id)) id = `${id}_${Math.random().toString(36).slice(2, 6)}`;
-        existing.add(id);
-        return { ...it, id };
+      const registered = registerMany(rawNew, registerItem, {
+        source: aiOutput.title,
+        age: next.age,
+        existingIds: [...next.inventory, ...(next.equipped || [])].map(it => it.id),
       });
-      next = addItems(next, deduped);
+      contentRegistryTrace.push(...registered.trace);
+      contentRegistryWarnings.push(...registered.warnings);
+      next = addItems(next, registered.accepted);
     }
   }
 
@@ -2079,13 +2096,19 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 
   // 3.6 AI 联动：直接放入已装备的物品（AI 创造性装备：项链·储物戒指串等）
   if (aiOutput.newEquippedItems && aiOutput.newEquippedItems.length) {
-    const ensured = ensureUniqueIds([], aiOutput.newEquippedItems);
-    const newEqItems = ensured.items;
+    const registered = registerMany(aiOutput.newEquippedItems, registerItem, {
+      source: aiOutput.title,
+      age: next.age,
+      existingIds: [...next.inventory, ...(next.equipped || [])].map(it => it.id),
+    });
+    contentRegistryTrace.push(...registered.trace);
+    contentRegistryWarnings.push(...registered.warnings);
+    const newEqItems = registered.accepted;
     next = {
       ...next,
       equipped: [...(next.equipped || []), ...newEqItems],
     };
-    // 应用 add 效果
+    // 应用装备 add 效果
     for (const it of newEqItems) next = applyItemEffects(next, it, 1);
     next = recalcCultivationMultiplier(next);
   }
@@ -2161,7 +2184,14 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   // ===== Task 20: 应用未决线索 / 战斗触发 =====
   // 7.1 添加新线索
   if (aiOutput.newThreads && aiOutput.newThreads.length) {
-    next = addThreads(next, aiOutput.newThreads);
+    const registered = registerMany(aiOutput.newThreads, registerThread, {
+      source: aiOutput.title,
+      age: next.age,
+      existingIds: (next.pendingThreads || []).map(t => t.id),
+    });
+    contentRegistryTrace.push(...registered.trace);
+    contentRegistryWarnings.push(...registered.warnings);
+    next = addThreads(next, registered.accepted);
   }
   // 7.2 推进现有线索进度
   if (aiOutput.advanceThreads && aiOutput.advanceThreads.length) {
@@ -2220,6 +2250,8 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     state: next,
     appliedChanges,
     rejectedChanges: rejected,
+    contentRegistryTrace,
+    contentRegistryWarnings,
     breakthroughHappened,
     newRealm,
     breakthroughMajor,
