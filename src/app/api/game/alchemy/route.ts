@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, alchemy, stateToResponse } from '@/lib/xianxia/engine';
+import { dbToState, alchemy, recordActionCausality, stateToResponse } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 
@@ -41,7 +41,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });
     }
 
-    const finalState = result.state;
+    const finalState = recordActionCausality(result.state, {
+      actionId: `alchemy_${state.age}_${materialIds.join('_')}`,
+      actionType: 'alchemy',
+      title: result.success ? `炼成${result.product?.name || '丹药'}` : '炼丹焦炉',
+      summary: result.narrative,
+      tags: ['alchemy', result.success ? 'success' : 'failed'],
+      newItems: result.product ? [result.product] : [],
+      consumedItems: result.consumedMaterials,
+    });
     const stateChangeLog = buildStateChangeLog({
       before: stateBeforeAlchemy,
       after: finalState,

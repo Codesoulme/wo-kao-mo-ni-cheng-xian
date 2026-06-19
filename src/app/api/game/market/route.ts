@@ -8,6 +8,7 @@ import {
   addItems,
   dbToState,
   normalizeCultivationState,
+  recordActionCausality,
   refreshWorldFacts,
   removeItemsByIds,
   stateToResponse,
@@ -251,6 +252,14 @@ export async function POST(req: NextRequest) {
       state = normalizeCultivationState(state);
       state = refreshWorldFacts(state, 'market-buy');
       newItems = [registered.content];
+      state = recordActionCausality(state, {
+        actionId: `market_buy_${state.age}_${registered.content.id}`,
+        actionType: 'trade',
+        title: `坊市购得${registered.content.name}`,
+        summary: `以 ${price} 枚灵石购得${registered.content.name}`,
+        tags: ['market', 'buy'],
+        newItems,
+      });
       appliedChanges.push(
         { attribute: 'spiritStones', delta: -price, reason: `购入${registered.content.name}` },
         { attribute: 'inventory', delta: 1, reason: `购入${registered.content.name}` } as any,
@@ -288,6 +297,14 @@ export async function POST(req: NextRequest) {
       state = normalizeCultivationState(state);
       state = refreshWorldFacts(state, 'market-sell');
       removedItemIds = [itemId];
+      state = recordActionCausality(state, {
+        actionId: `market_sell_${state.age}_${item.id}`,
+        actionType: 'trade',
+        title: `坊市售出${item.name}`,
+        summary: `售出${item.name}，换得 ${sellPrice} 枚灵石`,
+        tags: ['market', 'sell'],
+        removedItems: [item],
+      });
       appliedChanges.push(
         ...(removed.appliedChanges || []),
         { attribute: 'inventory', delta: -1, reason: `售出${item.name}` } as any,

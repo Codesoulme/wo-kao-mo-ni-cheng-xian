@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, equipItem, unequipItem, consumeItem, stateToResponse, buildStateContext, normalizeCultivationState } from '@/lib/xianxia/engine';
+import { dbToState, equipItem, unequipItem, consumeItem, recordActionCausality, stateToResponse, buildStateContext, normalizeCultivationState } from '@/lib/xianxia/engine';
 import { generateItemActionNarrative } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
@@ -142,6 +142,17 @@ export async function POST(req: NextRequest) {
     }
 
     state = normalizeCultivationState(state);
+    state = recordActionCausality(state, {
+      actionId: `item_${action}_${state.age}_${appliedItem?.id || itemId}`,
+      actionType: 'item',
+      title: `${actionVerb(action)}${appliedItem?.name || '物品'}`,
+      summary: narrative || message,
+      tags: ['item', action],
+      usedItems: action === 'use' && appliedItem ? [appliedItem] : [],
+      consumedItems: action === 'use' && appliedItem ? [appliedItem] : [],
+      equippedItems: action === 'equip' && appliedItem ? [appliedItem] : [],
+      unequippedItems: action === 'unequip' && appliedItem ? [appliedItem] : [],
+    });
 
     const stateChangeLog = buildStateChangeLog({
       before: stateBeforeAction,
