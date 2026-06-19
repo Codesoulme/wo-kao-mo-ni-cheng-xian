@@ -5,7 +5,7 @@ import { CharacterState } from '@/lib/xianxia/store';
 import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
-import { Heart, Sparkles, MapPin, ChevronRight, ChevronDown, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle, Coins, Sprout } from 'lucide-react';
+import { Heart, Sparkles, MapPin, ChevronRight, ChevronDown, Sword, Shield, Zap, Clover, Brain, Coins, Sprout } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface StatusPanelProps {
@@ -51,26 +51,32 @@ export function StatusPanel({ character }: StatusPanelProps) {
         <div className="relative px-3 py-2.5 bg-gradient-to-r from-secondary/40 to-transparent">
           <div className="flex items-start gap-3">
             {/* 头像：只有这里进入详情，避免点顶部空白误触 */}
-            <button
-              type="button"
-              aria-label="查看角色详情"
-              onClick={() => setDetailOpen(true)}
-              className="shrink-0 relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 transition-transform active:scale-95"
-            >
-              <RealmOrb
-                realmColor={character.realmColor}
-                realmName={character.realmName}
-                realmLevel={character.realmLevel}
-                realmMaxLevel={character.realmMaxLevel}
-                cultivationExp={character.cultivationExp}
-                expToBreak={character.expToBreak}
-                size="sm"
-                showLabel={false}
-              />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center shadow-sm">
-                <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
-              </div>
-            </button>
+            <div className="shrink-0 flex flex-col items-center gap-1">
+              <button
+                type="button"
+                aria-label="查看角色详情"
+                onClick={() => setDetailOpen(true)}
+                className="relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 transition-transform active:scale-95"
+              >
+                <RealmOrb
+                  realmColor={character.realmColor}
+                  realmName={character.realmName}
+                  realmLevel={character.realmLevel}
+                  realmMaxLevel={character.realmMaxLevel}
+                  cultivationExp={character.cultivationExp}
+                  expToBreak={character.expToBreak}
+                  size="sm"
+                  showLabel={false}
+                />
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center shadow-sm">
+                  <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
+                </div>
+              </button>
+              <span className="inline-flex items-center justify-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-600 tabular-nums max-w-[52px]">
+                <Coins className="w-2.5 h-2.5 shrink-0" />
+                <span className="truncate">{character.spiritStones}</span>
+              </span>
+            </div>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
@@ -97,43 +103,40 @@ export function StatusPanel({ character }: StatusPanelProps) {
                       <MapPin className="w-2.5 h-2.5 shrink-0" />
                       <span className="truncate">{character.location}</span>
                     </span>
-                    <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 tabular-nums shrink-0">
-                      <Coins className="w-2.5 h-2.5" />
-                      {character.spiritStones}
-                    </span>
                   </div>
                 </div>
               </div>
 
               {/* 境界与修为同区展示 */}
               <div className="mt-2 rounded-lg border border-border/50 bg-background/40 px-2 py-1.5">
-                <div className="flex items-center justify-between gap-2 text-[10px]">
+                <div className="flex items-center gap-2 text-[10px]">
                   <span
                     style={{ color: character.realmColor }}
-                    className="font-semibold font-serif-cn truncate"
+                    className="font-semibold font-serif-cn truncate max-w-[118px]"
                   >
                     {character.realmName}{character.realmMaxLevel > 0 ? ` ${character.realmLevel + 1}层` : ''}
                   </span>
-                  <span className="text-muted-foreground tabular-nums shrink-0">
+                  <div className="flex-1 h-1.5 bg-muted/60 rounded-full overflow-hidden min-w-[56px]">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${expPct}%`,
+                        background: `linear-gradient(to right, ${character.realmColor}99, ${character.realmColor})`,
+                        boxShadow: `0 0 5px ${character.realmColor}66`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-muted-foreground tabular-nums shrink-0 text-[9px]">
                     {character.cultivationExp}/{character.expToBreak}
                   </span>
-                </div>
-                <div className="mt-1 h-1.5 bg-muted/60 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${expPct}%`,
-                      background: `linear-gradient(to right, ${character.realmColor}99, ${character.realmColor})`,
-                      boxShadow: `0 0 5px ${character.realmColor}66`,
-                    }}
-                  />
                 </div>
               </div>
 
 
               {topStatuses.length > 0 && (
-                <div className="mt-1.5 grid grid-cols-3 gap-1 min-w-0 overflow-hidden">
-                  {topStatuses.map((s: any, idx: number) => {
+                <div className="mt-1.5 flex items-center gap-1 min-w-0 overflow-hidden">
+                  <div className="grid grid-cols-3 gap-1 min-w-0 flex-1 overflow-hidden">
+                    {topStatuses.map((s: any, idx: number) => {
                     const negative = s.category === 'debuff' || /伤|毒|虚|痛|劫|魔|损|衰/.test(s.name);
                     const color = negative ? '#c8453c' : '#2f8f5b';
                     return (
@@ -145,9 +148,8 @@ export function StatusPanel({ character }: StatusPanelProps) {
                             className="inline-flex items-center justify-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm cursor-pointer hover:scale-[1.02] transition-transform min-w-0 max-w-full"
                             style={{ borderColor: `${color}40`, background: `${color}10`, color }}
                           >
-                            {negative ? <AlertTriangle className="w-2.5 h-2.5" /> : <Leaf className="w-2.5 h-2.5" />}
                             <span className="truncate">{s.name}</span>
-                            {s.duration && s.duration !== -1 && <span className="opacity-70">{s.duration}岁</span>}
+                            {s.duration && s.duration !== -1 && <span className="opacity-70 shrink-0">{s.duration}岁</span>}
                           </span>
                         </PopoverTrigger>
                         <PopoverContent
@@ -196,6 +198,12 @@ export function StatusPanel({ character }: StatusPanelProps) {
                       </Popover>
                     );
                   })}
+                  </div>
+                  {visibleStatuses.length > topStatuses.length && (
+                    <span className="shrink-0 rounded-full bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground tabular-nums">
+                      +{visibleStatuses.length - topStatuses.length}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -205,7 +213,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 className="mt-1.5 w-full inline-flex items-center justify-center gap-1 rounded-lg border border-border/50 bg-background/45 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/60 transition-colors"
                 aria-expanded={expandedVitals}
               >
-                {expandedVitals ? '收起属性与气血' : '展开属性与气血'}
+                {expandedVitals ? '收起' : '展开'}
                 <ChevronDown className={`w-3 h-3 transition-transform ${expandedVitals ? 'rotate-180' : ''}`} />
               </button>
 
