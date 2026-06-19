@@ -275,3 +275,36 @@
 - 代码变更涉及玩法、系统、AI schema、UI 规则时，应同步更新本文档。
 - 文档应描述“玩家体验 + 系统规则 + AI 边界”，不要只写代码实现。
 - 基准版不删除，作为升级对照。
+
+## 11. 架构进展记录（2026-06-19）
+
+本轮升级把项目从“可玩的 AI 原型”推进到“可注册、可追踪、可审计的长期世界模拟原型”。当前已经落地的 Lite 架构层包括：
+
+- ContentRegistry Lite：AI 生成的物品、状态、线索、NPC、事件等内容先注册、再进入世界。
+- NPC Persistence Lite：结构化 NPC 能进入角色状态，拍卖竞拍者、战斗敌人和剧情人物可以持续存在。
+- CausalGraph Lite：事件、物品、状态、NPC、秘境、战斗、选择、灵宠之间的来源关系进入因果图。
+- EffectResolver / ERPE Lite：属性变化统一解析，记录应用、拒绝、边界裁剪和警告。
+- QuestEntry Lite：由 pendingThreads 派生任务/线索索引，供 AI 和调度器参考。
+- AI Boundary Validator Lite：对越界引用、过大数值、未承接高优先级线索等情况生成 warning/audit。
+- StateChangeLog Lite：主要行动都会生成隐藏状态变更审计。
+- WorldFacts Lite：地点、NPC、势力、秘境等长期事实保守持久化。
+- Event Scheduler Lite：根据未决线索、期限、意图和状态生成下一次 AI 事件的调度提示。
+
+### 11.1 Route Causal Trace 覆盖矩阵
+
+| Route | 追踪对象 | 状态 |
+| --- | --- | --- |
+| /api/game/advance | 年度 AI 事件、物品、状态、NPC、线索、战斗 | 已接入 |
+| /api/game/auction | 拍卖入场、竞拍者、拍品、钥匙线索 | 已接入 |
+| /api/game/alchemy | 炼丹材料、丹药产物 | 已接入 |
+| /api/game/item | 使用、装备、卸下 | 已接入 |
+| /api/game/market | 买入、卖出、灵石交易 | 已接入 |
+| /api/game/formation | 阵盘、阵法状态 | 已接入 |
+| /api/game/pet | 召唤、喂养、放归 | 已接入 |
+| /api/game/combat/action | 战斗回合行动 | 已接入 |
+| /api/game/combat/end | 战斗胜负、掉落、线索 | 已接入 |
+| /api/game/choose | 玩家选择 | 已接入 |
+| /api/game/interfere | 玩家干扰 | 已接入 |
+| /api/game/exploration | 秘境、探索收益、后续线索 | 已接入 |
+
+这些 trace 默认不直接显示给玩家；它们服务于长期连续性、AI 上下文、审计和后续沉浸式 UI 展示。

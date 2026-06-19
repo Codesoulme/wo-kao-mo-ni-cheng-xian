@@ -542,3 +542,31 @@ model StateChangeLog {
 - 史册阅读更舒服。
 - 选择按钮固定在底部。
 - 战斗/拍卖/秘境适合手机屏幕。
+
+## 15. 第一轮 Lite 补强完成记录（2026-06-19）
+
+原差距表中的第一轮系统骨架已经完成 Lite 实现。当前项目不再只是“玩法数量不够”，而是进入“系统层已搭好、需要深化模拟和展示”的阶段。
+
+已完成 Lite 项：
+
+- ContentRegistry Lite
+- NPC 持久化 Lite
+- CausalGraph Lite
+- EffectResolver / ERPE Lite
+- QuestEntry Lite
+- AI Boundary Validator Lite
+- StateChangeLog Lite 与隐藏审计效果
+- WorldFacts Lite
+- Event Scheduler Lite
+- 拍卖会系统 Lite
+- AI 连续性上下文深化
+- 主要 route 的因果追踪：炼丹、物品、市场、阵法、灵宠、战斗、选择、干扰、秘境探索、拍卖、年度事件。
+
+仍未完成的深化方向：
+
+1. 世界模拟深化：宗门、势力、地点经济、秘境生态、NPC 自主行动。
+2. 拍卖会后果：会后劫杀、竞拍仇怨、竞拍 NPC 长期回响。
+3. 因果图查询与展示：任务/线索 UI、物品来源追溯、NPC 因缘页、开发审计查看器。
+4. AI 事实一致性裁判：死亡 NPC、已消耗物品、已失效线索、地点/势力事实冲突检测。
+5. 系统化回归测试：AI JSON、route smoke、因果图节点/边增长、隐藏审计、UTF-8 与沉浸文案检查。
+6. 移动端任务/线索阅读体验：默认折叠、最近优先、沉浸式“心之所向”。
