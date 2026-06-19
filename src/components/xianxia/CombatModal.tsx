@@ -66,7 +66,8 @@ export function CombatModal() {
   }, [session?.id, session?.log?.length, battleStarted, endResult?.status]);
 
   const isOngoing = !!session && session.status === 'ongoing';
-  const shouldRender = !!character && (isOngoing || !!endResult);
+  const hasCombatTarget = !!session?.enemies?.length && !!session.enemies[session.currentEnemyIdx ?? 0];
+  const shouldRender = !!character && ((isOngoing && hasCombatTarget) || !!endResult);
   // 显示条件：战斗进行中 OR 有待展示的 endResult
   // （endResult 在 setCharacter 清掉 combatSession 后才展示，所以即使 session=null 也要渲染）
 
@@ -233,6 +234,7 @@ export function CombatModal() {
 
 
   // 战斗日志：最近 5 条，最新在底部
+
   const recentLog: any[] = session ? (session.log || []).slice(-5) : [];
 
   // 玩家可用法术
@@ -285,6 +287,8 @@ export function CombatModal() {
     }, 650);
     return () => clearTimeout(timer);
   }, [autoBattle, busy, isOngoing, battleStarted, endResult, halfHpOrLower, session?.round]);
+
+  if (!shouldRender) return null;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
