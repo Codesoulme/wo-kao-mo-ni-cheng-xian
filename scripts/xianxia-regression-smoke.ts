@@ -1,6 +1,7 @@
-﻿import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
+﻿import { readFileSync } from 'fs';
+import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, getSameYearThreads, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
 function assert(condition: unknown, message: string): void {
@@ -586,6 +587,40 @@ function smokeHiddenAudit(): void {
   log('hidden-audit', { passed: true, effects: effects.length, narrativeAudit: Boolean(audit), feedback: feedback.length });
 }
 
+function smokeSameYearContinuation(): void {
+  const state: any = {
+    name: '沈砚秋',
+    age: 21,
+    pendingThreads: [{
+      id: 'sect_trial_same_year',
+      title: '三月后的入门比试',
+      description: '青岚山执事约定三月后在外门石坪验看根骨与斗法胆气。',
+      category: 'competition',
+      startAge: 21,
+      deadlineAge: 21,
+      status: 'pending',
+      progress: 20,
+      dueInSameYear: true,
+      followUpHint: '同岁三月后赴外门石坪参加入门比试，不能拖到下一年。',
+    }],
+  };
+  const threads = getSameYearThreads(state);
+  assert(threads.length === 1, 'same-year thread should be selected before cross-year advance');
+  const output = buildThreadContinuationEvent(state, threads[0]);
+  assert(output.title.includes('约期已至'), 'same-year competition continuation should use appointment title');
+  assert(output.advanceThreads?.[0]?.id === 'sect_trial_same_year', 'same-year continuation should advance the selected thread');
+  assert(output.completeThreadIds?.includes('sect_trial_same_year'), 'same-year competition should complete the selected thread');
+  log('same-year-continuation', { passed: true, age: state.age, title: output.title });
+}
+
+function smokeAnnualNarrativePrompt(): void {
+  const source = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  assert(source.includes('年龄推进不是“一年只发生一件事”'), 'advance prompt should require annual multi-part narration');
+  assert(source.includes('dueInSameYear=true 表示下一次岁月流转会优先处理同岁后续'), 'advance prompt should explain same-year continuation behavior');
+  assert(source.includes('必须用 extraEvents 拆成多条短事件'), 'advance prompt should require extraEvents for multiple key beats');
+  log('annual-narrative-prompt', { passed: true });
+}
+
 async function smokeAuctionDbRoute(): Promise<void> {
   const { db } = await import('../src/lib/db');
   const { POST } = await import('../src/app/api/game/auction/route');
@@ -644,6 +679,8 @@ async function main(): Promise<void> {
   smokeWorldMemoryResolution();
   smokeWorldMemoryOutcomeFeedback();
   smokeThreadOutcomeSync();
+  smokeSameYearContinuation();
+  smokeAnnualNarrativePrompt();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();

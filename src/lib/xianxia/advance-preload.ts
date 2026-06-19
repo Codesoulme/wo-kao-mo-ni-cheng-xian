@@ -1,8 +1,8 @@
 ﻿import { createHash } from 'crypto';
 import { db } from '@/lib/db';
-import { dbToState, buildStateContext, tickStatusDurations, tickNaturalRecovery, checkFateNode, pickEventBlueprint, tickFormations, tickHeartDemon, tickPets } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, tickStatusDurations, tickNaturalRecovery, checkFateNode, pickEventBlueprint, tickFormations, tickHeartDemon, tickPets, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
-import { FATE_NODES } from '@/lib/xianxia/types';
+import { FATE_NODES, EventBlueprint } from '@/lib/xianxia/types';
 import { buildFallbackAgeEvent } from '@/lib/xianxia/advance-fallback';
 import { extractNarrativeContractFeedback } from '@/lib/xianxia/state-change-log';
 
@@ -101,33 +101,65 @@ async function getNarrativeContractFeedback(characterId: string) {
   return extractNarrativeContractFeedback(auditEvents.reverse());
 }
 
+function buildSameYearContinuationBlueprint(threadTitle: string): EventBlueprint {
+  return {
+    category: 'thread_resolve',
+    name: '同年续篇',
+    description: `今年内未竟之事仍在牵动：${threadTitle}。本轮不跨年，优先补完同岁关键后续。`,
+    weight: 1,
+    minRealm: 0,
+    maxRealm: 8,
+    minAge: 0,
+    maxAge: 9999,
+    examples: ['同岁三月后赴约', '今年内补完旧事后续', '入夜后承接前文因果'],
+  };
+}
+
 export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>) {
   const recentEvents = await getRecentEvents(char.id);
   const narrativeContractFeedback = await getNarrativeContractFeedback(char.id);
   let state = dbToState(char);
   const recentBlueprintCategories = (state as any)._recentBlueprintCategories || [];
-  const blueprint = pickEventBlueprint(state, recentBlueprintCategories);
+  const sameYearThreads = getSameYearThreads(state);
+  const sameYearThread = sameYearThreads[0];
+  const blueprint = sameYearThread
+    ? buildSameYearContinuationBlueprint(sameYearThread.title)
+    : pickEventBlueprint(state, recentBlueprintCategories);
 
-  state.age += 1;
-  state = tickStatusDurations(state);
-  state = tickNaturalRecovery(state);
-  const formationTick = tickFormations(state);
-  state = formationTick.state;
-  state = tickHeartDemon(state);
-  state = tickPets(state);
+  if (!sameYearThread) {
+    state.age += 1;
+    state = tickStatusDurations(state);
+    state = tickNaturalRecovery(state);
+    const formationTick = tickFormations(state);
+    state = formationTick.state;
+    state = tickHeartDemon(state);
+    state = tickPets(state);
+  }
 
-  const fateNodeIdx = checkFateNode(state);
+  const fateNodeIdx = sameYearThread ? null : checkFateNode(state);
   const referenceFateNode = fateNodeIdx !== null ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
   const isFateNode = false;
   const ctx = buildStateContext(state, recentEvents, narrativeContractFeedback);
   ctx.blueprint = blueprint;
 
   let aiOutput;
-  try {
-    aiOutput = await generateAgeEvent(ctx, isFateNode);
-  } catch (llmErr: any) {
-    console.error('LLM advance prepare failed, using fallback:', llmErr?.message || llmErr);
-    aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode);
+  if (sameYearThread) {
+    aiOutput = buildThreadContinuationEvent(state, sameYearThread);
+    aiOutput.narrativeContract = {
+      narrativeFocus: 'thread',
+      usedScheduleHintIds: [`seh_thread_${sameYearThread.id}`],
+      usedWorldFactIds: [],
+      usedNpcIds: [],
+      narrativeOutcome: sameYearThread.category === 'competition' ? 'resolved' : 'advanced',
+      contractNote: `同年续写：${sameYearThread.title}`,
+    };
+  } else {
+    try {
+      aiOutput = await generateAgeEvent(ctx, isFateNode);
+    } catch (llmErr: any) {
+      console.error('LLM advance prepare failed, using fallback:', llmErr?.message || llmErr);
+      aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode);
+    }
   }
 
   return {
