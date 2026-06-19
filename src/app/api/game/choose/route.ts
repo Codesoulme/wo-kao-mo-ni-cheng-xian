@@ -1,12 +1,13 @@
-// POST /api/game/choose
+﻿// POST /api/game/choose
 // 玩家在重要事件中做出选择
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -89,6 +90,14 @@ export async function POST(req: NextRequest) {
     state.cultivationFactors = computeCultivationFactors(state);
     // Task 20: 应用未决线索变更
     if (result.newThreads && result.newThreads.length) state = addThreads(state, result.newThreads);
+    if (result.newNpcs && result.newNpcs.length) {
+      const registeredNpcs = registerMany(result.newNpcs, registerNpc, {
+        source: 'choice',
+        age: state.age,
+        existingIds: (state.npcs || []).map(n => n.id),
+      });
+      state = upsertNpcs(state, registeredNpcs.accepted);
+    }
     if (result.advanceThreads && result.advanceThreads.length) {
       for (const adv of result.advanceThreads) {
         if (adv.id) state = advanceThread(state, adv.id, adv.progressDelta || 0, adv.note);
@@ -192,6 +201,7 @@ export async function POST(req: NextRequest) {
         pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
         characterIntentsJson: JSON.stringify(state.characterIntents || []),
         combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : '',
+        npcsJson: JSON.stringify(state.npcs || []),
         // Task 22: 心魔值
         heartDemon: state.heartDemon ?? 0,
         // Task 23: 灵宠

@@ -41,6 +41,7 @@ import {
   SecretRealm,
   SECRET_REALMS,
   ExplorationRecord,
+  WorldNpc,
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import {
@@ -48,6 +49,7 @@ import {
   registerMany,
   registerStatus,
   registerThread,
+  registerNpc,
   ValidationTrace,
 } from './content-registry';
 
@@ -79,6 +81,7 @@ export interface DBCharacter {
   petsJson?: string;
   // ===== Task 24 新增 =====
   exploredRealmsJson?: string;
+  npcsJson?: string;
 }
 
 // 旧存档 equippedJson 可能是 slot-map（{weapon: {...}}）或已是数组（[{...}]）
@@ -157,6 +160,7 @@ export function dbToState(c: DBCharacter): CharacterState {
     pets: safeParse<Pet[]>((c as any).petsJson || '[]', []),
     // Task 24 新字段
     exploredRealms: safeParse<ExplorationRecord[]>((c as any).exploredRealmsJson || '[]', []),
+    npcs: safeParse<WorldNpc[]>((c as any).npcsJson || '[]', []),
   };
   // 持久化的 recentEventTypes / recentBlueprintCategories 不进 state（仅 ctx 用），但需要保留
   // 这里通过闭包变量传给 buildStateContext（在 advance route 中调用）
@@ -1290,6 +1294,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
   const safeEquipped = Array.isArray(state.equipped) ? state.equipped : [];
   const safeCultivationFactors = Array.isArray(state.cultivationFactors) ? state.cultivationFactors : [];
   const safeLongTermMemory = Array.isArray(state.longTermMemory) ? state.longTermMemory : [];
+  const safeNpcs = Array.isArray(state.npcs) ? state.npcs : [];
   // 找下一个未完成的命节点
   const nextNode = FATE_NODES.find(n => !completedFateNodes.includes(n.index));
   // Task 20: 推进 urgent 线索状态（deadlineAge - age <= 3 视为 urgent）
@@ -1336,6 +1341,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     cultivationFactors: safeCultivationFactors,
     recentEvents: safeRecentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
     longTermMemory: safeLongTermMemory.slice(-10),
+    npcs: safeNpcs.slice(-20),
     completedFateNodes,
     availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
@@ -1569,6 +1575,63 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
 }
 
 // ==================== Task 20: 未决线索管理 ====================
+
+
+// ==================== NPC Persistence Lite ====================
+
+function mergeNpc(existing: WorldNpc, incoming: WorldNpc): WorldNpc {
+  const relationshipScore = incoming.relationshipScore !== 0 ? incoming.relationshipScore : existing.relationshipScore;
+  return {
+    ...existing,
+    ...incoming,
+    id: existing.id,
+    firstMetAge: Math.min(existing.firstMetAge ?? incoming.firstMetAge, incoming.firstMetAge ?? existing.firstMetAge),
+    lastSeenAge: Math.max(existing.lastSeenAge ?? incoming.lastSeenAge, incoming.lastSeenAge ?? existing.lastSeenAge),
+    attitude: incoming.attitude !== 'unknown' ? incoming.attitude : existing.attitude,
+    relationshipScore,
+    description: incoming.description || existing.description,
+    source: incoming.source || existing.source,
+    memory: incoming.memory || existing.memory,
+    tags: Array.from(new Set([...(existing.tags || []), ...(incoming.tags || [])])).slice(0, 12),
+    relatedThreadIds: Array.from(new Set([...(existing.relatedThreadIds || []), ...(incoming.relatedThreadIds || [])])),
+  };
+}
+
+export function upsertNpcs(state: CharacterState, npcs: WorldNpc[]): CharacterState {
+  if (!npcs.length) return state;
+  const current = Array.isArray(state.npcs) ? state.npcs : [];
+  const byId = new Map<string, WorldNpc>();
+  for (const npc of current) {
+    if (npc?.id) byId.set(npc.id, npc);
+  }
+  for (const npc of npcs) {
+    if (!npc?.id) continue;
+    const existing = byId.get(npc.id);
+    byId.set(npc.id, existing ? mergeNpc(existing, npc) : npc);
+  }
+  return { ...state, npcs: Array.from(byId.values()).slice(-80) };
+}
+
+function combatEnemiesToNpcs(enemies: CombatEnemy[] | undefined, aiOutput: AIEventOutput, state: CharacterState): Partial<WorldNpc>[] {
+  if (!Array.isArray(enemies)) return [];
+  return enemies
+    .filter(e => e?.name && !String(e.name).includes('心魔'))
+    .map(e => ({
+      id: e.id ? `npc_${e.id}` : undefined,
+      name: e.name,
+      description: e.description || e.name,
+      role: '战斗对手',
+      realm: e.realm,
+      attitude: 'hostile' as const,
+      relationshipScore: -40,
+      firstMetAge: state.age,
+      lastSeenAge: state.age,
+      lastKnownLocation: state.location,
+      source: aiOutput.title,
+      memory: aiOutput.narrative ? aiOutput.narrative.slice(0, 180) : undefined,
+      tags: ['combat'],
+    }));
+}
 
 export function addThreads(state: CharacterState, threads: PendingThread[]): CharacterState {
   if (!threads.length) return state;
@@ -2193,6 +2256,24 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     contentRegistryWarnings.push(...registered.warnings);
     next = addThreads(next, registered.accepted);
   }
+
+  // 7.1.5 NPC Persistence Lite: register explicit AI NPCs and combat opponents.
+  {
+    const rawNpcs = [
+      ...(aiOutput.newNpcs || []),
+      ...combatEnemiesToNpcs(aiOutput.triggerCombat?.enemies, aiOutput, next),
+    ];
+    if (rawNpcs.length) {
+      const registered = registerMany(rawNpcs, registerNpc, {
+        source: aiOutput.title,
+        age: next.age,
+        existingIds: (next.npcs || []).map(n => n.id),
+      });
+      contentRegistryTrace.push(...registered.trace);
+      contentRegistryWarnings.push(...registered.warnings);
+      next = upsertNpcs(next, registered.accepted);
+    }
+  }
   // 7.2 推进现有线索进度
   if (aiOutput.advanceThreads && aiOutput.advanceThreads.length) {
     for (const adv of aiOutput.advanceThreads) {
@@ -2311,6 +2392,7 @@ export function stateToResponse(s: CharacterState) {
     pendingThreads: s.pendingThreads || [],
     characterIntents: s.characterIntents || [],
     combatSession: s.combatSession || null,
+    npcs: s.npcs || [],
     // Task 22 新字段
     heartDemon: s.heartDemon ?? 0,
     // Task 23 新字段

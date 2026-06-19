@@ -92,6 +92,8 @@ model Character {
   combatStateJson String @default("")
   // 最近事件类型列表（用于反重复机制）
   recentEventTypesJson String @default("[]")
+  // NPC 持久化 Lite：WorldNpc[]，记录已出现的重要人物，供后续事件回响。
+  npcsJson String @default("[]")
   // 最近蓝图分类列表（用于反重复机制）
   recentBlueprintCategoriesJson String @default("[]")
   // ===== Task 22 新增 =====

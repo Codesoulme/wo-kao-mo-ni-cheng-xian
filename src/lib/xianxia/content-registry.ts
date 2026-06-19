@@ -6,6 +6,7 @@
   StatusCategory,
   StatusEffect,
   StatusEntry,
+  WorldNpc,
 } from './types';
 
 export type RegisteredContentType = 'item' | 'status' | 'thread' | 'realm' | 'npc' | 'event';
@@ -264,16 +265,6 @@ export function registerRealm(raw: Partial<SecretRealm> | any, context: Registry
   return accept('realm', realm, trace);
 }
 
-export interface RegistryNpcLite {
-  id: string;
-  name: string;
-  description: string;
-  role?: string;
-  realm?: string;
-  attitude?: string;
-  source?: string;
-}
-
 export interface RegistryEventLite {
   id: string;
   title: string;
@@ -283,20 +274,34 @@ export interface RegistryEventLite {
   age?: number;
 }
 
-export function registerNpc(raw: Partial<RegistryNpcLite> | any, context: RegistryContext = {}): RegistrationResult<RegistryNpcLite> {
+export function registerNpc(raw: Partial<WorldNpc> | any, context: RegistryContext = {}): RegistrationResult<WorldNpc> {
   const trace: ValidationTrace[] = [];
-  if (!raw || typeof raw !== 'object') return reject<RegistryNpcLite>(trace, 'npc is not an object');
+  if (!raw || typeof raw !== 'object') return reject<WorldNpc>(trace, 'npc is not an object');
   const existingIds = new Set(context.existingIds || []);
   const name = asText(raw.name, '', 40);
-  if (!name) return reject<RegistryNpcLite>(trace, 'npc missing name');
-  const npc: RegistryNpcLite = {
+  if (!name) return reject<WorldNpc>(trace, 'npc missing name');
+  const rawAttitude = asText(raw.attitude, 'unknown', 32);
+  const attitude = ['ally', 'friendly', 'neutral', 'hostile', 'enemy', 'unknown'].includes(rawAttitude) ? rawAttitude as WorldNpc['attitude'] : 'unknown';
+  if (attitude !== rawAttitude) {
+    trace.push({ severity: 'warning', code: 'field_normalized', field: 'attitude', message: `invalid npc attitude ${rawAttitude}, normalized to unknown` });
+  }
+  const age = context.age ?? 0;
+  const npc: WorldNpc = {
     id: ensureId(raw, 'npc', existingIds, trace),
     name,
     description: asText(raw.description, name, 400),
     role: raw.role ? asText(raw.role, '', 40) : undefined,
     realm: raw.realm ? asText(raw.realm, '', 40) : undefined,
-    attitude: raw.attitude ? asText(raw.attitude, '', 40) : undefined,
+    faction: raw.faction ? asText(raw.faction, '', 60) : undefined,
+    attitude,
+    relationshipScore: Math.round(safeNumber(raw.relationshipScore, 0, -100, 100, trace, 'relationshipScore')),
+    firstMetAge: Math.round(safeNumber(raw.firstMetAge, age, 0, 99999, trace, 'firstMetAge')),
+    lastSeenAge: Math.round(safeNumber(raw.lastSeenAge, age, 0, 99999, trace, 'lastSeenAge')),
+    lastKnownLocation: raw.lastKnownLocation ? asText(raw.lastKnownLocation, '', 80) : undefined,
     source: asText(raw.source, context.source || 'content-registry', 80),
+    memory: raw.memory ? asText(raw.memory, '', 300) : undefined,
+    relatedThreadIds: Array.isArray(raw.relatedThreadIds) ? raw.relatedThreadIds.map((x: unknown) => asText(x, '', 80)).filter(Boolean) : undefined,
+    tags: Array.isArray(raw.tags) ? raw.tags.map((x: unknown) => asText(x, '', 40)).filter(Boolean).slice(0, 8) : undefined,
   };
   return accept('npc', npc, trace);
 }

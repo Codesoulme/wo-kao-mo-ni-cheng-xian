@@ -211,6 +211,7 @@ export async function POST(req: NextRequest) {
         pendingThreadsJson: JSON.stringify(finalState.pendingThreads || []),
         characterIntentsJson: JSON.stringify(finalState.characterIntents || []),
         combatStateJson: finalState.combatSession ? JSON.stringify(finalState.combatSession) : '',
+        npcsJson: JSON.stringify(finalState.npcs || []),
         heartDemon: finalState.heartDemon ?? 0,
         petsJson: JSON.stringify(finalState.pets || []),
         exploredRealmsJson: JSON.stringify(finalState.exploredRealms || []),

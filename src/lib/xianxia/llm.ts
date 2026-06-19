@@ -369,6 +369,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
   "extraEvents": [],
   "causedDeath": false,
   "causedAscension": false,
+  "newNpcs": [],
   "newThreads": [],
   "advanceThreads": [],
   "completeThreadIds": [],
@@ -632,6 +633,7 @@ ${chosenText}
   "cultivationInsight": "选择后修炼心得文本（60-150字，按 advance 场景规则生成；必须引用引擎提供的准确来源名称与数字）",
   "causedDeath": false,
   "deathReason": "",
+  "newNpcs": [],
   "newThreads": [],
   "advanceThreads": [],
   "completeThreadIds": [],
@@ -695,6 +697,7 @@ ${playerInput}
   "memory": "此次干扰的一句话记忆（若 accepted=false 则留空）",
   "cultivationInsight": "干扰后修炼心得文本（60-150字，按 advance 场景规则生成；必须引用引擎提供的准确来源名称与数字；仅 accepted=true 时生成，false 时留空字符串）",
   "ageAdvance": 0,
+  "newNpcs": [],
   "newThreads": [],
   "advanceThreads": [],
   "completeThreadIds": [],
@@ -857,6 +860,7 @@ function extractFields(s: string): any {
     triggeredBreakthrough: false,
     causedDeath: false,
     causedAscension: false,
+    newNpcs: [],
     newThreads: [],
     advanceThreads: [],
     completeThreadIds: [],
@@ -1387,6 +1391,7 @@ function sanitizeEventOutput(raw: any, currentAge = 0): AIEventOutput {
     deathReason: raw?.deathReason ? String(raw.deathReason) : undefined,
     causedAscension: Boolean(raw?.causedAscension),
     // ===== Task 20 新增 =====
+    newNpcs: sanitizeNpcs(raw?.newNpcs, currentAge),
     newThreads: sanitizeThreads(raw?.newThreads, currentAge),
     advanceThreads: sanitizeAdvanceThreads(raw?.advanceThreads),
     completeThreadIds: Array.isArray(raw?.completeThreadIds) ? raw.completeThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
@@ -1431,6 +1436,31 @@ function sanitizeFactors(raw: any): CultivationFactor[] {
 }
 
 // 净化未决线索数组
+
+function sanitizeNpcs(raw: any, currentAge: number): any[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(n => n && n.name)
+    .slice(0, 8)
+    .map((n, idx) => ({
+      id: n.id ? String(n.id).slice(0, 80) : 'npc_' + Date.now().toString(36) + '_' + idx,
+      name: String(n.name).slice(0, 40),
+      description: String(n.description || n.name).slice(0, 400),
+      role: n.role ? String(n.role).slice(0, 40) : undefined,
+      realm: n.realm ? String(n.realm).slice(0, 40) : undefined,
+      faction: n.faction ? String(n.faction).slice(0, 60) : undefined,
+      attitude: ['ally','friendly','neutral','hostile','enemy','unknown'].includes(n.attitude) ? n.attitude : 'unknown',
+      relationshipScore: Math.max(-100, Math.min(100, Number(n.relationshipScore) || 0)),
+      firstMetAge: Math.max(0, Number(n.firstMetAge) || currentAge),
+      lastSeenAge: Math.max(0, Number(n.lastSeenAge) || currentAge),
+      lastKnownLocation: n.lastKnownLocation ? String(n.lastKnownLocation).slice(0, 80) : undefined,
+      source: n.source ? String(n.source).slice(0, 80) : 'llm',
+      memory: n.memory ? String(n.memory).slice(0, 300) : undefined,
+      relatedThreadIds: Array.isArray(n.relatedThreadIds) ? n.relatedThreadIds.map((x: any) => String(x).slice(0, 80)).filter(Boolean) : undefined,
+      tags: Array.isArray(n.tags) ? n.tags.map((x: any) => String(x).slice(0, 40)).filter(Boolean).slice(0, 8) : undefined,
+    }));
+}
+
 function sanitizeThreads(raw: any, currentAge: number): PendingThread[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -1550,6 +1580,7 @@ function sanitizeChoiceOutput(raw: any): ChoiceResultOutput {
     causedDeath: Boolean(raw?.causedDeath),
     deathReason: raw?.deathReason ? String(raw.deathReason) : undefined,
     // ===== Task 20 新增（ChoiceResultOutput 类型暂未声明这些字段，使用 type assertion 注入；引擎可在后续 task 扩展类型） =====
+    newNpcs: sanitizeNpcs(raw?.newNpcs, 0),
     newThreads: sanitizeThreads(raw?.newThreads, 0),
     advanceThreads: sanitizeAdvanceThreads(raw?.advanceThreads),
     completeThreadIds: Array.isArray(raw?.completeThreadIds) ? raw.completeThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
@@ -1591,6 +1622,7 @@ function sanitizeInterfereOutput(raw: any, currentAge = 0): InterfereOutput {
     cultivationInsight: accepted && raw?.cultivationInsight ? String(raw.cultivationInsight).slice(0, 400) : '',
     ageAdvance: accepted ? Math.max(0, Math.min(5, Number(raw?.ageAdvance) || 0)) : 0,
     // ===== Task 20 新增（accepted=false 时全为空数组/null，不可推进剧情） =====
+    newNpcs: accepted ? sanitizeNpcs(raw?.newNpcs, currentAge) : [],
     newThreads: accepted ? sanitizeThreads(raw?.newThreads, currentAge) : [],
     advanceThreads: accepted ? sanitizeAdvanceThreads(raw?.advanceThreads) : [],
     completeThreadIds: accepted && Array.isArray(raw?.completeThreadIds) ? raw.completeThreadIds.map((x: any) => String(x)).filter(Boolean) : [],

@@ -443,6 +443,26 @@ export interface CombatSession {
 
 // ==================== AI 输出结构 (EngineCommand) ====================
 
+export type WorldNpcAttitude = 'ally' | 'friendly' | 'neutral' | 'hostile' | 'enemy' | 'unknown';
+
+export interface WorldNpc {
+  id: string;
+  name: string;
+  description: string;
+  role?: string;
+  realm?: string;
+  faction?: string;
+  attitude: WorldNpcAttitude;
+  relationshipScore: number;
+  firstMetAge: number;
+  lastSeenAge: number;
+  lastKnownLocation?: string;
+  source: string;
+  memory?: string;
+  relatedThreadIds?: string[];
+  tags?: string[];
+}
+
 export type InputClass = 'action' | 'dialogue' | 'overreach' | 'rule_manipulation';
 
 // AI 生成的叙事事件
@@ -510,6 +530,7 @@ export interface AIEventOutput {
 
   // ===== Task 20 新增 =====
   // AI 添加新的未决线索（如"三个月后宗门比武""仇敌誓要报复"）
+  newNpcs?: Partial<WorldNpc>[];
   newThreads?: PendingThread[];
   // AI 推进现有线索的进度（id + 进度增量）
   advanceThreads?: { id: string; progressDelta: number; note?: string }[];
@@ -571,6 +592,7 @@ export interface ChoiceResultOutput {
   causedDeath?: boolean;
   deathReason?: string;
   // ===== Task 20 新增 =====
+  newNpcs?: Partial<WorldNpc>[];
   newThreads?: PendingThread[];
   advanceThreads?: { id: string; progressDelta: number; note?: string }[];
   completeThreadIds?: string[];
@@ -604,6 +626,7 @@ export interface InterfereOutput {
   // 干扰可能延迟年龄推进
   ageAdvance?: number;            // 干扰消耗的时间（岁），默认 0
   // ===== Task 20 新增 =====
+  newNpcs?: Partial<WorldNpc>[];
   newThreads?: PendingThread[];
   advanceThreads?: { id: string; progressDelta: number; note?: string }[];
   completeThreadIds?: string[];
@@ -666,6 +689,7 @@ export interface EngineStateContext {
   nextFateNode?: { index: number; name: string; realm: string };
   // ===== Task 20 新增 =====
   // 本轮事件蓝图主题（引擎抽取，AI 必须围绕此主题生成事件）
+  npcs: WorldNpc[];
   blueprint?: EventBlueprint;
   // 未决线索列表（AI 必须保持连续性；deadlineAge 临近的标记为 urgent）
   pendingThreads: PendingThread[];
@@ -757,6 +781,7 @@ export interface CharacterState {
   longTermMemory: string[];
   // ===== Task 20 新增 =====
   // 未决线索列表（重要剧情线索，会在后续推进/到期触发）
+  npcs: WorldNpc[];
   pendingThreads: PendingThread[];
   // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）
   characterIntents: CharacterIntent[];

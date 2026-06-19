@@ -240,6 +240,7 @@ export async function POST(req: NextRequest) {
         pendingThreadsJson: JSON.stringify(finalState.pendingThreads || []),
         characterIntentsJson: JSON.stringify(finalState.characterIntents || []),
         combatStateJson: finalState.combatSession ? JSON.stringify(finalState.combatSession) : '',
+        npcsJson: JSON.stringify(finalState.npcs || []),
         recentEventTypesJson: JSON.stringify(recentEventTypes),
         recentBlueprintCategoriesJson: JSON.stringify(newRecentBlueprintCategories),
         // Task 22: 心魔值
