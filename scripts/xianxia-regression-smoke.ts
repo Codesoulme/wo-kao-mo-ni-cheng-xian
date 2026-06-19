@@ -109,6 +109,42 @@ function smokeBoundaryFactChecks(): void {
   log('boundary-fact-checks', { passed: true, codes: codes.length });
 }
 
+function smokeNarrativeContract(): void {
+  const state: any = {
+    age: 30,
+    inventory: [],
+    equipped: [],
+    pendingThreads: [],
+    questEntries: [],
+    npcs: [{ id: 'npc_shadow', name: '阴鸦客', description: '敌意竞拍者', attitude: 'hostile', relationshipScore: -20, firstMetAge: 29, lastSeenAge: 30, source: 'auction' }],
+    worldFacts: [{ id: 'wf_market', kind: 'location', title: '青岚坊市', summary: '拍卖余波未散', confidence: 0.8, firstSeenAge: 29, lastSeenAge: 30, source: 'smoke', tags: ['location', 'market'] }],
+    eventSchedule: {
+      generatedAtAge: 30,
+      focus: { id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '阴鸦客', reason: '阴鸦客暗中盯梢。', requiredAction: 'echo_or_develop' },
+      hints: [{ id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '阴鸦客', reason: '阴鸦客暗中盯梢。', requiredAction: 'echo_or_develop' }],
+      pressureMap: { topThreat: '阴鸦客', topOpportunity: '青岚坊市', focalLocation: '青岚坊市', focalActor: '阴鸦客', likelyEventTypes: ['威胁回响'], summary: '最大威胁：阴鸦客；最大机会：青岚坊市；事件倾向：威胁回响' },
+      warnings: [],
+    },
+  };
+  const baseOutput: any = {
+    title: '坊外微影',
+    narrative: '沈砚秋在青岚坊市外觉出阴鸦客的目光，暂且避入人群。',
+    eventType: 'normal',
+    changes: [],
+    newStatuses: [],
+    newItems: [],
+    memory: '阴鸦客在青岚坊市外盯梢。',
+    hasChoice: false,
+  };
+  const missingCodes = validateAIBoundary(state, baseOutput).trace.map(t => t.code);
+  assert(missingCodes.includes('missing_narrative_contract'), 'missing contract should warn under pressure map');
+  const unknownCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', usedScheduleHintIds: ['seh_missing'], usedWorldFactIds: ['wf_missing'], usedNpcIds: ['npc_missing'], contractNote: '承接阴鸦客威胁。' } }).trace.map(t => t.code);
+  assert(unknownCodes.includes('unknown_schedule_hint_reference') && unknownCodes.includes('unknown_world_fact_reference') && unknownCodes.includes('unknown_npc_contract_reference'), 'unknown narrative contract references should warn');
+  const okCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', usedScheduleHintIds: ['seh_npc_shadow'], usedWorldFactIds: ['wf_market'], usedNpcIds: ['npc_shadow'], contractNote: '承接最大威胁阴鸦客的盯梢。' } }).trace.map(t => t.code);
+  assert(!okCodes.includes('missing_narrative_contract') && !okCodes.includes('unknown_schedule_hint_reference'), 'valid narrative contract should not raise contract warnings');
+  log('narrative-contract', { passed: true, missingCodes: missingCodes.length, unknownCodes: unknownCodes.length, okCodes: okCodes.length });
+}
+
 function smokeWorldFactsLite(): void {
   const state: any = {
     age: 42,
@@ -355,6 +391,7 @@ async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
+  smokeNarrativeContract();
   smokeWorldFactsLite();
   smokeFactionLocationStateProfiles();
   smokeWorldPressureOpportunityMap();

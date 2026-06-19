@@ -516,11 +516,27 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
   "completeThreadIds": [],
   "failThreadIds": [],
   "triggerCombat": null,
+  "narrativeContract": {
+    "narrativeFocus": "threat | opportunity | location | npc | faction | realm | daily",
+    "usedScheduleHintIds": [],
+    "usedWorldFactIds": [],
+    "usedNpcIds": [],
+    "contractNote": "一句话说明本轮承接了哪个压力、机会、地点、人物或因果"
+  },
   "newPets": []
 }
 
 可修改属性白名单：${ctx.availableAttributes.join(', ')}
 注意：attribute 必须在白名单内；delta 合理（普通事件 -50~+100，奇遇 -200~+500）；newStatuses 与 newItems 给出完整字段。
+
+【叙事契约字段——重要！用于世界连续性审计】
+narrativeContract 必须声明本轮主要承接对象：
+- narrativeFocus：从 threat/opportunity/location/npc/faction/realm/daily 中选择一个。
+- usedScheduleHintIds：若承接了“本年事件调度建议”中的某项，填入对应 hint id；无则 []。
+- usedWorldFactIds：若承接了“已确认的长期世界事实”中的地点/势力/秘境/事件，填入对应 fact id；无则 []。
+- usedNpcIds：若主要承接旧 NPC，填入 npc id；无则 []。
+- contractNote：一句话说明“本轮为什么写这个”，例如“承接最大威胁阴鸦客的盯梢余波”。
+此字段只用于审计，不会直接改变世界；但若高优先级压力/机会存在而你完全不声明，系统会记录 warning。
 
 【状态生成与状态感知规则——重要】
 玩家顶部会展示 activeStatuses 作为当前状态/机缘/伤势/心境；你必须把当前状态当作事件判断依据，例如带伤者更可能调息、求药、避战或伤势反复，灵息稳定者更容易修行。若叙事中出现持续性的身体、心境、环境或修炼余韵（如旧伤未愈、灵息渐稳、潭水洗脉、惊悸沉下、草木生机入体），必须在 newStatuses 中生成对应状态，不要只写在 narrative 里。

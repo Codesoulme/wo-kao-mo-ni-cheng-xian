@@ -248,6 +248,73 @@ function validateWorldFactConsistency(state: CharacterState, output: AIEventOutp
   }
 }
 
+function validateNarrativeContract(state: CharacterState, output: AIEventOutput, trace: BoundaryValidationTrace[]): void {
+  const contract = output.narrativeContract;
+  const schedule = (state as any).eventSchedule;
+  const focus = schedule?.focus;
+  const pressureMap = schedule?.pressureMap;
+  const hasStrongPressure = Boolean(pressureMap?.summary) || Boolean(focus && focus.priority >= 80);
+  const story = outputStoryText(output);
+
+  if (!contract) {
+    if (hasStrongPressure) {
+      pushTrace(trace, 'warning', 'missing_narrative_contract', 'AI did not declare narrativeContract despite available world pressure/scheduler focus.', { field: 'narrativeContract' });
+    }
+    return;
+  }
+
+  const validFocus = new Set(['threat', 'opportunity', 'location', 'npc', 'faction', 'realm', 'daily']);
+  if (contract.narrativeFocus && !validFocus.has(contract.narrativeFocus)) {
+    pushTrace(trace, 'warning', 'invalid_narrative_focus', `AI declared invalid narrative focus: ${contract.narrativeFocus}`, { field: 'narrativeContract.narrativeFocus' });
+  }
+
+  const knownHintIds = new Set((schedule?.hints || []).map(h => h.id));
+  for (const id of contract.usedScheduleHintIds || []) {
+    if (!knownHintIds.has(id)) {
+      pushTrace(trace, 'warning', 'unknown_schedule_hint_reference', `AI narrativeContract referenced unknown schedule hint id: ${id}`, { refId: id, field: 'narrativeContract.usedScheduleHintIds' });
+    }
+  }
+
+  const knownFactIds = new Set((state.worldFacts || []).map(f => f.id));
+  for (const id of contract.usedWorldFactIds || []) {
+    if (!knownFactIds.has(id)) {
+      pushTrace(trace, 'warning', 'unknown_world_fact_reference', `AI narrativeContract referenced unknown world fact id: ${id}`, { refId: id, field: 'narrativeContract.usedWorldFactIds' });
+    }
+  }
+
+  const knownNpcIds = new Set((state.npcs || []).map(n => n.id));
+  for (const id of contract.usedNpcIds || []) {
+    if (!knownNpcIds.has(id)) {
+      pushTrace(trace, 'warning', 'unknown_npc_contract_reference', `AI narrativeContract referenced unknown NPC id: ${id}`, { refId: id, field: 'narrativeContract.usedNpcIds' });
+    }
+  }
+
+  const usedSomething = Boolean(
+    contract.narrativeFocus ||
+    contract.contractNote ||
+    contract.usedScheduleHintIds?.length ||
+    contract.usedWorldFactIds?.length ||
+    contract.usedNpcIds?.length
+  );
+  if (hasStrongPressure && !usedSomething) {
+    pushTrace(trace, 'warning', 'empty_narrative_contract_under_pressure', 'AI emitted an empty narrativeContract despite strong pressure/opportunity context.', { field: 'narrativeContract' });
+  }
+
+  if (focus && focus.priority >= 90) {
+    const focusUsed = (contract.usedScheduleHintIds || []).includes(focus.id) || hasMeaningfulOverlap(story, focus.title) || hasMeaningfulOverlap(contract.contractNote, focus.title);
+    if (!focusUsed) {
+      pushTrace(trace, 'info', 'top_schedule_focus_not_declared', `AI did not clearly declare or mention the top schedule focus: ${focus.title}`, { refId: focus.id, field: 'narrativeContract.usedScheduleHintIds' });
+    }
+  }
+
+  if (pressureMap && contract.narrativeFocus === 'daily' && (pressureMap.topThreat || pressureMap.topOpportunity)) {
+    const mentionsPressure = hasMeaningfulOverlap(story, pressureMap.topThreat) || hasMeaningfulOverlap(story, pressureMap.topOpportunity) || hasMeaningfulOverlap(contract.contractNote, pressureMap.summary);
+    if (!mentionsPressure) {
+      pushTrace(trace, 'info', 'daily_focus_ignores_pressure_map', 'AI chose daily focus while pressure/opportunity map has stronger anchors.', { field: 'narrativeContract.narrativeFocus' });
+    }
+  }
+}
+
 function validateRewardsAndCombat(state: CharacterState, output: AIEventOutput, trace: BoundaryValidationTrace[]): void {
   const totalNewItems = (output.newItems?.length || 0) + (output.newEquippedItems?.length || 0) + (output.triggerCombat?.victoryDrops?.length || 0);
   if (totalNewItems > 12) {
@@ -282,6 +349,7 @@ export function validateAIBoundary(state: CharacterState, output: AIEventOutput)
   validateItemConsistency(state, output, trace);
   validateNpcConsistency(state, output, trace);
   validateWorldFactConsistency(state, output, trace);
+  validateNarrativeContract(state, output, trace);
   validateAttributeChanges(output, trace);
   validateRewardsAndCombat(state, output, trace);
 

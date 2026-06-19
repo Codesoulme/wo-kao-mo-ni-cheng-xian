@@ -564,6 +564,16 @@ export interface EventSchedulerPlan {
 
 export type InputClass = 'action' | 'dialogue' | 'overreach' | 'rule_manipulation';
 
+export type NarrativeFocusKind = 'threat' | 'opportunity' | 'location' | 'npc' | 'faction' | 'realm' | 'daily';
+
+export interface NarrativeContract {
+  narrativeFocus?: NarrativeFocusKind;
+  usedScheduleHintIds?: string[];
+  usedWorldFactIds?: string[];
+  usedNpcIds?: string[];
+  contractNote?: string;
+}
+
 // AI 生成的叙事事件
 export interface AIEventOutput {
   // 叙事
@@ -652,6 +662,10 @@ export interface AIEventOutput {
     defeatHeartDemonDelta?: number;
     isHeartDemonTrial?: boolean;
   };
+  // ===== Narrative Contract Lite =====
+  // AI 声明本轮承接的调度/世界事实/NPC/叙事焦点，仅用于审计与连续性校验，不直接改变世界。
+  narrativeContract?: NarrativeContract;
+
   // ===== Task 23 新增 =====
   // AI 授予玩家灵宠（如收服妖兽幼崽、前辈相赠、灵宠店购买）
   newPets?: Pet[];
