@@ -1,4 +1,4 @@
-// 修仙模拟器 - 引擎核心
+﻿// 修仙模拟器 - 引擎核心
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
@@ -802,15 +802,15 @@ const PILL_NAMES_BY_ELEMENT: Record<string, { common: string[]; uncommon: string
 };
 
 // 丹药效果表：按元素 + rarity
-function pillEffects(element: string, rarity: string): { target_attribute: string; operation: string; value: number; description: string }[] {
+function pillEffects(element: string, rarity: string, potencyMultiplier = 1): { target_attribute: string; operation: string; value: number; description: string }[] {
   const powerByRarity: Record<string, number> = { common: 15, uncommon: 30, rare: 60, epic: 120, legendary: 250, mythic: 500 };
-  const power = powerByRarity[rarity] || 15;
+  const power = (powerByRarity[rarity] || 15) * Math.max(0.6, Math.min(1.8, potencyMultiplier));
   const effByElement: Record<string, { target: string; desc: string }[]> = {
-    fire: [{ target: 'attack', desc: '火力催动，攻伐加成' }, { target: 'maxHp', desc: '阳火淬体，气血略增' }],
-    water: [{ target: 'maxMp', desc: '玄水润脉，灵力提升' }, { target: 'mp', desc: '补水培元，灵力恢复' }],
-    wood: [{ target: 'hp', desc: '木气生机，气血恢复' }, { target: 'cultivationExp', desc: '木气滋养，修为微增' }],
-    metal: [{ target: 'attack', desc: '金锐之气，攻伐提升' }, { target: 'speed', desc: '金气轻灵，身法加快' }],
-    earth: [{ target: 'defense', desc: '土气厚重，防御加固' }, { target: 'maxHp', desc: '土气培元，气血上限增' }],
+    fire: [{ target: 'attack', desc: '火性丹力淬炼经脉，攻伐更盛' }, { target: 'maxHp', desc: '火候入体，气血渐旺' }],
+    water: [{ target: 'maxMp', desc: '水性丹力润养灵海' }, { target: 'mp', desc: '水元回流，灵力复苏' }],
+    wood: [{ target: 'hp', desc: '木气生发，血脉回春' }, { target: 'cultivationExp', desc: '木性灵机推动修为' }],
+    metal: [{ target: 'attack', desc: '金性丹力砥砺锋芒' }, { target: 'speed', desc: '金气行脉，身法轻捷' }],
+    earth: [{ target: 'defense', desc: '土性丹力沉稳护身' }, { target: 'maxHp', desc: '土元厚重，气血根基增长' }],
   };
   const effs = effByElement[element] || effByElement.wood;
   return effs.map(e => ({
@@ -833,6 +833,42 @@ function extractMaterialElement(item: ItemEntry): string | null {
   return null;
 }
 
+interface AlchemyHarmony {
+  successBonus: number;
+  rarityBoost: number;
+  potencyMultiplier: number;
+  elementScores: Record<string, number>;
+  tags: string[];
+}
+
+function computeAlchemyHarmony(materials: ItemEntry[]): AlchemyHarmony {
+  const elementScores: Record<string, number> = {};
+  const tags = new Set<string>();
+  let potency = 1;
+  for (const material of materials) {
+    const rarity = Math.max(0, rarityIndex(material.rarity));
+    potency += rarity * 0.06;
+    for (const effect of material.effects || []) {
+      const target = effect.target_attribute;
+      const value = Math.max(1, Math.abs(Number(effect.value) || 1));
+      if (target === 'elementFire') elementScores.fire = (elementScores.fire || 0) + value;
+      if (target === 'elementWater') elementScores.water = (elementScores.water || 0) + value;
+      if (target === 'elementWood') elementScores.wood = (elementScores.wood || 0) + value;
+      if (target === 'elementMetal') elementScores.metal = (elementScores.metal || 0) + value;
+      if (target === 'elementEarth') elementScores.earth = (elementScores.earth || 0) + value;
+      if (target === 'cultivationExp') tags.add('cultivation');
+      if (target === 'hp' || target === 'maxHp') tags.add('vitality');
+      if (target === 'mp' || target === 'maxMp') tags.add('spirit');
+    }
+  }
+  const distinctElements = Object.keys(elementScores).length;
+  const dominant = Math.max(0, ...Object.values(elementScores));
+  const conflictPenalty = Math.max(0, distinctElements - 2) * 4;
+  const successBonus = Math.min(18, dominant * 0.8 + materials.length * 2) - conflictPenalty;
+  const rarityBoost = dominant >= 12 && distinctElements <= 2 ? 1 : 0;
+  return { successBonus, rarityBoost, potencyMultiplier: potency, elementScores, tags: Array.from(tags) };
+}
+
 const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
 function rarityIndex(r: string): number {
   return RARITY_ORDER.indexOf(r);
@@ -852,6 +888,13 @@ export interface AlchemyResult {
   consumedMaterials: ItemEntry[];
   spiritStoneCost: number;
   successRate: number;
+  contentRegistryTrace: ValidationTrace[];
+  contentRegistryWarnings: string[];
+  mainElement?: string;
+}
+
+function failedAlchemyResult(state: CharacterState, error: string): AlchemyResult {
+  return { state, ok: false, error, success: false, narrative: '', consumedMaterials: [], spiritStoneCost: 0, successRate: 0, contentRegistryTrace: [], contentRegistryWarnings: [] };
 }
 
 export function alchemy(
@@ -859,117 +902,118 @@ export function alchemy(
   materialIds: string[],
   spiritStoneCost: number = 10
 ): AlchemyResult {
-  // 校验材料数量
-  if (materialIds.length < 2 || materialIds.length > 3) {
-    return { state, ok: false, error: '须选 2-3 件材料入炉', success: false, narrative: '', consumedMaterials: [], spiritStoneCost: 0, successRate: 0 };
-  }
-  // 校验材料都在储物袋
-  const materials: ItemEntry[] = [];
-  for (const id of materialIds) {
-    const m = state.inventory.find(it => it.id === id);
-    if (!m) return { state, ok: false, error: '材料不在储物袋中', success: false, narrative: '', consumedMaterials: [], spiritStoneCost: 0, successRate: 0 };
-    materials.push(m);
-  }
-  // 校验灵石
-  if (state.spiritStones < spiritStoneCost) {
-    return { state, ok: false, error: `灵石不足，需 ${spiritStoneCost} 灵石`, success: false, narrative: '', consumedMaterials: [], spiritStoneCost: 0, successRate: 0 };
-  }
+  if (materialIds.length < 2 || materialIds.length > 3) return failedAlchemyResult(state, '须选 2-3 味材料入炉');
+  const uniqueMaterialIds = Array.from(new Set(materialIds));
+  if (uniqueMaterialIds.length !== materialIds.length) return failedAlchemyResult(state, '同一份材料不能重复入炉');
 
-  // 计算成功率
+  const contentRegistryTrace: ValidationTrace[] = [];
+  const contentRegistryWarnings: string[] = [];
+  const materials: ItemEntry[] = [];
+  for (const id of uniqueMaterialIds) {
+    const material = state.inventory.find(item => item.id === id);
+    if (!material) return failedAlchemyResult(state, '材料不在储物中');
+    materials.push(material);
+  }
+  if (state.spiritStones < spiritStoneCost) return failedAlchemyResult(state, `灵石不足，需 ${spiritStoneCost} 灵石`);
+
   const comprehensionBonus = state.comprehension * 0.4;
   const rootBonus = (state.rootMultiplier || 0) * 5;
-  const avgRarityIdx = materials.reduce((s, m) => s + rarityIndex(m.rarity), 0) / materials.length;
+  const avgRarityIdx = materials.reduce((sum, material) => sum + Math.max(0, rarityIndex(material.rarity)), 0) / materials.length;
+  const materialHarmony = computeAlchemyHarmony(materials);
   const rarityBonus = avgRarityIdx * 8;
+  const costBonus = Math.min(12, Math.max(0, spiritStoneCost - 10) * 0.6);
   const countPenalty = (materials.length - 2) * 5;
-  let successRate = 30 + comprehensionBonus + rootBonus + rarityBonus - countPenalty;
+  let successRate = 30 + comprehensionBonus + rootBonus + rarityBonus + materialHarmony.successBonus + costBonus - countPenalty;
   successRate = Math.max(10, Math.min(95, successRate));
 
-  // 消耗材料 + 灵石
   let next: CharacterState = {
     ...state,
-    inventory: state.inventory.filter(it => !materialIds.includes(it.id)),
+    inventory: state.inventory.filter(item => !uniqueMaterialIds.includes(item.id)),
     spiritStones: state.spiritStones - spiritStoneCost,
   };
 
-  // 判定成功
   const roll = Math.random() * 100;
   const success = roll < successRate;
-
   if (!success) {
-    // 失败：得废丹
-    const wastePill: ItemEntry = {
+    const rawWastePill: ItemEntry = {
       id: `item_pil_waste_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-      name: '废丹',
-      description: '炼丹失败所成的焦黑丹药，仅余微薄药力',
+      name: '焦丹',
+      description: '炉火失衡后凝成的焦黑丹丸，药力微弱，却仍留有一线温养之效。',
       item_type: 'consumable',
       rarity: 'common',
-      effects: [{ target_attribute: 'hp', operation: 'add', value: 5, description: '勉强可服，恢复少许气血' }],
-      source: '炼丹失败所得',
+      effects: [{ target_attribute: 'hp', operation: 'add', value: 5, description: '焦丹残余药性，略复气血' }],
+      source: '炼丹失手所得',
     };
-    next.inventory = [...next.inventory, wastePill];
+    const registered = registerItem(rawWastePill, { source: 'alchemy', existingIds: next.inventory.map(item => item.id) });
+    contentRegistryTrace.push(...registered.trace);
+    contentRegistryWarnings.push(...registered.warnings);
+    const wastePill = registered.content || rawWastePill;
+    next = addItems(next, [wastePill]);
+    next = normalizeCultivationState(next);
     return {
       state: next,
       ok: true,
       success: false,
-      narrative: `丹炉中骤然炸响，${materials.map(m => m.name).join('、')}化为飞灰。你心有不甘，从残渣中刮得一枚焦黑废丹。`,
+      narrative: `炉中火候一偏，${materials.map(material => material.name).join('、')}的灵性未能相融，丹烟散尽后只余一枚焦丹。`,
       product: wastePill,
       consumedMaterials: materials,
       spiritStoneCost,
       successRate,
+      contentRegistryTrace,
+      contentRegistryWarnings,
+      mainElement: 'waste',
     };
   }
 
-  // 成功：判定主要元素（取材料中最常出现的元素）
-  const elementCounts: Record<string, number> = {};
-  for (const m of materials) {
-    const el = extractMaterialElement(m);
-    if (el) elementCounts[el] = (elementCounts[el] || 0) + 1;
+  const elementCounts: Record<string, number> = { ...materialHarmony.elementScores };
+  for (const material of materials) {
+    const element = extractMaterialElement(material);
+    if (element) elementCounts[element] = (elementCounts[element] || 0) + 1;
   }
   let mainElement = 'wood';
   let maxCount = 0;
-  for (const [el, cnt] of Object.entries(elementCounts)) {
-    if (cnt > maxCount) { maxCount = cnt; mainElement = el; }
+  for (const [element, count] of Object.entries(elementCounts)) {
+    if (count > maxCount) { maxCount = count; mainElement = element; }
   }
-  // 若材料无元素倾向，按灵根五行倾向取（简化为木）
   if (maxCount === 0) mainElement = 'wood';
 
-  // 丹药 rarity：平均材料 rarity ± 1（随机浮动）
   const avgIdx = Math.round(avgRarityIdx);
   const drift = Math.random() < 0.4 ? (Math.random() < 0.5 ? -1 : 1) : 0;
-  let pillRarityIdx = Math.max(0, Math.min(4, avgIdx + drift)); // 不超过 legendary
+  const pillRarityIdx = Math.max(0, Math.min(RARITY_ORDER.length - 1, avgIdx + drift + materialHarmony.rarityBoost));
   const pillRarity = RARITY_ORDER[pillRarityIdx];
-
-  // 丹药名
   const namePool = PILL_NAMES_BY_ELEMENT[mainElement]?.[pillRarity as 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary'];
   const pillName = namePool?.[Math.floor(Math.random() * namePool.length)] || `${mainElement}元丹`;
-
-  // 丹药效果
-  const effects = pillEffects(mainElement, pillRarity) as any;
-
-  const pill: ItemEntry = {
+  const effects = pillEffects(mainElement, pillRarity, materialHarmony.potencyMultiplier) as any;
+  const elementZh = mainElement === 'fire' ? '火' : mainElement === 'water' ? '水' : mainElement === 'wood' ? '木' : mainElement === 'metal' ? '金' : '土';
+  const rarityZh: Record<string, string> = { common: '下品', uncommon: '中品', rare: '上品', epic: '地品', legendary: '天品', mythic: '玄品' };
+  const rawPill: ItemEntry = {
     id: `item_pil_${mainElement}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     name: pillName,
-    description: `以${materials.map(m => m.name).join('、')}炼制而成的${pillRarity === 'common' ? '凡品' : pillRarity === 'legendary' ? '传说' : ''}丹药，蕴含${mainElement === 'fire' ? '火' : mainElement === 'water' ? '水' : mainElement === 'wood' ? '木' : mainElement === 'metal' ? '金' : '土'}属性之力`,
+    description: `以${materials.map(material => material.name).join('、')}炼成的${rarityZh[pillRarity] || ''}丹药，丹纹中蕴着${elementZh}行灵机。`,
     item_type: 'consumable',
     rarity: pillRarity as any,
     effects,
-    source: '炼丹炉所炼',
+    source: '炼丹炉成丹',
   };
-
-  next.inventory = [...next.inventory, pill];
-
-  const elementZh = mainElement === 'fire' ? '火' : mainElement === 'water' ? '水' : mainElement === 'wood' ? '木' : mainElement === 'metal' ? '金' : '土';
-  const rarityZh: Record<string, string> = { common: '凡品', uncommon: '良品', rare: '稀有', epic: '史诗', legendary: '传说' };
+  const registered = registerItem(rawPill, { source: 'alchemy', existingIds: next.inventory.map(item => item.id) });
+  contentRegistryTrace.push(...registered.trace);
+  contentRegistryWarnings.push(...registered.warnings);
+  const pill = registered.content || rawPill;
+  next = addItems(next, [pill]);
+  next = normalizeCultivationState(next);
 
   return {
     state: next,
     ok: true,
     success: true,
-    narrative: `丹炉中异光乍现，${elementZh}属灵气汇聚成形。你心念一动，扣住炉盖——一颗${rarityZh[pillRarity]}丹药跃然而出：${pillName}。`,
+    narrative: `炉火三转，${elementZh}行灵机在丹室中凝成细密丹纹。你稳住炉息，开炉时一枚${rarityZh[pillRarity] || ''}丹药跃然而出，正是${pillName}。`,
     product: pill,
     consumedMaterials: materials,
     spiritStoneCost,
     successRate,
+    contentRegistryTrace,
+    contentRegistryWarnings,
+    mainElement,
   };
 }
 
@@ -3328,4 +3372,3 @@ export function recordExploration(
   delete (newState as any)._currentExploration;
   return newState;
 }
-
