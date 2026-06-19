@@ -645,8 +645,14 @@ function smokeTechniqueRequirements(): void {
   assert(adapted.usable && adapted.adaptation > 0 && adapted.adaptation < 1, 'soft requirements should reduce adaptation, not reject');
   const normalized = normalizeCultivationState({ ...baseState, equipped: [looseScripture] });
   assert(normalized.cultivationMultiplier > baseState.rootMultiplier && normalized.cultivationMultiplier < baseState.rootMultiplier * 3, 'cultivation multiplier should be partially reduced by adaptation');
-  const skills = buildLearnedCombatArts({ ...baseState, equipped: [strictScripture, looseScripture] });
-  assert(!skills.some((skill: any) => skill.itemId === strictScripture.id), 'unusable strict scripture should not grant combat art');
+  const passiveArtifact: any = {
+    id: 'item_art_water', name: '\u907f\u6c34\u73e0', description: '\u4f69\u6234\u540e\u6c34\u4e2d\u53ef\u547c\u5438', item_type: 'artifact', rarity: 'rare', source: 'smoke',
+    effects: [{ target_attribute: 'defense', operation: 'add', value: 6, description: '\u6c34\u7eb9\u62a4\u4f53' }],
+    technique: { kind: 'artifact', requirements: { spiritualRoots: ['heavenly'] }, artifactAbilities: [{ name: '\u907f\u6c34\u7075\u7981', description: '\u4f69\u6234\u540e\u53ef\u5728\u6c34\u4e2d\u547c\u5438', trigger: 'underwater', permanentBuff: true, power: 1.2 }] },
+  };
+  const skills = buildLearnedCombatArts({ ...baseState, equipped: [strictScripture, looseScripture, passiveArtifact] });
+  assert(!skills.some((skill: any) => skill.itemId === strictScripture.id), 'unusable strict scripture should not grant learned combat art');
+  assert(skills.some((skill: any) => skill.itemId === passiveArtifact.id && skill.name === '\u907f\u6c34\u7075\u7981'), 'artifact innate ability should be available even when wearer cannot learn it as a technique');
   assert(skills.every((skill: any) => skill.adaptation === undefined || skill.adaptation <= 1), 'combat arts should expose adaptation when applicable');
   log('technique-requirements', { passed: true, rejected: rejected.reasons[0], adaptation: adapted.adaptation, multiplier: normalized.cultivationMultiplier, skills: skills.length });
 }
@@ -656,6 +662,7 @@ function smokeNoProtagonistShieldPrompt(): void {
   assert(source.includes('\u4e0d\u8981\u4e3a\u4e86\u4fdd\u62a4\u73a9\u5bb6\u800c\u81ea\u52a8\u5339\u914d\u6218\u529b'), 'combat prompt should forbid protagonist shielding');
   assert(source.includes('causedDeath/eventType=death \u662f\u5408\u6cd5\u7ed3\u679c'), 'prompt should allow death as legitimate outcome');
   assert(source.includes('technique.requirements'), 'item prompt should require technique requirements');
+  assert(source.includes('technique.artifactAbilities'), 'item prompt should support artifact innate abilities');
   assert(source.includes('spiritualRoots \u662f\u4e25\u683c\u95e8\u69db'), 'prompt should explain strict spiritual root gates');
   log('no-protagonist-shield-prompt', { passed: true });
 }

@@ -587,21 +587,46 @@ function inferTechniqueProfile(item: ItemEntry): TechniqueProfile | undefined {
   else if (text.includes('\u6df7\u6c8c') || text.includes('\u4e94\u884c\u4ff1\u5168') || text.includes('\u592a\u521d')) requirements.spiritualRoots = ['chaos'];
   else if (preferredRoots.length) requirements.preferredRoots = Array.from(new Set(preferredRoots));
   const ri = safeRarityIndex(item.rarity);
-  if (ri >= 5) requirements.minRealm = 'nascent_soul';
-  else if (ri >= 4) requirements.minRealm = 'golden_core';
-  else if (ri >= 3) requirements.minRealm = 'foundation';
-  else if (ri >= 1) requirements.minRealm = 'qi_refining';
-  requirements.minComprehension = ri >= 4 ? 70 : ri >= 3 ? 55 : ri >= 2 ? 40 : undefined;
+  if (item.item_type === 'scripture') {
+    if (ri >= 5) requirements.minRealm = 'nascent_soul';
+    else if (ri >= 4) requirements.minRealm = 'golden_core';
+    else if (ri >= 3) requirements.minRealm = 'foundation';
+    else if (ri >= 1) requirements.minRealm = 'qi_refining';
+    requirements.minComprehension = ri >= 4 ? 70 : ri >= 3 ? 55 : ri >= 2 ? 40 : undefined;
+  } else {
+    if (ri >= 5) requirements.minRealm = 'golden_core';
+    else if (ri >= 4) requirements.minRealm = 'foundation';
+    else if (ri >= 2) requirements.minRealm = 'qi_refining';
+    requirements.minComprehension = ri >= 4 ? 55 : ri >= 3 ? 40 : undefined;
+  }
+  const artifactTrigger: 'active' | 'auto' | 'underwater' = text.includes('\u6c34') || text.includes('water') ? 'underwater' : text.includes('\u62a4') ? 'auto' : 'active';
+  const artifactAbilities = item.item_type === 'artifact'
+    ? [{
+      name: text.includes('\u6c34') || text.includes('water') ? '\u907f\u6c34\u7075\u7981' : text.includes('\u62a4') ? '\u81ea\u52a8\u62a4\u4f53' : item.name,
+      description: text.includes('\u6c34') || text.includes('water')
+        ? '\u4f69\u6234\u540e\u7075\u7981\u81ea\u884c\u5f20\u5f00\uff0c\u53ef\u5728\u6c34\u4e2d\u547c\u5438\u5e76\u51cf\u8f7b\u6c34\u538b\u3002'
+        : text.includes('\u62a4')
+          ? '\u9047\u9669\u65f6\u6cd5\u5b9d\u81ea\u884c\u62a4\u4f53\uff0c\u62b5\u6d88\u4e00\u90e8\u5206\u4f24\u52bf\u3002'
+          : '\u6cd5\u5b9d\u5185\u85cf\u4e00\u9053\u7075\u7981\uff0c\u4f69\u6234\u6216\u50ac\u52a8\u65f6\u53ef\u53d1\u6325\u5668\u7269\u795e\u5f02\u3002',
+      trigger: artifactTrigger,
+      power: 1 + ri * 0.35,
+      permanentBuff: text.includes('\u6c34') || text.includes('water') || text.includes('\u62a4'),
+      rarityNote: ri >= 2 ? '\u6cd5\u5b9d\u54c1\u8d28\u8f83\u9ad8\uff0c\u81ea\u5e26\u53ef\u89e6\u53d1\u7684\u5668\u7269\u7075\u7981\u3002' : '\u53ea\u6709\u5c11\u6570\u51e1\u54c1\u6cd5\u5b9d\u4f1a\u7559\u6709\u7c97\u6d45\u7075\u7981\u3002',
+    }]
+    : undefined;
   return {
-    kind: item.item_type === 'scripture' ? 'cultivation' : 'combat',
+    kind: item.item_type === 'scripture' ? 'cultivation' : 'artifact',
     requirements,
     traits: item.item_type === 'scripture'
       ? [{ name: '\u884c\u529f\u8def\u7ebf', description: '\u4fee\u70bc\u65f6\u6539\u53d8\u5410\u7eb3\u8282\u5f8b\u4e0e\u7075\u6c14\u8fd0\u8f6c\uff0c\u5f71\u54cd\u957f\u671f\u4fee\u4e3a\u79ef\u7d2f\u3002' }]
-      : [{ name: '\u5668\u7075\u672f\u5f0f', description: '\u6597\u6cd5\u65f6\u53ef\u501f\u6cd5\u5b9d\u7075\u673a\u65bd\u5c55\u4e00\u5f0f\u3002' }],
-    spell: item.item_type === 'artifact' || ['\u672f','\u8bc0','\u5251','\u706b','\u96f7','\u51b0','\u98ce','\u5370','\u638c','\u6307'].some(k => text.includes(k))
+      : [{ name: '\u5668\u7269\u7075\u7981', description: '\u6cd5\u5b9d\u7684\u7075\u7981\u968f\u4f69\u6234\u6216\u50ac\u52a8\u751f\u6548\uff0c\u4e0d\u7b49\u540c\u4e8e\u89d2\u8272\u5b66\u4f1a\u6b64\u6cd5\u672f\u3002' }],
+    spell: item.item_type === 'scripture' && ['\u672f','\u8bc0','\u5251','\u706b','\u96f7','\u51b0','\u98ce','\u5370','\u638c','\u6307'].some(k => text.includes(k))
       ? { name: item.name, description: item.description || `${item.name}\u6240\u8f7d\u672f\u5f0f`, power: 1 + safeRarityIndex(item.rarity) * 0.45 }
       : undefined,
-    mismatchRisk: '\u5f3a\u884c\u4fee\u4e60\u4e0d\u5408\u6839\u6027\u7684\u6cd5\u95e8\uff0c\u8f7b\u5219\u8fdb\u5883\u8fdf\u6ede\uff0c\u91cd\u5219\u7075\u529b\u9006\u884c\u3002',
+    artifactAbilities,
+    mismatchRisk: item.item_type === 'scripture'
+      ? '\u5f3a\u884c\u4fee\u4e60\u4e0d\u5408\u6839\u6027\u7684\u6cd5\u95e8\uff0c\u8f7b\u5219\u8fdb\u5883\u8fdf\u6ede\uff0c\u91cd\u5219\u7075\u529b\u9006\u884c\u3002'
+      : '\u6cd5\u5b9d\u7075\u7981\u53ef\u968f\u5668\u7269\u751f\u6548\uff0c\u4f46\u4fee\u4e3a\u4e0d\u8db3\u65f6\u4e3b\u52a8\u50ac\u52a8\u4f1a\u5a01\u529b\u6298\u51cf\u6216\u589e\u52a0\u53cd\u566c\u98ce\u9669\u3002',
   };
 }
 
@@ -655,10 +680,19 @@ export function evaluateTechniqueCompatibility(state: CharacterState, item: Item
   return { usable: adaptation > 0, adaptation, reasons, warnings, profile };
 }
 
+function isArtifactTechnique(profile?: TechniqueProfile): boolean {
+  return profile?.kind === 'artifact' || Boolean(profile?.artifactAbilities?.length);
+}
+
+function artifactAbilityPower(ability: NonNullable<TechniqueProfile['artifactAbilities']>[number], compatAdaptation: number): number {
+  const basePower = ability.power || 1;
+  return Number((basePower * Math.max(0.4, compatAdaptation || 0.4)).toFixed(2));
+}
+
 function adaptTechniqueEffect(state: CharacterState, item: ItemEntry, eff: any): any {
   if (item.item_type !== 'scripture' && item.item_type !== 'artifact') return eff;
   const compat = evaluateTechniqueCompatibility(state, item);
-  if (!compat.usable) return null;
+  if (!compat.usable && !isArtifactTechnique(compat.profile)) return null;
   if (compat.adaptation >= 0.98) return eff;
   if (eff.target_attribute === 'cultivationExp') {
     if (eff.operation === 'multiply') {
@@ -677,13 +711,30 @@ function adaptTechniqueEffect(state: CharacterState, item: ItemEntry, eff: any):
 export function buildLearnedCombatArts(state: CharacterState): { itemId: string; name: string; description: string; mpCost: number; power: number; rarity?: string; sourceType?: string; element?: 'metal' | 'wood' | 'water' | 'fire' | 'earth' | 'none'; adaptation?: number }[] {
   return (state.equipped || [])
     .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
-    .map(it => {
+    .flatMap(it => {
       const compat = evaluateTechniqueCompatibility(state, it);
-      if (!compat.usable) return null;
       const profile = compat.profile;
-      const spell = profile?.spell;
       const rarityCost = it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10;
-      return {
+      if (it.item_type === 'artifact') {
+        const abilities = profile?.artifactAbilities?.length
+          ? profile.artifactAbilities
+          : [{ name: it.name, description: it.description, mpCost: rarityCost, power: 1 + safeRarityIndex(it.rarity) * 0.35, element: 'none' as const }];
+        return abilities.map(ability => ({
+          itemId: it.id,
+          name: ability.name,
+          description: ability.description,
+          mpCost: Math.max(0, Math.floor(ability.mpCost ?? (ability.trigger === 'passive' || ability.trigger === 'auto' || ability.trigger === 'underwater' ? 0 : rarityCost))),
+          power: artifactAbilityPower(ability, compat.adaptation),
+          rarity: it.rarity,
+          sourceType: it.item_type,
+          element: ability.element,
+          adaptation: compat.adaptation,
+        }));
+      }
+      if (!compat.usable) return [];
+      const spell = profile?.spell;
+      if (!spell && !(profile?.traits || []).length) return [];
+      return [{
         itemId: it.id,
         name: spell?.name || it.name,
         description: spell?.description || it.description,
@@ -693,7 +744,7 @@ export function buildLearnedCombatArts(state: CharacterState): { itemId: string;
         sourceType: it.item_type,
         element: spell?.element,
         adaptation: compat.adaptation,
-      };
+      }];
     })
     .filter(Boolean)
     .slice(0, 8) as any;

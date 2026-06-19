@@ -703,6 +703,7 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
   * accessory(饰物)：effects 用 add，target 为 luck/comprehension/maxMp 等
   * artifact(法宝)：effects 用 add 或 multiply，target 为 attack/defense/speed/cultivationExp 等；高阶法宝可有 multiply 效果
     若法宝可施展法术，必须尽量给 technique.spell（name/description/mpCost/power/element）和 technique.requirements；法术也应受境界、灵根、五行、悟性或传承适配影响。
+    法宝可以自带器物灵禁/被动神通/主动攻击术，这不等于角色学会法术。自带法术的法宝算稀有品，应根据品质判断；可用 technique.artifactAbilities 描述如水中呼吸、自动护体、自动恢复耐久、提高修炼速度、主动攻击术等能力。
   * consumable(丹药)：effects 用 add，target 为 hp/mp/cultivationExp/lifespan 等；服用后消失
   * scripture(功法)：effects 必含一条 multiply cultivationExp（修炼倍率，凡品×1.2~1.5、良品×1.5~2.0、稀有×2.0~3.0、史诗×3.0~4.0、传说×4.0~5.0、神话×5.0~6.0）；必须尽量给 technique.requirements 与 technique.traits，写清灵根/境界/悟性/五行/传承门槛、适配风险和功法特性，不能只给白板修炼速度。
   * tool(器具)：可以是储物袋——effects 用 add，target 为 storageCapacity（如 +10 storageCapacity 表示增加 10 格容量）；储物袋获得即扩容，无需装备

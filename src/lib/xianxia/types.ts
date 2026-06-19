@@ -247,11 +247,24 @@ export interface TechniqueTrait {
   risk?: string;
 }
 
+export interface ArtifactAbility {
+  name: string;
+  description: string;
+  trigger?: 'passive' | 'active' | 'auto' | 'onHit' | 'onDamaged' | 'underwater' | 'cultivation';
+  mpCost?: number;
+  power?: number;
+  element?: ElementType | 'none';
+  effect?: StatusEffect;
+  permanentBuff?: boolean;
+  rarityNote?: string;
+}
+
 export interface TechniqueProfile {
-  kind?: 'cultivation' | 'combat' | 'body' | 'movement' | 'support' | 'forbidden';
+  kind?: 'cultivation' | 'combat' | 'body' | 'movement' | 'support' | 'forbidden' | 'artifact';
   requirements?: TechniqueRequirement;
   traits?: TechniqueTrait[];
   spell?: { name: string; description: string; mpCost?: number; power?: number; element?: ElementType | 'none' };
+  artifactAbilities?: ArtifactAbility[];
   mismatchRisk?: string;
 }
 
