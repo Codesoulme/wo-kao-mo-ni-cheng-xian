@@ -3,8 +3,9 @@
 import { useGameStore } from '@/lib/xianxia/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Compass } from 'lucide-react';
+import { ChevronDown, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 // 优先级 1-10 的颜色映射
 function priorityStyle(p: number): { color: string; bg: string; border: string } {
@@ -30,11 +31,16 @@ const INTENT_LABEL: Record<string, string> = {
 
 export function CharacterIntentsCard() {
   const { character } = useGameStore();
+  const [showAll, setShowAll] = useState(false);
   if (!character) return null;
   const intents: any[] = character.characterIntents || [];
 
-  // 按优先级降序
-  const sorted = [...intents].sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  // 按优先级降序；同优先级最近生成的在前
+  const sorted = [...intents]
+    .map((it, idx) => ({ ...it, __idx: idx }))
+    .sort((a, b) => (b.priority || 0) - (a.priority || 0) || (b.__idx || 0) - (a.__idx || 0));
+  const visibleIntents = showAll ? sorted : sorted.slice(0, 3);
+  const hiddenCount = Math.max(0, sorted.length - visibleIntents.length);
 
   return (
     <Card className="paper-texture">
@@ -57,7 +63,8 @@ export function CharacterIntentsCard() {
             心如止水，顺其自然。
           </p>
         ) : (
-          sorted.map((it, i) => {
+          <>
+            {visibleIntents.map((it, i) => {
             const p = it.priority || 1;
             const ps = priorityStyle(p);
             return (
@@ -85,15 +92,41 @@ export function CharacterIntentsCard() {
                   </div>
                   {it.description && (
                     <p className="text-[10px] text-muted-foreground font-serif-cn leading-relaxed line-clamp-2 mt-0.5">
-                      {it.description}
+                      {sanitizeIntentDescription(it.description)}
                     </p>
                   )}
                 </div>
               </div>
             );
-          })
+            })}
+            {sorted.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAll(v => !v)}
+                className="w-full rounded-md border border-dashed border-border/70 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
+              >
+                <ChevronDown className={cn("w-3 h-3 transition-transform", showAll && "rotate-180")} />
+                {showAll ? '收起所向' : `展开其余 ${hiddenCount} 条所向`}
+              </button>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
   );
+}
+
+
+function sanitizeIntentDescription(text: string): string {
+  return String(text || '')
+    .replace(/角色应主动/g, '心中已有念头，欲')
+    .replace(/角色必须/g, '心知此事须')
+    .replace(/不能被后续流年遗忘/g, '仍不可轻放')
+    .replace(/不可无故略过/g, '不宜轻轻揭过')
+    .replace(/不要让人际牵挂凭空消失/g, '旧缘不宜无声断去')
+    .replace(/deadline 临近/g, '期限渐近')
+    .replace(/若无武器应设法获取/g, '若兵器未备，须设法补足')
+    .replace(/若修为不足应闭关苦修/g, '若修为不足，便该闭关磨砺')
+    .replace(/说明暂时无法入内的原因/g, '另寻暂缓入内的缘由')
+    .trim();
 }

@@ -237,7 +237,7 @@ function groupCultivationFactors(factors: any[]): GroupedCultivationSource[] {
     });
   }
 
-  return groups;
+  return groups.reverse();
 }
 
 function formatGroupedEffect(eff: { operation: 'multiply' | 'add'; value: number }): string {

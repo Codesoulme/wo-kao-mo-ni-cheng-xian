@@ -42,16 +42,12 @@ export function StatusList() {
 
   if (!character) return null;
 
-  const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
-  const coreStatuses = visibleStatuses.filter(s =>
-    s.category === 'identity' || s.category === 'special'
-  );
-  const buffStatuses = visibleStatuses.filter(s =>
-    s.category === 'buff' || s.category === 'attribute' || s.category === 'skill'
-  );
-  const debuffStatuses = visibleStatuses.filter(s =>
-    s.category === 'debuff' || s.category === 'environment' || s.category === 'quest'
-  );
+  const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || [])
+    .map((s: any, idx: number) => ({ ...s, __idx: idx }))
+    .sort((a: any, b: any) => (b.__idx ?? 0) - (a.__idx ?? 0));
+  const coreStatuses = visibleStatuses.filter(s => classifyStatus(s) === 'core');
+  const buffStatuses = visibleStatuses.filter(s => classifyStatus(s) === 'buff');
+  const debuffStatuses = visibleStatuses.filter(s => classifyStatus(s) === 'debuff');
 
   return (
     <div className="space-y-3">
@@ -83,13 +79,13 @@ export function StatusList() {
               ) : (
                 <>
                   {coreStatuses.length > 0 && (
-                    <StatusGroup title="身份·命格" items={coreStatuses} />
+                    <StatusGroup title="身份·仙缘" items={coreStatuses} />
                   )}
                   {buffStatuses.length > 0 && (
-                    <StatusGroup title="增益·属性" items={buffStatuses} />
+                    <StatusGroup title="增益" items={buffStatuses} />
                   )}
                   {debuffStatuses.length > 0 && (
-                    <StatusGroup title="减益·环境" items={debuffStatuses} />
+                    <StatusGroup title="减益" items={debuffStatuses} />
                   )}
                 </>
               )}
@@ -114,6 +110,32 @@ export function StatusList() {
   );
 }
 
+
+function classifyStatus(status: any): 'core' | 'buff' | 'debuff' {
+  const text = `${status?.name || ''}${status?.description || ''}${status?.source || ''}`;
+  const effects = Array.isArray(status?.effects) ? status.effects : [];
+  const hasNegative = status?.category === 'debuff' || /毒|伤|虚弱|侵扰|反噬|诅咒|减|损|不利/.test(text)
+    || effects.some((e: any) => Number(e?.value ?? e?.delta ?? 0) < 0 || /降低|减少|削弱|受损|伤|毒|虚弱|不利|减/.test(`${e?.description || ''}${e?.attribute || ''}`));
+  if (hasNegative) return 'debuff';
+
+  const isFateLike = status?.category === 'identity' || status?.category === 'special' || status?.category === 'quest'
+    || /仙缘|机缘|因缘|秘境|传承|线索|潮|禁|门径|识门|悟息|玉片|残简|楼心|雾楼/.test(text);
+  const hasPositive = status?.category === 'buff' || status?.category === 'attribute'
+    || effects.some((e: any) => Number(e?.value ?? e?.delta ?? 0) > 0 || /提升|增加|增强|恢复|护持|加|微增/.test(`${e?.description || ''}${e?.attribute || ''}`));
+
+  if (isFateLike && status?.category !== 'buff' && !(status?.category === 'attribute' && hasPositive)) return 'core';
+  if (status?.category === 'skill' && !effects.length) return 'core';
+  if (hasPositive || status?.category === 'skill') return 'buff';
+  return 'core';
+}
+
+function displayCategoryLabel(status: any): string {
+  if (classifyStatus(status) === 'core' && status?.category !== 'identity') return '仙缘';
+  if (classifyStatus(status) === 'buff') return '增益';
+  if (classifyStatus(status) === 'debuff') return '减益';
+  return CATEGORY_LABEL[status?.category] || status?.category || '状态';
+}
+
 function effectTone(status: any, effect: any) {
   const text = `${effect?.description || ''}${effect?.attribute || ''}`;
   const value = Number(effect?.value ?? effect?.delta ?? 0);
@@ -125,11 +147,17 @@ function effectTone(status: any, effect: any) {
 }
 
 function StatusGroup({ title, items }: { title: string; items: any[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleItems = showAll ? items : items.slice(0, 3);
+  const hiddenCount = Math.max(0, items.length - visibleItems.length);
   return (
     <div>
-      <div className="text-[10px] text-muted-foreground mb-1 px-1">{title}</div>
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1 px-1">
+        <span>{title}</span>
+        <span>{showAll ? items.length : visibleItems.length}/{items.length}</span>
+      </div>
       <div className="space-y-1.5">
-        {items.map((s, i) => (
+        {visibleItems.map((s, i) => (
           <div
             key={i}
             className="rounded-md border p-2 text-xs"
@@ -149,7 +177,7 @@ function StatusGroup({ title, items }: { title: string; items: any[] }) {
                   <span className="text-[9px] text-muted-foreground">{s.duration}年</span>
                 )}
                 <span className="text-[9px] px-1 rounded bg-muted">
-                  {CATEGORY_LABEL[s.category] || s.category}
+                  {displayCategoryLabel(s)}
                 </span>
               </div>
             </div>
@@ -168,6 +196,16 @@ function StatusGroup({ title, items }: { title: string; items: any[] }) {
             )}
           </div>
         ))}
+        {items.length > 3 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(v => !v)}
+            className="w-full rounded-md border border-dashed border-border/70 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
+          >
+            <ChevronDown className={cn("w-3 h-3 transition-transform", showAll && "rotate-180")} />
+            {showAll ? '收起' : `展开其余 ${hiddenCount} 个`}
+          </button>
+        )}
       </div>
     </div>
   );

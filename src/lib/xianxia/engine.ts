@@ -1431,7 +1431,7 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
         id: `intent_due_${t.id}`,
         type: t.category === 'exploration' || t.category === 'mystery' || t.category === 'inheritance' ? 'explore_opportunity' : 'resolve_thread',
         title: `应约·${t.title}`,
-        description: `「${t.title}」已到约期。角色必须正面承接这段因果：前往赴约、尝试入境/应试/还愿，或写清楚为何暂时无法继续、为何改变心意；不可无故略过。${t.followUpHint ? `后续关窍：${t.followUpHint}` : ''}`,
+        description: `「${t.title}」已到约期。此事压在心头，须去赴约、入境、应试或还愿；若一时不能成行，也该给自己一个交代。${t.followUpHint ? `关窍：${t.followUpHint}` : ''}`,
         priority: 10,
         relatedThreadId: t.id,
       });
@@ -1442,7 +1442,7 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
         id: `intent_realm_${t.id}`,
         type: 'explore_opportunity',
         title: `牵挂·${t.title}`,
-        description: `「${t.title}」将在 ${remaining} 岁内重新牵动。角色应主动整理信物、参悟禁制、回访旧地，或说明暂时无法入内的原因；秘境/传承线索不能被后续流年遗忘。${t.followUpHint ? `后续关窍：${t.followUpHint}` : ''}`,
+        description: `「${t.title}」仍在心头，约莫 ${remaining} 岁内便会再起波澜。信物、禁制与旧地皆有未尽之意，若暂不能入内，也需另寻缘法。${t.followUpHint ? `关窍：${t.followUpHint}` : ''}`,
         priority: 9,
         relatedThreadId: t.id,
       });
@@ -1451,7 +1451,7 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
         id: `intent_promise_${t.id}`,
         type: 'socialize',
         title: `守约·${t.title}`,
-        description: `「${t.title}」临近。角色应主动履约、传信、探望或给出不得不失约的叙事原因；不要让人际牵挂凭空消失。`,
+        description: `「${t.title}」渐近，旧约旧人萦绕心间。或赴约，或传信，或亲自探望；若终究失约，也该有一番缘由。`,
         priority: 8,
         relatedThreadId: t.id,
       });
@@ -1461,7 +1461,7 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
         id: `intent_comp_${t.id}`,
         type: 'prepare_combat',
         title: `备战·${t.title}`,
-        description: `「${t.title}」将在 ${remaining} 岁后到来。角色应主动准备战斗装备、炼制或购买丹药、磨砺功法、请教前辈。若无武器应设法获取，若修为不足应闭关苦修。`,
+        description: `「${t.title}」将在 ${remaining} 岁后到来。兵器、丹药、功法与师长指点皆可早作筹谋；修为若浅，更该趁早磨砺。`,
         priority: 9,
         relatedThreadId: t.id,
       });
@@ -1470,7 +1470,7 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
         id: `intent_enemy_${t.id}`,
         type: 'avoid_danger',
         title: `防备·${t.title}`,
-        description: `「${t.title}」可能近期发作。角色应主动防备：随身携带防身法器、避免独行险地、寻求师长庇护或同门结伴。`,
+        description: `「${t.title}」近来隐有动静。独行险地需多留心，护身之物、师长照拂或同门同行，皆可保一线周全。`,
         priority: 8,
         relatedThreadId: t.id,
       });
@@ -1479,7 +1479,7 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
         id: `intent_quest_${t.id}`,
         type: 'resolve_thread',
         title: `推进·${t.title}`,
-        description: `「${t.title}」deadline 临近，角色应主动推进任务进度，采集材料、完成委托、寻觅目标等。`,
+        description: `「${t.title}」已近收束之时。材料、委托与目标仍需一一落实，不宜再久拖。`,
         priority: 8,
         relatedThreadId: t.id,
       });
@@ -1488,7 +1488,7 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
         id: `intent_debt_${t.id}`,
         type: 'gather_resources',
         title: `还债·${t.title}`,
-        description: `「${t.title}」即将到期，角色应主动筹措灵石或物品偿债，否则将有严重后果。`,
+        description: `「${t.title}」债期将近，灵石与抵偿之物都得早作筹措，否则恐生祸端。`,
         priority: 9,
         relatedThreadId: t.id,
       });

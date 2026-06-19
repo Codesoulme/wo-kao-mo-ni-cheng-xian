@@ -4,8 +4,9 @@ import { useGameStore } from '@/lib/xianxia/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ScrollText, Hourglass, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { ChevronDown, ScrollText, Hourglass, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 // 状态颜色映射：urgent 红 / pending 黄 / resolved 绿 / failed 灰
 const STATUS_STYLE: Record<string, {
@@ -43,8 +44,11 @@ const STATUS_STYLE: Record<string, {
 
 export function PendingThreadsCard() {
   const { character } = useGameStore();
+  const [showAll, setShowAll] = useState(false);
   if (!character) return null;
-  const threads: any[] = character.pendingThreads || [];
+  const threads: any[] = sortThreads(character.pendingThreads || []);
+  const visibleThreads = showAll ? threads : threads.slice(0, 3);
+  const hiddenCount = Math.max(0, threads.length - visibleThreads.length);
 
   return (
     <Card className="paper-texture">
@@ -67,7 +71,8 @@ export function PendingThreadsCard() {
             暂无未决之事，岁月静好。
           </p>
         ) : (
-          threads.map((t, i) => {
+          <>
+            {visibleThreads.map((t, i) => {
             const style = STATUS_STYLE[t.status] || STATUS_STYLE.pending;
             const age = character.age || 0;
             const remaining = (t.deadlineAge || 0) - age;
@@ -148,9 +153,33 @@ export function PendingThreadsCard() {
                 )}
               </div>
             );
-          })
+            })}
+            {threads.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAll(v => !v)}
+                className="w-full rounded-md border border-dashed border-border/70 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/30 transition-colors flex items-center justify-center gap-1"
+              >
+                <ChevronDown className={cn("w-3 h-3 transition-transform", showAll && "rotate-180")} />
+                {showAll ? '收起线索' : `展开其余 ${hiddenCount} 条线索`}
+              </button>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
   );
+}
+
+
+function sortThreads(threads: any[]): any[] {
+  const order: Record<string, number> = { urgent: 0, pending: 0, resolved: 1, failed: 2 };
+  return [...threads]
+    .map((t, idx) => ({ ...t, __idx: idx }))
+    .sort((a, b) => {
+      const oa = order[a.status] ?? 0;
+      const ob = order[b.status] ?? 0;
+      if (oa !== ob) return oa - ob;
+      return (b.__idx ?? 0) - (a.__idx ?? 0);
+    });
 }
