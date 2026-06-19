@@ -52,6 +52,36 @@ const BLUEPRINT_STYLE: Record<string, { bg: string; text: string; border: string
   daily:        { bg: 'bg-muted/40',       text: 'text-muted-foreground',              border: 'border-muted-foreground/30' },
 };
 
+
+function splitNarrativeParagraphs(text?: string): string[] {
+  const raw = String(text || '').trim();
+  if (!raw) return [];
+  const explicit = raw
+    .split(/\n+/)
+    .map(part => part.trim())
+    .filter(Boolean);
+  const source = explicit.length > 1 ? explicit : [raw];
+  const paragraphs: string[] = [];
+  for (const part of source) {
+    if (part.length <= 90) {
+      paragraphs.push(part);
+      continue;
+    }
+    const sentences = part.match(/[^。！？!?；;]+[。！？!?；;]?/g) || [part];
+    let current = '';
+    for (const sentence of sentences.map(s => s.trim()).filter(Boolean)) {
+      if (current && (current + sentence).length > 86) {
+        paragraphs.push(current);
+        current = sentence;
+      } else {
+        current += sentence;
+      }
+    }
+    if (current) paragraphs.push(current);
+  }
+  return paragraphs;
+}
+
 function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: string; name: string }; eventType?: string }) {
   if (!blueprint) return null;
   // “突破前夜/酝酿突破”是生成主题，不是玩家已成功突破的标签；成功破境只由 breakthrough 事件本身呈现。
@@ -303,9 +333,13 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 正文 - 可折叠 */}
                 {isExpanded && (
                   <div className="px-3 pb-2">
-                    <p className="text-xs leading-relaxed text-foreground/90 xianxia-prose">
-                      {event.narrative}
-                    </p>
+                    <div className="space-y-2 text-xs leading-relaxed text-foreground/90 xianxia-prose">
+                      {splitNarrativeParagraphs(event.narrative).map((paragraph, pIdx) => (
+                        <p key={pIdx} className="first-letter:pl-0">
+                          {paragraph}
+                        </p>
+                      ))}
+                    </div>
                     {/* 效果 */}
                     {visibleEffects.length > 0 && (
                       <div className="mt-2 flex flex-wrap gap-1">

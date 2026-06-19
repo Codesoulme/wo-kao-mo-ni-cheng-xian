@@ -5,7 +5,7 @@ import { CharacterState } from '@/lib/xianxia/store';
 import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
-import { Heart, Sparkles, MapPin, ChevronRight, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle, Coins, Sprout } from 'lucide-react';
+import { Heart, Sparkles, MapPin, ChevronRight, ChevronDown, Sword, Shield, Zap, Clover, Brain, Leaf, AlertTriangle, Coins, Sprout } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface StatusPanelProps {
@@ -15,6 +15,7 @@ interface StatusPanelProps {
 
 export function StatusPanel({ character }: StatusPanelProps) {
   const [detailOpen, setDetailOpen] = useState(false);
+  const [expandedVitals, setExpandedVitals] = useState(false);
   const lifespanLeft = character.lifespan - character.age;
   const hpPct = character.maxHp > 0
     ? Math.max(0, Math.min(100, (character.hp / character.maxHp) * 100))
@@ -47,22 +48,15 @@ export function StatusPanel({ character }: StatusPanelProps) {
   return (
     <>
       <div className="paper-texture rounded-xl border border-border/60 shadow-sm overflow-hidden">
-        {/* 顶部角色信息 - 可点击展开详情 */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setDetailOpen(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setDetailOpen(true);
-            }
-          }}
-          className="w-full text-left relative px-3 py-2.5 bg-gradient-to-r from-secondary/40 to-transparent hover:from-secondary/60 transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            {/* 境界球（可点击） */}
-            <div className="shrink-0 relative">
+        <div className="relative px-3 py-2.5 bg-gradient-to-r from-secondary/40 to-transparent">
+          <div className="flex items-start gap-3">
+            {/* 头像：只有这里进入详情，避免点顶部空白误触 */}
+            <button
+              type="button"
+              aria-label="查看角色详情"
+              onClick={() => setDetailOpen(true)}
+              className="shrink-0 relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 transition-transform active:scale-95"
+            >
               <RealmOrb
                 realmColor={character.realmColor}
                 realmName={character.realmName}
@@ -73,49 +67,79 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 size="sm"
                 showLabel={false}
               />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center">
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center shadow-sm">
                 <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
               </div>
-            </div>
+            </button>
 
-            {/* 名字 + 核心信息 */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <h2 className="font-serif-cn text-base font-bold truncate">{character.name}</h2>
-                <span className="seal text-[9px]">道</span>
-                {character.ascended && (
-                  <span className="text-[9px] px-1 rounded bg-yellow-400/20 text-yellow-600">飞升</span>
-                )}
-                {!character.alive && (
-                  <span className="text-[9px] px-1 rounded bg-destructive/20 text-destructive">陨落</span>
-                )}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h2 className="font-serif-cn text-base font-bold truncate">{character.name}</h2>
+                    <span className="seal text-[9px]">修</span>
+                    {character.ascended && (
+                      <span className="text-[9px] px-1 rounded bg-yellow-400/20 text-yellow-600">飞升</span>
+                    )}
+                    {!character.alive && (
+                      <span className="text-[9px] px-1 rounded bg-destructive/20 text-destructive">陨落</span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1 flex-wrap text-[10px] text-muted-foreground">
+                    <span className="rounded bg-muted/60 px-1.5 py-0.5 shrink-0">{genderLabel}</span>
+                    <span className="rounded bg-muted/60 px-1.5 py-0.5 shrink-0">{character.age}岁</span>
+                    <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700/90 shrink-0">寿余 {lifespanLeft} 岁</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedVitals(v => !v)}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/50 px-2 py-1 text-[10px] text-muted-foreground hover:bg-muted/60 transition-colors"
+                  aria-expanded={expandedVitals}
+                >
+                  {expandedVitals ? '收起' : '展开'}
+                  <ChevronDown className={`w-3 h-3 transition-transform ${expandedVitals ? 'rotate-180' : ''}`} />
+                </button>
               </div>
-              <div className="mt-1 space-y-1 text-[10px] text-muted-foreground">
-                <div className="flex items-center gap-1 flex-wrap">
+
+              {/* 境界与修为同区展示 */}
+              <div className="mt-2 rounded-lg border border-border/50 bg-background/40 px-2 py-1.5">
+                <div className="flex items-center justify-between gap-2 text-[10px]">
                   <span
-                    style={{ color: character.realmColor, background: `${character.realmColor}12` }}
-                    className="font-semibold rounded px-1.5 py-0.5 xianxia-chip-truncate max-w-full"
+                    style={{ color: character.realmColor }}
+                    className="font-semibold font-serif-cn truncate"
                   >
                     {character.realmName}{character.realmMaxLevel > 0 ? ` ${character.realmLevel + 1}层` : ''}
                   </span>
-                  <span className="rounded bg-muted/60 px-1.5 py-0.5 shrink-0">{genderLabel}</span>
-                  <span className="rounded bg-muted/60 px-1.5 py-0.5 shrink-0">{character.age}岁</span>
-                  <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-700/90 shrink-0">寿余 {lifespanLeft} 年</span>
-                </div>
-                <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-                  <span className="flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[110px] shrink">
-                    <Sprout className="w-2.5 h-2.5 shrink-0" />
-                    <span className="truncate">{rootLabel}</span>
-                  </span>
-                  <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[120px]">
-                    <MapPin className="w-2.5 h-2.5 shrink-0" />
-                    <span className="truncate">{character.location}</span>
-                  </span>
-                  <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 tabular-nums shrink-0">
-                    <Coins className="w-2.5 h-2.5" />
-                    {character.spiritStones}
+                  <span className="text-muted-foreground tabular-nums shrink-0">
+                    {character.cultivationExp}/{character.expToBreak}
                   </span>
                 </div>
+                <div className="mt-1 h-1.5 bg-muted/60 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${expPct}%`,
+                      background: `linear-gradient(to right, ${character.realmColor}99, ${character.realmColor})`,
+                      boxShadow: `0 0 5px ${character.realmColor}66`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-1.5 flex items-center gap-1 min-w-0 overflow-hidden text-[10px] text-muted-foreground">
+                <span className="flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[118px] shrink">
+                  <Sprout className="w-2.5 h-2.5 shrink-0" />
+                  <span className="truncate">{rootLabel}</span>
+                </span>
+                <span className="flex items-center gap-0.5 rounded bg-muted/50 px-1.5 py-0.5 min-w-0 max-w-[128px]">
+                  <MapPin className="w-2.5 h-2.5 shrink-0" />
+                  <span className="truncate">{character.location}</span>
+                </span>
+                <span className="flex items-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-amber-600 tabular-nums shrink-0">
+                  <Coins className="w-2.5 h-2.5" />
+                  {character.spiritStones}
+                </span>
               </div>
 
               {topStatuses.length > 0 && (
@@ -129,8 +153,6 @@ export function StatusPanel({ character }: StatusPanelProps) {
                           <span
                             role="button"
                             tabIndex={0}
-                            onClick={(e) => e.stopPropagation()}
-                            onKeyDown={(e) => e.stopPropagation()}
                             className="inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn shadow-sm cursor-pointer hover:scale-[1.02] transition-transform min-w-0 max-w-full"
                             style={{ borderColor: `${color}40`, background: `${color}10`, color }}
                           >
@@ -143,7 +165,6 @@ export function StatusPanel({ character }: StatusPanelProps) {
                           align="start"
                           side="bottom"
                           className="w-64 p-3 paper-texture border-primary/20 shadow-xl"
-                          onClick={(e) => e.stopPropagation()}
                         >
                           <div className="space-y-2 font-serif-cn">
                             <div className="flex items-start justify-between gap-2">
@@ -152,7 +173,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                                 <div className="text-[10px] text-muted-foreground mt-0.5">
                                   {statusCategoryLabel(s.category)}
                                   <span className="mx-1 opacity-50">·</span>
-                                  {s.duration === -1 ? '长驻' : s.duration ? `余 ${s.duration} 岁` : '短暂'}
+                                  {s.duration === -1 ? '长驻' : s.duration ? `余${s.duration}岁` : '短暂'}
                                 </div>
                               </div>
                               <span
@@ -192,63 +213,60 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 </div>
               )}
 
-              <div className="mt-1.5 grid grid-cols-5 gap-1">
-                {quickStats.map(stat => (
-                  <div
-                    key={stat.label}
-                    className="rounded-md border border-border/50 bg-background/45 px-1.5 py-1 text-center shadow-sm"
-                    title={`${stat.label}：${stat.value}`}
-                  >
-                    <div className="flex items-center justify-center gap-0.5 text-[9px] text-muted-foreground">
-                      <span style={{ color: stat.color }}>{stat.icon}</span>
-                      {stat.label}
-                    </div>
-                    <div className="text-[11px] leading-none mt-0.5 font-semibold tabular-nums" style={{ color: stat.color }}>
-                      {stat.value}
-                    </div>
+              {expandedVitals && (
+                <div className="mt-2 space-y-1.5 border-t border-border/40 pt-2 animate-in fade-in duration-150">
+                  <div className="grid grid-cols-5 gap-1">
+                    {quickStats.map(stat => (
+                      <div
+                        key={stat.label}
+                        className="rounded-md border border-border/50 bg-background/45 px-1.5 py-1 text-center shadow-sm"
+                        title={`${stat.label}：${stat.value}`}
+                      >
+                        <div className="flex items-center justify-center gap-0.5 text-[9px] text-muted-foreground">
+                          <span style={{ color: stat.color }}>{stat.icon}</span>
+                          {stat.label}
+                        </div>
+                        <div className="text-[11px] leading-none mt-0.5 font-semibold tabular-nums" style={{ color: stat.color }}>
+                          {stat.value}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
 
-              {dynamicAttributes.length > 0 && (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {dynamicAttributes.map((attr: any, idx: number) => (
-                    <span
-                      key={attr.id || `${attr.name}-${idx}`}
-                      className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary shadow-sm"
-                      title={`${attr.name}：${attr.description || attr.value || ''}`}
-                    >
-                      <Sparkles className="h-2.5 w-2.5 shrink-0" />
-                      <span className="max-w-[88px] truncate font-serif-cn">{attr.name}</span>
-                      {attr.value !== undefined && attr.value !== '' && (
-                        <span className="shrink-0 opacity-75">{attr.value}</span>
-                      )}
-                    </span>
-                  ))}
+                  {dynamicAttributes.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {dynamicAttributes.map((attr: any, idx: number) => (
+                        <span
+                          key={attr.id || `${attr.name}-${idx}`}
+                          className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-full border border-primary/25 bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary shadow-sm"
+                          title={`${attr.name}：${attr.description || attr.value || ''}`}
+                        >
+                          <Sparkles className="h-2.5 w-2.5 shrink-0" />
+                          <span className="max-w-[88px] truncate font-serif-cn">{attr.name}</span>
+                          {attr.value !== undefined && attr.value !== '' && (
+                            <span className="shrink-0 opacity-75">{attr.value}</span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="space-y-1">
+                    <MiniBar
+                      icon={<Heart className="w-2.5 h-2.5" />}
+                      color="#c8453c"
+                      pct={hpPct}
+                      label={`${character.hp}/${character.maxHp}`}
+                    />
+                    <MiniBar
+                      icon={<Sparkles className="w-2.5 h-2.5" />}
+                      color="#2e8f8a"
+                      pct={mpPct}
+                      label={`${character.mp}/${character.maxMp}`}
+                    />
+                  </div>
                 </div>
               )}
-
-              {/* 生命、灵力、修为 三进度条（寿元仅保留文字显示） */}
-              <div className="mt-1.5 space-y-1">
-                <MiniBar
-                  icon={<Heart className="w-2.5 h-2.5" />}
-                  color="#c8453c"
-                  pct={hpPct}
-                  label={`${character.hp}/${character.maxHp}`}
-                />
-                <MiniBar
-                  icon={<Sparkles className="w-2.5 h-2.5" />}
-                  color="#2e8f8a"
-                  pct={mpPct}
-                  label={`${character.mp}/${character.maxMp}`}
-                />
-                <MiniBar
-                  icon={<Zap className="w-2.5 h-2.5" />}
-                  color={character.realmColor}
-                  pct={expPct}
-                  label={`${character.cultivationExp}/${character.expToBreak}`}
-                />
-              </div>
             </div>
           </div>
         </div>
