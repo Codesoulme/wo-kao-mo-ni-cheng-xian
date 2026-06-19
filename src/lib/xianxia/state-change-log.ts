@@ -81,6 +81,9 @@ function summarizeStructuralDiff(before: CharacterState, after: CharacterState, 
   if (!before.combatSession && after.combatSession) {
     push(out, age, 'combat', 'info', 'combat_started', `Combat started: ${after.combatSession.contextTitle}`, { refId: after.combatSession.id });
   }
+  if (before.combatSession && !after.combatSession) {
+    push(out, age, 'combat', before.combatSession.status === 'defeat' ? 'warning' : 'info', 'combat_ended', `Combat ended: ${before.combatSession.contextTitle || before.combatSession.status}`, { refId: before.combatSession.id, meta: { result: before.combatSession.status } });
+  }
 }
 
 export function buildStateChangeLog(args: BuildStateChangeLogArgs): StateChangeLogEntry[] {

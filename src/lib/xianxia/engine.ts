@@ -1866,7 +1866,7 @@ function deriveWorldFactsFromState(state: CharacterState, source: string): World
   return facts;
 }
 
-function refreshWorldFacts(state: CharacterState, source: string): CharacterState {
+export function refreshWorldFacts(state: CharacterState, source: string): CharacterState {
   return upsertWorldFacts(state, deriveWorldFactsFromState(state, source));
 }
 
