@@ -241,6 +241,7 @@ export async function POST(req: NextRequest) {
         characterIntentsJson: JSON.stringify(finalState.characterIntents || []),
         combatStateJson: finalState.combatSession ? JSON.stringify(finalState.combatSession) : '',
         npcsJson: JSON.stringify(finalState.npcs || []),
+        causalGraphJson: JSON.stringify(finalState.causalGraph || { nodes: [], edges: [] }),
         recentEventTypesJson: JSON.stringify(recentEventTypes),
         recentBlueprintCategoriesJson: JSON.stringify(newRecentBlueprintCategories),
         // Task 22: 心魔值

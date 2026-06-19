@@ -94,6 +94,8 @@ model Character {
   recentEventTypesJson String @default("[]")
   // NPC 持久化 Lite：WorldNpc[]，记录已出现的重要人物，供后续事件回响。
   npcsJson String @default("[]")
+  // 因果图 Lite：CausalGraph，记录事件/线索/NPC/奖励之间的可追踪关系。
+  causalGraphJson String @default("{\"nodes\":[],\"edges\":[]}")
   // 最近蓝图分类列表（用于反重复机制）
   recentBlueprintCategoriesJson String @default("[]")
   // ===== Task 22 新增 =====

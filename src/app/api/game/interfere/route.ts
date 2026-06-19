@@ -192,6 +192,7 @@ export async function POST(req: NextRequest) {
         characterIntentsJson: JSON.stringify(state.characterIntents || []),
         combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : '',
         npcsJson: JSON.stringify(state.npcs || []),
+        causalGraphJson: JSON.stringify(state.causalGraph || { nodes: [], edges: [] }),
         // Task 22: 心魔值
         heartDemon: state.heartDemon ?? 0,
         // Task 23: 灵宠

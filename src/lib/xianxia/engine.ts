@@ -42,6 +42,9 @@ import {
   SECRET_REALMS,
   ExplorationRecord,
   WorldNpc,
+  CausalGraph,
+  CausalNode,
+  CausalEdge,
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import {
@@ -82,6 +85,7 @@ export interface DBCharacter {
   // ===== Task 24 新增 =====
   exploredRealmsJson?: string;
   npcsJson?: string;
+  causalGraphJson?: string;
 }
 
 // 旧存档 equippedJson 可能是 slot-map（{weapon: {...}}）或已是数组（[{...}]）
@@ -161,6 +165,7 @@ export function dbToState(c: DBCharacter): CharacterState {
     // Task 24 新字段
     exploredRealms: safeParse<ExplorationRecord[]>((c as any).exploredRealmsJson || '[]', []),
     npcs: safeParse<WorldNpc[]>((c as any).npcsJson || '[]', []),
+    causalGraph: safeParse<CausalGraph>((c as any).causalGraphJson || '{ "nodes": [], "edges": [] }', { nodes: [], edges: [] }),
   };
   // 持久化的 recentEventTypes / recentBlueprintCategories 不进 state（仅 ctx 用），但需要保留
   // 这里通过闭包变量传给 buildStateContext（在 advance route 中调用）
@@ -1295,6 +1300,7 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
   const safeCultivationFactors = Array.isArray(state.cultivationFactors) ? state.cultivationFactors : [];
   const safeLongTermMemory = Array.isArray(state.longTermMemory) ? state.longTermMemory : [];
   const safeNpcs = Array.isArray(state.npcs) ? state.npcs : [];
+  const safeCausalGraph = state.causalGraph && Array.isArray(state.causalGraph.nodes) && Array.isArray(state.causalGraph.edges) ? state.causalGraph : { nodes: [], edges: [] };
   // 找下一个未完成的命节点
   const nextNode = FATE_NODES.find(n => !completedFateNodes.includes(n.index));
   // Task 20: 推进 urgent 线索状态（deadlineAge - age <= 3 视为 urgent）
@@ -1342,6 +1348,11 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     recentEvents: safeRecentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
     longTermMemory: safeLongTermMemory.slice(-10),
     npcs: safeNpcs.slice(-20),
+    causalGraph: {
+      nodes: safeCausalGraph.nodes.slice(-30),
+      edges: safeCausalGraph.edges.slice(-50),
+      updatedAtAge: safeCausalGraph.updatedAtAge,
+    },
     completedFateNodes,
     availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
@@ -1577,6 +1588,90 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
 // ==================== Task 20: 未决线索管理 ====================
 
 
+// ==================== CausalGraph Lite ====================
+
+function causalId(prefix: string, seed: string): string {
+  const safe = String(seed || '').replace(/[^a-zA-Z0-9_\u4e00-\u9fa5-]/g, '_').slice(0, 48);
+  return prefix + '_' + (safe || Date.now().toString(36));
+}
+
+function normalizeCausalGraph(graph?: CausalGraph): CausalGraph {
+  return {
+    nodes: Array.isArray(graph?.nodes) ? graph!.nodes : [],
+    edges: Array.isArray(graph?.edges) ? graph!.edges : [],
+    updatedAtAge: graph?.updatedAtAge,
+  };
+}
+
+function appendCausalGraph(state: CharacterState, nodes: CausalNode[], edges: CausalEdge[]): CharacterState {
+  if (!nodes.length && !edges.length) return state;
+  const graph = normalizeCausalGraph(state.causalGraph);
+  const nodeMap = new Map<string, CausalNode>();
+  for (const node of graph.nodes) if (node?.id) nodeMap.set(node.id, node);
+  for (const node of nodes) if (node?.id) nodeMap.set(node.id, node);
+
+  const edgeMap = new Map<string, CausalEdge>();
+  for (const edge of graph.edges) if (edge?.id) edgeMap.set(edge.id, edge);
+  for (const edge of edges) if (edge?.id && edge.from && edge.to) edgeMap.set(edge.id, edge);
+
+  return {
+    ...state,
+    causalGraph: {
+      nodes: Array.from(nodeMap.values()).slice(-160),
+      edges: Array.from(edgeMap.values()).slice(-240),
+      updatedAtAge: state.age,
+    },
+  };
+}
+
+function recordEventCausality(state: CharacterState, aiOutput: AIEventOutput): CharacterState {
+  const age = state.age;
+  const eventId = causalId('event', age + '_' + (aiOutput.title || 'event'));
+  const nodes: CausalNode[] = [{
+    id: eventId,
+    type: aiOutput.triggerCombat ? 'combat' : 'event',
+    label: aiOutput.title || '无名事件',
+    age,
+    summary: (aiOutput.causalSummary || aiOutput.memory || aiOutput.narrative || '').slice(0, 180),
+    tags: [aiOutput.eventType || 'normal'],
+  }];
+  const edges: CausalEdge[] = [];
+
+  for (const thread of state.pendingThreads || []) {
+    const nodeId = causalId('thread', thread.id);
+    nodes.push({ id: nodeId, type: 'thread', label: thread.title, age: thread.startAge || age, refId: thread.id, summary: thread.description?.slice(0, 140), tags: [thread.status, thread.category] });
+    const edgeType = (aiOutput.completeThreadIds || []).includes(thread.id) ? 'resolved'
+      : (aiOutput.failThreadIds || []).includes(thread.id) ? 'failed'
+      : (aiOutput.newThreads || []).some(t => t.id === thread.id) ? 'created'
+      : (aiOutput.advanceThreads || []).some(t => t.id === thread.id) ? 'updated'
+      : undefined;
+    if (edgeType) edges.push({ id: causalId('edge', eventId + '_' + edgeType + '_' + nodeId), from: eventId, to: nodeId, type: edgeType, age, summary: thread.followUpHint || thread.description?.slice(0, 80) });
+  }
+
+  for (const npc of state.npcs || []) {
+    const mentioned = (aiOutput.newNpcs || []).some(n => n.id === npc.id || n.name === npc.name) || (aiOutput.triggerCombat?.enemies || []).some(e => npc.name && e.name === npc.name);
+    if (!mentioned) continue;
+    const nodeId = causalId('npc', npc.id);
+    nodes.push({ id: nodeId, type: 'npc', label: npc.name, age: npc.firstMetAge ?? age, refId: npc.id, summary: npc.memory || npc.description, tags: [npc.attitude, npc.role || 'npc'].filter(Boolean) });
+    edges.push({ id: causalId('edge', eventId + '_mentions_' + nodeId), from: eventId, to: nodeId, type: 'mentions', age, summary: npc.memory || npc.description?.slice(0, 80) });
+  }
+
+  for (const item of [...(aiOutput.newItems || []), ...(aiOutput.newEquippedItems || [])]) {
+    if (!item?.id || !item?.name) continue;
+    const nodeId = causalId('item', item.id);
+    nodes.push({ id: nodeId, type: 'item', label: item.name, age, refId: item.id, summary: item.description?.slice(0, 120), tags: [item.rarity, item.item_type].filter(Boolean) });
+    edges.push({ id: causalId('edge', eventId + '_rewards_' + nodeId), from: eventId, to: nodeId, type: 'rewards', age, summary: item.source });
+  }
+
+  for (const status of aiOutput.newStatuses || []) {
+    if (!status?.id || !status?.name) continue;
+    const nodeId = causalId('status', status.id);
+    nodes.push({ id: nodeId, type: 'status', label: status.name, age, refId: status.id, summary: status.description?.slice(0, 120), tags: [status.category] });
+    edges.push({ id: causalId('edge', eventId + '_caused_' + nodeId), from: eventId, to: nodeId, type: 'caused', age, summary: status.description?.slice(0, 80) });
+  }
+
+  return appendCausalGraph(state, nodes, edges);
+}
 // ==================== NPC Persistence Lite ====================
 
 function mergeNpc(existing: WorldNpc, incoming: WorldNpc): WorldNpc {
@@ -2325,6 +2420,8 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   // 8. 角色主动意图重新生成（每岁重算）
   next.characterIntents = generateCharacterIntents(next, next.pendingThreads);
 
+  next = recordEventCausality(next, aiOutput);
+
   const appliedChanges = (aiOutput.changes || []).filter(ch => ATTRIBUTE_BOUNDS[ch.attribute]);
 
   return {
@@ -2393,6 +2490,7 @@ export function stateToResponse(s: CharacterState) {
     characterIntents: s.characterIntents || [],
     combatSession: s.combatSession || null,
     npcs: s.npcs || [],
+    causalGraph: s.causalGraph || { nodes: [], edges: [] },
     // Task 22 新字段
     heartDemon: s.heartDemon ?? 0,
     // Task 23 新字段

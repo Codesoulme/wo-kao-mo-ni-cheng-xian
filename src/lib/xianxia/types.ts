@@ -463,6 +463,34 @@ export interface WorldNpc {
   tags?: string[];
 }
 
+export type CausalNodeType = 'event' | 'thread' | 'npc' | 'item' | 'status' | 'realm' | 'memory' | 'choice' | 'combat' | 'system';
+export type CausalEdgeType = 'created' | 'updated' | 'resolved' | 'failed' | 'mentions' | 'caused' | 'rewards' | 'harms' | 'continues' | 'triggers';
+
+export interface CausalNode {
+  id: string;
+  type: CausalNodeType;
+  label: string;
+  age: number;
+  refId?: string;
+  summary?: string;
+  tags?: string[];
+}
+
+export interface CausalEdge {
+  id: string;
+  from: string;
+  to: string;
+  type: CausalEdgeType;
+  age: number;
+  summary?: string;
+}
+
+export interface CausalGraph {
+  nodes: CausalNode[];
+  edges: CausalEdge[];
+  updatedAtAge?: number;
+}
+
 export type InputClass = 'action' | 'dialogue' | 'overreach' | 'rule_manipulation';
 
 // AI 生成的叙事事件
@@ -531,6 +559,7 @@ export interface AIEventOutput {
   // ===== Task 20 新增 =====
   // AI 添加新的未决线索（如"三个月后宗门比武""仇敌誓要报复"）
   newNpcs?: Partial<WorldNpc>[];
+  causalSummary?: string;
   newThreads?: PendingThread[];
   // AI 推进现有线索的进度（id + 进度增量）
   advanceThreads?: { id: string; progressDelta: number; note?: string }[];
@@ -690,6 +719,7 @@ export interface EngineStateContext {
   // ===== Task 20 新增 =====
   // 本轮事件蓝图主题（引擎抽取，AI 必须围绕此主题生成事件）
   npcs: WorldNpc[];
+  causalGraph: CausalGraph;
   blueprint?: EventBlueprint;
   // 未决线索列表（AI 必须保持连续性；deadlineAge 临近的标记为 urgent）
   pendingThreads: PendingThread[];
@@ -782,6 +812,7 @@ export interface CharacterState {
   // ===== Task 20 新增 =====
   // 未决线索列表（重要剧情线索，会在后续推进/到期触发）
   npcs: WorldNpc[];
+  causalGraph: CausalGraph;
   pendingThreads: PendingThread[];
   // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）
   characterIntents: CharacterIntent[];
