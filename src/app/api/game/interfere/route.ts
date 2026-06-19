@@ -7,7 +7,9 @@ import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
+import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -40,7 +42,18 @@ export async function POST(req: NextRequest) {
     }));
 
     let state = dbToState(char);
-    const stateBeforeInterfere = { ...state };
+    const stateBeforeInterfere = {
+      ...state,
+      inventory: [...(state.inventory || [])],
+      equipped: [...(state.equipped || [])],
+      activeStatuses: [...(state.activeStatuses || [])],
+      pendingThreads: [...(state.pendingThreads || [])],
+      npcs: [...(state.npcs || [])],
+      pets: [...(state.pets || [])],
+      worldFacts: [...(state.worldFacts || [])],
+    };
+    const contentRegistryTrace: ValidationTrace[] = [];
+    const contentRegistryWarnings: string[] = [];
     const ctx = buildStateContext(state, recentEvents);
 
     const result = await generateInterfereResponse(ctx, input.trim());
@@ -84,6 +97,8 @@ export async function POST(req: NextRequest) {
           age: state.age,
           existingIds: (state.npcs || []).map(n => n.id),
         });
+        contentRegistryTrace.push(...registeredNpcs.trace);
+        contentRegistryWarnings.push(...registeredNpcs.warnings);
         state = upsertNpcs(state, registeredNpcs.accepted);
       }
       if (result.advanceThreads && result.advanceThreads.length) {
@@ -155,6 +170,16 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+    const stateChangeLog = result.accepted ? buildStateChangeLog({
+      before: stateBeforeInterfere,
+      after: state,
+      appliedChanges: result.changes || [],
+      rejectedChanges: [],
+      contentRegistryTrace,
+      effectResolveTrace: [],
+      aiBoundaryTrace: [],
+    }) : [];
+
 
     // 持久化
     await db.character.update({
@@ -213,6 +238,7 @@ export async function POST(req: NextRequest) {
       newPets: result.newPets,
       removedItemIds: result.removedItemIds,
     }) : [];
+    const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
     // 写入干扰日志
     await db.interferenceLog.create({
@@ -222,7 +248,7 @@ export async function POST(req: NextRequest) {
         input: input.trim(),
         classification: result.classification,
         response: result.narrative,
-        effects: JSON.stringify(displayEffects),
+        effects: JSON.stringify(effectsWithAudit),
         accepted: result.accepted,
       },
     });
@@ -235,7 +261,7 @@ export async function POST(req: NextRequest) {
         title: result.accepted ? '干扰·天道回响' : '干扰·世界如常',
         narrative: result.narrative,
         eventType: 'interference',
-        effects: JSON.stringify(displayEffects),
+        effects: JSON.stringify(effectsWithAudit),
       },
     });
 

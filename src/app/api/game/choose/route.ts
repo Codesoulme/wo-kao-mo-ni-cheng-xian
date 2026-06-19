@@ -7,7 +7,9 @@ import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
+import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -46,7 +48,18 @@ export async function POST(req: NextRequest) {
     }));
 
     let state = dbToState(char);
-    const stateBeforeChoice = { ...state };
+    const stateBeforeChoice = {
+      ...state,
+      inventory: [...(state.inventory || [])],
+      equipped: [...(state.equipped || [])],
+      activeStatuses: [...(state.activeStatuses || [])],
+      pendingThreads: [...(state.pendingThreads || [])],
+      npcs: [...(state.npcs || [])],
+      pets: [...(state.pets || [])],
+      worldFacts: [...(state.worldFacts || [])],
+    };
+    const contentRegistryTrace: ValidationTrace[] = [];
+    const contentRegistryWarnings: string[] = [];
     const ctx = buildStateContext(state, recentEvents);
 
     // Task 22: 读取 pendingChoice 中的 deferredCombat（advance 时若同时有 choice + combat，战斗延迟到选择后触发）
@@ -96,6 +109,8 @@ export async function POST(req: NextRequest) {
         age: state.age,
         existingIds: (state.npcs || []).map(n => n.id),
       });
+      contentRegistryTrace.push(...registeredNpcs.trace);
+      contentRegistryWarnings.push(...registeredNpcs.warnings);
       state = upsertNpcs(state, registeredNpcs.accepted);
     }
     if (result.advanceThreads && result.advanceThreads.length) {
@@ -162,6 +177,16 @@ export async function POST(req: NextRequest) {
 
     // 若结果还需要继续抉择（如拍卖会继续出价），保留选择态；否则退出选择态。
     state.isAtChoice = !!nextChoice;
+    const stateChangeLog = buildStateChangeLog({
+      before: stateBeforeChoice,
+      after: state,
+      appliedChanges: result.changes || [],
+      rejectedChanges: [],
+      contentRegistryTrace,
+      effectResolveTrace: [],
+      aiBoundaryTrace: [],
+    });
+
 
     // 持久化
     await db.character.update({
@@ -236,6 +261,7 @@ export async function POST(req: NextRequest) {
       newPets: result.newPets,
       removedItemIds: result.removedItemIds,
     });
+    const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
     // 写入事件日志
     await db.eventLog.create({
@@ -245,7 +271,7 @@ export async function POST(req: NextRequest) {
         title: `抉择：${chosenOption.text.slice(0, 12)}`,
         narrative: result.narrative,
         eventType: 'choice',
-        effects: JSON.stringify(displayEffects),
+        effects: JSON.stringify(effectsWithAudit),
       },
     });
 
