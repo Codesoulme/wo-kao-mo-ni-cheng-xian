@@ -27,6 +27,7 @@ import {
   EventBlueprint,
 } from './types';
 import { ensureUniqueIds, filterMeaningfulStatuses } from './engine';
+import { deriveWorldFactStateProfile } from './event-scheduler';
 
 type RuntimeAIConfig = {
   baseUrl: string;
@@ -229,7 +230,10 @@ function buildWorldFactFocusList(ctx: EngineStateContext): string {
     })
     .slice(0, 16);
   if (!facts.length) return '暂无已确认的长期世界事实。';
-  return facts.map(f => `- [${f.kind}][confidence:${f.confidence}][seen:${f.firstSeenAge}-${f.lastSeenAge}] ${f.title}：${textLimit(f.summary, 180)}${f.tags?.length ? `；标记：${f.tags.slice(0, 5).join('、')}` : ''}`).join('\n');
+  return facts.map(f => {
+    const profile = deriveWorldFactStateProfile(f, ctx.character as any);
+    return `- [${f.kind}][confidence:${f.confidence}][seen:${f.firstSeenAge}-${f.lastSeenAge}] ${f.title}：${textLimit(f.summary, 180)}${f.tags?.length ? `；标记：${f.tags.slice(0, 5).join('、')}` : ''}${profile ? `；${textLimit(profile.summary, 180)}` : ''}`;
+  }).join('\n');
 }
 
 function npcAutonomousHintText(n: any): string {

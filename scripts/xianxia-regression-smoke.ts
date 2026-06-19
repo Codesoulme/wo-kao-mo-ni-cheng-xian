@@ -1,5 +1,5 @@
 ﻿import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
-import { buildEventSchedulerPlan } from '../src/lib/xianxia/event-scheduler';
+import { buildEventSchedulerPlan, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { deriveWorldEventConsequences, deriveWorldFactsFromState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
 import { appendStateChangeAuditEffect } from '../src/lib/xianxia/state-change-log';
 
@@ -154,6 +154,50 @@ function smokeWorldFactsLite(): void {
   log('worldfacts-lite', { passed: true, facts: facts.length, hints: plan.hints.length });
 }
 
+function smokeFactionLocationStateProfiles(): void {
+  const state: any = {
+    age: 46,
+    location: '青岚坊市',
+    npcs: [{
+      id: 'npc_shadow',
+      name: '阴鸦客',
+      faction: '黑鸦会',
+      attitude: 'hostile',
+      relationshipScore: -40,
+      firstMetAge: 44,
+      lastSeenAge: 46,
+      lastKnownLocation: '青岚坊市',
+      source: 'auction',
+      tags: ['auction', 'aftermath'],
+    }],
+    pendingThreads: [{
+      id: 'thread_ambush',
+      title: '坊市外的黑鸦盯梢',
+      description: '黑鸦会在青岚坊市外盯梢，可能截杀夺钥。',
+      category: 'enemy',
+      startAge: 45,
+      deadlineAge: 47,
+      status: 'pending',
+      progress: 30,
+      followUpHint: '可让黑鸦会追责、通缉或伏击。',
+    }],
+    questEntries: [],
+    causalGraph: { nodes: [], edges: [] },
+    worldFacts: [
+      { id: 'wf_location_market', kind: 'location', title: '青岚坊市', summary: '近期拍卖余波未散。', confidence: 0.8, firstSeenAge: 44, lastSeenAge: 46, source: 'smoke', tags: ['location', 'market', 'auction', 'event-consequence'] },
+      { id: 'wf_faction_black', kind: 'faction', title: '黑鸦会', summary: '黑鸦会与旧洞府铜钥余波相连。', confidence: 0.8, firstSeenAge: 44, lastSeenAge: 46, source: 'smoke', tags: ['faction', 'hostile', 'danger'] },
+    ],
+  };
+  const locationProfile = deriveWorldFactStateProfile(state.worldFacts[0], state);
+  const factionProfile = deriveWorldFactStateProfile(state.worldFacts[1], state);
+  assert(locationProfile?.summary.includes('危险度') && locationProfile.summary.includes('交易活跃') && locationProfile.summary.includes('近期传闻'), 'location profile should expose danger/trade/rumor state');
+  assert(factionProfile?.summary.includes('追责压力') && factionProfile.summary.includes('观察倾向') && factionProfile.summary.includes('NPC关联压力'), 'faction profile should expose pressure/observation/npc state');
+  const plan = buildEventSchedulerPlan(state);
+  assert(plan.hints.some(h => h.title === '青岚坊市' && h.reason.includes('地点画像')), 'scheduler should include location state profile');
+  assert(plan.hints.some(h => h.title === '黑鸦会' && h.reason.includes('势力画像') && h.reason.includes('追责')), 'scheduler should include faction state profile');
+  log('faction-location-state', { passed: true, location: locationProfile?.summary, faction: factionProfile?.summary, hints: plan.hints.length });
+}
+
 function smokeWorldEventConsequences(): void {
   const state: any = {
     age: 45,
@@ -265,6 +309,7 @@ async function main(): Promise<void> {
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
   smokeWorldFactsLite();
+  smokeFactionLocationStateProfiles();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();

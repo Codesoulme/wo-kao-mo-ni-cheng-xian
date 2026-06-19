@@ -83,6 +83,120 @@ function worldFactAutonomousTail(fact: { kind?: string; tags?: string[] }): stri
   return '此势力可通过任务、传闻、交易、盘问或人情往来自然牵动角色。';
 }
 
+export interface WorldFactStateProfile {
+  scope: 'location' | 'faction';
+  summary: string;
+  priorityBoost: number;
+  rumorTypes?: string[];
+}
+
+function levelText(value: number): '低' | '中' | '高' | '极高' {
+  if (value >= 75) return '极高';
+  if (value >= 50) return '高';
+  if (value >= 25) return '中';
+  return '低';
+}
+
+function boundedScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function relatedTextCount(texts: string[], pattern: RegExp): number {
+  return texts.filter(text => pattern.test(text)).length;
+}
+
+function deriveLocationProfile(fact: { title?: string; summary?: string; tags?: string[] }, state: CharacterState): WorldFactStateProfile {
+  const title = String(fact.title || '此地');
+  const tags = fact.tags || [];
+  const factText = [fact.title, fact.summary, ...tags].filter(Boolean).join('；');
+  const localNpcs = (state.npcs || []).filter((npc: any) => String(npc.lastKnownLocation || '').includes(title) || title.includes(String(npc.lastKnownLocation || '___')));
+  const hostileNpcCount = localNpcs.filter((npc: any) => ['enemy', 'hostile'].includes(npc.attitude)).length;
+  const friendlyNpcCount = localNpcs.filter((npc: any) => ['ally', 'friendly'].includes(npc.attitude)).length;
+  const threadTexts = (state.pendingThreads || []).map(thread => [thread.title, thread.description, thread.followUpHint, thread.sourceEventTitle].filter(Boolean).join('；'));
+  const relatedThreads = threadTexts.filter(text => text.includes(title) || /秘境|洞府|遗迹|拍卖|坊市|黑市|截杀|盯梢|追踪/.test(text));
+  const danger = boundedScore(
+    (tags.includes('danger') ? 35 : 0) +
+    (tags.includes('conflict') ? 30 : 0) +
+    hostileNpcCount * 18 +
+    relatedTextCount(relatedThreads, /截杀|劫杀|追踪|盯梢|危险|邪|魔|煞|冲突/) * 12 +
+    (/邪|魔|劫|险|毒|煞|禁|死|乱|战/.test(factText) ? 22 : 0)
+  );
+  const tradeActivity = boundedScore(
+    (tags.includes('market') ? 40 : 0) +
+    (tags.includes('auction') ? 28 : 0) +
+    (tags.includes('trade') ? 20 : 0) +
+    relatedTextCount(relatedThreads, /坊市|黑市|拍卖|交易|商会|买|卖/) * 12
+  );
+  const realmVolatility = boundedScore(
+    (tags.includes('realm') || tags.includes('realm-hint') || tags.includes('exploration') ? 35 : 0) +
+    relatedTextCount(relatedThreads, /秘境|洞府|遗迹|遗府|禁制|信物|钥|传承/) * 14 +
+    (/秘境|洞府|遗迹|遗府|禁制|浮阁|传承/.test(factText) ? 20 : 0)
+  );
+  const rumorTypes = [
+    tradeActivity >= 25 ? '资源流向' : '',
+    danger >= 25 ? '凶险风声' : '',
+    realmVolatility >= 25 ? '秘境异动' : '',
+    hostileNpcCount > 0 ? '仇家踪迹' : '',
+    friendlyNpcCount > 0 ? '熟人照应' : '',
+  ].filter(Boolean);
+  return {
+    scope: 'location',
+    summary: `地点画像：危险度${levelText(danger)}(${danger})，交易活跃${levelText(tradeActivity)}(${tradeActivity})，秘境波动${levelText(realmVolatility)}(${realmVolatility})，近期传闻：${rumorTypes.join('、') || '乡野日常'}。`,
+    priorityBoost: Math.min(32, danger * 0.16 + tradeActivity * 0.12 + realmVolatility * 0.14 + hostileNpcCount * 4),
+    rumorTypes,
+  };
+}
+
+function deriveFactionProfile(fact: { title?: string; summary?: string; tags?: string[] }, state: CharacterState): WorldFactStateProfile {
+  const title = String(fact.title || '此势力');
+  const tags = fact.tags || [];
+  const factionNpcs = (state.npcs || []).filter((npc: any) => npc.faction === title);
+  const hostileNpcs = factionNpcs.filter((npc: any) => ['enemy', 'hostile'].includes(npc.attitude));
+  const friendlyNpcs = factionNpcs.filter((npc: any) => ['ally', 'friendly'].includes(npc.attitude));
+  const relationPressure = factionNpcs.reduce((sum: number, npc: any) => sum + Math.max(0, -Number(npc.relationshipScore || 0)), 0);
+  const threadTexts = (state.pendingThreads || []).map(thread => [thread.title, thread.description, thread.followUpHint, thread.sourceEventTitle, thread.category].filter(Boolean).join('；'));
+  const relatedThreads = threadTexts.filter(text => text.includes(title) || /通缉|追责|盯梢|截杀|拍卖|宗门|势力|邀/.test(text));
+  const accountability = boundedScore(
+    (tags.includes('hostile') || tags.includes('enemy') ? 38 : 0) +
+    (tags.includes('danger') ? 22 : 0) +
+    hostileNpcs.length * 18 +
+    relationPressure * 0.45 +
+    relatedTextCount(relatedThreads, /追责|报复|悬赏|通缉|截杀|盯梢|压价/) * 14
+  );
+  const observation = boundedScore(
+    (tags.includes('current') ? 22 : 0) +
+    factionNpcs.length * 8 +
+    relatedTextCount(relatedThreads, /观察|试探|盘问|打听|传讯|邀/) * 12 +
+    (tags.includes('faction') ? 8 : 0)
+  );
+  const invitation = boundedScore(
+    (tags.includes('current') ? 35 : 0) +
+    friendlyNpcs.length * 18 +
+    relatedTextCount(relatedThreads, /邀请|引荐|庇护|差遣|宗门|人情/) * 14
+  );
+  const npcPressure = boundedScore(hostileNpcs.length * 24 + friendlyNpcs.length * 10 + Math.min(40, relationPressure * 0.25));
+  const attitude = accountability >= 55 ? '敌视施压' : invitation >= 45 ? '倾向接纳' : observation >= 35 ? '观望试探' : tags.includes('current') ? '名义相连' : '关系未明';
+  const tendencies = [
+    accountability >= 35 ? '追责' : '',
+    accountability >= 60 ? '通缉/截杀' : '',
+    observation >= 30 ? '观察/盘问' : '',
+    invitation >= 35 ? '邀请/差遣' : '',
+    npcPressure >= 30 ? '人物关联施压' : '',
+  ].filter(Boolean);
+  return {
+    scope: 'faction',
+    summary: `势力画像：对角色态度=${attitude}，追责压力${levelText(accountability)}(${accountability})，观察倾向${levelText(observation)}(${observation})，邀请倾向${levelText(invitation)}(${invitation})，NPC关联压力${levelText(npcPressure)}(${npcPressure})；可回响为${tendencies.join('、') || '传闻、人情或资源往来'}。`,
+    priorityBoost: Math.min(36, accountability * 0.18 + observation * 0.1 + invitation * 0.1 + npcPressure * 0.16),
+    rumorTypes: tendencies,
+  };
+}
+
+export function deriveWorldFactStateProfile(fact: { kind?: string; title?: string; summary?: string; tags?: string[] }, state: CharacterState): WorldFactStateProfile | undefined {
+  if (fact.kind === 'location') return deriveLocationProfile(fact, state);
+  if (fact.kind === 'faction') return deriveFactionProfile(fact, state);
+  return undefined;
+}
+
 export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPlan {
   const age = state.age;
   const hints: ScheduledEventHint[] = [];
@@ -163,12 +277,13 @@ export function buildEventSchedulerPlan(state: CharacterState): EventSchedulerPl
   const recentFacts = (state.worldFacts || []).slice(-30);
   for (const fact of recentFacts) {
     if (!['realm', 'npc', 'relationship', 'location', 'faction', 'event'].includes(fact.kind)) continue;
-    const boost = worldFactPriorityBoost(fact);
+    const profile = deriveWorldFactStateProfile(fact, state);
+    const boost = worldFactPriorityBoost(fact) + (profile?.priorityBoost || 0);
     const kind = fact.kind === 'realm' ? 'realm' : fact.kind === 'npc' || fact.kind === 'relationship' ? 'npc' : 'world';
     const reasonTail = fact.kind === 'location'
-      ? '此地可作为后续遭遇、交易、追踪、历练或休整的空间锚点。'
+      ? ['此地可作为后续遭遇、交易、追踪、历练或休整的空间锚点。', profile?.summary].filter(Boolean).join(' ')
       : fact.kind === 'faction'
-        ? ['此势力可作为后续人情、宗门、恩怨或资源网络的背景锚点。', worldFactAutonomousTail(fact)].filter(Boolean).join(' ')
+        ? ['此势力可作为后续人情、宗门、恩怨或资源网络的背景锚点。', worldFactAutonomousTail(fact), profile?.summary].filter(Boolean).join(' ')
         : '';
     hints.push({
       id: hintId('fact', fact.id),
