@@ -200,6 +200,8 @@ export async function POST(req: NextRequest) {
         age: finalState.age,
         lifespan: finalState.lifespan,
         realm: finalState.realm,
+        spiritualRoot: finalState.spiritualRoot,
+        rootDetail: finalState.rootDetail,
         realmLevel: finalState.realmLevel,
         cultivationExp: finalState.cultivationExp,
         expToBreak: finalState.expToBreak,

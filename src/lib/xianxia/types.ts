@@ -605,6 +605,9 @@ export interface AIEventOutput {
   // 状态变更（AI 提议，引擎校验）
   changes: AttributeChange[];
 
+  // 灵根蜕变（结构化字段；引擎校验 spiritualRoot 后才会改写角色灵根与修炼倍率）
+  spiritualRootChange?: SpiritualRootChange;
+
   // 新增状态词条
   newStatuses: StatusEntry[];
 
@@ -698,6 +701,12 @@ export interface AttributeChange {
   reason: string;        // 变化原因
 }
 
+export interface SpiritualRootChange {
+  spiritualRoot: SpiritualRoot;
+  rootDetail?: string;
+  reason: string;
+}
+
 export type EffectResolveSeverity = 'info' | 'warning' | 'error';
 
 export interface EffectResolveTrace {
@@ -733,6 +742,7 @@ export interface ChoiceOption {
 export interface ChoiceResultOutput {
   narrative: string;
   changes: AttributeChange[];
+  spiritualRootChange?: SpiritualRootChange;
   newStatuses: StatusEntry[];
   newItems: ItemEntry[];
   // 选择结果后若仍需玩家继续决定（如拍卖会出价），可继续挂起下一段抉择。
@@ -769,6 +779,7 @@ export interface InterfereOutput {
   accepted: boolean;              // 是否接受（false=静默拒绝）
   narrative: string;              // 回应叙事
   changes: AttributeChange[];     // 状态变更
+  spiritualRootChange?: SpiritualRootChange;
   newStatuses: StatusEntry[];
   newItems: ItemEntry[];
   removedItemIds?: string[];

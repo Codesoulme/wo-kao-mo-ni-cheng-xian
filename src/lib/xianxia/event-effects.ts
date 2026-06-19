@@ -1,7 +1,7 @@
 import type { AttributeChange, CharacterState, ItemEntry, Pet, StatusEntry } from './types';
 
 export type EventDisplayEffect = AttributeChange | {
-  kind: 'item' | 'equipment' | 'status' | 'pet' | 'loss';
+  kind: 'item' | 'equipment' | 'status' | 'pet' | 'loss' | 'root';
   label: string;
   name: string;
   tone?: 'positive' | 'negative' | 'neutral';
@@ -52,6 +52,15 @@ export function buildEventDisplayEffects(args: {
   const addedEquipped = collectAdded(args.before.equipped || [], args.after.equipped || []);
   const addedStatuses = collectAdded(args.before.activeStatuses, args.after.activeStatuses);
   const addedPets = collectAdded(args.before.pets || [], args.after.pets || []);
+
+  if (args.before.spiritualRoot !== args.after.spiritualRoot || args.before.rootDetail !== args.after.rootDetail) {
+    pushUnique(out, seen, {
+      kind: 'root',
+      label: '灵根蜕变',
+      name: cleanName(args.after.rootDetail || args.after.spiritualRoot),
+      tone: (args.after.rootMultiplier || 0) >= (args.before.rootMultiplier || 0) ? 'positive' : 'negative',
+    });
+  }
 
   for (const item of addedInventory) {
     pushUnique(out, seen, {

@@ -16,6 +16,7 @@ import {
   SPIRITUAL_ROOTS,
   FATE_NODES,
   AIEventOutput,
+  SpiritualRootChange,
   EngineStateContext,
   NarrativeOutcomeKind,
   EquipSlot,
@@ -1177,6 +1178,54 @@ export function tryMinorBreakthrough(state: CharacterState): { state: CharacterS
     speed: Math.floor(state.speed * 1.05),
   };
   return { state: newState, advanced: true };
+}
+
+
+export function applySpiritualRootChange(state: CharacterState, change?: SpiritualRootChange): { state: CharacterState; applied?: AttributeChange; trace?: EffectResolveTrace } {
+  if (!change || !change.spiritualRoot) return { state };
+  const rootInfo = SPIRITUAL_ROOTS[change.spiritualRoot];
+  if (!rootInfo) {
+    return {
+      state,
+      trace: {
+        severity: 'warning',
+        code: 'invalid_spiritual_root_change',
+        attribute: 'spiritualRoot',
+        message: '灵根蜕变未生效：灵根类型不在天赋谱系中。',
+        source: change.reason || 'ai-event',
+      },
+    };
+  }
+  const beforeRoot = state.spiritualRoot;
+  const beforeMultiplier = state.rootMultiplier || 0;
+  const rootDetail = String(change.rootDetail || rootInfo.name).trim().slice(0, 48) || rootInfo.name;
+  let next: CharacterState = {
+    ...state,
+    spiritualRoot: change.spiritualRoot,
+    rootDetail,
+    rootMultiplier: rootInfo.multiplier,
+  };
+  next = normalizeCultivationState(next);
+  if (beforeRoot === next.spiritualRoot && state.rootDetail === next.rootDetail) return { state: next };
+  const applied: AttributeChange = {
+    attribute: 'spiritualRoot',
+    delta: Number((next.rootMultiplier - beforeMultiplier).toFixed(2)),
+    reason: change.reason || `灵根蜕变为${rootDetail}`,
+  };
+  return {
+    state: next,
+    applied,
+    trace: {
+      severity: 'info',
+      code: 'spiritual_root_changed',
+      attribute: 'spiritualRoot',
+      message: `灵根由${SPIRITUAL_ROOTS[beforeRoot]?.name || beforeRoot}蜕变为${rootDetail}。`,
+      before: beforeMultiplier,
+      delta: applied.delta,
+      after: next.rootMultiplier,
+      source: change.reason || 'ai-event',
+    },
+  };
 }
 
 // ==================== 寿元检查 ====================
@@ -2849,6 +2898,17 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 
   // 4. 添加长期记忆
   if (aiOutput.memory) next = addMemory(next, aiOutput.memory);
+
+  // 4.2 灵根蜕变：只有结构化 spiritualRootChange 会改变角色灵根，避免从叙事文本误判。
+  {
+    const rootChange = applySpiritualRootChange(next, aiOutput.spiritualRootChange);
+    next = rootChange.state;
+    if (rootChange.applied) appliedChanges.push(rootChange.applied);
+    if (rootChange.trace) {
+      effectResolveTrace.push(rootChange.trace);
+      if (rootChange.trace.severity !== 'info') effectResolveWarnings.push(rootChange.trace.message);
+    }
+  }
 
   // 4.5 更新修炼心得文本 + 结构化来源条目
   // 只在 AI 输出了非空文本时才覆盖，避免被空值误清

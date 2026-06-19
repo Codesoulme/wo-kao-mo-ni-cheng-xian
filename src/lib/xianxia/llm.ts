@@ -549,6 +549,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
 
 可修改属性白名单：${ctx.availableAttributes.join(', ')}
 注意：attribute 必须在白名单内；delta 合理（普通事件 -50~+100，奇遇 -200~+500）；newStatuses 与 newItems 给出完整字段。
+灵根若因洗髓、传承、体质觉醒等明确因果发生改变，不要写进 changes；必须使用 spiritualRootChange，格式为 {"spiritualRoot":"mixed|common|pure|heavenly|chaos|none", "rootDetail":"玩家可见的中文灵根名", "reason":"中文因果"}；无改变填 null。
 
 【叙事契约字段——重要！用于世界连续性审计】
 narrativeContract 必须声明本轮主要承接对象：

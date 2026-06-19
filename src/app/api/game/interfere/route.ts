@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, applySpiritualRootChange, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
       }
       // 引擎权威：cultivationFactors 完全由引擎从 state 计算（灵根 + 功法 + 状态词条）
       // 不再合并 AI 输出——避免条目忽隐忽现 + 数字与 multiplier 脱节
+      state = applySpiritualRootChange(state, result.spiritualRootChange).state;
       state.cultivationFactors = computeCultivationFactors(state);
       // Task 20: 应用未决线索变更
       if (result.newThreads && result.newThreads.length) state = addThreads(state, result.newThreads);
@@ -213,6 +214,8 @@ export async function POST(req: NextRequest) {
         age: state.age,
         lifespan: state.lifespan,
         realm: state.realm,
+        spiritualRoot: state.spiritualRoot,
+        rootDetail: state.rootDetail,
         realmLevel: state.realmLevel,
         cultivationExp: state.cultivationExp,
         expToBreak: state.expToBreak,
