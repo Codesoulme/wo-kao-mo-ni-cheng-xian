@@ -268,6 +268,11 @@ function validateNarrativeContract(state: CharacterState, output: AIEventOutput,
     pushTrace(trace, 'warning', 'invalid_narrative_focus', `AI declared invalid narrative focus: ${contract.narrativeFocus}`, { field: 'narrativeContract.narrativeFocus' });
   }
 
+  const validOutcome = new Set(['advanced', 'resolved', 'failed', 'deferred', 'echoed', 'ignored']);
+  if (contract.narrativeOutcome && !validOutcome.has(contract.narrativeOutcome)) {
+    pushTrace(trace, 'warning', 'invalid_narrative_outcome', `AI declared invalid narrative outcome: ${contract.narrativeOutcome}`, { field: 'narrativeContract.narrativeOutcome' });
+  }
+
   const knownHintIds = new Set((schedule?.hints || []).map(h => h.id));
   for (const id of contract.usedScheduleHintIds || []) {
     if (!knownHintIds.has(id)) {
@@ -291,6 +296,7 @@ function validateNarrativeContract(state: CharacterState, output: AIEventOutput,
 
   const usedSomething = Boolean(
     contract.narrativeFocus ||
+    contract.narrativeOutcome ||
     contract.contractNote ||
     contract.usedScheduleHintIds?.length ||
     contract.usedWorldFactIds?.length ||

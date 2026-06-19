@@ -207,6 +207,7 @@ export interface BuildNarrativeContractAuditEffectArgs {
 const NARRATIVE_CONTRACT_AUDIT_CODES = new Set([
   'missing_narrative_contract',
   'invalid_narrative_focus',
+  'invalid_narrative_outcome',
   'unknown_schedule_hint_reference',
   'unknown_world_fact_reference',
   'unknown_npc_contract_reference',
@@ -274,6 +275,7 @@ export function extractNarrativeContractFeedback(events: NarrativeContractAuditE
         age: event.age,
         title: event.title,
         narrativeFocus: audit.contract?.narrativeFocus,
+        narrativeOutcome: audit.contract?.narrativeOutcome,
         contractNote: audit.contract?.contractNote,
         focusHintId: audit.focusHintId,
         focusHintTitle: audit.focusHintTitle,

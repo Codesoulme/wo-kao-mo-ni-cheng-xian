@@ -138,9 +138,10 @@ function smokeNarrativeContract(): void {
   };
   const missingCodes = validateAIBoundary(state, baseOutput).trace.map(t => t.code);
   assert(missingCodes.includes('missing_narrative_contract'), 'missing contract should warn under pressure map');
-  const unknownCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', usedScheduleHintIds: ['seh_missing'], usedWorldFactIds: ['wf_missing'], usedNpcIds: ['npc_missing'], contractNote: '承接阴鸦客威胁。' } }).trace.map(t => t.code);
+  const unknownCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', narrativeOutcome: 'vanished', usedScheduleHintIds: ['seh_missing'], usedWorldFactIds: ['wf_missing'], usedNpcIds: ['npc_missing'], contractNote: '承接阴鸦客威胁。' } }).trace.map(t => t.code);
   assert(unknownCodes.includes('unknown_schedule_hint_reference') && unknownCodes.includes('unknown_world_fact_reference') && unknownCodes.includes('unknown_npc_contract_reference'), 'unknown narrative contract references should warn');
-  const okCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', usedScheduleHintIds: ['seh_npc_shadow'], usedWorldFactIds: ['wf_market'], usedNpcIds: ['npc_shadow'], contractNote: '承接最大威胁阴鸦客的盯梢。' } }).trace.map(t => t.code);
+  assert(unknownCodes.includes('invalid_narrative_outcome'), 'invalid narrative outcome should warn');
+  const okCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', narrativeOutcome: 'advanced', usedScheduleHintIds: ['seh_npc_shadow'], usedWorldFactIds: ['wf_market'], usedNpcIds: ['npc_shadow'], contractNote: '承接最大威胁阴鸦客的盯梢。' } }).trace.map(t => t.code);
   assert(!okCodes.includes('missing_narrative_contract') && !okCodes.includes('unknown_schedule_hint_reference'), 'valid narrative contract should not raise contract warnings');
   log('narrative-contract', { passed: true, missingCodes: missingCodes.length, unknownCodes: unknownCodes.length, okCodes: okCodes.length });
 }
@@ -353,6 +354,46 @@ function smokeWorldMemoryResolution(): void {
   log('world-memory-resolution', { passed: true, due: due?.resolutionStage, npc: npc?.resolutionStage, fact: oldFact?.resolutionStage });
 }
 
+function smokeWorldMemoryOutcomeFeedback(): void {
+  const baseState: any = {
+    age: 60,
+    location: '青岚坊市',
+    pendingThreads: [],
+    questEntries: [],
+    causalGraph: { nodes: [], edges: [] },
+    worldFacts: [],
+    npcs: [{
+      id: 'npc_shadow',
+      name: '阴鸦客',
+      attitude: 'hostile',
+      relationshipScore: -50,
+      lastSeenAge: 60,
+      memory: '阴鸦客仍惦记旧洞府铜钥。',
+      tags: ['auction', 'aftermath'],
+    }],
+  };
+  const basePlan = buildEventSchedulerPlan(baseState);
+  const baseNpc = basePlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
+  assert(baseNpc, 'baseline outcome smoke should include NPC hint');
+
+  const resolvedPlan = buildEventSchedulerPlan({
+    ...baseState,
+    narrativeContractFeedback: [{ age: 59, title: '旧怨了结', narrativeFocus: 'npc', narrativeOutcome: 'resolved', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] }],
+  });
+  const resolvedNpc = resolvedPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
+  assert(resolvedNpc && resolvedNpc.priority < baseNpc!.priority, 'resolved outcome should lower repeated focus priority');
+  assert(resolvedNpc?.resolutionStage === 'resolved', 'resolved outcome should mark hint resolved');
+
+  const ignoredPlan = buildEventSchedulerPlan({
+    ...baseState,
+    narrativeContractFeedback: [{ age: 59, title: '闭门炼气', narrativeFocus: 'daily', narrativeOutcome: 'ignored', focusHintId: 'seh_npc_npc_shadow', focusHintTitle: '阴鸦客', topThreat: '阴鸦客', usedNpcIds: [], usedScheduleHintIds: [], usedWorldFactIds: [], warningCodes: [] }],
+  });
+  const ignoredNpc = ignoredPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
+  assert(ignoredNpc && ignoredNpc.priority > baseNpc!.priority, 'ignored outcome should warm up high-pressure focus');
+  assert(ignoredPlan.warnings.some(w => w.includes('承接不足')), 'ignored outcome should produce carryover warning');
+  log('world-memory-outcome-feedback', { passed: true, base: baseNpc!.priority, resolved: resolvedNpc!.priority, ignored: ignoredNpc!.priority, stage: resolvedNpc!.resolutionStage });
+}
+
 function smokeWorldEventConsequences(): void {
   const state: any = {
     age: 45,
@@ -421,6 +462,7 @@ function smokeHiddenAudit(): void {
       newItems: [],
       narrativeContract: {
         narrativeFocus: 'npc',
+        narrativeOutcome: 'advanced',
         usedScheduleHintIds: ['seh_npc_shadow'],
         usedWorldFactIds: ['wf_market'],
         usedNpcIds: ['npc_shadow'],
@@ -440,11 +482,13 @@ function smokeHiddenAudit(): void {
   assert(audit?.hidden === true, 'narrative contract audit effect should be hidden');
   assert(audit?.focusHintId === 'seh_npc_shadow', 'narrative contract audit should persist focus hint id');
   assert(audit?.contract?.narrativeFocus === 'npc', 'narrative contract audit should persist contract focus');
+  assert(audit?.contract?.narrativeOutcome === 'advanced', 'narrative contract audit should persist contract outcome');
   assert(audit?.warnings?.some((entry: any) => entry.code === 'top_schedule_focus_not_declared'), 'narrative contract audit should persist related boundary entries');
 
   const feedback = extractNarrativeContractFeedback([{ age: 30, title: '坊外微影', effects: JSON.stringify(narrativeEffects) }]);
   assert(feedback.length === 1, 'narrative contract feedback should be extracted from hidden audit');
   assert(feedback[0].narrativeFocus === 'npc', 'feedback should preserve narrative focus');
+  assert(feedback[0].narrativeOutcome === 'advanced', 'feedback should preserve narrative outcome');
   assert(feedback[0].topThreat === '阴鸦客', 'feedback should preserve pressure map threat');
   assert(feedback[0].usedNpcIds.includes('npc_shadow'), 'feedback should preserve used npc ids');
   assert(feedback[0].warningCodes.includes('top_schedule_focus_not_declared'), 'feedback should preserve contract warning codes');
@@ -507,6 +551,7 @@ async function main(): Promise<void> {
   smokeWorldPressureOpportunityMap();
   smokeWorldMemoryPressureDecay();
   smokeWorldMemoryResolution();
+  smokeWorldMemoryOutcomeFeedback();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();

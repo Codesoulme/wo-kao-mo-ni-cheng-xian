@@ -234,10 +234,27 @@ function memoryPressureAdjustment(hint: ScheduledEventHint, feedback: NarrativeC
   if (!feedback.length) return { delta: 0, notes: [] };
   const recent = feedback.slice(-4);
   const matches = recent.filter(entry => hintMatchesFeedback(hint, entry));
-  const ignored = recent.filter(entry => (entry.warningCodes || []).some(code => code === 'top_schedule_focus_not_declared' || code === 'missing_narrative_contract' || code === 'daily_focus_ignores_pressure_map') && hintMatchesFeedback(hint, entry));
+  const ignored = recent.filter(entry => ((entry.warningCodes || []).some(code => code === 'top_schedule_focus_not_declared' || code === 'missing_narrative_contract' || code === 'daily_focus_ignores_pressure_map') || entry.narrativeOutcome === 'ignored') && hintMatchesFeedback(hint, entry));
   const exactRecentReuse = feedback.slice(-2).filter(entry => hintMatchesFeedback(hint, entry)).length;
+  const latestMatch = [...recent].reverse().find(entry => hintMatchesFeedback(hint, entry));
   let delta = 0;
   const notes: string[] = [];
+  if (latestMatch?.narrativeOutcome === 'resolved') {
+    delta -= 34;
+    notes.push('结果回写：上次已了结，只作旧因或低频余波。');
+  } else if (latestMatch?.narrativeOutcome === 'failed') {
+    delta -= 14;
+    notes.push('结果回写：上次已失败，应写代价/后果，不应当作仍可正常完成。');
+  } else if (latestMatch?.narrativeOutcome === 'deferred') {
+    delta += 6;
+    notes.push('结果回写：上次明确暂缓，可保留但需解释原因或给出新时机。');
+  } else if (latestMatch?.narrativeOutcome === 'advanced') {
+    delta -= 6;
+    notes.push('结果回写：上次已有推进，本次若承接须继续向前，不要原地重复。');
+  } else if (latestMatch?.narrativeOutcome === 'echoed') {
+    delta -= 10;
+    notes.push('结果回写：上次只是回响，本次宜转折/推进/了结，或降为背景。');
+  }
   if (exactRecentReuse >= 2) {
     delta -= 18;
     notes.push('记忆潮汐：近两年已反复承接，除非推进/转折/了结，否则应降温。');
@@ -280,10 +297,10 @@ function deriveResolutionStage(hint: ScheduledEventHint): { stage: ScheduledEven
   if (hint.kind === 'deadline' || hint.requiredAction === 'resolve_or_fail') {
     return { stage: 'escalating', hint: '已到关键关口，本轮应推进到完成、失败、战斗、选择或明确解释无法执行。' };
   }
-  if (/已失|失败|错过|失约|\bfailed\b/.test(text)) {
+  if (/结果回写：上次已失败|已失|失败|错过|失约|\bfailed\b/.test(text)) {
     return { stage: 'failed', hint: '此事已失，应写后果、代价或余波，不要当作仍可正常完成的目标。' };
   }
-  if (/已了|已解决|平息|余波已散|\bresolved\b|\bcompleted\b/.test(text)) {
+  if (/结果回写：上次已了结|已了|已解决|平息|余波已散|\bresolved\b|\bcompleted\b/.test(text)) {
     return { stage: 'resolved', hint: '此事已了，只可作为低频背景或新因果的旧因，不要重复重开。' };
   }
   if (/记忆潮汐：近两年已反复承接|记忆潮汐：近期已多次回响/.test(text)) {

@@ -307,7 +307,7 @@ function buildNarrativeContractFeedbackList(ctx: EngineStateContext): string {
     ].filter(Boolean).join('；') || '未声明结构引用';
     const pressure = [entry.topThreat ? `威胁:${entry.topThreat}` : '', entry.topOpportunity ? `机会:${entry.topOpportunity}` : ''].filter(Boolean).join('；') || '无明确压力/机会';
     const warnings = entry.warningCodes?.length ? `；审计:${entry.warningCodes.join(',')}` : '';
-    return `- ${entry.age}岁《${entry.title}》：focus=${entry.narrativeFocus || '未声明'}；${pressure}；${used}${entry.contractNote ? `；说明:${textLimit(entry.contractNote, 80)}` : ''}${warnings}`;
+    return `- ${entry.age}岁《${entry.title}》：focus=${entry.narrativeFocus || '未声明'}；outcome=${entry.narrativeOutcome || '未声明'}；${pressure}；${used}${entry.contractNote ? `；说明:${textLimit(entry.contractNote, 80)}` : ''}${warnings}`;
   }).join('\n');
 }
 
@@ -336,7 +336,7 @@ ${buildNarrativeContractFeedbackList(ctx)}
 - 因果图中的 created/continues/triggers 是后续事件种子；resolved/failed 是旧因果结论，不要反复重开，除非叙事有充分由头。
 - 若本次只是日常，也应让角色围绕上述锚点做小行动、小打听、小修补或小代价，避免空白。
 - 若存在“世界压力与机会”摘要，优先把最大威胁、最大机会、焦点地点或焦点人物/势力之一自然融入本年事件。
-- 参考“最近叙事契约回看”：连续多次已承接的对象不要原地重复，应推进、转折、解决、失败或换角度；被审计提示忽略的压力/机会，本轮若合适应补上。`;
+- 参考“最近叙事契约回看”：连续多次已承接的对象不要原地重复，应推进、转折、解决、失败或换角度；resolved/failed 不要重开，deferred 要解释时机，ignored 的高压锚点若合适应补上。`;
 }
 
 // ==================== Prompt 构建 ====================
@@ -537,6 +537,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
   "triggerCombat": null,
   "narrativeContract": {
     "narrativeFocus": "threat | opportunity | location | npc | faction | realm | daily",
+    "narrativeOutcome": "advanced | resolved | failed | deferred | echoed | ignored",
     "usedScheduleHintIds": [],
     "usedWorldFactIds": [],
     "usedNpcIds": [],
@@ -551,6 +552,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
 【叙事契约字段——重要！用于世界连续性审计】
 narrativeContract 必须声明本轮主要承接对象：
 - narrativeFocus：从 threat/opportunity/location/npc/faction/realm/daily 中选择一个。
+- narrativeOutcome：从 advanced/resolved/failed/deferred/echoed/ignored 中选择一个；advanced=有实质推进，resolved=了结，failed=失败并产生后果，deferred=明确暂缓并解释原因，echoed=低频回响，ignored=本轮未承接强压力。
 - usedScheduleHintIds：若承接了“本年事件调度建议”中的某项，填入对应 hint id；无则 []。
 - usedWorldFactIds：若承接了“已确认的长期世界事实”中的地点/势力/秘境/事件，填入对应 fact id；无则 []。
 - usedNpcIds：若主要承接旧 NPC，填入 npc id；无则 []。
