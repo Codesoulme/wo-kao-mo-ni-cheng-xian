@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Swords, Heart, Sparkles, Shield, Footprints, ChevronDown, BookOpen, FlaskConical, Loader2, Zap,
+  Swords, Heart, Sparkles, Shield, Footprints, ChevronDown, FlaskConical, Loader2, Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -34,13 +34,13 @@ export function CombatModal() {
   const { character, setCharacter, addEvent, setLoading, setError, setSettlementResult } = useGameStore();
   const [busy, setBusy] = useState(false);
   const [autoBattle, setAutoBattle] = useState(false);
-  const [contextCollapsed, setContextCollapsed] = useState(false);
   // 战斗结束后短暂展示结果界面（玩家点"了结"按钮关闭）
   const [endResult, setEndResult] = useState<{ status: string; narrative: string } | null>(null);
   // Task 22: 伤害飘字
   const [floats, setFloats] = useState<FloatNumber[]>([]);
   // 先让玩家读完事件缘由，再进入战斗操作界面
   const [battleStarted, setBattleStarted] = useState(false);
+  const [openPalette, setOpenPalette] = useState<string | null>(null);
   const lastSessionIdRef = useRef<string | null>(null);
   const logScrollRef = useRef<HTMLDivElement | null>(null);
   // 上一次的 HP/MP 快照，用于计算差值生成飘字
@@ -257,7 +257,71 @@ export function CombatModal() {
     return !(item.effects || []).some((e: any) => talismanTargets.has(getEffectTarget(e)));
   });
 
-  const palette: any = (session as any)?.actionPalette || null;
+  const makeFallbackCombatPalette = () => {
+    if (!session) return null;
+    const skillOptions = (session.playerSkills || []).slice(0, 8).map((sk: any, idx: number) => ({
+      id: 'skill-' + idx,
+      name: sk.name || '\u672a\u540d\u672f',
+      description: sk.description || '\u8c03\u52a8\u5df2\u4f1a\u672f\u6cd5\u5e94\u6218\u3002',
+      actionType: 'spell',
+      source: sk.sourceType === 'artifact' ? 'artifact' : 'spell',
+      enabled: session.playerMp >= (sk.mpCost || 0),
+      disabledReason: session.playerMp < (sk.mpCost || 0) ? '\u7075\u529b\u4e0d\u8db3\u3002' : undefined,
+      skillIdx: idx,
+      itemId: sk.itemId,
+      mpCost: sk.mpCost || 0,
+    }));
+    const itemOptions = (session.playerItems || []).map((it: any) => ({
+      id: 'item-' + it.itemId,
+      name: it.name || '\u968f\u8eab\u7269',
+      description: it.effect || it.description || '\u6218\u4e2d\u53ef\u7528\u4e4b\u7269\u3002',
+      actionType: 'item',
+      source: 'item',
+      enabled: true,
+      itemId: it.itemId,
+    }));
+    const basicOptions = [
+      { id: 'basic-mana-burst', name: '\u51dd\u6c14\u4e00\u51fb', description: '\u4ee5\u7075\u529b\u5316\u52b2\uff0c\u8bd5\u63a2\u5bf9\u624b\u7834\u7efd\u3002', actionType: 'basic_attack', source: 'body', enabled: session.playerMp >= 3, disabledReason: session.playerMp < 3 ? '\u7075\u529b\u4e0d\u8db3\u3002' : undefined, mpCost: 3 },
+      { id: 'basic-body-strike', name: '\u8fd1\u8eab\u640f\u6740', description: '\u8d34\u8eab\u51fa\u624b\uff0c\u4ee5\u6c14\u8840\u4e0e\u8eab\u6cd5\u76f8\u62fc\u3002', actionType: 'basic_attack', source: 'body', enabled: true, mpCost: 0 },
+    ];
+    const defenseOptions = [
+      { id: 'defense-guard', name: '\u655b\u606f\u5b88\u5fa1', description: '\u6536\u675f\u7075\u529b\uff0c\u62a4\u4f4f\u8981\u5bb3\u3002', actionType: 'defense', source: 'body', enabled: true, mpCost: 0 },
+      { id: 'defense-focus', name: '\u89c2\u52bf\u5bfb\u9699', description: '\u7a33\u4f4f\u5fc3\u795e\uff0c\u7aa5\u89c1\u5bf9\u624b\u7834\u7efd\u3002', actionType: 'defense', source: 'body', enabled: true, mpCost: 0 },
+    ];
+    const otherOptions = [
+      { id: 'other-observe-opening', name: '\u501f\u52bf\u5e94\u53d8', description: '\u5ba1\u65f6\u5ea6\u52bf\uff0c\u968f\u573a\u8c03\u6574\u6218\u6cd5\u3002', actionType: 'other', source: 'environment', enabled: true, mpCost: 0 },
+      { id: 'other-flee', name: '\u8f6c\u8eab\u9041\u8d70', description: '\u5bfb\u9699\u8131\u8eab\uff0c\u672a\u5fc5\u80fd\u5168\u8eab\u800c\u9000\u3002', actionType: 'flee', source: 'body', enabled: true, risk: '\u53ef\u80fd\u88ab\u654c\u4eba\u8ffd\u51fb' },
+    ];
+    return {
+      basicAttack: { enabled: basicOptions.some((o: any) => o.enabled), label: '\u653b\u4f10', options: basicOptions },
+      spell: { enabled: skillOptions.some((o: any) => o.enabled), label: '\u6cd5\u672f', disabledReason: skillOptions.length ? '\u7075\u529b\u4e0d\u8db3\u3002' : '\u6682\u65e0\u53ef\u7528\u672f\u6cd5\u3002', options: skillOptions },
+      defense: { enabled: defenseOptions.some((o: any) => o.enabled), label: '\u5b88\u5fa1', options: defenseOptions },
+      item: { enabled: itemOptions.some((o: any) => o.enabled), label: '\u7269\u7528', disabledReason: itemOptions.length ? '\u6b64\u523b\u96be\u4ee5\u53d6\u7528\u3002' : '\u6682\u65e0\u53ef\u7528\u4e4b\u7269\u3002', options: itemOptions },
+      other: { enabled: otherOptions.some((o: any) => o.enabled), label: '\u5e94\u53d8', options: otherOptions },
+      generatedBy: 'ui-resume-fallback',
+    };
+  };
+  const storedPalette: any = (session as any)?.actionPalette || null;
+  const fallbackPalette: any = makeFallbackCombatPalette();
+  const mergePaletteGroup = (key: string) => {
+    const storedGroup = storedPalette?.[key];
+    const fallbackGroup = fallbackPalette?.[key];
+    const storedOptions = storedGroup?.options || [];
+    const hasUsableStoredOption = storedOptions.some((option: any) => option?.enabled);
+    if (!storedGroup || !storedOptions.length || !hasUsableStoredOption) {
+      return fallbackGroup || storedGroup || { enabled: false, label: key, options: [] };
+    }
+    return storedGroup;
+  };
+  const palette: any = {
+    ...(fallbackPalette || {}),
+    ...(storedPalette || {}),
+    basicAttack: mergePaletteGroup('basicAttack'),
+    spell: mergePaletteGroup('spell'),
+    defense: mergePaletteGroup('defense'),
+    item: mergePaletteGroup('item'),
+    other: mergePaletteGroup('other'),
+  };
   const groupOf = (key: string, fallbackLabel: string) => palette?.[key] || { enabled: false, label: fallbackLabel, options: [] };
   const actionFromOption = (option: any): CombatAction => {
     if (option?.actionType === 'spell') return 'skill';
@@ -270,7 +334,7 @@ export function CombatModal() {
   };
   const runPaletteOption = (option: any) => doAction(actionFromOption(option), { skillIdx: option?.skillIdx, itemId: option?.itemId, optionId: option?.id });
   const chooseAutoOption = () => {
-    const groups = [groupOf('spell', '法术'), groupOf('basicAttack', '普攻'), groupOf('defense', '防御'), groupOf('other', '应变')];
+    const groups = [groupOf('spell', '\u6cd5\u672f'), groupOf('basicAttack', '\u653b\u4f10'), groupOf('defense', '\u5b88\u5fa1'), groupOf('other', '\u5e94\u53d8')];
     return groups.flatMap((g: any) => g.options || []).find((o: any) => o.enabled && !String(o.id || '').includes('flee') && !o.risk)
       || groups.flatMap((g: any) => g.options || []).find((o: any) => o.enabled && !String(o.id || '').includes('flee'));
   };
@@ -348,31 +412,7 @@ export function CombatModal() {
           )}
 
           {(!session || battleStarted || endResult) && (<div className="flex-1 min-h-0 flex flex-col gap-2">
-          {/* 事件缘由叙事（可折叠） */}
-          {session?.contextNarrative && (
-            <div className="rounded-lg border border-border/60 bg-card/40 overflow-hidden">
-              <button
-                onClick={() => setContextCollapsed(v => !v)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-accent/10 transition-colors min-w-0"
-              >
-                <BookOpen className="w-3 h-3 text-muted-foreground shrink-0" />
-                <span className="text-[11px] font-semibold font-serif-cn text-muted-foreground flex-1 min-w-0 xianxia-readable">
-                  事件缘由
-                </span>
-                <ChevronDown className={cn(
-                  "w-3 h-3 text-muted-foreground transition-transform shrink-0",
-                  contextCollapsed ? "" : "rotate-180"
-                )} />
-              </button>
-              {!contextCollapsed && (
-                <p className="px-3 pb-2 text-xs leading-relaxed text-foreground/85 font-serif-cn xianxia-prose">
-                  {session?.contextNarrative}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* 敌方信息（顶部） */}
+          {/* Combat context is shown before entering battle, not repeated here. */}
           {enemy && (
             <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 space-y-1.5 relative overflow-visible">
               {/* Task 22: 敌人伤害飘字 */}
@@ -576,11 +616,11 @@ export function CombatModal() {
         {isOngoing && battleStarted && !endResult && (
           <div className="relative shrink-0 border-t border-border/40 bg-card/40 p-2">
             <div className="grid grid-cols-6 gap-1">
-              <PaletteButton group={groupOf('basicAttack', '普攻')} icon={<Swords className="w-3.5 h-3.5" />} tone="primary" busy={busy} onPick={runPaletteOption} />
-              <PaletteButton group={groupOf('spell', '法术')} icon={<Sparkles className="w-3.5 h-3.5" />} tone="gold" busy={busy} onPick={runPaletteOption} />
-              <PaletteButton group={groupOf('defense', '防御')} icon={<Shield className="w-3.5 h-3.5" />} tone="neutral" busy={busy} onPick={runPaletteOption} />
-              <PaletteButton group={groupOf('item', '物品')} icon={<FlaskConical className="w-3.5 h-3.5" />} tone="green" busy={busy} onPick={runPaletteOption} />
-              <PaletteButton group={groupOf('other', '应变')} icon={<Zap className="w-3.5 h-3.5" />} tone="purple" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton paletteKey="basicAttack" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('basicAttack', '\u653b\u4f10')} icon={<Swords className="w-3.5 h-3.5" />} tone="primary" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton paletteKey="spell" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('spell', '\u6cd5\u672f')} icon={<Sparkles className="w-3.5 h-3.5" />} tone="gold" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton paletteKey="defense" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('defense', '\u5b88\u5fa1')} icon={<Shield className="w-3.5 h-3.5" />} tone="neutral" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton paletteKey="item" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('item', '\u7269\u7528')} icon={<FlaskConical className="w-3.5 h-3.5" />} tone="green" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton paletteKey="other" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('other', '\u5e94\u53d8')} icon={<Zap className="w-3.5 h-3.5" />} tone="purple" busy={busy} onPick={runPaletteOption} />
               <button
                 onClick={() => {
                   if (halfHpOrLower) {
@@ -617,7 +657,7 @@ export function CombatModal() {
 
 // 紧凑行动按钮组件
 
-function PaletteButton({ group, icon, tone, busy, onPick }: { group: any; icon: React.ReactNode; tone: 'primary' | 'gold' | 'neutral' | 'green' | 'purple'; busy?: boolean; onPick: (option: any) => void }) {
+function PaletteButton({ paletteKey, openPalette, setOpenPalette, group, icon, tone, busy, onPick }: { paletteKey: string; openPalette: string | null; setOpenPalette: (key: string | null) => void; group: any; icon: React.ReactNode; tone: 'primary' | 'gold' | 'neutral' | 'green' | 'purple'; busy?: boolean; onPick: (option: any) => void }) {
   const options = group?.options || [];
   const enabledOptions = options.filter((o: any) => o.enabled);
   const disabled = busy || !group?.enabled || enabledOptions.length === 0;
@@ -628,8 +668,9 @@ function PaletteButton({ group, icon, tone, busy, onPick }: { group: any; icon: 
     green: 'border-green-500/40 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500/60 text-green-700 dark:text-green-400',
     purple: 'border-purple-500/40 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/60 text-purple-700 dark:text-purple-400',
   };
+  const isOpen = openPalette === paletteKey;
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isOpen} onOpenChange={(open) => setOpenPalette(open ? paletteKey : null)}>
       <DropdownMenuTrigger asChild>
         <button
           disabled={disabled}
@@ -654,7 +695,7 @@ function PaletteButton({ group, icon, tone, busy, onPick }: { group: any; icon: 
         ) : options.map((option: any) => (
           <DropdownMenuItem
             key={option.id}
-            onClick={() => option.enabled && onPick(option)}
+            onClick={() => { if (!option.enabled) return; setOpenPalette(null); onPick(option); }}
             disabled={busy || !option.enabled}
             className="flex items-start gap-2 py-2"
           >
