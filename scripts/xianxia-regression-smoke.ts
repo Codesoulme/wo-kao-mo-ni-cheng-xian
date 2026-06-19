@@ -1,7 +1,7 @@
 ﻿import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { deriveWorldEventConsequences, deriveWorldFactsFromState, recordActionCausality, refreshWorldFacts } from '../src/lib/xianxia/engine';
-import { appendStateChangeAuditEffect } from '../src/lib/xianxia/state-change-log';
+import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect } from '../src/lib/xianxia/state-change-log';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -338,7 +338,38 @@ function smokeActionCausality(): void {
 function smokeHiddenAudit(): void {
   const effects = appendStateChangeAuditEffect([{ kind: 'visible', text: '可见效果' }], [{ code: 'attribute_applied', source: 'effect', message: '修为增长' } as any]);
   assert(effects.some((effect: any) => effect?.kind === '__audit_state_change_log' && effect.hidden === true), 'hidden audit effect should be appended');
-  log('hidden-audit', { passed: true, effects: effects.length });
+
+  const narrativeEffects = appendNarrativeContractAuditEffect([{ kind: 'visible', text: '可见效果' }], {
+    output: {
+      title: '坊外微影',
+      narrative: '阴鸦客仍在坊外盯梢。',
+      eventType: 'normal',
+      changes: [],
+      newStatuses: [],
+      newItems: [],
+      narrativeContract: {
+        narrativeFocus: 'npc',
+        usedScheduleHintIds: ['seh_npc_shadow'],
+        usedWorldFactIds: ['wf_market'],
+        usedNpcIds: ['npc_shadow'],
+        contractNote: '承接阴鸦客盯梢。',
+      },
+    } as any,
+    eventSchedule: {
+      generatedAtAge: 30,
+      focus: { id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '阴鸦客', reason: '阴鸦客暗中盯梢。', requiredAction: 'echo_or_develop' },
+      hints: [],
+      pressureMap: { topThreat: '阴鸦客', topOpportunity: '青岚坊市', focalLocation: '青岚坊市', focalActor: '阴鸦客', likelyEventTypes: ['威胁回响'], summary: '最大威胁：阴鸦客；最大机会：青岚坊市' },
+      warnings: [],
+    } as any,
+    boundaryEntries: [{ id: 'scl_30_boundary_top_schedule_focus_not_declared_0', age: 30, source: 'boundary', severity: 'info', code: 'top_schedule_focus_not_declared', message: 'AI did not clearly declare top schedule focus.' } as any],
+  });
+  const audit = narrativeEffects.find((effect: any) => effect?.kind === '__audit_narrative_contract') as any;
+  assert(audit?.hidden === true, 'narrative contract audit effect should be hidden');
+  assert(audit?.focusHintId === 'seh_npc_shadow', 'narrative contract audit should persist focus hint id');
+  assert(audit?.contract?.narrativeFocus === 'npc', 'narrative contract audit should persist contract focus');
+  assert(audit?.warnings?.some((entry: any) => entry.code === 'top_schedule_focus_not_declared'), 'narrative contract audit should persist related boundary entries');
+  log('hidden-audit', { passed: true, effects: effects.length, narrativeAudit: Boolean(audit) });
 }
 
 async function smokeAuctionDbRoute(): Promise<void> {

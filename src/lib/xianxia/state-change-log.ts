@@ -1,10 +1,10 @@
-﻿import type { AttributeChange, CharacterState } from './types';
+﻿import type { AttributeChange, AIEventOutput, CharacterState, EventSchedulerPlan, NarrativeContract, WorldPressureOpportunityMap } from './types';
 import type { ValidationTrace } from './content-registry';
 import type { EffectResolveTrace } from './types';
 import type { BoundaryValidationTrace } from './ai-boundary-validator';
 
 export type StateChangeLogSeverity = 'info' | 'warning' | 'error';
-export type StateChangeLogSource = 'effect' | 'registry' | 'boundary' | 'thread' | 'combat' | 'npc' | 'pet' | 'system';
+export type StateChangeLogSource = 'effect' | 'registry' | 'boundary' | 'thread' | 'combat' | 'npc' | 'pet' | 'system' | 'narrative_contract';
 
 export interface StateChangeLogEntry {
   id: string;
@@ -181,5 +181,67 @@ export function buildStateChangeAuditEffect(entries: StateChangeLogEntry[] | und
 
 export function appendStateChangeAuditEffect<T>(effects: T[], entries: StateChangeLogEntry[] | undefined): Array<T | StateChangeAuditEffect> {
   const audit = buildStateChangeAuditEffect(entries);
+  return audit ? [...effects, audit] : effects;
+}
+
+export interface NarrativeContractAuditEffect {
+  kind: '__audit_narrative_contract';
+  hidden: true;
+  version: 1;
+  contract?: NarrativeContract;
+  focusHintId?: string;
+  focusHintTitle?: string;
+  pressureMap?: WorldPressureOpportunityMap;
+  usedScheduleHintIds: string[];
+  usedWorldFactIds: string[];
+  usedNpcIds: string[];
+  warnings: StateChangeLogEntry[];
+}
+
+export interface BuildNarrativeContractAuditEffectArgs {
+  output: AIEventOutput;
+  eventSchedule?: EventSchedulerPlan;
+  boundaryEntries?: StateChangeLogEntry[];
+}
+
+const NARRATIVE_CONTRACT_AUDIT_CODES = new Set([
+  'missing_narrative_contract',
+  'invalid_narrative_focus',
+  'unknown_schedule_hint_reference',
+  'unknown_world_fact_reference',
+  'unknown_npc_contract_reference',
+  'empty_narrative_contract_under_pressure',
+  'top_schedule_focus_not_declared',
+  'daily_focus_ignores_pressure_map',
+]);
+
+export function buildNarrativeContractAuditEffect(args: BuildNarrativeContractAuditEffectArgs): NarrativeContractAuditEffect | null {
+  const contract = args.output.narrativeContract;
+  const schedule = args.eventSchedule;
+  const warnings = (args.boundaryEntries || [])
+    .filter(entry => entry.source === 'boundary' && NARRATIVE_CONTRACT_AUDIT_CODES.has(entry.code))
+    .slice(-30);
+  const hasContext = Boolean(schedule?.focus || schedule?.pressureMap?.summary || schedule?.hints?.length);
+  if (!contract && !warnings.length && !hasContext) return null;
+  return {
+    kind: '__audit_narrative_contract',
+    hidden: true,
+    version: 1,
+    contract,
+    focusHintId: schedule?.focus?.id,
+    focusHintTitle: schedule?.focus?.title,
+    pressureMap: schedule?.pressureMap,
+    usedScheduleHintIds: contract?.usedScheduleHintIds || [],
+    usedWorldFactIds: contract?.usedWorldFactIds || [],
+    usedNpcIds: contract?.usedNpcIds || [],
+    warnings,
+  };
+}
+
+export function appendNarrativeContractAuditEffect<T>(
+  effects: T[],
+  args: BuildNarrativeContractAuditEffectArgs,
+): Array<T | NarrativeContractAuditEffect> {
+  const audit = buildNarrativeContractAuditEffect(args);
   return audit ? [...effects, audit] : effects;
 }

@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { executeAIEvent, checkLifespan, applyChanges, stateToResponse, tryBreakthrough, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tryHeartDemonTrial, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { appendStateChangeAuditEffect } from '@/lib/xianxia/state-change-log';
+import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-log';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 
 export const runtime = 'nodejs';
@@ -256,16 +256,23 @@ export async function POST(req: NextRequest) {
     });
 
     // 写入事件日志；同一岁允许多段史册记录，避免复杂年份只塞进一段文本。
-    const displayEffects = buildEventDisplayEffects({
-      before: stateBeforeEvent,
-      after: finalState,
-      changes: result.appliedChanges,
-      newStatuses: aiOutput.newStatuses,
-      newItems: aiOutput.newItems,
-      newEquippedItems: aiOutput.newEquippedItems,
-      newPets: aiOutput.newPets,
-      removedItemIds: aiOutput.removedItemIds,
-    });
+    const displayEffects = appendNarrativeContractAuditEffect(
+      buildEventDisplayEffects({
+        before: stateBeforeEvent,
+        after: finalState,
+        changes: result.appliedChanges,
+        newStatuses: aiOutput.newStatuses,
+        newItems: aiOutput.newItems,
+        newEquippedItems: aiOutput.newEquippedItems,
+        newPets: aiOutput.newPets,
+        removedItemIds: aiOutput.removedItemIds,
+      }),
+      {
+        output: aiOutput,
+        eventSchedule: stateBeforeEvent.eventSchedule,
+        boundaryEntries: result.stateChangeLog,
+      },
+    );
 
     const isSuccessfulBreakthroughText = (title?: string, narrative?: string) =>
       /成功|破境|更进|踏入|晋入|成就|贯通/.test(`${title || ''}
