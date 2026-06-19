@@ -559,6 +559,8 @@ export interface ChoiceResultOutput {
   changes: AttributeChange[];
   newStatuses: StatusEntry[];
   newItems: ItemEntry[];
+  // 选择结果后若仍需玩家继续决定（如拍卖会出价），可继续挂起下一段抉择。
+  nextChoice?: ChoicePrompt;
   removedItemIds?: string[];
   newEquippedItems?: ItemEntry[];
   equipItemIds?: string[];

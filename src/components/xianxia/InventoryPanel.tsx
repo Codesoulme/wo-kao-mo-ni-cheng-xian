@@ -64,12 +64,18 @@ export function InventoryPanel() {
   const [busy, setBusy] = useState<string | null>(null);
   const [bagOpen, setBagOpen] = useState(true);
   const [specialOpen, setSpecialOpen] = useState(true);
+  const [showAllEquipped, setShowAllEquipped] = useState(false);
+  const [showAllArts, setShowAllArts] = useState(false);
+  const [showAllSpecial, setShowAllSpecial] = useState(false);
+  const [expandedBagGroups, setExpandedBagGroups] = useState<Record<string, boolean>>({});
   const [detailItem, setDetailItem] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
   if (!character) return null;
 
   const equippedList: any[] = Array.isArray(character.equipped) ? character.equipped : [];
+  const equippedNewest = [...equippedList].reverse();
+  const visibleEquipped = showAllEquipped ? equippedNewest : equippedNewest.slice(0, 3);
   const inventory: any[] = character.inventory || [];
   const activeStatuses: StatusEntry[] = filterMeaningfulStatuses(character.activeStatuses || []) as StatusEntry[];
 
@@ -106,7 +112,7 @@ export function InventoryPanel() {
 
   // 储物袋按类型分组
   const grouped: Record<string, any[]> = {};
-  for (const it of inventory) {
+  for (const it of [...inventory].reverse()) {
     const t = it.item_type || 'material';
     if (!grouped[t]) grouped[t] = [];
     grouped[t].push(it);
@@ -122,16 +128,22 @@ export function InventoryPanel() {
   const capacityNearFull = capacityRatio >= 0.8 && !capacityWarn;
 
   // 特殊状态
-  const specialStatuses = activeStatuses.filter(s => s.category === 'special' || s.category === 'identity');
+  const specialStatuses = activeStatuses
+    .map((s, __idx) => ({ ...s, __idx }))
+    .filter(s => s.category === 'special' || s.category === 'identity')
+    .sort((a, b) => b.__idx - a.__idx);
+  const visibleSpecialStatuses = showAllSpecial ? specialStatuses : specialStatuses.slice(0, 3);
 
   // 习得的法术：当前已装备/修习的功法、法宝可在斗法中施展
-  const learnedArts = equippedList
+  const learnedArts = equippedNewest
     .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
     .map(it => ({
       ...it,
       mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
       power: 1 + ((['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) >= 0 ? ['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) : 0) * 0.5),
     }));
+  const visibleArts = showAllArts ? learnedArts : learnedArts.slice(0, 3);
+  const toggleBagGroup = (type: string) => setExpandedBagGroups(prev => ({ ...prev, [type]: !prev[type] }));
 
   return (
     <div className="space-y-3 pb-2">
@@ -154,7 +166,7 @@ export function InventoryPanel() {
               身无长物。获得装备后可在储物袋装备。
             </p>
           ) : (
-            equippedList.map((item, i) => {
+            visibleEquipped.map((item, i) => {
               const isBusy = busy === item.id;
               const color = RARITY_COLORS[item.rarity] || '#6b7280';
               return (
@@ -222,8 +234,17 @@ export function InventoryPanel() {
               );
             })
           )}
+          {equippedList.length > 3 && (
+            <button
+              onClick={() => setShowAllEquipped(v => !v)}
+              className="w-full text-[10px] text-muted-foreground hover:text-primary flex items-center justify-center gap-1 py-1"
+            >
+              <ChevronDown className={cn("w-3 h-3 transition-transform", showAllEquipped && "rotate-180")} />
+              {showAllEquipped ? '收起装备' : `展开其余 ${equippedList.length - 3} 件装备`}
+            </button>
+          )}
           <p className="text-[9px] text-muted-foreground/60 leading-relaxed pt-1 px-0.5">
-            点击装备查看详情。
+            最近装备在前，点击装备查看详情。
           </p>
         </CardContent>
       </Card>
@@ -247,7 +268,7 @@ export function InventoryPanel() {
               尚未修习可用于斗法的功法或法宝。装备功法、法宝后，此处会显现可施展之术。
             </p>
           ) : (
-            learnedArts.map((art, i) => {
+            visibleArts.map((art, i) => {
               const color = RARITY_COLORS[art.rarity] || '#6b7280';
               return (
                 <div
@@ -278,6 +299,15 @@ export function InventoryPanel() {
                 </div>
               );
             })
+          )}
+          {learnedArts.length > 3 && (
+            <button
+              onClick={() => setShowAllArts(v => !v)}
+              className="w-full text-[10px] text-muted-foreground hover:text-primary flex items-center justify-center gap-1 py-1"
+            >
+              <ChevronDown className={cn("w-3 h-3 transition-transform", showAllArts && "rotate-180")} />
+              {showAllArts ? '收起法术' : `展开其余 ${learnedArts.length - 3} 门法术`}
+            </button>
           )}
         </CardContent>
       </Card>
@@ -333,6 +363,8 @@ export function InventoryPanel() {
                 groupOrder.map(type => {
                   const items = grouped[type];
                   if (!items || items.length === 0) return null;
+                  const groupOpen = !!expandedBagGroups[type];
+                  const visibleItems = groupOpen ? items : items.slice(0, 3);
                   return (
                     <div key={type}>
                       <div className="text-[10px] text-muted-foreground mb-1 px-0.5 flex items-center gap-1">
@@ -341,7 +373,7 @@ export function InventoryPanel() {
                         <span>{items.length}</span>
                       </div>
                       <div className="space-y-1.5">
-                        {items.map((item, i) => {
+                        {visibleItems.map((item, i) => {
                           const slot = itemToSlot(item.item_type);
                           const canEquip = !!slot && !isStorageBag(item);
                           const canUse = item.item_type === 'consumable';
@@ -427,6 +459,15 @@ export function InventoryPanel() {
                             </div>
                           );
                         })}
+                        {items.length > 3 && (
+                          <button
+                            onClick={() => toggleBagGroup(type)}
+                            className="w-full text-[10px] text-muted-foreground hover:text-primary flex items-center justify-center gap-1 py-1"
+                          >
+                            <ChevronDown className={cn("w-3 h-3 transition-transform", groupOpen && "rotate-180")} />
+                            {groupOpen ? `收起${ITEM_TYPE_LABEL[type] || type}` : `展开其余 ${items.length - 3} 件`}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -472,7 +513,7 @@ export function InventoryPanel() {
                   尚无奇缘异宝。灵根、伤势、心境等常规状态请看「状态」页；此处只收录灵宠、命格、身份、特殊体质等长期奇缘。
                 </p>
               ) : (
-                specialStatuses.map((s, i) => {
+                visibleSpecialStatuses.map((s, i) => {
                   const color = RARITY_COLORS[s.rarity] || '#6b7280';
                   return (
                     <div
@@ -521,6 +562,15 @@ export function InventoryPanel() {
                     </div>
                   );
                 })
+              )}
+              {specialStatuses.length > 3 && (
+                <button
+                  onClick={() => setShowAllSpecial(v => !v)}
+                  className="w-full text-[10px] text-muted-foreground hover:text-primary flex items-center justify-center gap-1 py-1"
+                >
+                  <ChevronDown className={cn("w-3 h-3 transition-transform", showAllSpecial && "rotate-180")} />
+                  {showAllSpecial ? '收起奇缘' : `展开其余 ${specialStatuses.length - 3} 项奇缘`}
+                </button>
               )}
             </CardContent>
           </CollapsibleContent>

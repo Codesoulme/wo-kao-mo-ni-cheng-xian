@@ -140,8 +140,19 @@ export async function POST(req: NextRequest) {
     }
 
 
-    // 选择后退出选择态
-    state.isAtChoice = false;
+    const nextChoice = result.nextChoice;
+    const pendingChoiceJson = nextChoice
+      ? JSON.stringify({
+          prompt: nextChoice.prompt,
+          options: nextChoice.options,
+          contextTitle: `抉择：${chosenOption.text.slice(0, 12)}`,
+          contextNarrative: result.narrative,
+          contextAge: state.age,
+        })
+      : '';
+
+    // 若结果还需要继续抉择（如拍卖会继续出价），保留选择态；否则退出选择态。
+    state.isAtChoice = !!nextChoice;
 
     // 持久化
     await db.character.update({
@@ -175,7 +186,7 @@ export async function POST(req: NextRequest) {
         cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
         cultivationInsight: state.cultivationInsight || '',
         cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
-        pendingChoiceJson: '',
+        pendingChoiceJson,
         memoryJson: JSON.stringify(state.longTermMemory),
         // Task 20 新字段
         pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
@@ -234,6 +245,7 @@ export async function POST(req: NextRequest) {
       newItems: result.newItems,
       died,
       deathReason,
+      pendingChoice: nextChoice ? JSON.parse(pendingChoiceJson) : null,
       // Task 20: 是否触发战斗（前端据此打开 CombatModal）
       triggeredCombat: !!state.combatSession,
       state: stateToResponse(state),

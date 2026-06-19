@@ -13,6 +13,7 @@ import {
   AttributeChange,
   StatusEntry,
   ItemEntry,
+  ChoicePrompt,
   SpiritualRoot,
   SPIRITUAL_ROOTS,
   Element,
@@ -116,6 +117,7 @@ const SCENE_PROMPTS: Record<string, string> = {
 - 金丹以上多为闭关、渡劫、争斗、传承、游历、秘境探索、大能遗府。
 - 命节点只作长期参考/灵感锚点；可以借其主题启发事件，但不得强行认定角色命运、不得机械按节点推进。
 - 真正的重大抉择、突破、生死关头可生成 hasChoice=true 与 choice 选项；不要因为命节点参考本身就强制给选择。
+- 【拍卖会入场规则】若蓝图/情境是拍卖大会、拍卖行、黑市大拍、交易大会等大型拍卖，不要在本轮直接生成完整拍卖长剧情；只能写轻量入场邀请/场外见闻，并设置 hasChoice=true，choice 让玩家确认是否进入（如「入场竞拍」「只在外场观望」「转身离去」）。未确认进入前，不生成逐件拍品、竞拍者资产心理和大段竞价流程，避免无谓消耗。
 - 普通年份事件 narrative 100-250字；重大事件可略长但要克制。若同一岁发生多个关键片段（如先交易后破境），可用 extraEvents 拆成多条短事件，每条 60-180字，避免主叙事过长或漏写关键过程。
 - 属性变化要合理：修炼获修为、战斗有损耗、奇遇有增益、丹药有效果。
 - 修为自然增长：每岁根据境界与灵根给 cultivationExp 增量（凡人0，炼气10-30，筑基30-80，金丹80-200，更高境界更多）。
@@ -170,7 +172,14 @@ const SCENE_PROMPTS: Record<string, string> = {
 - 选择可能触发战斗（triggerCombat）或添加/推进/完成未决线索。
 - narrative 150-400字，要有戏剧张力与因果回响。
 - 不要忘记该给的修为、属性变化。
-- 若选择涉及"角色主动意图"的执行（如选择备战），应明显推进对应未决线索。`,
+- 若选择涉及"角色主动意图"的执行（如选择备战），应明显推进对应未决线索。
+
+【拍卖会选择规则】
+- 若玩家选择进入拍卖会/交易大会，narrative 必须生成完整开场与第一阶段拍卖：主持人欢迎语、会场气氛、第一件与第二件以上稀有珍贵拍品的介绍、起拍价、竞拍者喊价文本（如「青袍散修出价三百灵石」「乌家少主加到五百灵石」）。
+- 竞拍者不能只是名字：必须体现各自需求、资产、背景、心理盘算；由拍品价值、竞拍者需求与资产决定是否继续竞价。
+- 高境界或财力雄厚者可出言压人、威慑旁人，玩家与其争夺可能招恨；豪客可不计溢价强夺；阴暗竞拍者可在会后劫杀玩家或他人，必要时用 newThreads 保留后续线索，或用 triggerCombat 触发冲突。
+- 若拍卖尚未结束，必须输出 nextChoice，给玩家继续出价/观望/放弃的预选项（通常 3-4 个，含不同灵石价位或策略）。若玩家不入场或只观望，则不要生成完整竞拍流程。
+- 拍品应尽量稀有珍贵，但实际获得物品、扣除灵石必须与玩家选择和当前灵石合理匹配。`,
 
   // 玩家干扰
   interfere: `【当前场景：玩家干扰模拟】
@@ -633,6 +642,7 @@ ${chosenText}
 
 可修改属性白名单：${ctx.availableAttributes.join(', ')}
 newStatuses：若选择结果造成持续状态/机缘/伤势/心境变化，必须生成状态，顶部会显示；同时必须考虑已有状态对选择结果的影响，不要只写在叙事里。
+nextChoice：仅当选择结果需要玩家立即继续决定时使用，例如进入拍卖会后给出下一轮出价/观望/放弃选项；结构同 {prompt, options:[{text,hint}]}，最多4项。普通选择结果请填 null。
 equipItemIds / unequipItemIds / newEquippedItems：用于选择后立即装备/卸下/创造性合成物品（详见 advance 场景规则）。
 【Task 22 心魔值】当前心魔值 ${ctx.character.heartDemon}/100。选择可能影响心魔（如选"血战到底"→heartDemon +5~10；选"忍辱退让"→heartDemon +3~8 但避免战斗；选"高人化解"→heartDemon -10~20）。在 changes 中用 attribute='heartDemon' 调整。
 
@@ -1501,6 +1511,18 @@ function sanitizeTriggerCombat(raw: any): AIEventOutput['triggerCombat'] | undef
   };
 }
 
+
+function sanitizeChoicePrompt(raw: any): ChoicePrompt | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const prompt = String(raw.prompt || '').trim();
+  const options = Array.isArray(raw.options) ? raw.options.map((o: any, i: number) => ({
+    text: String(o?.text || `选项${i + 1}`).slice(0, 80),
+    hint: o?.hint ? String(o.hint).slice(0, 120) : undefined,
+  })).filter((o: any) => o.text).slice(0, 4) : [];
+  if (!prompt || options.length < 2) return undefined;
+  return { prompt: prompt.slice(0, 800), options };
+}
+
 function sanitizeChoiceOutput(raw: any): ChoiceResultOutput {
   const changes: AttributeChange[] = Array.isArray(raw?.changes) ? raw.changes.map((c: any) => ({
     attribute: String(c.attribute || ''),
@@ -1518,6 +1540,7 @@ function sanitizeChoiceOutput(raw: any): ChoiceResultOutput {
     changes,
     newStatuses: filterMeaningfulStatuses(statuses as any),
     newItems: items,
+    nextChoice: sanitizeChoicePrompt(raw?.nextChoice),
     removedItemIds: Array.isArray(raw?.removedItemIds) ? raw.removedItemIds.map((x: any) => String(x)).filter(Boolean) : [],
     newEquippedItems: sanitizeItems(raw?.newEquippedItems),
     equipItemIds: Array.isArray(raw?.equipItemIds) ? raw.equipItemIds.map((x: any) => String(x)).filter(Boolean) : [],

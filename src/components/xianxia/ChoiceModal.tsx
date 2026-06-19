@@ -46,7 +46,7 @@ export function ChoiceModal() {
       if (!data.success) throw new Error(data.error || '选择失败');
 
       setCharacter({ ...character, ...data.state });
-      setPendingChoice(null);
+      setPendingChoice(data.pendingChoice || null);
       setLastChange(data.changes || null);
 
       // 记录选择
