@@ -5,14 +5,19 @@ export const runtime = 'nodejs';
 
 export async function GET() {
   try {
-    const active = await db.character.findFirst({
-      where: { alive: true, ascended: false },
+    const latest = await db.character.findFirst({
+      where: {
+        alive: true,
+        ascended: false,
+        NOT: [
+          { name: { startsWith: '回归烟测_' } },
+          { name: { startsWith: '烟测_' } },
+          { name: { startsWith: 'smoke_' } },
+          { name: { startsWith: 'test_' } },
+        ],
+      },
       orderBy: { updatedAt: 'desc' },
       select: { id: true, name: true, age: true, realm: true, realmLevel: true, location: true, updatedAt: true },
-    });
-    const latest = active || await db.character.findFirst({
-      orderBy: { updatedAt: 'desc' },
-      select: { id: true, name: true, age: true, realm: true, realmLevel: true, location: true, updatedAt: true, alive: true, ascended: true },
     });
 
     if (!latest) {
