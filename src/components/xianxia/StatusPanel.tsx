@@ -51,7 +51,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
         <div className="relative px-3 py-2.5 bg-gradient-to-r from-secondary/40 to-transparent">
           <div className="flex items-start gap-3">
             {/* 头像：只有这里进入详情，避免点顶部空白误触 */}
-            <div className="shrink-0 flex flex-col items-center gap-1">
+            <div className="shrink-0 flex flex-col items-center gap-2.5">
               <button
                 type="button"
                 aria-label="查看角色详情"
@@ -72,7 +72,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                   <ChevronRight className="w-2.5 h-2.5 text-muted-foreground" />
                 </div>
               </button>
-              <span className="inline-flex items-center justify-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-600 tabular-nums max-w-[52px]">
+              <span className="inline-flex items-center justify-center gap-0.5 rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-600 tabular-nums max-w-[60px] translate-y-0.5">
                 <Coins className="w-2.5 h-2.5 shrink-0" />
                 <span className="truncate">{character.spiritStones}</span>
               </span>

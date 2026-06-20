@@ -171,7 +171,7 @@ export function generateSettlementResult(character: CharacterState, events: Game
 
   const notableDeeds = [
     character.ascended ? '羽化飞升，叩开天门' : character.causeOfDeath ? `终局：${character.causeOfDeath}` : '走完一段凡尘道途',
-    character.realmName ? `最高境界：${character.realmName}` : `最高境界：${character.realm}`,
+    `最高境界：${realmText}`,
     events.length ? `留下${events.length}段岁月记载` : '此世记载寥寥，如墨未干',
     combatEvents.length ? `历经${combatEvents.length}场凶险争斗` : '',
   ].filter(Boolean).slice(0, 4);
@@ -183,7 +183,7 @@ export function generateSettlementResult(character: CharacterState, events: Game
     characterName: character.name,
     gender: character.gender,
     age: character.age,
-    highestRealm: character.realmName || character.realm,
+    highestRealm: realmText,
     realmLevel: character.realmLevel || 0,
     ending,
     evaluationTitle: rank,

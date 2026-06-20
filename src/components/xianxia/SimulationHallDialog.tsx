@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,41 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Landmark } from 'lucide-react';
+
+const REALM_LABELS: Record<string, string> = {
+  mortal: '凡人',
+  qi_refining: '练气',
+  foundation: '筑基',
+  golden_core: '金丹',
+  nascent_soul: '元婴',
+  spirit_severing: '化神',
+  great_vehicle: '大乘',
+  tribulation: '渡劫',
+  ascension: '飞升',
+};
+
+const GENDER_LABELS: Record<string, string> = {
+  male: '男',
+  female: '女',
+  unknown: '未知',
+};
+
+function displayGender(value?: string | null) {
+  if (!value) return '未知';
+  return GENDER_LABELS[value] || value;
+}
+
+function displayRealm(value?: string | null) {
+  if (!value) return '凡身未蜕';
+  return REALM_LABELS[value] || value;
+}
+
+function displayDeed(value: string) {
+  return Object.entries(REALM_LABELS).reduce(
+    (text, [key, label]) => text.replace(new RegExp(key, 'g'), label),
+    value
+  );
+}
 
 export function SimulationHallDialog() {
   const { hallOfSimulations } = useGameStore();
@@ -47,7 +82,7 @@ export function SimulationHallDialog() {
                     <div>
                       <div className="font-serif-cn font-semibold text-base">{record.characterName}</div>
                       <div className="text-xs text-muted-foreground">
-                        {record.gender || '\u672a\u77e5'} {'\u00b7'} {record.age}{'\u5c81'} {'\u00b7'} {record.highestRealm}
+                        {displayGender(record.gender)} {'\u00b7'} {record.age}{'\u5c81'} {'\u00b7'} {displayRealm(record.highestRealm)}
                       </div>
                     </div>
                     <Badge variant={record.ending === 'ascension' ? 'default' : 'secondary'} className="font-serif-cn">
@@ -60,7 +95,7 @@ export function SimulationHallDialog() {
                     <div className="flex flex-wrap gap-1.5">
                       {record.notableDeeds.map((deed, index) => (
                         <span key={`${record.id}-deed-${index}`} className="rounded-full bg-muted/60 px-2 py-0.5 text-[10px]">
-                          {deed}
+                          {displayDeed(deed)}
                         </span>
                       ))}
                     </div>
