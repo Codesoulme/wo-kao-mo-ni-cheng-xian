@@ -13,6 +13,24 @@ interface StatusPanelProps {
   compact?: boolean;
 }
 
+const RARITY_ORDER: Record<string, number> = {
+  mythic: 6,
+  legendary: 5,
+  epic: 4,
+  rare: 3,
+  uncommon: 2,
+  common: 1,
+};
+
+const RARITY_COLORS: Record<string, string> = {
+  common: '#6b7280',
+  uncommon: '#2f8f5b',
+  rare: '#2e5c8a',
+  epic: '#7c3aed',
+  legendary: '#c47f2c',
+  mythic: '#c8453c',
+};
+
 export function StatusPanel({ character }: StatusPanelProps) {
   const [detailOpen, setDetailOpen] = useState(false);
   const [expandedVitals, setExpandedVitals] = useState(false);
@@ -35,7 +53,14 @@ export function StatusPanel({ character }: StatusPanelProps) {
     { label: '运', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
     { label: '悟', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
   ];
-  const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || []).filter(status => !isConstitutionStatus(status));
+  const meaningfulStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
+  const constitutionStatuses = meaningfulStatuses
+    .filter(isConstitutionStatus)
+    .sort((a: any, b: any) => (RARITY_ORDER[b.rarity] || 0) - (RARITY_ORDER[a.rarity] || 0));
+  const topConstitutions = constitutionStatuses.slice(0, 3);
+  const constitutionExtraCount = Math.max(0, constitutionStatuses.length - topConstitutions.length);
+  const rootHint = character.cultivationInsight?.trim();
+  const visibleStatuses = meaningfulStatuses.filter(status => !isConstitutionStatus(status));
   const topStatuses = visibleStatuses
     .map((s: any, __idx: number) => ({ ...s, __idx }))
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
@@ -81,13 +106,51 @@ export function StatusPanel({ character }: StatusPanelProps) {
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <h2 className="font-serif-cn text-base font-bold truncate">{character.name}</h2>
+                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                    <h2 className="font-serif-cn text-base font-bold truncate shrink min-w-[3rem]">{character.name}</h2>
+                    <span className="seal text-[9px] shrink-0">修</span>
                     <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[92px] shrink">
                       <Sprout className="w-2.5 h-2.5 shrink-0" />
                       <span className="truncate">{rootLabel}</span>
                     </span>
-                    <span className="seal text-[9px]">修</span>
+                    {rootHint && (
+                      <span className="inline-flex max-w-[92px] shrink items-center rounded bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary/80" title={rootHint}>
+                        <span className="truncate">{rootHint}</span>
+                      </span>
+                    )}
+                    {topConstitutions.map((s: any, idx: number) => {
+                      const color = RARITY_COLORS[s.rarity] || '#6b7280';
+                      return (
+                        <Popover key={s.id || `${s.name}-${idx}`}>
+                          <PopoverTrigger asChild>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="inline-flex max-w-[82px] shrink items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn cursor-pointer min-w-0"
+                              style={{ borderColor: `${color}40`, background: `${color}10`, color }}
+                              title={s.description || s.name}
+                            >
+                              <span className="truncate">{s.name}</span>
+                            </span>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" side="bottom" className="w-64 p-3 paper-texture border-primary/20 shadow-xl">
+                            <div className="space-y-1.5 font-serif-cn">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-sm font-bold" style={{ color }}>{s.name}</div>
+                                {s.constitution && <span className="text-[10px] text-muted-foreground shrink-0">{s.constitution.currentStage || 1}/{s.constitution.maxStage || 1}阶</span>}
+                              </div>
+                              {s.description && <p className="text-[11px] leading-relaxed text-foreground/85 xianxia-prose">{s.description}</p>}
+                              {s.source && <div className="text-[10px] text-muted-foreground xianxia-readable">来源：{s.source}</div>}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })}
+                    {constitutionExtraCount > 0 && (
+                      <span className="shrink-0 rounded-full bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground tabular-nums">
+                        +{constitutionExtraCount}
+                      </span>
+                    )}
                     {character.ascended && (
                       <span className="text-[9px] px-1 rounded bg-yellow-400/20 text-yellow-600">飞升</span>
                     )}
