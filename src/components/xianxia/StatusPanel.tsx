@@ -59,7 +59,6 @@ export function StatusPanel({ character }: StatusPanelProps) {
     .sort((a: any, b: any) => (RARITY_ORDER[b.rarity] || 0) - (RARITY_ORDER[a.rarity] || 0));
   const topConstitutions = constitutionStatuses.slice(0, 3);
   const constitutionExtraCount = Math.max(0, constitutionStatuses.length - topConstitutions.length);
-  const rootHint = character.cultivationInsight?.trim();
   const visibleStatuses = meaningfulStatuses.filter(status => !isConstitutionStatus(status));
   const topStatuses = visibleStatuses
     .map((s: any, __idx: number) => ({ ...s, __idx }))
@@ -113,11 +112,6 @@ export function StatusPanel({ character }: StatusPanelProps) {
                       <Sprout className="w-2.5 h-2.5 shrink-0" />
                       <span className="truncate">{rootLabel}</span>
                     </span>
-                    {rootHint && (
-                      <span className="inline-flex max-w-[92px] shrink items-center rounded bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary/80" title={rootHint}>
-                        <span className="truncate">{rootHint}</span>
-                      </span>
-                    )}
                     {topConstitutions.map((s: any, idx: number) => {
                       const color = RARITY_COLORS[s.rarity] || '#6b7280';
                       return (
