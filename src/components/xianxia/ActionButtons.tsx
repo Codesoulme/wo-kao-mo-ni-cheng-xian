@@ -50,6 +50,7 @@ export function ActionButtons() {
   const {
     character, events, pendingChoice, loading,
     setCharacter, addEvent, setPendingChoice,
+    setEvents, setChoices, setFateNodes,
     setLastChange, setLastBreakthrough, setLoading, setError,
     setBreakthroughCeremony,
     setSettlementResult,
@@ -63,6 +64,22 @@ export function ActionButtons() {
   const [autoCount, setAutoCount] = useState(0); // 0 = off, >0 = remaining years
   const [autoTotal, setAutoTotal] = useState(0);
   const autoCancelRef = useRef(false);
+
+  const syncLatestState = async (characterId: string) => {
+    const res = await fetch(`/api/game/state?characterId=${characterId}`);
+    const data = await res.json();
+    if (!data.success || !data.character) return null;
+    setCharacter(data.character);
+    setEvents(data.events || []);
+    setChoices(data.choices || []);
+    setFateNodes(data.fateNodes || []);
+    if (data.pendingChoice && data.character?.isAtChoice) {
+      setPendingChoice(data.pendingChoice);
+    } else if (!data.character?.isAtChoice) {
+      setPendingChoice(null);
+    }
+    return data.character;
+  };
 
   const prepareNextTurn = (characterId: string) => {
     fetch('/api/game/preload-advance', {
@@ -119,7 +136,19 @@ export function ActionButtons() {
         body: JSON.stringify({ characterId: character.id }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || '推进失败');
+      if (!data.success) {
+        const message = data.error || '推进失败';
+        if (message.includes('战斗进行中')) {
+          const latest = await syncLatestState(character.id);
+          autoCancelRef.current = true;
+          if (latest?.combatSession?.status === 'ongoing') {
+            setError(null);
+            toast('战斗已接续', { description: '请先了结此战，再让岁月继续流转' });
+            return;
+          }
+        }
+        throw new Error(message);
+      }
 
       // 更新角色
       setCharacter({ ...character, ...data.state });
