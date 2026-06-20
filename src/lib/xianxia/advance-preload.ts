@@ -115,9 +115,10 @@ function buildSameYearContinuationBlueprint(threadTitle: string): EventBlueprint
   };
 }
 
-export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>) {
+export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>, options: { qualityMode?: 'full' | 'light' } = {}) {
+  const qualityMode = options.qualityMode || 'full';
   const recentEvents = await getRecentEvents(char.id);
-  const narrativeContractFeedback = await getNarrativeContractFeedback(char.id);
+  const narrativeContractFeedback = qualityMode === 'light' ? [] : await getNarrativeContractFeedback(char.id);
   let state = dbToState(char);
   const recentBlueprintCategories = (state as any)._recentBlueprintCategories || [];
   const sameYearThreads = getSameYearThreads(state);
@@ -139,7 +140,7 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   const fateNodeIdx = sameYearThread ? null : checkFateNode(state);
   const referenceFateNode = fateNodeIdx !== null ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
   const isFateNode = false;
-  const ctx = buildStateContext(state, recentEvents, narrativeContractFeedback);
+  const ctx = buildStateContext(state, qualityMode === 'light' ? recentEvents.slice(-3) : recentEvents, narrativeContractFeedback);
   ctx.blueprint = blueprint;
 
   let aiOutput;
@@ -155,7 +156,7 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     };
   } else {
     try {
-      aiOutput = await generateAgeEvent(ctx, isFateNode);
+      aiOutput = await generateAgeEvent(ctx, isFateNode, qualityMode);
     } catch (llmErr: any) {
       console.error('LLM advance prepare failed, using fallback:', llmErr?.message || llmErr);
       aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode);

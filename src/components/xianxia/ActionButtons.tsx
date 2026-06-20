@@ -220,24 +220,91 @@ export function ActionButtons() {
     }
   };
 
-  // 一键十载：连续推进 N 年
+  // 一键十载：后端批量推进，遇到命节点/战斗/陨落/飞升立即停下
   const autoAdvance = async (years: number) => {
-    if (advancingRef.current || atChoice || isDead || isAscended || inCombat) return;
+    if (advancingRef.current || atChoice || isDead || isAscended || inCombat || !character) return;
     autoCancelRef.current = false;
+    advancingRef.current = true;
+    setLoading(true);
+    setError(null);
     setAutoTotal(years);
     setAutoCount(years);
-    toast(`开始连推 ${years} 载`, { description: '遇到命节点/陨落会自动停止' });
-    for (let i = 0; i < years; i++) {
-      if (autoCancelRef.current) break;
-      setAutoCount(years - i);
-      await advance();
-      // advance 完成后检查是否需要中断
-      if (autoCancelRef.current) break;
-      // 短暂停顿，让 UI 有反馈
-      await new Promise(r => setTimeout(r, 200));
+    toast(`开始连推 ${years} 载`, { description: '遇到命节点、战斗或终局会自动停止' });
+    try {
+      const res = await fetch('/api/game/advance-batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterId: character.id, years }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        const message = data.error || '推进失败';
+        if (message.includes('战斗进行中')) {
+          const latest = await syncLatestState(character.id);
+          if (latest?.combatSession?.status === 'ongoing') {
+            toast('战斗已接续', { description: '请先了结此战，再让岁月继续流转' });
+            return;
+          }
+        }
+        throw new Error(message);
+      }
+
+      setAutoCount(Math.max(0, years - (data.count || 0)));
+      if (data.state) setCharacter({ ...character, ...data.state });
+      setLastChange(data.changes || null);
+      if (data.breakthrough) setLastBreakthrough(data.breakthrough);
+
+      const returnedEvents = Array.isArray(data.events) && data.events.length ? data.events : [];
+      returnedEvents.forEach((evt: any, idx: number) => addEvent({
+        id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+        age: evt.age,
+        title: evt.title,
+        narrative: evt.narrative,
+        eventType: evt.eventType,
+        effects: evt.effects || (idx === returnedEvents.length - 1 ? (data.changes || []) : []),
+        isFateNode: evt.isFateNode,
+        fateNodeName: evt.fateNodeName,
+        blueprint: evt.blueprint,
+        createdAt: evt.createdAt || new Date().toISOString(),
+      }));
+
+      const finalEvent = data.event || returnedEvents[returnedEvents.length - 1];
+      if (data.hasChoice && data.choice && finalEvent) {
+        setPendingChoice({
+          ...data.choice,
+          contextTitle: finalEvent.title,
+          contextNarrative: finalEvent.narrative,
+          contextAge: finalEvent.age,
+          contextFateNodeName: finalEvent.fateNodeName,
+        });
+        toast('命节点触发', { description: '请做出你的抉择' });
+        autoCancelRef.current = true;
+      }
+      if (data.triggeredCombat) {
+        toast('战斗爆发', { description: '请先处理战斗' });
+        autoCancelRef.current = true;
+      }
+      if (data.died) {
+        toast.error('角色陨落', { description: data.deathReason });
+        autoCancelRef.current = true;
+      }
+      if (data.ascended) {
+        toast.success('飞升仙界！', { description: '超脱凡俗，与天地同寿' });
+        autoCancelRef.current = true;
+      }
+      if (!data.hasChoice && !data.triggeredCombat && !data.died && !data.ascended && character.id) {
+        prepareNextTurn(character.id);
+      }
+    } catch (err: any) {
+      setError(err.message);
+      toast.error('推进失败', { description: err.message });
+      autoCancelRef.current = true;
+    } finally {
+      advancingRef.current = false;
+      setLoading(false);
+      setAutoCount(0);
+      setAutoTotal(0);
     }
-    setAutoCount(0);
-    setAutoTotal(0);
   };
 
   const stopAuto = () => {

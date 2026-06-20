@@ -343,7 +343,15 @@ ${buildNarrativeContractFeedbackList(ctx)}
 
 // ==================== Prompt 构建 ====================
 
-function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean): string {
+function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean, qualityMode: 'full' | 'light' = 'full'): string {
+  const isLightMode = qualityMode === 'light' && !isFateNode;
+  const speedGuidance = isLightMode ? `
+【普通年份轻量推演】
+本轮不是命节点或强因果事件。请保持世界逻辑和角色连续性，但输出更紧凑：
+- narrative 约120-220字，必须有具体行动、小收获/小代价/线索之一，禁止“无事发生”。
+- 少写空泛铺陈，优先写角色今年做了什么、为什么这样做、留下什么后果。
+- 若出现战斗、秘境、拍卖、突破、重大选择，仍按完整关键事件质量书写，不要省略因果。
+` : '';
   const sc = ctx.character;
   const elements = `金${sc.elements.metal}/木${sc.elements.wood}/水${sc.elements.water}/火${sc.elements.fire}/土${sc.elements.earth}`;
   const statusList = ctx.activeStatuses.length
@@ -417,6 +425,7 @@ ${eqList}
 ${curInsight || '（尚未生成，本轮请首次生成）'}
 【当前修炼速度来源条目】（引擎权威计算，数字准确，与顶部倍率一致；你必须在 cultivationInsight 文本中引用这些来源与数字，不可编造或增减）
 ${engineFactors}
+${speedGuidance}
 
 【事件蓝图区】（本轮事件必须围绕此主题展开——天道抽取，你不可更改）
 主题：${ctx.blueprint ? `${ctx.blueprint.name}（分类：${ctx.blueprint.category}）` : '无（自由发挥，但须避免与最近事件类型重复）'}
@@ -1246,8 +1255,8 @@ function escapeRegExp(s: string): string {
   return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-export async function generateAgeEvent(ctx: EngineStateContext, isFateNode: boolean): Promise<AIEventOutput> {
-  const userPrompt = buildAdvancePrompt(ctx, isFateNode);
+export async function generateAgeEvent(ctx: EngineStateContext, isFateNode: boolean, qualityMode: 'full' | 'light' = 'full'): Promise<AIEventOutput> {
+  const userPrompt = buildAdvancePrompt(ctx, isFateNode, qualityMode);
   const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.advance);
   const sanitized = sanitizeEventOutput(raw, ctx.character.age);
   // 后处理：修正 narrative 中主角年龄数字

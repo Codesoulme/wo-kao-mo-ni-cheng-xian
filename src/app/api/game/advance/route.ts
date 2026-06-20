@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const characterId: string | undefined = body?.characterId;
+    const qualityMode: 'full' | 'light' = body?.qualityMode === 'light' ? 'light' : 'full';
+    const skipPreload = Boolean(body?.skipPreload);
     if (!characterId) {
       return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
     }
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
       } catch { /* ignore */ }
     }
 
-    const preload = await db.advancePreload.findUnique({ where: { characterId } });
+    const preload = skipPreload ? null : await db.advancePreload.findUnique({ where: { characterId } });
     let candidate;
     if (preload && await isAdvancePreloadUsable(char, preload)) {
       candidate = {
@@ -48,7 +50,7 @@ export async function POST(req: NextRequest) {
       await clearAdvancePreload(characterId);
     } else {
       if (preload) await clearAdvancePreload(characterId);
-      candidate = await prepareAdvanceCandidate(char);
+      candidate = await prepareAdvanceCandidate(char, { qualityMode });
     }
 
     let state = candidate.preparedState;

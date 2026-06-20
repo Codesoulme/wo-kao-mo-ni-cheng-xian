@@ -21,6 +21,20 @@ import { z } from 'zod';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
+function needsCombatNarrativeRewrite(text?: string) {
+  if (!text) return true;
+  const compact = text.replace(/\s+/g, '');
+  if (compact.length < 36) return true;
+  const mechanicalPatterns = [
+    /造成\d+点?伤害/,
+    /受到\d+点?伤害/,
+    /敌人反扑/,
+    /HP|hp|气血[:：]?\d+|生命[:：]?\d+/i,
+    /你攻击.*敌人攻击/,
+  ];
+  return mechanicalPatterns.some(pattern => pattern.test(compact));
+}
+
 function persistableCombatActionStateData(state: ReturnType<typeof dbToState>) {
   return {
     hp: state.hp,
@@ -122,7 +136,7 @@ export async function POST(req: NextRequest) {
       : executeCombatRound(state, action, payload || {});
     state = normalizeCultivationState(result.state);
 
-    if (sessionBefore && result.round) {
+    if (sessionBefore && result.round && needsCombatNarrativeRewrite(result.round.narrative)) {
       const enemyName = sessionBefore.enemies?.[sessionBefore.currentEnemyIdx]?.name;
       const ctx = buildStateContext(state, []);
       const narrative = await Promise.race([
