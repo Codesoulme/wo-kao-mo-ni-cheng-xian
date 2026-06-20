@@ -570,7 +570,7 @@ narrativeContract 必须声明本轮主要承接对象：
 玩家顶部会展示 activeStatuses 作为当前状态/机缘/伤势/心境；你必须把当前状态当作事件判断依据，例如带伤者更可能调息、求药、避战或伤势反复，灵息稳定者更容易修行。若叙事中出现持续性的身体、心境、环境或修炼余韵（如旧伤未愈、灵息渐稳、潭水洗脉、惊悸沉下、草木生机入体），必须在 newStatuses 中生成对应状态，不要只写在 narrative 里。
 - 临时增益：category="buff"，duration 1-5，如「寒潭润脉」「灵息渐稳」「木气养身」。
 - 临时负面：category="debuff"，duration 1-5，如「旧伤隐痛」「气血亏虚」「心神惊悸」。
-- 特殊体质/命格/身份：category="special" 或 "identity"，duration -1，必须是重大事件或开局天生因果才给。特殊体质必须像修仙小说中的体质机制一样影响修炼、战斗、交际、机缘或风险，不要只当装饰标签。
+- 特殊体质：category="constitution"，duration -1，必须是重大事件或开局天生因果才给，并应像修仙小说中的体质机制一样影响修炼、战斗、交际、机缘或风险，不要只当装饰标签。命格/身份仍可用 category="special" 或 "identity"。
 - 普通 buff/debuff/attribute/environment/skill 状态必须有真实 effects 才会显示；不要生成纯装饰状态。
 - 只有 identity、quest，或具有身份/命格/奇缘/传承/血脉/体质/誓约/因果/线索/印记/称号/灵宠/契约等长期叙事意义的 special 状态，才允许 effects 为空，用作后续 AI 判断标志。
 - 若有真实数值影响，target_attribute 必须用白名单里的内部字段，但 description 必须是中文。
@@ -759,7 +759,7 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
 玩家「宝」页除装备与储物袋外，还有「奇缘异宝」栏，只展示 category=special 或 identity 的长期特殊状态（灵宠、命格、天赋、身份、特殊体质等）；普通灵根、伤势、心境、短期 buff/debuff 在「状态」页展示，不要塞进奇缘异宝。AI 可通过 newStatuses 联动修改：
 - 灵宠/坐骑：如获灵宠，newStatuses 给出 {category:"special", name:"灵宠·小白", description:"一只通体雪白的灵狐，善感知", rarity:"rare", duration:-1, source:"山林拾得", effects:[{target_attribute:"luck",operation:"add",value:5,description:"灵宠伴身，气运微增"}]}
 - 命格/命途：如觉醒命格，{category:"special", name:"剑修命格", description:"天生与剑道相合", rarity:"epic", duration:-1, source:"剑道顿悟", effects:[{target_attribute:"attack",operation:"multiply",value:1.2,description:"剑器威力加成"}]}
-- 天赋/体质：如觉醒特殊体质，{category:"special", name:"九阳之体", description:"纯阳之体，火系功法威力倍增", rarity:"legendary", duration:-1, source:"天生", effects:[{target_attribute:"elementFire",operation:"add",value:20,description:"火属性倾向"}]}
+- 天赋/体质：如觉醒特殊体质，{category:"constitution", name:"九阳之体", description:"纯阳之体，火系功法威力倍增", rarity:"legendary", duration:-1, source:"天生", effects:[{target_attribute:"elementFire",operation:"add",value:20,description:"火属性倾向"}]}
 - 身份/师承：如入宗门、拜师，{category:"identity", name:"青云宗内门弟子", description:"已入青云宗内门", rarity:"uncommon", duration:-1, source:"宗门考核", effects:[]}
 - 临时奇遇 buff：{category:"buff", name:"灵泉淬体", description:"饮灵泉水，气血充盈", rarity:"uncommon", duration:3, source:"灵泉奇遇", effects:[{target_attribute:"maxHp",operation:"add",value:20,description:"气血上限提升"}]}
 注意：special/identity 类多为 duration:-1（永久）；buff 类 duration 为正数（剩余岁数）。每 3-5 岁可酌情给一个奇缘，避免过频。

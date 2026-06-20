@@ -407,6 +407,36 @@ const ROOT_RARITY: Record<SpiritualRoot, 'common' | 'uncommon' | 'rare' | 'epic'
   none: 'common', mixed: 'common', common: 'uncommon', pure: 'rare', heavenly: 'legendary', chaos: 'mythic',
 };
 
+const CONSTITUTION_CULTIVATION_MULTIPLIER_BY_RARITY: Record<string, number> = {
+  common: 1.03,
+  uncommon: 1.06,
+  rare: 1.10,
+  epic: 1.16,
+  legendary: 1.25,
+  mythic: 1.40,
+};
+
+const CONSTITUTION_NAME_RE = /体质|道体|圣体|灵体|剑体|雷体|火体|水体|木体|金体|土体|仙体|魔体|妖体|宝体|血脉|仙骨|灵骨|道骨|根骨|先天|天赋/;
+
+export function isConstitutionStatus(status: Partial<StatusEntry> | null | undefined): boolean {
+  if (!status || !status.name) return false;
+  if (status.constitution) return true;
+  if (status.category === 'constitution') return true;
+  const text = `${status.name || ''} ${status.description || ''} ${status.source || ''}`;
+  return status.category === 'special' && CONSTITUTION_NAME_RE.test(text);
+}
+
+function hasCultivationEffect(status: Partial<StatusEntry> | null | undefined): boolean {
+  return Array.isArray(status?.effects) && status.effects.some((eff: any) => eff?.target_attribute === 'cultivationExp' && eff.operation && eff.value !== undefined && eff.value !== 0);
+}
+
+function getConstitutionCultivationMultiplier(status: Partial<StatusEntry>): number {
+  if (!isConstitutionStatus(status)) return 1;
+  const rarityBase = CONSTITUTION_CULTIVATION_MULTIPLIER_BY_RARITY[status.rarity || 'common'] || 1.06;
+  const stage = Math.max(1, Number(status.constitution?.currentStage || 1));
+  return Number((rarityBase + Math.max(0, stage - 1) * 0.04).toFixed(2));
+}
+
 // 引擎权威：从 state 计算修炼速度来源条目（保证数值准确，不依赖 AI 的主观感知）
 // AI 仍可输出 cultivationFactors（用于补充环境/心境等引擎不跟踪的因素），引擎会合并去重
 export function computeCultivationFactors(state: CharacterState): CultivationFactor[] {
@@ -422,7 +452,23 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
       note: '灵根根基',
     });
   }
-  // 2. 已装备物品中所有影响 cultivationExp 的效果
+  // 2. 特殊体质独立于普通状态：若 AI 已给 cultivationExp 效果则按效果，否则按稀有度/觉醒阶段给基础修炼共鸣。
+  for (const s of (state.activeStatuses || []).filter(isConstitutionStatus)) {
+    const cultivationEffects = (s.effects || []).filter(e => e.target_attribute === 'cultivationExp');
+    if (cultivationEffects.length) {
+      for (const eff of cultivationEffects) {
+        if (eff.operation === 'multiply' && eff.value > 0) {
+          factors.push({ name: s.name, value: eff.value, operation: 'multiply', rarity: s.rarity as any, note: '体质共鸣' });
+        } else if (eff.operation === 'add' && eff.value !== 0) {
+          factors.push({ name: s.name, value: eff.value, operation: 'add', rarity: s.rarity as any, note: '体质滋养' });
+        }
+      }
+    } else {
+      const value = getConstitutionCultivationMultiplier(s);
+      if (value > 1) factors.push({ name: s.name, value, operation: 'multiply', rarity: s.rarity as any, note: '体质根骨' });
+    }
+  }
+  // 3. 已装备物品中所有影响 cultivationExp 的效果
   for (const it of state.equipped || []) {
     const compat = evaluateTechniqueCompatibility(state, it);
     if (!compat.usable) {
@@ -453,8 +499,8 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
       }
     }
   }
-  // 3. 状态词条中影响 cultivationExp 的（如九阳之体等奇缘）
-  for (const s of state.activeStatuses || []) {
+  // 4. 普通状态词条中影响 cultivationExp 的（体质已在上方独立计算）
+  for (const s of (state.activeStatuses || []).filter(status => !isConstitutionStatus(status))) {
     for (const eff of s.effects || []) {
       if (eff.target_attribute === 'cultivationExp') {
         if (eff.operation === 'multiply' && eff.value > 0) {
@@ -477,7 +523,7 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
       }
     }
   }
-  // 4. Task 22: 心魔值惩罚（仅当 >= 30 显示）
+  // 5. Task 22: 心魔值惩罚（仅当 >= 30 显示）
   const hd = state.heartDemon ?? 0;
   if (hd >= 30) {
     const penalty = Math.min(0.7, Math.floor((hd - 20) / 10) * 0.1);
@@ -489,7 +535,7 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
       note: `心魔值 ${hd}/100，道心不稳`,
     });
   }
-  // 5. Task 23: 灵宠陪伴效应
+  // 6. Task 23: 灵宠陪伴效应
   if (state.pets && state.pets.length > 0) {
     const petBonus = computePetPassiveBonus(state).cultivationRate;
     if (petBonus > 0) {
@@ -519,6 +565,17 @@ export function computeEffectiveCultivationRate(state: CharacterState): { multip
   const rootInfo = SPIRITUAL_ROOTS[state.spiritualRoot];
   let multiplier = rootInfo?.multiplier ?? 0;
   let flatBonus = 0;
+  for (const s of (state.activeStatuses || []).filter(isConstitutionStatus)) {
+    if (hasCultivationEffect(s)) {
+      for (const eff of s.effects || []) {
+        if (eff.target_attribute !== 'cultivationExp') continue;
+        if (eff.operation === 'multiply' && eff.value > 0) multiplier *= eff.value;
+        else if (eff.operation === 'add') flatBonus += eff.value;
+      }
+    } else {
+      multiplier *= getConstitutionCultivationMultiplier(s);
+    }
+  }
   for (const it of state.equipped || []) {
     if (!evaluateTechniqueCompatibility(state, it).usable) continue;
     for (const rawEff of it.effects || []) {
@@ -528,7 +585,7 @@ export function computeEffectiveCultivationRate(state: CharacterState): { multip
       else if (eff.operation === 'add') flatBonus += eff.value;
     }
   }
-  for (const s of state.activeStatuses || []) {
+  for (const s of (state.activeStatuses || []).filter(status => !isConstitutionStatus(status))) {
     for (const eff of s.effects || []) {
       if (eff.target_attribute !== 'cultivationExp') continue;
       if (eff.operation === 'multiply' && eff.value > 0) multiplier *= eff.value;

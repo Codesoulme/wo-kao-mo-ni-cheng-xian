@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Heart, Sparkles, Sword, Shield, Zap, Clover, Brain, Coins, Star, MapPin, Users, GraduationCap, Flame, Info } from 'lucide-react';
 import { REALMS, ELEMENTS, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
-import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
+import { filterMeaningfulStatuses, isConstitutionStatus } from '@/lib/xianxia/engine';
 import { useState } from 'react';
 
 interface CharacterDetailSheetProps {
@@ -21,7 +21,9 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
   const rootInfo = SPIRITUAL_ROOTS[current.spiritualRoot as keyof typeof SPIRITUAL_ROOTS];
   const lifespanLeft = current.lifespan - current.age;
   const genderLabel = current.gender === 'male' ? '男' : current.gender === 'female' ? '女' : current.gender || '未知';
-  const visibleStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
+  const meaningfulStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
+  const constitutionStatuses = meaningfulStatuses.filter(isConstitutionStatus);
+  const visibleStatuses = meaningfulStatuses.filter(status => !isConstitutionStatus(status));
   const dynamicAttributes = (current.cultivationAttributes || []).filter((attr: any) => attr && attr.visible !== false && attr.name);
   const [selectedAttr, setSelectedAttr] = useState<AttributeInfo | null>(null);
 
@@ -95,7 +97,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
 
           {/* 灵根 */}
           <section>
-            <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title="灵根·天赋" />
+            <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title="灵根·体质" />
             <button type="button" onClick={() => setSelectedAttr(ATTRIBUTE_INFO.spiritualRoot)} className="w-full text-left rounded-lg border border-border/60 p-3 mt-1.5 bg-card/40 transition hover:border-primary/40 hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/30">
               <div className="flex items-center justify-between mb-1">
                 <span className="font-serif-cn font-semibold text-sm" style={{
@@ -112,6 +114,28 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
               <p className="text-[11px] text-muted-foreground">{rootInfo?.description}</p>
               <p className="mt-1 text-[10px] text-primary/70 flex items-center gap-1"><Info className="w-3 h-3" />点按查看影响</p>
             </button>
+
+            <div className="mt-2 rounded-lg border border-border/60 p-2 bg-card/40">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-foreground/80">体质</span>
+                <span className="text-[10px] text-muted-foreground">{constitutionStatuses.length ? `${constitutionStatuses.length}道天赋` : '尚未显化'}</span>
+              </div>
+              {constitutionStatuses.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">未见特殊体质显化，根骨仍以灵根与五行为主。</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {constitutionStatuses.map((s: any, i: number) => (
+                    <div key={s.id || i} className="rounded-md border px-2 py-1.5" style={{ borderColor: `${RARITY_COLORS[s.rarity] || '#6b7280'}40`, background: `${RARITY_COLORS[s.rarity] || '#6b7280'}0D` }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-serif-cn font-semibold truncate" style={{ color: RARITY_COLORS[s.rarity] || '#6b7280' }}>{s.name}</span>
+                        {s.constitution && <span className="text-[10px] text-muted-foreground shrink-0">{s.constitution.currentStage || 1}/{s.constitution.maxStage || 1}阶</span>}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">{s.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* 五行 */}
             <div className="grid grid-cols-5 gap-1.5 mt-2">

@@ -185,7 +185,7 @@ export const ELEMENTS: Record<Element, { name: string; color: string; icon: stri
 
 export type StatusCategory =
   | 'attribute' | 'skill' | 'buff' | 'debuff'
-  | 'special' | 'identity' | 'quest' | 'environment';
+  | 'special' | 'constitution' | 'identity' | 'quest' | 'environment';
 
 export type ConstitutionCategory = 'element' | 'combat' | 'social' | 'fate' | 'body' | 'dao';
 export type ConstitutionRiskType = 'none' | 'heart_demon' | 'backlash' | 'attention' | 'conflict';

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { CharacterState } from '@/lib/xianxia/store';
-import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
+import { filterMeaningfulStatuses, isConstitutionStatus } from '@/lib/xianxia/engine';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
 import { Heart, Sparkles, MapPin, ChevronRight, ChevronDown, Sword, Shield, Zap, Clover, Brain, Coins, Sprout } from 'lucide-react';
@@ -35,7 +35,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
     { label: '运', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
     { label: '悟', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
   ];
-  const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
+  const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || []).filter(status => !isConstitutionStatus(status));
   const topStatuses = visibleStatuses
     .map((s: any, __idx: number) => ({ ...s, __idx }))
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
