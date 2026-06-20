@@ -4141,8 +4141,7 @@ export function adjustHeartDemon(state: CharacterState, delta: number, reason?: 
   const next = Math.max(0, Math.min(100, (state.heartDemon ?? 0) + delta));
   if (reason) {
     // 心魔变化仅写日志，不污染长期记忆
-    console.log(`[Task 22] heartDemon ${delta >= 0 ? '+' : ''}${delta} → ${next} (${reason})`);
-  }
+    }
   return { ...state, heartDemon: next };
 }
 
@@ -4286,7 +4285,6 @@ export function addPet(state: CharacterState, pet: Pet): CharacterState {
   const existing = state.pets || [];
   if (existing.length >= 5) {
     // 已满，不加（AI 应避免过度授予；可考虑替换最弱的一只）
-    console.log(`[Task 23] 灵宠已满 5 只，拒绝新灵宠 ${pet.name}`);
     return state;
   }
   // ID 去重
@@ -4371,8 +4369,7 @@ export function tickPets(state: CharacterState): CharacterState {
     const newHp = Math.min(pet.maxHp, pet.hp + hpRegen);
     // 忠诚度 < 30 时 5% 概率逃离
     if (newLoyalty < 30 && Math.random() < 0.05) {
-      console.log(`[Task 23] 灵宠 ${pet.name} 忠诚度过低（${newLoyalty}），逃离了！`);
-      continue; // 灵宠逃离
+        continue; // 灵宠逃离
     }
     survivedPets.push({ ...pet, satiety: newSatiety, loyalty: newLoyalty, hp: newHp });
   }

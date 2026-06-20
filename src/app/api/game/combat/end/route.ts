@@ -136,7 +136,6 @@ export async function POST(req: NextRequest) {
       if (delta !== 0) {
         appliedChanges.push({ attribute: 'heartDemon', delta, reason: '战斗杀伐扰动道心' });
       }
-      console.log(`[Task 22] Combat victory +3 heartDemon (kill disturbs dao heart) -> ${state.heartDemon}`);
     }
 
     let narrative = '';

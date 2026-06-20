@@ -227,28 +227,6 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             </div>
           </section>
 
-          {/* 背包摘要 */}
-          <section className="pb-4">
-            <SectionTitle icon={<Coins className="w-3.5 h-3.5" />} title={`储物袋 (${current.inventory.length})`} />
-            <div className="rounded-lg border border-border/60 p-2 mt-1.5 bg-card/40">
-              {current.inventory.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-2">储物袋空空如也</p>
-              ) : (
-                <div className="space-y-1">
-                  {current.inventory.map((item: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between text-xs">
-                      <span className="font-serif-cn" style={{ color: RARITY_COLORS[item.rarity] || '#6b7280' }}>
-                        {item.name}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground">
-                        {RARITY_LABEL[item.rarity] || item.rarity}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
         </div>
       </SheetContent>
       <AttributeInfoDialog info={selectedAttr} onOpenChange={(nextOpen) => !nextOpen && setSelectedAttr(null)} />
@@ -271,7 +249,7 @@ const ATTRIBUTE_INFO: Record<string, AttributeInfo> = {
   attack: { title: '攻击', summary: '攻击影响斗法中的杀伤力，也代表角色主动破局的锋芒。', affects: ['战斗造成伤害', '狩猎、劫斗、比试等事件胜算', '对弱小敌人的威慑', '武器、功法、灵宠加成收益'] },
   defense: { title: '防御', summary: '防御影响承受攻击的能力，也代表护体法门和肉身韧性。', affects: ['战斗减伤与败亡风险', '秘境陷阱、妖兽冲撞和天劫余波', '护甲、阵法、防御符的收益', '受伤后是否需要长期休养'] },
   speed: { title: '速度', summary: '速度影响出手、闪避、追逃和游历效率。', affects: ['战斗先手与闪避叙事', '逃离追杀或追击敌人', '赶赴约期、秘境潮汐等时间事件', '遁术、身法、飞行法器收益'] },
-  luck: { title: '气运', summary: '气运影响机缘的临门一脚，也会改变风险事件的走向。', affects: ['奇遇、宝物、贵人相助概率', '探索和拍卖中遇见好物的机会', '灾厄、走火入魔和意外损失的缓冲', 'AI 生成事件时的机会/风险权重'] },
+  luck: { title: '气运', summary: '气运影响机缘的临门一脚，也会改变风险事件的走向。', affects: ['奇遇、宝物、贵人相助概率', '探索和拍卖中遇见好物的机会', '灾厄、走火入魔和意外损失的缓冲', '天机续写时的机会/风险权重'] },
   comprehension: { title: '悟性', summary: '悟性影响理解功法、顿悟和把经历化为修为的能力。', affects: ['修炼、闭关和参悟类事件收益', '学习功法、法术、阵道丹道的速度', '突破时对瓶颈的理解', '同等机缘下能否领会隐藏传承'] },
   spiritStones: { title: '灵石', summary: '灵石是修仙界通用资源，既是交易筹码，也是修炼与行动的底气。', affects: ['购买丹药、法宝、材料和情报', '拍卖会出价与竞争上限', '传送、秘境准备、疗伤和打点人情', '贫富差距带来的机缘或劫修风险'] },
   reputation: { title: '声望', summary: '声望代表角色在周边修仙界的名气与可信度。', affects: ['宗门、坊市、散修圈的态度', '求助、结盟、交易、拜师成功率', '仇敌盯上或强者注意的概率', '称号、身份和势力关系推进'] },

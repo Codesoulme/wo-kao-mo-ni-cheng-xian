@@ -52,7 +52,7 @@ async function loadAIConfig(): Promise<RuntimeAIConfig> {
   const apiKey = String(cfg?.apiKey || '').trim();
   const model = String(cfg?.model || cfg?.modelName || 'ark-code-latest').trim() || 'ark-code-latest';
   if (!baseUrl || !apiKey) {
-    throw new Error('游戏 AI 配置不完整，请在设置中填写 Base URL 和 API Key');
+    throw new Error('天机通路尚不完整，请先补齐通路地址与密钥');
   }
   cachedAIConfig = {
     baseUrl,
@@ -969,9 +969,9 @@ async function callLLMText(systemPrompt: string, userPrompt: string): Promise<st
     const text = await res.text();
     let data: any = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-    if (!res.ok) throw new Error(`AI 接口请求失败：${aiErrorMessage(data || text, res.status)}`);
+    if (!res.ok) throw new Error(`天机通路回应失败：${aiErrorMessage(data || text, res.status)}`);
     const content = data?.choices?.[0]?.message?.content || '';
-    if (!content) throw new Error('AI 接口返回为空');
+    if (!content) throw new Error('天机通路没有传回有效回应');
     return content;
   } catch (err: any) {
     console.error('LLM call failed:', err?.message || err);

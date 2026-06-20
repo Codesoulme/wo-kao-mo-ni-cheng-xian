@@ -64,13 +64,13 @@ export async function POST(req: NextRequest) {
     const model = String(body?.model || 'ark-code-latest').trim();
 
     if (!baseUrl) {
-      return NextResponse.json({ success: false, error: '请填写 API Base URL' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '请填写通路地址' }, { status: 400 });
     }
     if (!/^https?:\/\//i.test(baseUrl)) {
-      return NextResponse.json({ success: false, error: 'Base URL 必须以 http:// 或 https:// 开头' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '通路地址必须以 http:// 或 https:// 开头' }, { status: 400 });
     }
     if (!apiKey) {
-      return NextResponse.json({ success: false, error: '请填写 API Key' }, { status: 400 });
+      return NextResponse.json({ success: false, error: '请填写通路密钥' }, { status: 400 });
     }
 
     const config: GameAIConfig = { baseUrl, apiKey, model: model || 'ark-code-latest' };
@@ -92,6 +92,6 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err?.message || '保存 AI 配置失败' }, { status: 500 });
+    return NextResponse.json({ success: false, error: err?.message || '天机通路保存失败' }, { status: 500 });
   }
 }

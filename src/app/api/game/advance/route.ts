@@ -72,8 +72,7 @@ export async function POST(req: NextRequest) {
                             (aiOutput.failThreadIds && aiOutput.failThreadIds.length > 0);
       if (urgentThread && !aiDidAdvance) {
         // 引擎自动推进 +30%（让 urgent 线索不至于完全卡死）
-        finalState = advanceThread(finalState, urgentThread.id, 30, '引擎兜底推进（AI 未推进 urgent 线索）');
-        console.log(`[Task 21] Engine auto-advancing urgent thread: ${urgentThread.id} (${urgentThread.title}) +30%`);
+        finalState = advanceThread(finalState, urgentThread.id, 30, '因缘暗潮自行推进');
       }
     }
 
@@ -137,8 +136,7 @@ export async function POST(req: NextRequest) {
         finalState = startCombat(finalState, trial.trigger);
         // 追加叙事提示
         aiOutput.narrative = aiOutput.narrative + `\n\n【心魔试炼】${trial.trigger.contextNarrative}`;
-        console.log(`[Task 22] Heart demon trial triggered at age ${finalState.age} (heartDemon=${finalState.heartDemon})`);
-      }
+        }
     }
 
 

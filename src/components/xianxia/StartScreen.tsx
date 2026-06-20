@@ -158,7 +158,7 @@ export function StartScreen() {
             </Button>
           )}
           <div className="text-[10px] text-muted-foreground text-center leading-relaxed">
-            {'AI \u63a8\u6f14 \u00b7 \u56e0\u679c\u7eed\u5199 \u00b7 \u6b64\u4e16\u65e0\u5e38'}
+            {'\u5929\u673a\u63a8\u884d \u00b7 \u56e0\u679c\u7eed\u5199 \u00b7 \u6b64\u4e16\u65e0\u5e38'}
           </div>
           <div className="grid grid-cols-2 gap-2">
             <CustomSimulationDialog />

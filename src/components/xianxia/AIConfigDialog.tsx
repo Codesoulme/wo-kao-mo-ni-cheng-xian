@@ -72,10 +72,10 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       if (!data.success) throw new Error(data.error || '保存失败');
       setStatus({ configured: true, config: data.config });
       setApiKey('');
-      toast.success('AI 接口配置已保存', { description: '已写入本地 .xianxia-ai-config，不会提交到 Git' });
+      toast.success('天机通路已立稳', { description: '此通路只留在本机，不入云端。' });
       setOpen(false);
     } catch (err: any) {
-      toast.error('AI 配置保存失败', { description: err.message });
+      toast.error('天机通路保存失败', { description: err.message });
     } finally {
       setLoading(false);
     }
@@ -91,12 +91,12 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
         body: JSON.stringify({ baseUrl, apiKey, model, chatId, userId }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || '测试连接失败');
-      toast.success('AI 连接测试成功', {
-        description: `模型 ${data.model || model} 可用，耗时 ${data.elapsedMs ?? '?'}ms`,
+      if (!data.success) throw new Error(data.error || '通路校验失败');
+      toast.success('天机通路可用', {
+        description: `回应已至，耗时 ${data.elapsedMs ?? '?'}ms`,
       });
     } catch (err: any) {
-      toast.error('AI 连接测试失败', { description: err.message });
+      toast.error('天机通路校验失败', { description: err.message });
     } finally {
       setTesting(false);
     }
@@ -105,19 +105,19 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   const trigger = variant === 'menu' ? (
     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); }} className="text-xs cursor-pointer">
       <Settings className="w-3.5 h-3.5 mr-2" />
-      <span>AI 配置</span>
+      <span>天机通路</span>
     </DropdownMenuItem>
   ) : variant === 'start' ? (
     <Button variant={status.configured ? 'outline' : 'default'} className="w-full font-serif-cn gap-2">
       {status.configured ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <KeyRound className="w-4 h-4" />}
-      {status.configured ? 'AI 接口已配置' : '配置 AI 接口'}
+      {status.configured ? '天机通路已立' : '立下天机通路'}
     </Button>
   ) : (
     <Button
       variant="ghost"
       size="icon"
       className={cn('h-8 w-8', !status.configured && 'text-amber-500')}
-      title={status.configured ? 'AI 接口已配置' : '配置 AI 接口'}
+      title={status.configured ? '天机通路已立' : '立下天机通路'}
     >
       {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />}
     </Button>
@@ -130,10 +130,10 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
         <DialogHeader>
           <DialogTitle className="font-serif-cn flex items-center gap-2">
             <KeyRound className="w-4 h-4 text-primary" />
-            AI 接口配置
+            天机通路
           </DialogTitle>
           <DialogDescription>
-            本游戏依赖 AI 生成剧情。配置会保存到项目根目录 .xianxia-ai-config，本地使用，不会上传仓库。
+            此世剧情由天机续写。通路只留在本机，用于接引你已备好的火山月卡或兼容服务。
           </DialogDescription>
         </DialogHeader>
 
@@ -144,53 +144,53 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
           )}>
             {status.configured ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />}
             <div className="space-y-1 min-w-0">
-              <div className="font-medium">{status.configured ? '当前已配置 AI 接口' : '当前未配置 AI 接口'}</div>
-              {status.config?.baseUrl && <div className="truncate text-muted-foreground">Base URL：{status.config.baseUrl}</div>}
-              {status.config?.apiKeyMasked && <div className="text-muted-foreground">API Key：{status.config.apiKeyMasked}</div>}
-              {status.config?.model && <div className="text-muted-foreground">模型：{status.config.model}</div>}
+              <div className="font-medium">{status.configured ? '天机通路已立' : '天机通路未立'}</div>
+              {status.config?.baseUrl && <div className="truncate text-muted-foreground">通路地址：{status.config.baseUrl}</div>}
+              {status.config?.apiKeyMasked && <div className="text-muted-foreground">通路密钥：{status.config.apiKeyMasked}</div>}
+              {status.config?.model && <div className="text-muted-foreground">承载之名：{status.config.model}</div>}
             </div>
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium">API Base URL</label>
+            <label className="text-xs font-medium">通路地址</label>
             <Input
               value={baseUrl}
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="例如：https://api.example.com/v1"
               autoComplete="off"
             />
-            <p className="text-[10px] text-muted-foreground">请填写兼容 OpenAI Chat Completions 的 Base URL，例如火山方舟接口地址。</p>
+            <p className="text-[10px] text-muted-foreground">请填写火山方舟或兼容服务的通路地址。</p>
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium">API Key</label>
+            <label className="text-xs font-medium">通路密钥</label>
             <Input
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={status.configured ? '留空不会复用旧 key；如需更新请重新填写' : '请输入 API Key'}
+              placeholder={status.configured ? '留空沿用旧密钥；如需更新请重新填写' : '请输入通路密钥'}
               type="password"
               autoComplete="new-password"
             />
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-medium">模型名</label>
+            <label className="text-xs font-medium">承载之名名</label>
             <Input
               value={model}
               onChange={(e) => setModel(e.target.value)}
               placeholder="例如：ark-code-latest"
               autoComplete="off"
             />
-            <p className="text-[10px] text-muted-foreground">火山 Ark 接口必须传 model；当前月卡配置可先用 ark-code-latest。</p>
+            <p className="text-[10px] text-muted-foreground">火山方舟通路需要填写承载之名；当前月卡可先用 ark-code-latest。</p>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-2">
-              <label className="text-xs font-medium">chatId（可选）</label>
+              <label className="text-xs font-medium">会话印记（可选）</label>
               <Input value={chatId} onChange={(e) => setChatId(e.target.value)} placeholder="可选" autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-medium">userId（可选）</label>
+              <label className="text-xs font-medium">行者印记（可选）</label>
               <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="可选" autoComplete="off" />
             </div>
           </div>
@@ -202,12 +202,12 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
               onClick={testConnection}
               disabled={testing || loading || !baseUrl.trim() || (!status.configured && !apiKey.trim()) || !model.trim()}
             >
-              {testing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />测试中</> : '测试连接'}
+              {testing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />校验中</> : '校验通路'}
             </Button>
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setOpen(false)} disabled={loading || testing}>取消</Button>
               <Button className="flex-1" onClick={save} disabled={loading || testing || !baseUrl.trim() || (!status.configured && !apiKey.trim()) || !model.trim()}>
-                {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中</> : '保存配置'}
+                {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中</> : '保存通路'}
               </Button>
             </div>
           </div>
