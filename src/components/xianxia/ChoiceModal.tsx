@@ -81,7 +81,7 @@ export function ChoiceModal() {
       }
     } catch (err: any) {
       setError(err.message);
-      if (String(err.message || '').includes('请先配置 AI 接口') || String(err.message || '').includes('天机通路')) {
+      if (String(err.message || '').includes('请先配置 AI 接口')) {
         setAiConfigPromptOpen(true);
       } else {
         toast.error('选择失败', { description: err.message });
@@ -187,9 +187,9 @@ export function ChoiceModal() {
       <Dialog open={aiConfigPromptOpen} onOpenChange={setAiConfigPromptOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-serif-cn">天机通路未立</DialogTitle>
+            <DialogTitle className="font-serif-cn">需要配置 AI 接口</DialogTitle>
             <DialogDescription>
-              此处抉择需要天机续写。请先立下通路地址与密钥，保存后回到此处继续选择。
+              天道抉择需要 AI 生成后续剧情。请先配置 API Base URL 和 API Key，保存后回到此处继续选择。
             </DialogDescription>
           </DialogHeader>
           <AIConfigDialog variant="start" />
