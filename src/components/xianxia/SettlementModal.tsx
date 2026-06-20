@@ -51,7 +51,7 @@ export function SettlementModal() {
     setSelectedIds((current) => {
       if (current.includes(id)) return current.filter((item) => item !== id);
       if (current.length >= 3) {
-        toast.warning('轮回之门狭窄', { description: '此版最多带出三项传承。' });
+        toast.warning('轮回之门狭窄', { description: '至多携三缕旧缘入下一世。' });
         return current;
       }
       return [...current, id];
@@ -66,12 +66,12 @@ export function SettlementModal() {
     setSelectedIds([]);
     reset();
     toast.success('轮回结算已归档', {
-      description: heritageItems.length ? `已收入传承池：${heritageItems.map((item) => item.name).join('、')}` : '未选择带出物，仅留名模拟殿堂。',
+      description: heritageItems.length ? `已收入传承池：${heritageItems.map((item) => item.name).join('、')}` : '未选择带出物，仅留名仙路殿堂。',
     });
   };
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) confirm(); }}>
+    <Dialog open onOpenChange={() => undefined}>
       <DialogContent className="max-w-md max-h-[86dvh] overflow-y-auto paper-texture">
         <DialogHeader>
           <DialogTitle className="font-serif-cn flex items-center gap-2">
@@ -91,7 +91,7 @@ export function SettlementModal() {
             </div>
             <div className="text-2xl font-bold text-primary tabular-nums">{settlementResult.score}</div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              结算只允许带出旧物、命格、灵宠、法宝、体质等因缘；修为不会成为奖励。
+              轮回不携一世修为，只认尚未散尽的旧缘。可从旧物、命格、灵宠、法宝或体质中择其最深者，留作下一世开端。
             </p>
           </CardContent>
         </Card>
@@ -109,14 +109,26 @@ export function SettlementModal() {
             options.map((option) => {
               const checked = selectedIds.includes(option.id);
               return (
-                <button
+                <div
                   key={option.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => toggle(option.id)}
-                  className="w-full text-left rounded-lg border bg-card/70 p-3 transition hover:bg-muted/40"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      toggle(option.id);
+                    }
+                  }}
+                  className="w-full cursor-pointer text-left rounded-lg border bg-card/70 p-3 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                 >
                   <div className="flex gap-3">
-                    <Checkbox checked={checked} className="mt-1" />
+                    <Checkbox
+                      checked={checked}
+                      onCheckedChange={() => toggle(option.id)}
+                      onClick={(event) => event.stopPropagation()}
+                      className="mt-1"
+                    />
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2">
                         <span className="font-serif-cn text-sm font-semibold truncate">{option.name}</span>
@@ -128,7 +140,7 @@ export function SettlementModal() {
                       <p className="text-[10px] text-primary/80 leading-relaxed">{option.reason}</p>
                     </div>
                   </div>
-                </button>
+                </div>
               );
             })
           )}
