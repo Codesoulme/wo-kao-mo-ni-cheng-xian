@@ -38,6 +38,7 @@ const RARITY_CLASS: Record<string, string> = {
 export function SettlementModal() {
   const { settlementResult, setSettlementResult, addHeritageItems, addHallRecord, reset } = useGameStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [confirming, setConfirming] = useState(false);
 
   const options = settlementResult?.options || [];
   const selectedItem = options.find((option) => selectedIds.includes(option.id));
@@ -51,12 +52,30 @@ export function SettlementModal() {
     });
   };
 
-  const confirm = () => {
+  const confirm = async () => {
+    if (confirming) return;
+    setConfirming(true);
     const heritageItems: HeritageItem[] = selectedItem ? [selectedItem].map(({ reason: _reason, ...item }) => item) : [];
+
+    try {
+      const res = await fetch('/api/game/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterId: settlementResult.characterId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) throw new Error(data.error || '归档旧世失败');
+    } catch (err: any) {
+      setConfirming(false);
+      toast.error('归档旧世失败', { description: err?.message || '请稍后重试' });
+      return;
+    }
+
     addHeritageItems(heritageItems);
     addHallRecord({ ...settlementResult.hallRecord, carriedOut: heritageItems });
     setSettlementResult(null);
     setSelectedIds([]);
+    setConfirming(false);
     reset();
     toast.success('轮回结算已归档', {
       description: heritageItems.length ? `已收入传承池：${heritageItems.map((item) => item.name).join('、')}` : '未选择带出物，仅留名仙路殿堂。',
@@ -140,9 +159,9 @@ export function SettlementModal() {
         </div>
 
         <DialogFooter>
-          <Button onClick={confirm} className="w-full font-serif-cn tracking-wider">
-            <Sparkles className="w-4 h-4 mr-2" />
-            归入轮回，开启下一世
+          <Button onClick={confirm} disabled={confirming} className="w-full font-serif-cn tracking-wider">
+            <Sparkles className={`w-4 h-4 mr-2 ${confirming ? 'animate-spin' : ''}`} />
+            {confirming ? '归档旧世...' : '归入轮回，开启下一世'}
           </Button>
         </DialogFooter>
       </DialogContent>
