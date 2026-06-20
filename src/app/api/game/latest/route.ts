@@ -7,8 +7,7 @@ export async function GET() {
   try {
     const latest = await db.character.findFirst({
       where: {
-        alive: true,
-        ascended: false,
+        age: { gt: 0 },
         NOT: [
           { name: { contains: '烟测' } },
           { name: { contains: '测试' } },
@@ -19,17 +18,18 @@ export async function GET() {
         ],
       },
       orderBy: { updatedAt: 'desc' },
-      select: { id: true, name: true, age: true, realm: true, realmLevel: true, location: true, updatedAt: true },
+      select: { id: true, name: true, age: true, realm: true, realmLevel: true, location: true, updatedAt: true, alive: true, ascended: true },
     });
 
-    if (!latest) {
+    if (!latest || !latest.alive || latest.ascended) {
       return NextResponse.json({ success: true, hasSave: false });
     }
 
+    const { alive: _alive, ascended: _ascended, ...character } = latest;
     return NextResponse.json({
       success: true,
       hasSave: true,
-      character: latest,
+      character,
     });
   } catch (err: any) {
     console.error('latest save error:', err);

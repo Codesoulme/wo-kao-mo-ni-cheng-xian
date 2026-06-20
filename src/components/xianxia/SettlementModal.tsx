@@ -72,7 +72,7 @@ export function SettlementModal() {
             {settlementResult.title}
           </DialogTitle>
           <DialogDescription className="leading-relaxed font-serif-cn">
-            {settlementResult.summary}
+            轮回不携一世修为，只认尚未散尽的旧缘。请在天命浮现的旧物、命格、灵宠、法宝或体质中择其一，留作下一世开端。
           </DialogDescription>
         </DialogHeader>
 
@@ -84,7 +84,7 @@ export function SettlementModal() {
             </div>
             <div className="text-2xl font-bold text-primary tabular-nums">{settlementResult.score}</div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              轮回不携一世修为，只认尚未散尽的旧缘。请在天命浮现的旧物、命格、灵宠、法宝或体质中择其一，留作下一世开端。
+              {settlementResult.summary}
             </p>
           </CardContent>
         </Card>
