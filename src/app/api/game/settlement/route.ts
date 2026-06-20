@@ -51,40 +51,38 @@ export async function POST(req: NextRequest) {
     const fallback = generateSettlementResult(state as any, events as any);
     let settlementResult = fallback;
 
-    if (fallback.options.length) {
-      try {
-        const ai = await Promise.race([
-          generateSettlementEvaluation({
-            character: state,
-            events,
-            candidateOptions: fallback.options,
-            fallback: {
-              title: fallback.title,
-              summary: fallback.summary,
-              rank: fallback.rank,
-              score: fallback.score,
-            },
-          }),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('settlement ai timeout')), 6000)),
-        ]);
-        const selected = fallback.options
-          .filter((option) => ai.optionIds.includes(option.id))
-          .map((option) => ({ ...option, reason: ai.reasons[option.id] || option.reason }));
-        settlementResult = {
-          ...fallback,
-          title: ai.title || fallback.title,
-          summary: ai.summary || fallback.summary,
-          rank: ai.rank || fallback.rank,
-          options: selected.length ? selected : fallback.options.slice(0, 1),
-          hallRecord: {
-            ...fallback.hallRecord,
-            evaluationTitle: ai.rank || fallback.hallRecord.evaluationTitle,
+    try {
+      const ai = await Promise.race([
+        generateSettlementEvaluation({
+          character: state,
+          events,
+          candidateOptions: fallback.options,
+          fallback: {
+            title: fallback.title,
+            summary: fallback.summary,
+            rank: fallback.rank,
+            score: fallback.score,
           },
-        };
-      } catch (err: any) {
-        console.error('settlement ai failed:', err?.message || err);
-        settlementResult = { ...fallback, options: fallback.options.slice(0, Math.min(3, fallback.options.length)) };
-      }
+        }),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('settlement ai timeout')), 6000)),
+      ]);
+      const selected = fallback.options
+        .filter((option) => ai.optionIds.includes(option.id))
+        .map((option) => ({ ...option, reason: ai.reasons[option.id] || option.reason }));
+      settlementResult = {
+        ...fallback,
+        title: ai.title || fallback.title,
+        summary: ai.summary || fallback.summary,
+        rank: ai.rank || fallback.rank,
+        options: selected,
+        hallRecord: {
+          ...fallback.hallRecord,
+          evaluationTitle: ai.rank || fallback.hallRecord.evaluationTitle,
+        },
+      };
+    } catch (err: any) {
+      console.error('settlement ai failed:', err?.message || err);
+      settlementResult = { ...fallback, options: fallback.options.slice(0, Math.min(3, fallback.options.length)) };
     }
 
     return NextResponse.json({ success: true, settlementResult });

@@ -1438,11 +1438,14 @@ export async function generateSettlementEvaluation(args: {
   fallback: { title: string; summary: string; rank: string; score: number };
 }): Promise<{ title: string; summary: string; rank: string; optionIds: string[]; reasons: Record<string, string> }> {
   const { character, events, candidateOptions, fallback } = args;
-  const recentEvents = (events || []).slice(-12).map((event) => ({
+  const importantEvents = (events || [])
+    .filter((event) => ['birth', 'fate_node', 'choice', 'interference', 'combat', 'breakthrough', 'death', 'auction', 'exploration', 'normal'].includes(String(event.eventType || 'normal')))
+    .slice(-18);
+  const recentEvents = importantEvents.map((event) => ({
     age: event.age,
     title: event.title,
     eventType: event.eventType,
-    narrative: String(event.narrative || '').slice(0, 180),
+    narrative: String(event.narrative || '').slice(0, 260),
   }));
   const candidates = (candidateOptions || []).slice(0, 12).map((option) => ({
     id: option.id,
@@ -1456,16 +1459,20 @@ export async function generateSettlementEvaluation(args: {
 
   const system = `${IDENTITY_PROMPT}
 
-【当前场景：一世轮回结算】
-你负责根据角色真实经历，为这一世写出结算评价，并从引擎提供的候选传承中挑出少量最有价值者展示给玩家。
+【当前任务：一世轮回结算】
+你负责根据角色真实经历，为这一世写出一段传记式结语，并从引擎提供的候选传承中挑出最有价值、最值得展示给玩家的选项。
 
 硬规则：
-- 只能从 candidateOptions 中选择 optionIds，严禁编造不存在的传承。
-- optionIds 数量由你根据评价、因果深浅和候选质量决定：没有合适就空；普通一世可给 1-3 个；厚重一世可给 4-5 个；极少超过 5 个。
-- 玩家最终只能选择其中一个带入下一世，所以候选应精而少，不要把所有东西都端出来。
-- 文案必须是修仙世界内表达，不要出现 AI、系统、版本、奖励、配置、接口、抽卡等局外词。
-- 修为境界本身不可作为传承，但由修行留下的命格、旧物、体质、灵宠、法宝、功法因缘可以。
-- 严格输出 JSON。`;
+- 只能从 candidateOptions 中选择 optionIds，严禁创造不存在的传承。
+- optionIds 数量由你根据评价、角色厚度和候选质量决定；没有合适就空，普通一世可给 1-3 个，厚重一世可给 4-5 个，但极少超过 5 个。
+- 玩家最终只会选择其中一个，因此同一类高度相似候选应当精简，不要为了凑数量而塞满。
+- summary 必须像人物小传/墓志铭/仙路评传，不要只写一句模板。优先按“姓名与资质/根骨 → 早年或出身 → 关键年龄节点与事件 → 机缘、战斗、秘境、拍卖、突破或牵挂 → 终局评价”的顺序组织。
+- 必须尽量引用 recentEvents 中真实发生的年龄、事件标题或结果；如果事件很少，也要结合灵根、境界、主动放弃/死亡/飞升原因写出具体评语，不能写成“止步于0岁”“一世虽终”这类机械兜底。
+- 若 ending/causeOfDeath 是“主动放下此世因果”，语气应是“此番暂按因果、收束推演/参悟旧路，但其在此世仍曾奔赴自己的仙路”，不要把它写成死亡或失败判词。
+- 若死亡，应写清何因而终、其道途遗憾与可留之缘；若飞升，应写成叩开天门后的总结。
+- 文案必须沉浸在修仙世界内表达，不要出现 AI、系统、版本、缓存、配置、接口、抽卡等局外词。
+- 视为世界本身对这段人生的判词，可以提及其心性、境遇、资质、抉择、战斗、机缘与遗憾。
+- 严格返回 JSON。`;
 
   const user = `【角色】
 姓名：${character.name}
@@ -1508,7 +1515,7 @@ ${JSON.stringify(fallback, null, 2)}
   }
   return {
     title: String(raw?.title || fallback.title).trim().slice(0, 36) || fallback.title,
-    summary: String(raw?.summary || fallback.summary).trim().slice(0, 280) || fallback.summary,
+    summary: String(raw?.summary || fallback.summary).trim().slice(0, 520) || fallback.summary,
     rank: String(raw?.rank || fallback.rank).trim().slice(0, 12) || fallback.rank,
     optionIds,
     reasons,

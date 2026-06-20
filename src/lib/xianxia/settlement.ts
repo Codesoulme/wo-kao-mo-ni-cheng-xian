@@ -137,10 +137,25 @@ export function generateSettlementResult(character: CharacterState, events: Game
 
   const rank = score >= 160 ? '天外留名' : score >= 115 ? '一代宗师' : score >= 80 ? '名动一方' : score >= 45 ? '道途有痕' : '尘缘初记';
   const ending = character.ascended ? 'ascension' : 'death';
-  const title = character.ascended ? '羽化登仙，旧世成碑' : '尘缘已尽，轮回将启';
-  const summary = character.ascended
-    ? `${character.name}终破凡尘，踏过${character.realmName || character.realm}之门。此世因果不随风散，其中至亮者可入传承池。`
-    : `${character.name}止步于${character.age}岁，${character.causeOfDeath || '一身因果归于沉寂'}。一世虽终，仍有旧物旧缘可随轮回而去。`;
+  const title = character.ascended ? '羽化登真，名录仙碑' : '尘缘已尽，轮回将启';
+  const rootText = character.rootDetail || character.spiritualRoot || '灵根未显';
+  const realmText = character.realmName || (character.realm === 'mortal' ? '凡人' : character.realm) || '凡身未蜕';
+  const ageText = (character.age || 0) > 0 ? `行至${character.age}岁` : '此世方启';
+  const keyEvents = events
+    .filter((event) => event.title || event.narrative)
+    .slice(-6)
+    .map((event) => `${event.age}岁“${event.title || '无名旧事'}”`);
+  const eventTrail = keyEvents.length
+    ? `其一世可考之迹，有${keyEvents.join('，')}。`
+    : '其一世尚未留下足够多的年岁旧事，仙路仍如未展之卷。';
+  const endingText = character.ascended
+    ? `终能叩开天门，踏破${realmText}之限，名入仙碑。`
+    : character.causeOfDeath === '主动放下此世因果'
+      ? '此番主动按下因果，并非身死道消；只是将这一段推演暂收于轮回簿上。若在此世继续行走，他仍会循着自己的心念奔赴仙路；而今所留旧缘，便作来世再问天命的开端。'
+      : character.causeOfDeath
+        ? `终因${character.causeOfDeath}而止，道途有憾，却仍有未散旧缘可入轮回。`
+        : '此段道途暂归尘烟，虽未抵彼岸，仍有旧物旧缘可随轮回而去。';
+  const summary = `${character.name}，${rootText}，${ageText}，最高曾至${realmText}${character.realmLevel ? `第${character.realmLevel + 1}层` : ''}。${eventTrail}${endingText}`.slice(0, 520);
 
   const rawOptions = [
     ...inventory.map((item) => itemToHeritage(item, score, item?.source || '随身旧物')),
