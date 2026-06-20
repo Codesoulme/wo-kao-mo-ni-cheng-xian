@@ -21,18 +21,66 @@ import { z } from 'zod';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
+
+function isMechanicalCombatSentence(text: string) {
+  const compact = text.replace(/\s+/g, '');
+  const numberLike = '[0-9一二三四五六七八九十百千万两]+';
+  const patterns = [
+    new RegExp(`造成(?:了)?${numberLike}(?:点)?(?:伤害|创伤|气血)`),
+    new RegExp(`(?:受到|承受|损失|扣除)(?:了)?${numberLike}(?:点)?(?:伤害|气血|生命)`),
+    new RegExp(`(?:敌人|对手|敌方).{0,8}(?:反扑|反击).{0,8}造成`),
+    /HP|hp|生命值|气血值|伤害值|数值|公式|结算|本回合/i,
+    /你(?:对|向)?.{0,12}造成.{0,8}伤害/,
+    /敌方(?:对|向)?.{0,12}造成.{0,8}伤害/,
+  ];
+  return patterns.some(pattern => pattern.test(compact));
+}
+
+function cleanCombatNarrative(text?: string) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+  const parts = raw.match(/[^。！？；.!?;]+[。！？；.!?;]?/g) || [raw];
+  const kept = parts
+    .map(part => part.trim())
+    .filter(part => part && !isMechanicalCombatSentence(part));
+  return kept.join('').replace(/\s{2,}/g, ' ').trim().slice(0, 380);
+}
+
 function needsCombatNarrativeRewrite(text?: string) {
   if (!text) return true;
   const compact = text.replace(/\s+/g, '');
-  if (compact.length < 36) return true;
-  const mechanicalPatterns = [
-    /造成\d+点?伤害/,
-    /受到\d+点?伤害/,
-    /敌人反扑/,
-    /HP|hp|气血[:：]?\d+|生命[:：]?\d+/i,
-    /你攻击.*敌人攻击/,
-  ];
-  return mechanicalPatterns.some(pattern => pattern.test(compact));
+  if (compact.length < 48) return true;
+  if (isMechanicalCombatSentence(compact)) return true;
+  const cleaned = cleanCombatNarrative(text);
+  return cleaned.length < Math.min(48, compact.length * 0.55);
+}
+
+function buildLocalCombatNarrativeFallback(args: {
+  playerAction?: string;
+  enemyName?: string;
+  playerDamage?: number;
+  enemyDamage?: number;
+  playerHeal?: number;
+  endStatus?: string;
+}) {
+  const action = args.playerAction || '攻势';
+  const enemy = args.enemyName || '敌手';
+  const opening = `你提气运转${action}，灵力沿经脉骤然绷紧，衣袍被劲风扯得猎猎作响。`;
+  const pressure = args.playerDamage && args.playerDamage > 0
+    ? `${enemy}身前护光一暗，脚下碎石被余波震开，身形也被逼得后撤半步。`
+    : `${enemy}看破来势，侧身卸去锋芒，双方气机在半空短促相撞。`;
+  const counter = args.enemyDamage && args.enemyDamage > 0
+    ? `对方旋即借势压回，罡风擦过肩臂，你气血一阵翻涌。`
+    : `你稳住步伐，没有给对方趁隙反扑的余地。`;
+  const heal = args.playerHeal && args.playerHeal > 0 ? `一缕回元之力随呼吸沉入丹田，紊乱气息稍稍平复。` : '';
+  const ending = args.endStatus === 'victory'
+    ? `待尘雾落下，敌势已散，此战胜负分明。`
+    : args.endStatus === 'defeat'
+      ? `只是余劲未消，你眼前一沉，战局终究滑向不可挽回。`
+      : args.endStatus === 'fled'
+        ? `你趁气浪遮眼抽身疾退，战场很快被抛在身后。`
+        : `片刻之后，双方仍隔着翻涌灵压对峙，破绽尚在暗处游移。`;
+  return `${opening}${pressure}${counter}${heal}${ending}`.slice(0, 380);
 }
 
 function persistableCombatActionStateData(state: ReturnType<typeof dbToState>) {
@@ -136,18 +184,32 @@ export async function POST(req: NextRequest) {
       : executeCombatRound(state, action, payload || {});
     state = normalizeCultivationState(result.state);
 
-    if (sessionBefore && result.round && needsCombatNarrativeRewrite(result.round.narrative)) {
+    if (sessionBefore && result.round) {
       const enemyName = sessionBefore.enemies?.[sessionBefore.currentEnemyIdx]?.name;
-      const ctx = buildStateContext(state, []);
-      const narrative = await Promise.race([
-        generateCombatRoundNarrative({
-          ctx,
-          sessionBefore,
-          round: result.round,
+      let narrative = cleanCombatNarrative(result.round.narrative);
+      if (needsCombatNarrativeRewrite(result.round.narrative)) {
+        const ctx = buildStateContext(state, []);
+        const rewritten = await Promise.race([
+          generateCombatRoundNarrative({
+            ctx,
+            sessionBefore,
+            round: { ...result.round, narrative: narrative || result.round.narrative },
+            enemyName,
+          }),
+          new Promise<string>((resolve) => setTimeout(() => resolve(narrative || result.round.narrative), 3500)),
+        ]);
+        narrative = cleanCombatNarrative(rewritten);
+      }
+      if (!narrative || needsCombatNarrativeRewrite(narrative)) {
+        narrative = buildLocalCombatNarrativeFallback({
+          playerAction: result.round.playerAction,
           enemyName,
-        }),
-        new Promise<string>((resolve) => setTimeout(() => resolve(result.round.narrative), 3500)),
-      ]);
+          playerDamage: result.round.playerDamage,
+          enemyDamage: result.round.enemyDamage,
+          playerHeal: result.round.playerHeal,
+          endStatus: result.endStatus,
+        });
+      }
       result.round.narrative = narrative;
       if (state.combatSession?.log?.length) {
         const log = [...state.combatSession.log];
