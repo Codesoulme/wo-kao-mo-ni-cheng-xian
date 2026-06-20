@@ -1430,6 +1430,91 @@ function sanitizeCombatRoundProposal(raw: any): CombatRoundProposal {
   };
 }
 
+
+export async function generateSettlementEvaluation(args: {
+  character: any;
+  events: any[];
+  candidateOptions: any[];
+  fallback: { title: string; summary: string; rank: string; score: number };
+}): Promise<{ title: string; summary: string; rank: string; optionIds: string[]; reasons: Record<string, string> }> {
+  const { character, events, candidateOptions, fallback } = args;
+  const recentEvents = (events || []).slice(-12).map((event) => ({
+    age: event.age,
+    title: event.title,
+    eventType: event.eventType,
+    narrative: String(event.narrative || '').slice(0, 180),
+  }));
+  const candidates = (candidateOptions || []).slice(0, 12).map((option) => ({
+    id: option.id,
+    name: option.name,
+    category: option.category,
+    rarity: option.rarity,
+    source: option.source,
+    description: String(option.description || '').slice(0, 120),
+    engineReason: String(option.reason || '').slice(0, 120),
+  }));
+
+  const system = `${IDENTITY_PROMPT}
+
+【当前场景：一世轮回结算】
+你负责根据角色真实经历，为这一世写出结算评价，并从引擎提供的候选传承中挑出少量最有价值者展示给玩家。
+
+硬规则：
+- 只能从 candidateOptions 中选择 optionIds，严禁编造不存在的传承。
+- optionIds 数量由你根据评价、因果深浅和候选质量决定：没有合适就空；普通一世可给 1-3 个；厚重一世可给 4-5 个；极少超过 5 个。
+- 玩家最终只能选择其中一个带入下一世，所以候选应精而少，不要把所有东西都端出来。
+- 文案必须是修仙世界内表达，不要出现 AI、系统、版本、奖励、配置、接口、抽卡等局外词。
+- 修为境界本身不可作为传承，但由修行留下的命格、旧物、体质、灵宠、法宝、功法因缘可以。
+- 严格输出 JSON。`;
+
+  const user = `【角色】
+姓名：${character.name}
+年岁：${character.age}/${character.lifespan}
+境界：${character.realmName || character.realm} ${character.realmLevel ? `${character.realmLevel + 1}层` : ''}
+灵根：${character.rootDetail || character.spiritualRoot}
+结局：${character.ascended ? '飞升' : character.causeOfDeath || '此世终了'}
+灵石：${character.spiritStones || 0}
+声望：${character.reputation || 0}
+
+【近年关键经历】
+${JSON.stringify(recentEvents, null, 2)}
+
+【可被挑选的真实候选传承】
+${JSON.stringify(candidates, null, 2)}
+
+【引擎基础评价】
+${JSON.stringify(fallback, null, 2)}
+
+请输出 JSON：
+{
+  "title": "8-18字，像一世结语，不要写系统词",
+  "summary": "100-220字，评价此人一世因果、成败、执念与余韵，可自然说明为何有这些传承浮现",
+  "rank": "2-8字评价称号",
+  "optionIds": ["只能填候选传承中的 id，数量由你判断，玩家最终只能选一个"],
+  "reasons": { "候选id": "20-60字，说明此物/此缘为何值得留入下一世" }
+}`;
+
+  const content = await callLLMText(system, user);
+  const raw = parseJSON(content);
+  const validIds = new Set<string>(candidates.map((option) => String(option.id)));
+  const optionIds: string[] = Array.from(new Set<string>(Array.isArray(raw?.optionIds) ? raw.optionIds.map(String) : []))
+    .filter((id: string) => validIds.has(id))
+    .slice(0, 5);
+  const reasons: Record<string, string> = {};
+  const rawReasons: Record<string, any> = raw?.reasons && typeof raw.reasons === 'object' ? raw.reasons : {};
+  for (const id of optionIds) {
+    const reason = String(rawReasons[id] || '').trim();
+    if (reason) reasons[id] = reason.slice(0, 90);
+  }
+  return {
+    title: String(raw?.title || fallback.title).trim().slice(0, 36) || fallback.title,
+    summary: String(raw?.summary || fallback.summary).trim().slice(0, 280) || fallback.summary,
+    rank: String(raw?.rank || fallback.rank).trim().slice(0, 12) || fallback.rank,
+    optionIds,
+    reasons,
+  };
+}
+
 export async function generateCombatRoundProposal(args: {
   ctx: EngineStateContext;
   sessionBefore: CombatSession;

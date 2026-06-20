@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useGameStore, type HeritageItem } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -40,26 +40,19 @@ export function SettlementModal() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const options = settlementResult?.options || [];
-  const selectedItems = useMemo(
-    () => options.filter((option) => selectedIds.includes(option.id)),
-    [options, selectedIds],
-  );
+  const selectedItem = options.find((option) => selectedIds.includes(option.id));
 
   if (!settlementResult) return null;
 
   const toggle = (id: string) => {
     setSelectedIds((current) => {
-      if (current.includes(id)) return current.filter((item) => item !== id);
-      if (current.length >= 3) {
-        toast.warning('轮回之门狭窄', { description: '至多携三缕旧缘入下一世。' });
-        return current;
-      }
-      return [...current, id];
+      if (current.includes(id)) return [];
+      return [id];
     });
   };
 
   const confirm = () => {
-    const heritageItems: HeritageItem[] = selectedItems.map(({ reason: _reason, ...item }) => item);
+    const heritageItems: HeritageItem[] = selectedItem ? [selectedItem].map(({ reason: _reason, ...item }) => item) : [];
     addHeritageItems(heritageItems);
     addHallRecord({ ...settlementResult.hallRecord, carriedOut: heritageItems });
     setSettlementResult(null);
@@ -91,7 +84,7 @@ export function SettlementModal() {
             </div>
             <div className="text-2xl font-bold text-primary tabular-nums">{settlementResult.score}</div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              轮回不携一世修为，只认尚未散尽的旧缘。可从旧物、命格、灵宠、法宝或体质中择其最深者，留作下一世开端。
+              轮回不携一世修为，只认尚未散尽的旧缘。请在天命浮现的旧物、命格、灵宠、法宝或体质中择其一，留作下一世开端。
             </p>
           </CardContent>
         </Card>
@@ -99,7 +92,7 @@ export function SettlementModal() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-sm font-serif-cn font-semibold">可带出传承</div>
-            <div className="text-xs text-muted-foreground">{selectedIds.length}/3</div>
+            <div className="text-xs text-muted-foreground">{selectedIds.length}/1</div>
           </div>
           {options.length === 0 ? (
             <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">

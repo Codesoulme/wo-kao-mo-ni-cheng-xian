@@ -23,7 +23,6 @@ import {
 import { RotateCcw, ScrollText, Info, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
-import { generateSettlementResult } from '@/lib/xianxia/settlement';
 
 export function GameMenu() {
   const { character, events, choices, setSettlementResult } = useGameStore();
@@ -31,16 +30,22 @@ export function GameMenu() {
   const [aboutOpen, setAboutOpen] = useState(false);
 
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (!character) return;
-    const abandonedCharacter = {
-      ...character,
-      alive: false,
-      causeOfDeath: character.causeOfDeath || '主动放下此世因果',
-    };
-    setSettlementResult(generateSettlementResult(abandonedCharacter, events));
     setResetOpen(false);
-    toast('此世已入轮回结算', { description: '你仍可从此世旧物、命格、灵宠或因缘中选择传承。' });
+    try {
+      const res = await fetch('/api/game/settlement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterId: character.id, reason: 'abandon' }),
+      });
+      const data = await res.json();
+      if (!data.success || !data.settlementResult) throw new Error(data.error || 'settlement failed');
+      setSettlementResult(data.settlementResult);
+      toast('此世已入轮回结算', { description: '请从浮现的旧缘中择一带入下一世。' });
+    } catch (err: any) {
+      toast.error('结算此世失败', { description: err?.message || '请稍后再试。' });
+    }
   };
 
   const totalEvents = events.length;

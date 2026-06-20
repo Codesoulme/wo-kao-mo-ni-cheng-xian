@@ -18,7 +18,6 @@ import { GameMenu } from '@/components/xianxia/GameMenu';
 import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Scroll, Sparkles, Package } from 'lucide-react';
-import { generateSettlementResult } from '@/lib/xianxia/settlement';
 
 // 客户端 hydration 检测：避免 SSR/CSR mismatch
 // 用微任务延迟 setState，避免在 effect body 同步调用触发 react-hooks 规则
@@ -48,6 +47,7 @@ export default function Home() {
   const effectiveTab = pendingChoice || combatResultPending ? 'story' : tab;
   const storyScrollRef = useRef<HTMLDivElement | null>(null);
   const storyScrollTopRef = useRef(0);
+  const settlingCharacterIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (effectiveTab !== 'story') return;
@@ -83,17 +83,42 @@ export default function Home() {
         // 静默失败
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      if (settlingCharacterIdRef.current === character.id) settlingCharacterIdRef.current = null;
+    };
   }, [hydrated, character?.id, events.length, setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice]);
 
   useEffect(() => {
     if (!hydrated || !character) return;
     if (character.alive && !character.ascended) return;
     if (settlementResult?.characterId === character.id) return;
-    const result = generateSettlementResult(character, events);
-    if (hallOfSimulations.some((record) => record.id === result.hallRecord.id)) return;
-    setSettlementResult(result);
-  }, [hydrated, character, events, settlementResult?.characterId, hallOfSimulations, setSettlementResult]);
+    if (settlingCharacterIdRef.current === character.id) return;
+    if (hallOfSimulations.some((record) => record.characterName === character.name && record.age === character.age)) return;
+    let cancelled = false;
+    settlingCharacterIdRef.current = character.id;
+    (async () => {
+      try {
+        const res = await fetch('/api/game/settlement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ characterId: character.id }),
+        });
+        const data = await res.json();
+        if (!cancelled && data.success && data.settlementResult) {
+          setSettlementResult(data.settlementResult);
+        }
+      } catch (err) {
+        console.error('settlement request failed:', err);
+      } finally {
+        if (!cancelled) settlingCharacterIdRef.current = null;
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (settlingCharacterIdRef.current === character.id) settlingCharacterIdRef.current = null;
+    };
+  }, [hydrated, character, settlementResult?.characterId, hallOfSimulations, setSettlementResult]);
 
   // 防止 hydration mismatch：在客户端 hydration 完成前不渲染 character 相关 UI
   if (!hydrated) {
