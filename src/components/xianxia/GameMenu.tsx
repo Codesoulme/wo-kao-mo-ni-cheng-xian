@@ -23,17 +23,24 @@ import {
 import { RotateCcw, ScrollText, Info, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
+import { generateSettlementResult } from '@/lib/xianxia/settlement';
 
 export function GameMenu() {
-  const { character, events, choices, reset } = useGameStore();
+  const { character, events, choices, setSettlementResult } = useGameStore();
   const [resetOpen, setResetOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
 
   const handleReset = () => {
-    reset();
+    if (!character) return;
+    const abandonedCharacter = {
+      ...character,
+      alive: false,
+      causeOfDeath: character.causeOfDeath || '主动放下此世因果',
+    };
+    setSettlementResult(generateSettlementResult(abandonedCharacter, events));
     setResetOpen(false);
-    toast('已放弃模拟', { description: '主动放弃不会获得本次模拟结算奖励。' });
+    toast('此世已入轮回结算', { description: '你仍可从此世旧物、命格、灵宠或因缘中选择传承。' });
   };
 
   const totalEvents = events.length;
@@ -80,7 +87,7 @@ export function GameMenu() {
           <AlertDialogHeader>
             <AlertDialogTitle className="font-serif-cn text-base">放弃模拟？</AlertDialogTitle>
             <AlertDialogDescription className="text-xs leading-relaxed">
-              放弃后会回到首页，本次模拟不会进入结算，也不会获得可带入下一世的选项。确定要舍弃此世因果吗？
+              放弃后会结束此世，并进入轮回结算。你仍可从旧物、命格、灵宠、法宝或因缘中选择可带入下一世的传承。确定要放下此世吗？
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -90,7 +97,7 @@ export function GameMenu() {
               className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               <RotateCcw className="w-3 h-3 mr-1.5" />
-              确认放弃
+              结算此世
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
