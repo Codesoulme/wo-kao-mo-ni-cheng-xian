@@ -97,9 +97,18 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
       )}
       title={`主题：${blueprint.name}`}
     >
-      {blueprint.name}
+      因缘：{blueprint.name}
     </span>
   );
+}
+
+function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
+  const worldLabel = event.worldTime?.label;
+  const segmentLabel = event.timeAdvance?.label;
+  if (worldLabel && segmentLabel) return ageMeta.isContinuation ? `${segmentLabel}?${worldLabel}?` : `${event.age}? ? ${segmentLabel}?${worldLabel}?`;
+  if (worldLabel) return ageMeta.isContinuation ? `续记【${worldLabel}】` : `${event.age}岁【${worldLabel}】`;
+  if (segmentLabel) return ageMeta.isContinuation ? segmentLabel : `${event.age}? ? ${segmentLabel}`;
+  return ageMeta.isContinuation ? '同岁续记' : `${event.age}岁`;
 }
 
 export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true }: EventTimelineProps) {
@@ -289,13 +298,12 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 头部 - 始终可见 */}
                 <div className="flex items-center justify-between mb-0.5 px-3 pt-2">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    {!ageMeta.isContinuation ? (
-                      <span className="text-xs font-bold text-primary font-serif-cn">
-                        {event.age}岁
-                      </span>
-                    ) : (
-                      <span className="h-px w-6 bg-amber-500/40" aria-hidden="true" />
-                    )}
+                    <span className={cn(
+                      "text-xs font-bold font-serif-cn",
+                      ageMeta.isContinuation ? "text-amber-600 dark:text-amber-300" : "text-primary"
+                    )}>
+                      {eventTimeLabel(event, ageMeta)}
+                    </span>
                     {isFate && (
                       <span className="seal text-[9px]">命</span>
                     )}
@@ -409,7 +417,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
 
 
 function isVisibleEffect(eff: any): boolean {
-  return isVisibleNumericEventEffect(eff);
+  return eff?.kind !== 'eventMeta' && isVisibleNumericEventEffect(eff);
 }
 
 function formatEffectLabel(eff: any): React.ReactNode {

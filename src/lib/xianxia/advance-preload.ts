@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { dbToState, buildStateContext, tickStatusDurations, tickNaturalRecovery, checkFateNode, pickEventBlueprint, tickFormations, tickHeartDemon, tickPets, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES, EventBlueprint } from '@/lib/xianxia/types';
+import { clampTimeAdvance, suggestTimeAdvance } from '@/lib/xianxia/world-time';
 import { buildFallbackAgeEvent } from '@/lib/xianxia/advance-fallback';
 import { extractNarrativeContractFeedback } from '@/lib/xianxia/state-change-log';
 
@@ -115,7 +116,7 @@ function buildSameYearContinuationBlueprint(threadTitle: string): EventBlueprint
   };
 }
 
-export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>, options: { qualityMode?: 'full' | 'light' } = {}) {
+export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>, options: { qualityMode?: 'full' | 'light'; worldCalendar?: any; previousWorldLegacies?: any[] } = {}) {
   const qualityMode = options.qualityMode || 'full';
   const recentEvents = await getRecentEvents(char.id);
   const narrativeContractFeedback = qualityMode === 'light' ? [] : await getNarrativeContractFeedback(char.id);
@@ -127,21 +128,38 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     ? buildSameYearContinuationBlueprint(sameYearThread.title)
     : pickEventBlueprint(state, recentBlueprintCategories);
 
+  const suggestedTimeAdvance = suggestTimeAdvance({
+    age: state.age,
+    pendingThreads: state.pendingThreads || [],
+    sameYearThread,
+    blueprint,
+  });
+  const timeAdvance = clampTimeAdvance(suggestedTimeAdvance);
+
   if (!sameYearThread) {
-    state.age += 1;
-    state = tickStatusDurations(state);
-    state = tickNaturalRecovery(state);
-    const formationTick = tickFormations(state);
-    state = formationTick.state;
-    state = tickHeartDemon(state);
-    state = tickPets(state);
+    state.age += timeAdvance.ageDeltaYears;
+    const yearlyTicks = Math.max(0, timeAdvance.ageDeltaYears);
+    for (let i = 0; i < yearlyTicks; i += 1) {
+      state = tickStatusDurations(state);
+      state = tickNaturalRecovery(state);
+      const formationTick = tickFormations(state);
+      state = formationTick.state;
+      state = tickHeartDemon(state);
+      state = tickPets(state);
+    }
+    if (yearlyTicks === 0 && timeAdvance.elapsedDays > 0) {
+      state = tickNaturalRecovery(state);
+    }
   }
 
-  const fateNodeIdx = sameYearThread ? null : checkFateNode(state);
+  const fateNodeIdx = sameYearThread || timeAdvance.ageDeltaYears <= 0 ? null : checkFateNode(state);
   const referenceFateNode = fateNodeIdx !== null ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
   const isFateNode = false;
   const ctx = buildStateContext(state, qualityMode === 'light' ? recentEvents.slice(-3) : recentEvents, narrativeContractFeedback);
   ctx.blueprint = blueprint;
+  ctx.suggestedTimeAdvance = timeAdvance;
+  if (options.worldCalendar) ctx.worldCalendar = options.worldCalendar;
+  if (Array.isArray(options.previousWorldLegacies)) ctx.previousWorldLegacies = options.previousWorldLegacies;
 
   let aiOutput;
   if (sameYearThread) {
@@ -166,7 +184,7 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   return {
     preparedState: state,
     blueprint,
-    aiOutput,
+    aiOutput: { ...aiOutput, timeAdvance: clampTimeAdvance(aiOutput?.timeAdvance, timeAdvance) },
     isFateNode,
     fateNode: referenceFateNode,
     recentBlueprintCategories,

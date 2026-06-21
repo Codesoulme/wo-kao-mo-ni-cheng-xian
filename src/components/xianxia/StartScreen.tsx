@@ -22,7 +22,7 @@ export function StartScreen({
   onContinueCurrent?: () => void;
   onEnterGame?: () => void;
 } = {}) {
-  const { setCharacter, setEvents, setChoices, setFateNodes, setLoading, selectedHeritage } = useGameStore();
+  const { setCharacter, setEvents, setChoices, setFateNodes, setLoading, selectedHeritage, worldCalendar, worldLegacies } = useGameStore();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const start = async () => {
@@ -36,7 +36,7 @@ export function StartScreen({
       const res = await fetch('/api/game/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() || undefined, heritage }),
+        body: JSON.stringify({ name: name.trim() || undefined, heritage, worldCalendar, previousWorldLegacies: worldLegacies }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '开启失败');
@@ -46,7 +46,7 @@ export function StartScreen({
       const stateData = await stateRes.json();
       if (!stateData.success) throw new Error('初始化状态失败');
 
-      setCharacter(stateData.character);
+      setCharacter({ ...stateData.character, worldCalendar });
       setFateNodes(stateData.fateNodes);
       setEvents(stateData.events || []);
       setChoices(stateData.choices || []);

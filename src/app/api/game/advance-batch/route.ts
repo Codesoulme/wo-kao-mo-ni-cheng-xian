@@ -4,11 +4,11 @@ import { POST as advanceOne } from '../advance/route';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-function makeAdvanceRequest(characterId: string, qualityMode: 'full' | 'light') {
+function makeAdvanceRequest(characterId: string, qualityMode: 'full' | 'light', worldCalendar?: any, previousWorldLegacies?: any[]) {
   return new Request('http://localhost/api/game/advance', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ characterId, qualityMode, skipPreload: true }),
+    body: JSON.stringify({ characterId, qualityMode, skipPreload: true, worldCalendar, previousWorldLegacies }),
   }) as NextRequest;
 }
 
@@ -16,6 +16,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const characterId: string | undefined = body?.characterId;
+    let worldCalendar = body?.worldCalendar;
+    const previousWorldLegacies = Array.isArray(body?.previousWorldLegacies) ? body.previousWorldLegacies.slice(0, 8) : [];
     const requested = Number(body?.years || body?.count || 1);
     const years = Math.max(1, Math.min(10, Number.isFinite(requested) ? Math.floor(requested) : 1));
     if (!characterId) return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
@@ -26,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < years; i++) {
       const qualityMode: 'full' | 'light' = i === 0 ? 'full' : 'light';
-      const res = await advanceOne(makeAdvanceRequest(characterId, qualityMode));
+      const res = await advanceOne(makeAdvanceRequest(characterId, qualityMode, worldCalendar, previousWorldLegacies));
       const data = await res.json();
       if (!data.success) {
         stoppedReason = data.error || '推进中断';
@@ -38,6 +40,7 @@ export async function POST(req: NextRequest) {
 
       steps.push(data);
       finalStep = data;
+      if (data.worldCalendar) worldCalendar = data.worldCalendar;
 
       if (data.hasChoice) { stoppedReason = 'choice'; break; }
       if (data.triggeredCombat) { stoppedReason = 'combat'; break; }
@@ -56,6 +59,10 @@ export async function POST(req: NextRequest) {
       changes: finalStep?.changes || [],
       rejectedChanges: finalStep?.rejectedChanges || [],
       breakthrough: finalStep?.breakthrough || null,
+      timeAdvance: finalStep?.timeAdvance || null,
+      worldCalendar: finalStep?.worldCalendar || worldCalendar,
+      worldTime: finalStep?.worldTime || null,
+      actionProjections: finalStep?.actionProjections || [],
       hasChoice: Boolean(finalStep?.hasChoice),
       choice: finalStep?.choice || null,
       died: Boolean(finalStep?.died),

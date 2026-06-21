@@ -854,6 +854,29 @@ export interface NarrativeContractFeedbackEntry {
 }
 
 // AI 生成的叙事事件
+export interface TimeAdvance {
+  amount: number;
+  unit: 'moment' | 'hour' | 'day' | 'month' | 'season' | 'year' | 'decade' | 'century';
+  label: string;
+  reason: string;
+  ageDeltaYears: number;
+  elapsedDays: number;
+}
+
+export interface ActionProjection {
+  id: string;
+  kind: 'advance' | 'market' | 'exploration' | 'thread' | 'cultivate' | 'trade' | 'rest' | 'combat' | 'choice' | 'custom';
+  label: string;
+  description?: string;
+  sourceEventId?: string;
+  sourceThreadId?: string;
+  requirements?: string[];
+  risk?: 'safe' | 'low' | 'medium' | 'high' | 'deadly';
+  expiresAtAge?: number;
+  expiresAtWorldDay?: number;
+  payload?: Record<string, any>;
+}
+
 export interface AIEventOutput {
   // 叙事
   title: string;              // 事件标题（≤16字）
@@ -897,6 +920,11 @@ export interface AIEventOutput {
   // AI/事件生成的非常规属性投影（引擎校验后展示；持久化仍建议通过 newStatuses category='attribute' 落库）
   cultivationAttributes?: CultivationAttributeEntry[];
 
+  // AI ??????????????????????????????????????
+  timeAdvance?: TimeAdvance;
+  // ??????????? AI/?????????????????????????
+  actionProjections?: ActionProjection[];
+
   // 是否触发选择节点
   hasChoice: boolean;
   choice?: ChoicePrompt;
@@ -913,7 +941,7 @@ export interface AIEventOutput {
   realmProfilePatch?: RealmProfile;
 
   // 同一岁内的补充事件文本，用于把复杂年份拆成多段史册记录，避免一段叙事过长或漏写关键过程。
-  extraEvents?: { title: string; narrative: string; eventType?: AIEventOutput['eventType'] }[];
+  extraEvents?: { title: string; narrative: string; eventType?: AIEventOutput['eventType']; timeAdvance?: TimeAdvance; actionProjections?: ActionProjection[] }[];
 
   // 是否死亡
   causedDeath?: boolean;
@@ -1113,7 +1141,10 @@ export interface EngineStateContext {
   storageCapacity: number;
   // 修炼速度倍率（灵根 × 功法 × 其他装备的乘法效果之和）
   cultivationMultiplier: number;
-  recentEvents: { age: number; title: string; narrative: string; eventType: string }[];
+  recentEvents: { age: number; title: string; narrative: string; eventType: string; timeLabel?: string; worldTimeLabel?: string }[];
+  worldCalendar?: { eraName: string; calendarYear: number; elapsedDays: number; label?: string };
+  previousWorldLegacies?: { characterName: string; status: string; summary: string; relicSeeds?: string[]; legendSeeds?: string[] }[];
+  suggestedTimeAdvance?: TimeAdvance;
   narrativeContractFeedback: NarrativeContractFeedbackEntry[];
   longTermMemory: string[];
   completedFateNodes: number[];

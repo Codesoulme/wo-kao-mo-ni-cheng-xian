@@ -7,6 +7,51 @@ import { persist } from 'zustand/middleware';
 export type HeritageCategory = 'scripture' | 'fate' | 'pet' | 'artifact' | 'constitution' | 'treasure';
 export type HeritageRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
+export type TimeAdvanceUnit = 'moment' | 'hour' | 'day' | 'month' | 'season' | 'year' | 'decade' | 'century';
+
+export interface TimeAdvance {
+  amount: number;
+  unit: TimeAdvanceUnit;
+  label: string;
+  reason: string;
+  ageDeltaYears: number;
+  elapsedDays: number;
+}
+
+export interface WorldCalendarState {
+  eraName: string;
+  calendarYear: number;
+  elapsedDays: number;
+}
+
+export interface ActionProjection {
+  id: string;
+  kind: 'advance' | 'market' | 'exploration' | 'thread' | 'cultivate' | 'trade' | 'rest' | 'combat' | 'choice' | 'custom';
+  label: string;
+  description?: string;
+  sourceEventId?: string;
+  sourceThreadId?: string;
+  requirements?: string[];
+  risk?: 'safe' | 'low' | 'medium' | 'high' | 'deadly';
+  expiresAtAge?: number;
+  expiresAtWorldDay?: number;
+  payload?: Record<string, any>;
+}
+
+export interface WorldLegacyRecord {
+  id: string;
+  characterId: string;
+  characterName: string;
+  age: number;
+  highestRealm?: string;
+  status: 'dead' | 'ascended' | 'living_autonomous';
+  summary: string;
+  relicSeeds: string[];
+  legendSeeds: string[];
+  createdAtWorldLabel?: string;
+  updatedAt: string;
+}
+
 export interface HeritageItem {
   id: string;
   category: HeritageCategory;
@@ -30,7 +75,7 @@ export interface SimulationHallRecord {
   age: number;
   highestRealm: string;
   realmLevel: number;
-  ending: 'death' | 'ascension';
+  ending: 'death' | 'ascension' | 'living_autonomous';
   evaluationTitle: string;
   score: number;
   notableDeeds: string[];
@@ -41,7 +86,7 @@ export interface SimulationHallRecord {
 export interface SettlementResult {
   id: string;
   characterId: string;
-  ending: 'death' | 'ascension';
+  ending: 'death' | 'ascension' | 'living_autonomous';
   title: string;
   summary: string;
   score: number;
@@ -127,6 +172,9 @@ export interface GameEvent {
   createdAt: string;
   // Task 20: 事件蓝图（advance route 返回；用于 EventTimeline 显示主题 chip）
   blueprint?: { category: string; name: string };
+  timeAdvance?: TimeAdvance;
+  worldTime?: WorldCalendarState & { label?: string; monthName?: string; day?: number; phase?: string };
+  actionProjections?: ActionProjection[];
 }
 
 export interface ChoiceRecord {
@@ -198,6 +246,8 @@ interface GameState {
   selectedHeritage: SelectedHeritage;
   hallOfSimulations: SimulationHallRecord[];
   settlementResult: SettlementResult | null;
+  worldCalendar: WorldCalendarState;
+  worldLegacies: WorldLegacyRecord[];
 
   setCharacter: (c: CharacterState | null) => void;
   setEvents: (e: GameEvent[]) => void;
@@ -227,6 +277,9 @@ interface GameState {
   clearSelectedHeritage: () => void;
   setSettlementResult: (result: SettlementResult | null) => void;
   addHallRecord: (record: SimulationHallRecord) => void;
+  setWorldCalendar: (world: WorldCalendarState) => void;
+  advanceWorldCalendar: (time?: TimeAdvance | null) => WorldCalendarState;
+  addWorldLegacy: (record: WorldLegacyRecord) => void;
   reset: () => void;
 }
 
@@ -253,6 +306,8 @@ export const useGameStore = create<GameState>()(
       selectedHeritage: {},
       hallOfSimulations: [],
       settlementResult: null,
+      worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
+      worldLegacies: [],
 
       setCharacter: (c) => set({ character: c }),
       setEvents: (e) => set({ events: e }),
@@ -296,6 +351,24 @@ export const useGameStore = create<GameState>()(
       addHallRecord: (record) => set((s) => ({
         hallOfSimulations: [record, ...s.hallOfSimulations.filter((it) => it.id !== record.id)].slice(0, 50),
       })),
+      setWorldCalendar: (world) => set({ worldCalendar: world }),
+      advanceWorldCalendar: (time) => {
+        let nextWorld: WorldCalendarState = { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 };
+        set((s) => {
+          const addDays = Math.max(0, Math.round(Number(time?.elapsedDays ?? ((time?.ageDeltaYears || 0) * 365))));
+          const elapsedDays = Math.max(0, (s.worldCalendar?.elapsedDays || 0) + addDays);
+          nextWorld = {
+            eraName: s.worldCalendar?.eraName || '青岚仙历',
+            calendarYear: 5000 + Math.floor(elapsedDays / 365),
+            elapsedDays,
+          };
+          return { worldCalendar: nextWorld };
+        });
+        return nextWorld;
+      },
+      addWorldLegacy: (record) => set((s) => ({
+        worldLegacies: [record, ...s.worldLegacies.filter((it) => it.id !== record.id)].slice(0, 80),
+      })),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
         loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null, lastInterfereAge: null,
@@ -312,6 +385,8 @@ export const useGameStore = create<GameState>()(
         selectedHeritage: s.selectedHeritage,
         hallOfSimulations: s.hallOfSimulations,
         settlementResult: s.settlementResult,
+        worldCalendar: s.worldCalendar,
+        worldLegacies: s.worldLegacies,
       }),
     }
   )

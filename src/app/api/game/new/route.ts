@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateBirthEvent } from '@/lib/xianxia/llm';
 import { rollBirthConstitution, heritageToStatus } from '@/lib/xianxia/constitutions';
+import { hiddenEventMeta, normalizeWorldCalendar, worldTimeStamp } from '@/lib/xianxia/world-time';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -21,6 +22,9 @@ export async function POST(req: NextRequest) {
           ? Object.values(body.selectedHeritage).flat()
           : [];
     const selectedHeritage = rawHeritage.slice(0, 6).map((h: any) => ({ ...h, kind: h?.type || h?.category, payload: h?.payload || h }));
+    const worldCalendar = normalizeWorldCalendar(body?.worldCalendar);
+    const worldTime = worldTimeStamp(worldCalendar, '降生时');
+    const previousWorldLegacies = Array.isArray(body?.previousWorldLegacies) ? body.previousWorldLegacies.slice(0, 6) : [];
 
     const birth = await generateBirthEvent(customName);
 
@@ -126,6 +130,8 @@ export async function POST(req: NextRequest) {
         title: event.title,
         narrative: event.narrative,
         eventType: event.eventType,
+        worldTime,
+        actionProjections: [],
       },
     });
   } catch (err: any) {

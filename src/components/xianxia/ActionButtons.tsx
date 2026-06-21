@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
-import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Store, Compass } from 'lucide-react';
+import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Store, Compass, ScrollText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { REALMS } from '@/lib/xianxia/types';
@@ -11,30 +11,11 @@ import type { CharacterState, GameEvent } from '@/lib/xianxia/store';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
 
-type AiOpportunity = {
-  market: boolean;
-  exploration: boolean;
-  sourceLabel: string;
-};
-
-const MARKET_TRIGGER_RE = /(坊市|市集|集市|黑市|商铺|店铺|摊位|商会|拍卖|交易|买卖|商人|货郎|丹药铺|法器铺|灵材铺)/;
-const EXPLORATION_TRIGGER_RE = /(秘境|遗迹|遗址|洞府|古洞|古墓|禁地|洞天|遗府|试炼之地|裂隙|古阵|灵脉|荒谷|山谷深处)/;
-
-function getAiOpportunity(events: GameEvent[]): AiOpportunity {
+function latestActionProjections(events: GameEvent[]) {
   const latest = events[events.length - 1];
-  if (!latest) return { market: false, exploration: false, sourceLabel: '' };
-
-  const category = latest.blueprint?.category;
-  const text = `${latest.title || ''}
-${latest.narrative || ''}
-${latest.blueprint?.name || ''}`;
-  const market = latest.eventType === 'trade' || category === 'trade' || MARKET_TRIGGER_RE.test(text);
-  const exploration = latest.eventType === 'exploration' || category === 'exploration' || EXPLORATION_TRIGGER_RE.test(text);
-
   return {
-    market,
-    exploration,
-    sourceLabel: latest.title || latest.blueprint?.name || '近期事件',
+    sourceLabel: latest?.title || latest?.blueprint?.name || '近期事件',
+    projections: (latest?.actionProjections || []).filter((a: any) => ['market', 'exploration', 'thread', 'trade', 'cultivate', 'rest', 'custom'].includes(a.kind)).slice(0, 4),
   };
 }
 
@@ -48,7 +29,7 @@ const ATTR_LABEL: Record<string, string> = {
 
 export function ActionButtons() {
   const {
-    character, events, pendingChoice, loading,
+    character, events, pendingChoice, loading, worldCalendar, worldLegacies,
     setCharacter, addEvent, setPendingChoice,
     setEvents, setChoices, setFateNodes,
     setLastChange, setLastBreakthrough, setLoading, setError,
@@ -56,6 +37,7 @@ export function ActionButtons() {
     setSettlementResult,
     setMarketOpen,
     setExplorationOpen,
+    setWorldCalendar,
     reset,
   } = useGameStore();
 
@@ -96,7 +78,7 @@ export function ActionButtons() {
   const atChoice = !!pendingChoice;
   // Task 20: 战斗进行中时禁用推进
   const inCombat = !!(character.combatSession && character.combatSession.status === 'ongoing');
-  const aiOpportunity = getAiOpportunity(events);
+  const aiOpportunity = latestActionProjections(events);
 
   // 触发突破仪式
   const triggerBreakthroughCeremony = (newState: any, oldChar: typeof character) => {
@@ -133,7 +115,7 @@ export function ActionButtons() {
       const res = await fetch('/api/game/advance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: character.id }),
+        body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
       });
       const data = await res.json();
       if (!data.success) {
@@ -151,7 +133,8 @@ export function ActionButtons() {
       }
 
       // 更新角色
-      setCharacter({ ...character, ...data.state });
+      setCharacter({ ...character, ...data.state, worldCalendar: data.worldTime || data.worldCalendar });
+      if (data.worldCalendar) setWorldCalendar(data.worldCalendar);
       setLastChange(data.changes || null);
       if (data.breakthrough) setLastBreakthrough(data.breakthrough);
 
@@ -167,6 +150,9 @@ export function ActionButtons() {
         isFateNode: evt.isFateNode,
         fateNodeName: evt.fateNodeName,
         blueprint: evt.blueprint,
+        timeAdvance: evt.timeAdvance,
+        worldTime: evt.worldTime,
+        actionProjections: evt.actionProjections || [],
         createdAt: evt.createdAt || new Date().toISOString(),
       }));
 
@@ -234,7 +220,7 @@ export function ActionButtons() {
       const res = await fetch('/api/game/advance-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: character.id, years }),
+        body: JSON.stringify({ characterId: character.id, years, worldCalendar, previousWorldLegacies: worldLegacies }),
       });
       const data = await res.json();
       if (!data.success) {
@@ -250,7 +236,8 @@ export function ActionButtons() {
       }
 
       setAutoCount(Math.max(0, years - (data.count || 0)));
-      if (data.state) setCharacter({ ...character, ...data.state });
+      if (data.state) setCharacter({ ...character, ...data.state, worldCalendar: data.worldTime || data.worldCalendar });
+      if (data.worldCalendar) setWorldCalendar(data.worldCalendar);
       setLastChange(data.changes || null);
       if (data.breakthrough) setLastBreakthrough(data.breakthrough);
 
@@ -265,6 +252,9 @@ export function ActionButtons() {
         isFateNode: evt.isFateNode,
         fateNodeName: evt.fateNodeName,
         blueprint: evt.blueprint,
+        timeAdvance: evt.timeAdvance,
+        worldTime: evt.worldTime,
+        actionProjections: evt.actionProjections || [],
         createdAt: evt.createdAt || new Date().toISOString(),
       }));
 
@@ -391,42 +381,51 @@ export function ActionButtons() {
         )}
       </div>
 
-      {/* 坊市/秘境入口：只在最近事件明确触发相关场景时出现 */}
-      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && (aiOpportunity.market || aiOpportunity.exploration) && (
+      {/* 行动投影：后端/AI 注册此刻可做之事，前端只负责投影 */}
+      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && aiOpportunity.projections.length > 0 && (
         <div className="space-y-1.5 rounded-lg border border-primary/15 bg-primary/5 p-2">
           <div className="text-[10px] text-muted-foreground font-serif-cn truncate">
-            事件触发：{aiOpportunity.sourceLabel}
+            因缘所至：{aiOpportunity.sourceLabel}
           </div>
-          <div className="grid gap-2" style={{ gridTemplateColumns: aiOpportunity.market && aiOpportunity.exploration ? '1fr 1fr' : '1fr' }}>
-            {aiOpportunity.market && (
-              <Button
-                onClick={() => setMarketOpen(true)}
-                disabled={loading}
-                variant="outline"
-                className="h-9 border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60 font-serif-cn tracking-wider"
-              >
-                <Store className="w-3.5 h-3.5 mr-1.5" />
-                前往坊市
-                <span className="ml-1 text-[10px] text-amber-700/70 dark:text-amber-400/70 tabular-nums">
-                  {character.spiritStones || 0}
-                </span>
-              </Button>
-            )}
-            {aiOpportunity.exploration && (
-              <Button
-                onClick={() => setExplorationOpen(true)}
-                disabled={loading}
-                variant="outline"
-                className="h-9 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/60 font-serif-cn tracking-wider"
-              >
-                <Compass className="w-3.5 h-3.5 mr-1.5" />
-                探入秘境
-              </Button>
-            )}
+          <div className="grid gap-2" style={{ gridTemplateColumns: aiOpportunity.projections.length > 1 ? '1fr 1fr' : '1fr' }}>
+            {aiOpportunity.projections.map((action: any) => {
+              const isMarket = action.kind === 'market' || action.kind === 'trade';
+              const isExplore = action.kind === 'exploration';
+              const Icon = isMarket ? Store : isExplore ? Compass : ScrollText;
+              const onClick = () => {
+                if (isMarket) setMarketOpen(true);
+                else if (isExplore) setExplorationOpen(true);
+                else toast(action.label, { description: action.description || '此因缘已入心中，后续将随剧情承接。' });
+              };
+              return (
+                <Button
+                  key={action.id}
+                  onClick={onClick}
+                  disabled={loading}
+                  variant="outline"
+                  title={action.description || action.label}
+                  className={cn(
+                    "h-9 font-serif-cn tracking-wider",
+                    isMarket
+                      ? "border-amber-500/40 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/60"
+                      : isExplore
+                        ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/10 hover:border-emerald-500/60"
+                        : "border-primary/30 text-primary hover:bg-primary/10"
+                  )}
+                >
+                  <Icon className="w-3.5 h-3.5 mr-1.5" />
+                  {action.label}
+                  {isMarket && (
+                    <span className="ml-1 text-[10px] text-amber-700/70 dark:text-amber-400/70 tabular-nums">
+                      {character.spiritStones || 0}
+                    </span>
+                  )}
+                </Button>
+              );
+            })}
           </div>
         </div>
       )}
-
       {/* 连推进度条 */}
       {isAutoRunning && (
         <div className="h-1 bg-muted rounded-full overflow-hidden">

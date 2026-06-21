@@ -8,6 +8,7 @@ import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-log';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { getRealmInfo } from '@/lib/xianxia/types';
+import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, hiddenEventMeta, sanitizeActionProjections, worldTimeStamp } from '@/lib/xianxia/world-time';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -18,6 +19,8 @@ export async function POST(req: NextRequest) {
     const characterId: string | undefined = body?.characterId;
     const qualityMode: 'full' | 'light' = body?.qualityMode === 'light' ? 'light' : 'full';
     const skipPreload = Boolean(body?.skipPreload);
+    const inputWorldCalendar = body?.worldCalendar;
+    const previousWorldLegacies = Array.isArray(body?.previousWorldLegacies) ? body.previousWorldLegacies.slice(0, 8) : [];
     if (!characterId) {
       return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
     }
@@ -51,12 +54,15 @@ export async function POST(req: NextRequest) {
       await clearAdvancePreload(characterId);
     } else {
       if (preload) await clearAdvancePreload(characterId);
-      candidate = await prepareAdvanceCandidate(char, { qualityMode });
+      candidate = await prepareAdvanceCandidate(char, { qualityMode, worldCalendar: inputWorldCalendar, previousWorldLegacies });
     }
 
     let state = candidate.preparedState;
     const blueprint = candidate.blueprint;
     const aiOutput = candidate.aiOutput;
+    const timeAdvance = clampTimeAdvance(aiOutput?.timeAdvance, candidate.aiOutput?.timeAdvance);
+    const worldCalendar = advanceWorldCalendar(inputWorldCalendar, timeAdvance);
+    const worldTime = worldTimeStamp(worldCalendar);
     const isFateNode = candidate.isFateNode;
     const fateNode = candidate.fateNode;
     const recentBlueprintCategories = candidate.recentBlueprintCategories || [];
@@ -161,7 +167,7 @@ ${breakthroughText}`;
 
     // 同岁续写：若本轮产生/保留了“今年内、不久后、三月后”等必须承接的线索，
     // 自动追加一段同岁史册，避免“准备进仙门，下一年却跑路”这类断裂。
-    const sameYearContinuationDrafts: { title: string; narrative: string; eventType: string; effects: any[] }[] = [];
+    const sameYearContinuationDrafts: { title: string; narrative: string; eventType: string; effects: any[]; timeAdvance?: any; worldTime?: any; actionProjections?: any[] }[] = [];
     if (!finalState.isAtChoice && !finalState.combatSession && finalState.alive && !finalState.ascended) {
       const sameYearThreads = getSameYearThreads(finalState);
       for (const thread of sameYearThreads) {
@@ -178,11 +184,17 @@ ${breakthroughText}`;
           newEquippedItems: continuationOutput.newEquippedItems,
           removedItemIds: continuationOutput.removedItemIds,
         });
+        const continuationTimeAdvance = clampTimeAdvance((continuationOutput as any).timeAdvance, { amount: 1, unit: 'month', label: '月余后', reason: '同年因缘续写', ageDeltaYears: 0, elapsedDays: 30 });
+        const continuationWorldTime = worldTimeStamp(advanceWorldCalendar(worldCalendar, continuationTimeAdvance));
+        const continuationActions = deriveActionProjections({ title: continuationOutput.title, narrative: continuationOutput.narrative, eventType: continuationOutput.eventType, threads: finalState.pendingThreads || [] });
         sameYearContinuationDrafts.push({
           title: continuationOutput.title,
           narrative: continuationOutput.narrative,
           eventType: continuationOutput.eventType || 'normal',
-          effects: continuationEffects,
+          effects: [...continuationEffects, hiddenEventMeta({ timeAdvance: continuationTimeAdvance, worldTime: continuationWorldTime, actionProjections: continuationActions })],
+          timeAdvance: continuationTimeAdvance,
+          worldTime: continuationWorldTime,
+          actionProjections: continuationActions,
         });
       }
     }
@@ -296,20 +308,41 @@ ${narrative || ''}`);
       return result.breakthroughHappened && isSuccessfulBreakthroughText(title, narrative) ? 'breakthrough' : 'normal';
     };
 
-    const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[] }[] = [{
-      // 主事件只记录这一年发生的因果；不要因为最终数值成功突破，就把“冲关前夜/开始冲关”提前包装成已破境。
+    const baseActionProjections = sanitizeActionProjections(
+      aiOutput.actionProjections,
+      deriveActionProjections({
+        title: aiOutput.title,
+        narrative: aiOutput.narrative,
+        eventType: aiOutput.eventType,
+        blueprint,
+        threads: finalState.pendingThreads || [],
+        realms: finalState.discoveredRealms || [],
+      }),
+    );
+
+    const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[]; timeAdvance?: any; worldTime?: any; actionProjections?: any[] }[] = [{
+      // 主事件只记录这一段时日发生的因果；不要因为最终数值成功突破，就把“冲关前夜/开始冲关”提前包装成已破境。
       title: aiOutput.title,
       narrative: aiOutput.narrative,
       eventType: isFateNode ? 'fate_node' : visibleEventType(aiOutput.eventType, aiOutput.title, aiOutput.narrative),
-      effects: displayEffects,
+      effects: [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime, actionProjections: baseActionProjections })],
+      timeAdvance,
+      worldTime,
+      actionProjections: baseActionProjections,
     }];
 
     for (const extra of aiOutput.extraEvents || []) {
+      const extraTimeAdvance = extra.timeAdvance ? clampTimeAdvance(extra.timeAdvance, timeAdvance) : undefined;
+      const extraWorldTime = extraTimeAdvance ? worldTimeStamp(advanceWorldCalendar(worldCalendar, extraTimeAdvance)) : worldTime;
+      const extraActions = sanitizeActionProjections(extra.actionProjections);
       eventDrafts.push({
         title: extra.title,
         narrative: extra.narrative,
         eventType: visibleEventType(extra.eventType || 'normal', extra.title, extra.narrative),
-        effects: [],
+        effects: [hiddenEventMeta({ timeAdvance: extraTimeAdvance, worldTime: extraWorldTime, actionProjections: extraActions })],
+        timeAdvance: extraTimeAdvance,
+        worldTime: extraWorldTime,
+        actionProjections: extraActions,
       });
     }
     for (const continuation of sameYearContinuationDrafts) {
@@ -379,6 +412,9 @@ ${narrative || ''}`);
         fateNodeName: undefined,
         blueprint: idx === 0 ? { category: blueprint.category, name: blueprint.name } : undefined,
         effects: draft.effects,
+        timeAdvance: draft.timeAdvance,
+        worldTime: draft.worldTime,
+        actionProjections: draft.actionProjections || [],
         createdAt: created.createdAt,
       });
     }
@@ -390,6 +426,10 @@ ${narrative || ''}`);
       changes: result.appliedChanges,
       rejectedChanges: result.rejectedChanges,
       breakthrough: result.breakthroughHappened ? { newRealm: result.newRealm, major: Boolean(result.breakthroughMajor), steps: result.breakthroughSteps || 1 } : null,
+      timeAdvance,
+      worldCalendar,
+      worldTime,
+      actionProjections: baseActionProjections,
       hasChoice: aiOutput.hasChoice,
       choice: aiOutput.choice,
       died: result.died,

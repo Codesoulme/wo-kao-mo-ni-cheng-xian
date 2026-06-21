@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { dbToState, computeEffectiveCultivationRate, stateToResponse } from '@/lib/xianxia/engine';
 import { FATE_NODES, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
+import { extractEventMeta } from '@/lib/xianxia/world-time';
 
 export const runtime = 'nodejs';
 
@@ -103,6 +104,7 @@ export async function GET(req: NextRequest) {
         narrative: e.narrative,
         eventType: e.eventType,
         effects: JSON.parse(e.effects || '[]'),
+        ...extractEventMeta(JSON.parse(e.effects || '[]')),
         createdAt: e.createdAt,
       })),
       choices: choices.map(c => ({

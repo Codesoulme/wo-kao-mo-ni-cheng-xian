@@ -36,7 +36,7 @@ const RARITY_CLASS: Record<string, string> = {
 };
 
 export function SettlementModal() {
-  const { settlementResult, setSettlementResult, addHeritageItems, addHallRecord, reset } = useGameStore();
+  const { settlementResult, setSettlementResult, addHeritageItems, addHallRecord, addWorldLegacy, worldCalendar, reset } = useGameStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
 
@@ -73,6 +73,19 @@ export function SettlementModal() {
 
     addHeritageItems(heritageItems);
     addHallRecord({ ...settlementResult.hallRecord, carriedOut: heritageItems });
+    addWorldLegacy({
+      id: `legacy-${settlementResult.characterId}-${Date.now()}`,
+      characterId: settlementResult.characterId,
+      characterName: settlementResult.hallRecord.characterName,
+      age: settlementResult.hallRecord.age,
+      highestRealm: settlementResult.hallRecord.highestRealm,
+      status: settlementResult.ending === 'ascension' ? 'ascended' : settlementResult.ending === 'death' ? 'dead' : 'living_autonomous',
+      summary: settlementResult.summary,
+      relicSeeds: heritageItems.map((item) => item.name).slice(0, 6),
+      legendSeeds: settlementResult.hallRecord.notableDeeds.slice(0, 6),
+      createdAtWorldLabel: `${worldCalendar.eraName}${worldCalendar.calendarYear}?`,
+      updatedAt: new Date().toISOString(),
+    });
     setSettlementResult(null);
     setSelectedIds([]);
     setConfirming(false);

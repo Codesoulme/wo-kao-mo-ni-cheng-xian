@@ -29,6 +29,7 @@ import {
   EventBlueprint, AlchemyAIOutcome, MarketAIOutcome, AuctionAIOutcome, CombatLootAIOutcome, PetBondAIOutcome, PetCareAIOutcome, Pet, getRealmInfo} from './types';
 import { ensureUniqueIds, filterMeaningfulStatuses } from './engine';
 import { deriveWorldFactStateProfile } from './event-scheduler';
+import { clampTimeAdvance, sanitizeActionProjections } from './world-time';
 
 type RuntimeAIConfig = {
   baseUrl: string;
@@ -543,7 +544,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
   "breakthroughTargetRealm": null,
   "breakthroughTargetLevel": null,
   "realmProfilePatch": null,
-  "extraEvents": [],
+  "extraEvents": [{"title":"??????","narrative":"????","eventType":"normal","timeAdvance":{"amount":3,"unit":"month","label":"???","reason":"????","ageDeltaYears":0,"elapsedDays":90},"actionProjections":[]}],
   "causedDeath": false,
   "causedAscension": false,
   "newNpcs": [],
@@ -2135,6 +2136,8 @@ function sanitizeEventOutput(raw: any, currentAge = 0): AIEventOutput {
     unequipItemIds: Array.isArray(raw?.unequipItemIds) ? raw.unequipItemIds.map((x: any) => String(x)).filter(Boolean) : [],
     memory: String(raw?.memory || ''),
     cultivationInsight: raw?.cultivationInsight ? String(raw.cultivationInsight).slice(0, 400) : '',
+    timeAdvance: clampTimeAdvance(raw?.timeAdvance, undefined),
+    actionProjections: sanitizeActionProjections(raw?.actionProjections),
     hasChoice,
     choice,
     triggeredBreakthrough: Boolean(raw?.triggeredBreakthrough),
