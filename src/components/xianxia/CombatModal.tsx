@@ -288,9 +288,10 @@ export function CombatModal() {
     const item = sourceItems.find((it: any) => it.id && it.id === sk?.itemId);
     const spell = item?.technique?.spell;
     const ability = item?.technique?.artifactAbilities?.[idx] || item?.technique?.artifactAbilities?.[0];
-    const replacement = spell || ability;
-    if (!replacement || (!isGenericSkillName(sk?.name) && !/行动.*气术|气术式/.test(String(sk?.description || '')))) return sk;
-    return { ...sk, name: replacement.name || item?.name || sk?.name, description: replacement.description || item?.description || sk?.description };
+    const replacement = item?.item_type === 'artifact' ? ability : (spell || ability);
+    const nameLooksLikeItemName = item?.name && sk?.name === item.name;
+    if (!replacement || (!nameLooksLikeItemName && !isGenericSkillName(sk?.name) && !/行动.*气术|气术式/.test(String(sk?.description || '')))) return sk;
+    return { ...sk, name: replacement.name || sk?.name, description: replacement.description || sk?.description, sourceType: item?.item_type || sk?.sourceType };
   };
 
   const combatArtDisplayKind = (sk: any): 'technique' | 'spell' | 'artifact' => {

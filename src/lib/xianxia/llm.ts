@@ -1527,12 +1527,22 @@ function sanitizeAiEffects(raw: any, limit = 3): any[] {
     description: String(e.description || '灵机变化').slice(0, 80),
   })).filter(e => e.operation === 'multiply' || e.value !== 0) : [];
 }
+function stripLootOwnerPrefix(name?: string): string {
+  const text = String(name || '').trim();
+  const match = text.match(/^(.{1,10})的(.{2,24})$/u);
+  if (!match) return text;
+  const [, owner, objectName] = match;
+  const ownerLooksLikeEnemy = /修|汉|客|匪|贼|妖|魔|邪|劫|道人|真人|老祖|敌|疤|牙|瘦|胖|黑衣|蒙面/.test(owner);
+  const objectLooksLikeLoot = /符|剑|刀|珠|环|甲|袍|幡|铃|镜|印|袋|丹|诀|经|玉简|法器|法宝|护/.test(objectName);
+  return ownerLooksLikeEnemy && objectLooksLikeLoot ? objectName : text;
+}
+
 function sanitizeAiItem(raw: any, source: string, fallbackName = '无名灵物'): ItemEntry {
   const rarity = AI_RARITIES.includes(raw?.rarity) ? raw.rarity : 'common';
   const itemType = AI_ITEM_TYPES.includes(raw?.item_type) ? raw.item_type : 'material';
   return {
     id: String(raw?.id || `${source}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
-    name: String(raw?.name || fallbackName).slice(0, 24),
+    name: (source === '战利所得' ? stripLootOwnerPrefix(String(raw?.name || fallbackName)) : String(raw?.name || fallbackName)).slice(0, 24),
     description: String(raw?.description || '来历未明的灵物。').slice(0, 180),
     item_type: itemType as ItemEntry['item_type'],
     rarity: rarity as ItemEntry['rarity'],
@@ -1618,7 +1628,9 @@ export async function generateCombatLootProposal(ctx: EngineStateContext, sessio
 ${enemies}
 
 请生成 JSON：{"items":[ItemEntry字段，不要id，最多6件],"spiritStones":灵石数,"narrativeHint":"战利品如何得来（30-80字）"}
-应优先给敌人合理携带且未毁坏的装备、法器、丹药、储物袋、材料；不要只给无用碎片。`;
+应优先给敌人合理携带且未毁坏的装备、法器、丹药、储物袋、材料；不要只给无用碎片。
+物品名不要写成“某某的XX”“从某某身上搜得的XX”，归属和来历写进 description/source；物品名只写器物本名，例如“残光护符”“潮纹护珠”。
+若给法宝/法器且自带术式，必须在 technique.artifactAbilities 写独立术式名，例如“残光护幕”，不能让术式名复用法宝名。`;
   try {
     const raw = parseJSON(await callLLMText(system, user));
     const items = Array.isArray(raw?.items) ? raw.items.slice(0, 6).map((it: any) => sanitizeAiItem(it, '战利所得', '战利灵物')) : [];

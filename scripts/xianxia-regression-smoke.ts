@@ -955,7 +955,7 @@ function smokeCombatTechniqueSpellSplit(): void {
   assert(palette.technique?.label === '\u529f\u6cd5', 'combat palette should expose a separate technique group');
   assert(palette.technique.options.some((option: any) => option.itemId === 'scripture_cloud'), 'scripture-derived combat art should appear under technique');
   assert(!palette.spell.options.some((option: any) => option.itemId === 'scripture_cloud'), 'scripture-derived technique should not be mixed into spell group');
-  assert(palette.spell.options.some((option: any) => option.itemId === 'artifact_pearl' && option.source === 'artifact'), 'artifact innate ability should remain available as spell-like artifact art');
+  assert(palette.spell.options.some((option: any) => option.itemId === 'artifact_pearl' && option.source === 'artifact' && option.name === '潮息水幕'), 'artifact innate ability should remain available as spell-like artifact art and show ability name');
   log('combat-technique-spell-split', { passed: true, technique: palette.technique.options.map((o: any) => o.name).join('|'), spell: palette.spell.options.map((o: any) => o.name).join('|') });
 }
 

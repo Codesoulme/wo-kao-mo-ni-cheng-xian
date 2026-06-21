@@ -656,6 +656,17 @@ function makeLootId(prefix = 'loot'): string {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function stripLootOwnerPrefix(name?: string): string {
+  const text = String(name || '').trim();
+  if (!text) return text;
+  const match = text.match(/^(.{1,10})的(.{2,24})$/u);
+  if (!match) return text;
+  const [, owner, objectName] = match;
+  const ownerLooksLikeEnemy = /修|汉|客|匪|贼|妖|魔|邪|劫|道人|真人|老祖|敌|疤|牙|瘦|胖|黑衣|蒙面/.test(owner);
+  const objectLooksLikeLoot = /符|剑|刀|珠|环|甲|袍|幡|铃|镜|印|袋|丹|诀|经|玉简|法器|法宝|护/.test(objectName);
+  return ownerLooksLikeEnemy && objectLooksLikeLoot ? objectName : text;
+}
+
 const ELEMENT_KEYS = ['metal', 'wood', 'water', 'fire', 'earth'] as const;
 
 function realmIndexOf(realm?: string): number {
@@ -1043,20 +1054,20 @@ function enemyLootTier(enemy: CombatEnemy, state: CharacterState): number {
 
 function enemyGearLootProfile(enemy: CombatEnemy, tier: number): { name: string; description: string; itemType: ItemEntry['item_type']; effectTarget: string; ability: ArtifactAbility } {
   const text = `${enemy.name || ''} ${enemy.description || ''}`;
-  const title = String(enemy.name || '\u654c\u4fee').replace(/^(\u8499\u9762|\u9ed1\u8863|\u90aa\u4fee|\u52ab\u4fee)/u, '').trim() || '\u654c\u4fee';
-  if (/\u5251|\u5251\u4fee/.test(text)) {
-    return { name: `${title}\u9057\u4e0b\u7684\u88c2\u9e23\u5251`, description: `\u4ece${title}\u624b\u4e2d\u593a\u4e0b\u7684\u98de\u5251\uff0c\u5251\u810a\u6709\u65b0\u88c2\uff0c\u4ecd\u80fd\u55e1\u9e23\u4f24\u654c\u3002`, itemType: 'weapon', effectTarget: 'attack', ability: { name: '\u88c2\u9e23\u5251\u6c14', description: '\u50ac\u52a8\u65f6\u5251\u8eab\u53d1\u51fa\u88c2\u9e23\uff0c\u653e\u51fa\u4e00\u9053\u950b\u9510\u5251\u6c14\u3002', trigger: 'active', element: 'metal', power: 1.15 + tier * 0.25 } };
+  const title = String(enemy.name || '敌修').replace(/^(蒙面|黑衣|邪修|劫修)/u, '').trim() || '敌修';
+  if (/剑|剑修/.test(text)) {
+    return { name: '裂鸣剑', description: `从${title}手中夺下的飞剑，剑脊有新裂，仍能嗡鸣伤敌。`, itemType: 'weapon', effectTarget: 'attack', ability: { name: '裂鸣剑气', description: '催动时剑身发出裂鸣，放出一道锋锐剑气。', trigger: 'active', element: 'metal', power: 1.15 + tier * 0.25 } };
   }
-  if (/\u9b54|\u90aa|\u8840/.test(text)) {
-    return { name: `${title}\u7684\u8840\u7eb9\u62a4\u7b26`, description: `\u4ece${title}\u8eab\u4e0a\u627e\u5230\u7684\u8840\u7eb9\u6cd5\u5668\uff0c\u51f6\u715e\u672a\u6563\uff0c\u796d\u70bc\u540e\u53ef\u62a4\u4f53\uff0c\u4e5f\u53ef\u80fd\u6270\u52a8\u5fc3\u795e\u3002`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '\u8840\u7eb9\u715e\u5e55', description: '\u6cd5\u5668\u81ea\u884c\u6d6e\u8d77\u8840\u8272\u5149\u5e55\uff0c\u66ff\u4e3b\u4eba\u6321\u4e0b\u4e00\u6ce2\u653b\u52bf\u3002', trigger: 'auto', element: 'fire', power: 1.1 + tier * 0.2 } };
+  if (/魔|邪|血/.test(text)) {
+    return { name: '血纹护符', description: `从${title}身上找到的血纹法器，凶煞未散，祭炼后可护体，也可能扰动心神。`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '血纹煞幕', description: '法器自行浮起血色光幕，替主人挡下一波攻势。', trigger: 'auto', element: 'fire', power: 1.1 + tier * 0.2 } };
   }
-  if (/\u6c34|\u6f6e|\u51b0|\u6c5f|\u6cb3/.test(text)) {
-    return { name: `${title}\u7684\u6f6e\u7eb9\u62a4\u73e0`, description: `\u4ece${title}\u9057\u7269\u4e2d\u53d6\u5f97\u7684\u6c34\u8272\u6cd5\u73e0\uff0c\u5185\u91cc\u6709\u6f6e\u58f0\u56de\u54cd\uff0c\u5c1a\u672a\u5728\u6597\u6cd5\u4e2d\u788e\u88c2\u3002`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '\u6f6e\u606f\u6c34\u5e55', description: '\u6cd5\u73e0\u6d8c\u51fa\u4e00\u5c42\u6f6e\u606f\u6c34\u5e55\uff0c\u80fd\u7f13\u53bb\u6765\u88ad\u529b\u9053\u3002', trigger: 'auto', element: 'water', power: 1.1 + tier * 0.2 } };
+  if (/水|潮|冰|江|河/.test(text)) {
+    return { name: '潮纹护珠', description: `从${title}遗物中取得的水色法珠，内里有潮声回响，尚未在斗法中碎裂。`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '潮息水幕', description: '法珠涌出一层潮息水幕，能缓去来袭力道。', trigger: 'auto', element: 'water', power: 1.1 + tier * 0.2 } };
   }
-  if (/\u6728|\u85e4|\u82b1|\u8349|\u9752/.test(text)) {
-    return { name: `${title}\u7684\u9752\u85e4\u62a4\u8155`, description: `\u4ece${title}\u8eab\u4fa7\u53d6\u4e0b\u7684\u9752\u85e4\u6cd5\u5668\uff0c\u85e4\u7eb9\u5c1a\u80fd\u968f\u7075\u673a\u8212\u5c55\u3002`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '\u9752\u85e4\u7ed5\u8eab', description: '\u62a4\u8155\u4e2d\u751f\u51fa\u7075\u85e4\u865a\u5f71\uff0c\u7f20\u7ed5\u8eab\u5468\u5206\u62c5\u653b\u52bf\u3002', trigger: 'auto', element: 'wood', power: 1.05 + tier * 0.2 } };
+  if (/木|藤|花|草|青/.test(text)) {
+    return { name: '青藤护腕', description: `从${title}身侧取下的青藤法器，藤纹尚能随灵机舒展。`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '青藤绕身', description: '护腕中生出灵藤虚影，缠绕身周分担攻势。', trigger: 'auto', element: 'wood', power: 1.05 + tier * 0.2 } };
   }
-  return { name: `${title}\u7684\u6b8b\u5149\u62a4\u7b26`, description: `\u4ece${title}\u8eab\u4e0a\u641c\u5f97\u7684\u62a4\u8eab\u6cd5\u5668\uff0c\u867d\u7ecf\u6597\u6cd5\u9707\u8361\uff0c\u6838\u5fc3\u7075\u7981\u5c1a\u53ef\u91cd\u65b0\u796d\u70bc\u3002`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '\u6b8b\u5149\u62a4\u5e55', description: '\u6cd5\u5668\u4e2d\u6b8b\u5b58\u7684\u7075\u5149\u5c55\u5f00\u6210\u8584\u5e55\uff0c\u66ff\u4e3b\u4eba\u5378\u53bb\u90e8\u5206\u653b\u52bf\u3002', trigger: 'auto', element: 'none', power: 1 + tier * 0.18 } };
+  return { name: '残光护符', description: `从${title}身上搜得的护身法器，虽经斗法震荡，核心灵禁尚可重新祭炼。`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '残光护幕', description: '法器中残存的灵光展开成薄幕，替主人卸去部分攻势。', trigger: 'auto', element: 'none', power: 1 + tier * 0.18 } };
 }
 
 function buildEnemyCarriedLoot(enemy: CombatEnemy, state: CharacterState, enemyIndex: number): { items: ItemEntry[]; spiritStones: number } {
@@ -1078,7 +1089,7 @@ function buildEnemyCarriedLoot(enemy: CombatEnemy, state: CharacterState, enemyI
 
   if (isCultivator) {
     addItem(
-      `${title.replace(/^(蒙面|黑衣)/, '')}的储物袋`,
+      '储物袋',
       `从${title}身侧搜得的小型储物法器，袋口禁制已散，可并入自身储物之用。`,
       'tool',
       baseRarity,
@@ -1147,7 +1158,7 @@ export function buildCombatVictorySpoils(state: CharacterState, session: CombatS
 
   // AI 主路径：战后由 AI 根据敌人身份/境界/携带资源生成战利品，引擎只去重、补 id、clamp 灵石。
   if (aiLoot && (Array.isArray(aiLoot.items) || Number(aiLoot.spiritStones) > 0)) {
-    allItems.push(...(aiLoot.items || []).map((it, idx) => ({ ...it, id: it.id || makeLootId(`ai_loot_${idx}`), source: it.source || '战利所得' })));
+    allItems.push(...(aiLoot.items || []).map((it, idx) => ({ ...it, name: stripLootOwnerPrefix(it.name), id: it.id || makeLootId(`ai_loot_${idx}`), source: it.source || '战利所得' })));
     spiritStones += Math.max(0, Math.floor(Number(aiLoot.spiritStones || 0)));
   } else {
     // AI 失败时才回退旧的敌人关键词模板。
@@ -1164,6 +1175,7 @@ export function buildCombatVictorySpoils(state: CharacterState, session: CombatS
 
   const seen = new Set<string>();
   const deduped = allItems.filter(item => {
+    item.name = stripLootOwnerPrefix(item.name);
     const key = `${item.name}|${item.item_type}|${item.rarity}`;
     if (seen.has(key)) return false;
     seen.add(key);
@@ -3328,8 +3340,10 @@ function repairCombatArtsFromState(state: CharacterState, arts?: CombatSession['
     const learnedMatch = (art.itemId ? firstByItem.get(art.itemId) : undefined) || learned[idx];
     if (!learnedMatch) return art;
     const desc = String(art.description || '');
-    if (!isGenericCombatArtName(art.name) && desc && !/行动.*气术|气术式/.test(desc)) return art;
-    return { ...art, name: learnedMatch.name, description: learnedMatch.description, mpCost: art.mpCost ?? learnedMatch.mpCost, power: art.power || learnedMatch.power, element: art.element || learnedMatch.element, adaptation: art.adaptation ?? learnedMatch.adaptation, sourceType: art.sourceType || learnedMatch.sourceType };
+    const learnedIsArtifactArt = learnedMatch.sourceType === 'artifact';
+    const nameLooksLikeItemName = state.equipped?.some((it: any) => it.id === art.itemId && art.name === it.name);
+    if (!learnedIsArtifactArt && !nameLooksLikeItemName && !isGenericCombatArtName(art.name) && desc && !/行动.*气术|气术式/.test(desc)) return art;
+    return { ...art, name: learnedMatch.name, description: learnedMatch.description, mpCost: art.mpCost ?? learnedMatch.mpCost, power: art.power || learnedMatch.power, element: art.element || learnedMatch.element, adaptation: art.adaptation ?? learnedMatch.adaptation, sourceType: learnedMatch.sourceType || art.sourceType };
   });
   return (repaired.length ? repaired : learned) as NonNullable<CombatSession['playerSkills']>;
 }
