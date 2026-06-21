@@ -170,7 +170,7 @@ export function ActionButtons() {
         createdAt: evt.createdAt || new Date().toISOString(),
       }));
 
-      // 设置待选择（带上命节点前情提要，供弹窗展示完整情境）
+      // 设置待选择（带上因缘前情提要，供弹窗展示完整情境）
       if (data.hasChoice && data.choice) {
         setPendingChoice({
           ...data.choice,
@@ -179,8 +179,8 @@ export function ActionButtons() {
           contextAge: data.event.age,
           contextFateNodeName: data.fateNodeName,
         });
-        toast('命节点触发', { description: '请做出你的抉择' });
-        // 命节点中断自动推进
+        toast('因缘转折', { description: '请做出你的抉择' });
+        // 因缘抉择中断自动推进
         autoCancelRef.current = true;
       }
 
@@ -220,7 +220,7 @@ export function ActionButtons() {
     }
   };
 
-  // 一键十载：后端批量推进，遇到命节点/战斗/陨落/飞升立即停下
+  // 一键十载：后端批量推进，遇到因缘抉择/战斗/陨落/飞升立即停下
   const autoAdvance = async (years: number) => {
     if (advancingRef.current || atChoice || isDead || isAscended || inCombat || !character) return;
     autoCancelRef.current = false;
@@ -229,7 +229,7 @@ export function ActionButtons() {
     setError(null);
     setAutoTotal(years);
     setAutoCount(years);
-    toast(`开始连推 ${years} 载`, { description: '遇到命节点、战斗或终局会自动停止' });
+    toast(`开始连推 ${years} 载`, { description: '遇到因缘抉择、战斗或终局会自动停止' });
     try {
       const res = await fetch('/api/game/advance-batch', {
         method: 'POST',
@@ -277,7 +277,7 @@ export function ActionButtons() {
           contextAge: finalEvent.age,
           contextFateNodeName: finalEvent.fateNodeName,
         });
-        toast('命节点触发', { description: '请做出你的抉择' });
+        toast('因缘转折', { description: '请做出你的抉择' });
         autoCancelRef.current = true;
       }
       if (data.triggeredCombat) {

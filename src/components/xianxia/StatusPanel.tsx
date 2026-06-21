@@ -57,7 +57,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
   const constitutionStatuses = meaningfulStatuses
     .filter(isConstitutionStatus)
     .sort((a: any, b: any) => (RARITY_ORDER[b.rarity] || 0) - (RARITY_ORDER[a.rarity] || 0));
-  const topConstitutions = constitutionStatuses.slice(0, 3);
+  const topConstitutions = constitutionStatuses.slice(0, 2);
   const constitutionExtraCount = Math.max(0, constitutionStatuses.length - topConstitutions.length);
   const visibleStatuses = meaningfulStatuses.filter(status => !isConstitutionStatus(status));
   const topStatuses = visibleStatuses

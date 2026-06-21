@@ -245,8 +245,9 @@ function clampProfileNumber(n: any, min: number, max: number, fallback: number):
 function sanitizeRealmProfile(raw: any): RealmProfile | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const profile: RealmProfile = {};
-  if (raw.name) profile.name = String(raw.name).slice(0, 16);
-  if (raw.shortName) profile.shortName = String(raw.shortName).slice(0, 3);
+  const rawName = raw.name ? String(raw.name).trim() : '';
+  if (rawName && !/候补|杂役|弟子|门人|执事|长老|宗主|身份|职位|职司|差役|仆役/.test(rawName)) profile.name = rawName.slice(0, 16);
+  if (raw.shortName && !/候补|杂役|弟子|门人|执事|长老|身份|职位/.test(String(raw.shortName))) profile.shortName = String(raw.shortName).slice(0, 3);
   if (/^#[0-9a-fA-F]{6}$/.test(String(raw.color || ''))) profile.color = String(raw.color);
   if (raw.maxLevel !== undefined) profile.maxLevel = Math.round(clampProfileNumber(raw.maxLevel, 0, 999, 9));
   if (raw.powerMultiplier !== undefined) profile.powerMultiplier = clampProfileNumber(raw.powerMultiplier, 0.5, 9, 1);
@@ -260,8 +261,9 @@ export function getRealmProfile(state: CharacterState): RealmProfile | undefined
   if (explicit) return explicit;
 
   const status = (state.activeStatuses || []).find(st =>
-    (st.category === 'special' || st.category === 'identity') &&
-    /境界|道基|金丹|筑基|炼气|練氣|元婴|元嬰|化神|大乘|渡劫|飞升|飛升|九转|完美|叠层|道果/.test(`${st.name} ${st.description}`)
+    st.category === 'special' &&
+    /境界|道基|金丹|筑基|炼气|練氣|元婴|元嬰|化神|大乘|渡劫|飞升|飛升|九转|完美|叠层|道果/.test(`${st.name} ${st.description}`) &&
+    (st.effects || []).some(e => ['realmMaxLevel', 'realmPower', 'realmExp'].includes(e.target_attribute))
   );
   if (!status) return undefined;
 
