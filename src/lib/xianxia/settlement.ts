@@ -147,18 +147,17 @@ export function generateSettlementResult(character: CharacterState, events: Game
     .slice()
     .sort((a, b) => (a.age || 0) - (b.age || 0));
   const firstEvent = sortedEvents[0];
-  const lifeDeeds = sortedEvents.slice(-5).map((event) => {
-    const gist = String(event.narrative || '').replace(/\s+/g, '').replace(/[。！？；，、]+$/, '').slice(0, 28);
-    const titleText = event.title || '旧事';
-    return gist
-      ? `${event.age}岁，${titleText}，${gist}${gist.length >= 28 ? '…' : ''}`
-      : `${event.age}岁，${titleText}`;
-  });
-  const originText = firstEvent
-    ? `早年以${rootText}入道，${firstEvent.age}岁遇“${firstEvent.title || '初入修行'}”，自此踏上修仙之路。`
-    : `以${rootText}赋，早年踏上修仙之路。`;
-  const deedText = lifeDeeds.length
-    ? `其平生可考者：${lifeDeeds.join('；')}。`
+  const notableTypes = new Set(['fate_node', 'breakthrough', 'combat', 'auction', 'exploration', 'interference']);
+  const notableEvents = sortedEvents.filter((event) => notableTypes.has(String(event.eventType || '')));
+  const pickedDeeds = (notableEvents.length ? notableEvents : sortedEvents).slice(-3);
+  const deedGists = pickedDeeds
+    .map((event) => String(event.narrative || event.title || '').replace(/\s+/g, '').replace(/[。！？；，、]+$/, '').slice(0, 26))
+    .filter(Boolean);
+  const originText = (firstEvent && (firstEvent.age || 0) <= 16)
+    ? `早年以${rootText}入道，自幼便踏上修行一途。`
+    : `其以${rootText}赋，半生游走于修行与人世之间。`;
+  const deedText = deedGists.length
+    ? `其间${deedGists.join('，')}。`
     : '此世年岁旧事尚浅，仙路才刚展开。';
   const realmJourneyText = `修为最高曾至${realmText}${character.realmLevel ? `第${character.realmLevel + 1}层` : ''}，${ageText}。`;
   const endingText = character.ascended
