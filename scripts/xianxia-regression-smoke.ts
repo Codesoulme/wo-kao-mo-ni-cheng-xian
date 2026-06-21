@@ -816,6 +816,27 @@ function smokeDynamicCultivationAttributes(): void {
   log('dynamic-cultivation-attributes', { passed: true, count: attrs.length, first: attrs[0]?.name });
 }
 
+
+function smokeCombatArtFallbackNames(): void {
+  const rawState: any = {
+    spiritualRoot: 'common', realm: 'qi_refining', realmLevel: 2, comprehension: 55,
+    elements: { metal: 30, wood: 30, water: 30, fire: 30, earth: 30 },
+    activeStatuses: [], equipped: [], inventory: [],
+  };
+  const baseState: any = normalizeCultivationState(rawState);
+  const scriptures: any[] = [
+    { id: 'manual_breath', name: '\u9752\u5c71\u5410\u7eb3\u529f', description: '\u5c71\u95f4\u5410\u7eb3\u7684\u57fa\u7840\u529f\u6cd5\u3002', item_type: 'scripture', rarity: 'common', effects: [], source: '\u574a\u5e02' },
+    { id: 'manual_cloud', name: '\u4e91\u6c34\u517b\u6c14\u8bc0', description: '\u4e91\u6c34\u6c14\u673a\u7f20\u7ed5\u7684\u6cd5\u95e8\u3002', item_type: 'scripture', rarity: 'uncommon', effects: [], source: '\u6d1e\u5e9c' },
+    { id: 'manual_sword', name: '\u9752\u7af9\u5251\u7ecf', description: '\u4ee5\u5251\u610f\u7275\u5f15\u9752\u7af9\u751f\u673a\u3002', item_type: 'scripture', rarity: 'rare', effects: [], source: '\u5251\u5802' },
+  ];
+  const arts = buildLearnedCombatArts({ ...baseState, equipped: scriptures });
+  const names = arts.map((art: any) => art.name);
+  assert(names.length >= 3, 'scripture fallback combat arts should be generated');
+  assert(new Set(names).size === names.length, 'scripture fallback combat art names should be unique');
+  assert(!names.includes('\u884c\u6c14\u672f\u5f0f'), 'scripture fallback combat art names should not collapse to generic 行气术式');
+  log('combat-art-fallback-names', { passed: true, names: names.join('|') });
+}
+
 function smokeAiDrivenCombatActionPalette(): void {
   const state: any = {
     id: 'c-palette',
@@ -872,6 +893,7 @@ async function main(): Promise<void> {
   smokeConstitutionProfiles();
   smokeCombatSettlementSingleFlow();
   smokeDynamicCultivationAttributes();
+  smokeCombatArtFallbackNames();
   smokeAiDrivenCombatActionPalette();
   smokeTechniqueSpellNaming();
   smokeWorldEventConsequences();

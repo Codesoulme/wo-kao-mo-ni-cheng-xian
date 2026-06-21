@@ -734,19 +734,44 @@ function inferDominantElementFromText(text: string): ElementType | 'none' {
   return 'none';
 }
 
+function cleanTechniqueBaseName(name?: string): string {
+  const raw = String(name || '').trim();
+  const cleaned = raw
+    .replace(/[\u300a\u300b<>]/g, '')
+    .replace(/(\u7389\u7b80|\u5fc3\u5f97|\u529f\u6cd5|\u6cd5\u95e8|\u6b8b\u7bc7|\u771f\u7ecf|\u7ecf\u5377|\u7ecf|\u8bc0|\u6cd5|\u529f|\u672f|\u8c31)$/u, '')
+    .trim();
+  return (cleaned || raw || '\u7075\u673a').slice(0, 6);
+}
+
+function fallbackScriptureAbilityName(item: ItemEntry, element: ElementType | 'none', text: string): string {
+  if (/\u5251|sword|blade/i.test(text)) return `${cleanTechniqueBaseName(item.name)}\u5251\u5f0f`;
+  if (/\u5200|\u5203|blade|sabre/i.test(text)) return `${cleanTechniqueBaseName(item.name)}\u5203\u5f0f`;
+  if (/\u96f7|thunder|lightning/i.test(text)) return `${cleanTechniqueBaseName(item.name)}\u96f7\u5f15`;
+  if (/\u706b|\u708e|\u7130|fire|flame/i.test(text)) return `${cleanTechniqueBaseName(item.name)}\u706b\u6cd5`;
+  if (/\u6c34|\u51b0|\u6f6e|water|ice|tide/i.test(text)) return `${cleanTechniqueBaseName(item.name)}\u6f6e\u6cd5`;
+  if (/\u6728|\u82b1|\u85e4|\u9752|wood|flower|plant/i.test(text)) return `${cleanTechniqueBaseName(item.name)}\u9752\u6728\u672f`;
+  if (/\u571f|\u5c71|\u5ca9|earth|mountain|rock/i.test(text)) return `${cleanTechniqueBaseName(item.name)}\u5ca9\u5cb3\u672f`;
+  if (element === 'metal') return `${cleanTechniqueBaseName(item.name)}\u91d1\u950b\u672f`;
+  if (element === 'wood') return `${cleanTechniqueBaseName(item.name)}\u751f\u673a\u672f`;
+  if (element === 'water') return `${cleanTechniqueBaseName(item.name)}\u51dd\u6ce2\u672f`;
+  if (element === 'fire') return `${cleanTechniqueBaseName(item.name)}\u708e\u606f\u672f`;
+  if (element === 'earth') return `${cleanTechniqueBaseName(item.name)}\u539a\u571f\u672f`;
+  return `${cleanTechniqueBaseName(item.name)}\u672f\u5f0f`;
+}
+
 function fallbackTechniqueAbility(item: ItemEntry, source: 'scripture' | 'artifact'): { name: string; description: string; element: ElementType | 'none'; trigger?: ArtifactAbility['trigger'] } {
   const text = `${item.name || ''}${item.description || ''}`;
   const element = inferDominantElementFromText(text);
-  const isSword = /剑|sword|blade/i.test(text);
-  const isWater = /水|冰|潮|water|ice|tide/i.test(text);
-  const isProtect = /护|盾|守|罩|protect|shield|guard/i.test(text);
+  const isSword = /\u5251|sword|blade/i.test(text);
+  const isWater = /\u6c34|\u51b0|\u6f6e|water|ice|tide/i.test(text);
+  const isProtect = /\u62a4|\u76fe|\u5b88|\u7f69|protect|shield|guard/i.test(text);
   const trigger: ArtifactAbility['trigger'] = isWater ? 'underwater' : isProtect ? 'auto' : 'active';
   const name = source === 'artifact'
-    ? (isProtect ? '护身灵禁' : isWater ? '避水灵禁' : isSword ? '剑纹灵禁' : '器物灵禁')
-    : (isSword ? '剑意术式' : '行气术式');
+    ? (isProtect ? '\u62a4\u8eab\u7075\u7981' : isWater ? '\u907f\u6c34\u7075\u7981' : isSword ? '\u5251\u7eb9\u7075\u7981' : `${cleanTechniqueBaseName(item.name)}\u7075\u7981`)
+    : fallbackScriptureAbilityName(item, element, text);
   const description = source === 'artifact'
-    ? '法宝内藏灵禁被催动，形成一道独立于器物本名的器术效果。'
-    : '依功法行气脉络凝成的基础斗法术式，不等同于功法本名。';
+    ? '\u6cd5\u5b9d\u5185\u85cf\u7075\u7981\u88ab\u50ac\u52a8\uff0c\u5f62\u6210\u4e00\u9053\u72ec\u7acb\u4e8e\u5668\u7269\u672c\u540d\u7684\u5668\u672f\u6548\u679c\u3002'
+    : `\u4f9d${item.name || '\u6b64\u95e8\u529f\u6cd5'}\u7684\u884c\u6c14\u8109\u7edc\u51dd\u6210\u6597\u6cd5\u672f\u5f0f\uff0c\u4e0d\u76f4\u63a5\u590d\u7528\u529f\u6cd5\u672c\u540d\u3002`;
   return { name, description, element, trigger };
 }
 
