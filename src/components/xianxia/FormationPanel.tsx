@@ -86,21 +86,24 @@ export function FormationPanel() {
   const loadList = useCallback(async () => {
     if (!character?.id) return;
     setLoading(true);
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12000);
     try {
       const res = await fetch('/api/game/formation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ characterId: character.id, action: 'list' }),
+        signal: ctrl.signal,
       });
       const data = await res.json();
       if (data.success) {
         setDisks(data.disks || []);
         setActiveFormations(data.activeFormations || []);
       }
-    } catch (err) {
-      // 静默失败：list 是辅助加载，不打扰玩家
-      console.error('load formations failed:', err);
+    } catch {
+      // 静默失败：list 是辅助加载，网络抖动/超时不打扰玩家，也不触发开发错误浮层。
     } finally {
+      clearTimeout(timer);
       setLoading(false);
     }
   }, [character?.id]);
