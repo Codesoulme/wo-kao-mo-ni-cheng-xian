@@ -322,64 +322,11 @@ export function CombatModal() {
     return 'spell';
   };
 
-  const makeFallbackCombatPalette = () => {
-    if (!session) return null;
-    const techniqueOptions: any[] = [];
-    const spellOptions: any[] = [];
-    (session.playerSkills || []).slice(0, 8).forEach((rawSkill: any, idx: number) => {
-      const sk = repairSkillForDisplay(rawSkill, idx);
-      const kind = combatArtDisplayKind(sk);
-      const option = {
-        id: 'skill-' + idx,
-        name: sk.name || '\u672a\u540d\u672f',
-        description: sk.description || (kind === 'technique' ? '\u501f\u529f\u6cd5\u884c\u6c14\u8def\u6570\u5e94\u6218\u3002' : '\u8c03\u52a8\u5df2\u4f1a\u672f\u6cd5\u5e94\u6218\u3002'),
-        actionType: kind === 'technique' ? 'technique' : 'spell',
-        source: kind === 'artifact' ? 'artifact' : kind,
-        enabled: session.playerMp >= (sk.mpCost || 0),
-        disabledReason: session.playerMp < (sk.mpCost || 0) ? '\u7075\u529b\u4e0d\u8db3\u3002' : undefined,
-        skillIdx: idx,
-        itemId: sk.itemId,
-        mpCost: sk.mpCost || 0,
-      };
-      if (kind === 'technique') techniqueOptions.push(option);
-      else spellOptions.push(option);
-    });
-    const itemOptions = (session.playerItems || []).map((it: any) => ({
-      id: 'item-' + it.itemId,
-      name: it.name || '\u968f\u8eab\u7269',
-      description: it.effect || it.description || '\u6218\u4e2d\u53ef\u7528\u4e4b\u7269\u3002',
-      actionType: 'item',
-      source: 'item',
-      enabled: true,
-      itemId: it.itemId,
-    }));
-    const basicOptions = [
-      { id: 'basic-mana-burst', name: '\u51dd\u6c14\u4e00\u51fb', description: '\u4ee5\u7075\u529b\u5316\u52b2\uff0c\u8bd5\u63a2\u5bf9\u624b\u7834\u7efd\u3002', actionType: 'basic_attack', source: 'body', enabled: session.playerMp >= 3, disabledReason: session.playerMp < 3 ? '\u7075\u529b\u4e0d\u8db3\u3002' : undefined, mpCost: 3 },
-      { id: 'basic-body-strike', name: '\u8fd1\u8eab\u640f\u6740', description: '\u8d34\u8eab\u51fa\u624b\uff0c\u4ee5\u6c14\u8840\u4e0e\u8eab\u6cd5\u76f8\u62fc\u3002', actionType: 'basic_attack', source: 'body', enabled: true, mpCost: 0 },
-    ];
-    const defenseOptions = [
-      { id: 'defense-guard', name: '\u655b\u606f\u5b88\u5fa1', description: '\u6536\u675f\u7075\u529b\uff0c\u62a4\u4f4f\u8981\u5bb3\u3002', actionType: 'defense', source: 'body', enabled: true, mpCost: 0 },
-      { id: 'defense-focus', name: '\u89c2\u52bf\u5bfb\u9699', description: '\u7a33\u4f4f\u5fc3\u795e\uff0c\u7aa5\u89c1\u5bf9\u624b\u7834\u7efd\u3002', actionType: 'defense', source: 'body', enabled: true, mpCost: 0 },
-    ];
-    const otherOptions = [
-      { id: 'other-observe-opening', name: '\u501f\u52bf\u5e94\u53d8', description: '\u5ba1\u65f6\u5ea6\u52bf\uff0c\u968f\u573a\u8c03\u6574\u6218\u6cd5\u3002', actionType: 'other', source: 'environment', enabled: true, mpCost: 0 },
-      { id: 'other-flee', name: '\u8f6c\u8eab\u9041\u8d70', description: '\u5bfb\u9699\u8131\u8eab\uff0c\u672a\u5fc5\u80fd\u5168\u8eab\u800c\u9000\u3002', actionType: 'flee', source: 'body', enabled: true, risk: '\u53ef\u80fd\u88ab\u654c\u4eba\u8ffd\u51fb' },
-    ];
-    return {
-      basicAttack: { enabled: basicOptions.some((o: any) => o.enabled), label: '\u653b\u4f10', options: basicOptions },
-      technique: { enabled: techniqueOptions.some((o: any) => o.enabled), label: '\u529f\u6cd5', disabledReason: techniqueOptions.length ? '\u7075\u529b\u4e0d\u8db3\u3002' : '\u6682\u65e0\u53ef\u7528\u529f\u6cd5\u3002', options: techniqueOptions },
-      spell: { enabled: spellOptions.some((o: any) => o.enabled), label: '\u6cd5\u672f', disabledReason: spellOptions.length ? '\u7075\u529b\u4e0d\u8db3\u3002' : '\u6682\u65e0\u53ef\u7528\u6cd5\u672f\u3002', options: spellOptions },
-      defense: { enabled: defenseOptions.some((o: any) => o.enabled), label: '\u5b88\u5fa1', options: defenseOptions },
-      item: { enabled: itemOptions.some((o: any) => o.enabled), label: '\u7269\u7528', disabledReason: itemOptions.length ? '\u6b64\u523b\u96be\u4ee5\u53d6\u7528\u3002' : '\u6682\u65e0\u53ef\u7528\u4e4b\u7269\u3002', options: itemOptions },
-      other: { enabled: otherOptions.some((o: any) => o.enabled), label: '\u5e94\u53d8', options: otherOptions },
-      generatedBy: 'ui-resume-fallback',
-    };
-  };
+  const emptyPaletteGroup = (label: string) => ({ enabled: false, label, options: [] as any[] });
+
   const storedPalette: any = (session as any)?.actionPalette || null;
-  const fallbackPalette: any = makeFallbackCombatPalette();
   const mergePaletteGroup = (key: string) => {
     const storedGroup = storedPalette?.[key];
-    const fallbackGroup = fallbackPalette?.[key];
     const storedOptions = storedGroup?.options || [];
     const repairedStoredOptions = (key === 'spell' || key === 'technique')
       ? storedOptions.map((option: any) => {
@@ -395,12 +342,11 @@ export function CombatModal() {
       : storedOptions;
     const hasUsableStoredOption = repairedStoredOptions.some((option: any) => option?.enabled);
     if (!storedGroup || !repairedStoredOptions.length || !hasUsableStoredOption) {
-      return fallbackGroup || storedGroup || { enabled: false, label: key, options: [] };
+      return storedGroup || emptyPaletteGroup(key);
     }
     return (key === 'spell' || key === 'technique') ? { ...storedGroup, options: repairedStoredOptions } : storedGroup;
   };
   const palette: any = {
-    ...(fallbackPalette || {}),
     ...(storedPalette || {}),
     basicAttack: mergePaletteGroup('basicAttack'),
     technique: mergePaletteGroup('technique'),
@@ -409,7 +355,7 @@ export function CombatModal() {
     item: mergePaletteGroup('item'),
     other: mergePaletteGroup('other'),
   };
-  const groupOf = (key: string, fallbackLabel: string) => palette?.[key] || { enabled: false, label: fallbackLabel, options: [] };
+  const groupOf = (key: string, fallbackLabel: string) => palette?.[key] || emptyPaletteGroup(fallbackLabel);
   const actionFromOption = (option: any): CombatAction => {
     if (option?.actionType === 'spell' || option?.actionType === 'technique') return 'skill';
     if (option?.actionType === 'item') return 'item';

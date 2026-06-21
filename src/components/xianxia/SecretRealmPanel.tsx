@@ -5,6 +5,7 @@ import { useGameStore } from '@/lib/xianxia/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import {
   MapPin, X, Loader2, Skull, Sparkles, Clock, Zap, AlertTriangle, Trophy,
   Compass, ChevronRight, Ghost, CloudLightning, Droplet, ScrollText,
@@ -58,9 +59,23 @@ const ELEMENT_LABEL: Record<string, string> = {
 };
 
 // 危险度渲染（骷髅头）
+function dangerOmen(level: number) {
+  if (level <= 2) return '\u7075\u673a\u6e29\u548c';
+  if (level <= 4) return '\u5c1a\u6709\u9669\u610f';
+  if (level <= 6) return '\u7981\u5236\u6df1\u91cd';
+  if (level <= 8) return '\u6740\u673a\u6f5c\u4f0f';
+  return '\u51f6\u8c61\u8feb\u4eba';
+}
+
+function revisitTrace(times: number, bestReward?: string) {
+  if (times <= 0) return '';
+  if (bestReward) return `\u65e7\u8ff9\u5c1a\u5b58\uff0c\u66fe\u5f97\u300c${bestReward}\u300d`;
+  return times > 1 ? '\u65e7\u8ff9\u91cd\u91cd\uff0c\u5c1a\u53ef\u518d\u8fa8' : '\u66fe\u5165\u6b64\u5730\uff0c\u4ecd\u6709\u4f59\u7eea';
+}
+
 function DangerMeter({ level }: { level: number }) {
   return (
-    <div className="flex items-center gap-0.5" title={`危险度 ${level}/10`}>
+    <div className="flex items-center gap-0.5" title={dangerOmen(level)}>
       {Array.from({ length: 10 }).map((_, i) => (
         <Skull
           key={i}
@@ -330,6 +345,7 @@ export function SecretRealmPanel() {
     setLastExploration, setPendingChoice, setSelectedEventId,
   } = useGameStore();
   const [busyRealmId, setBusyRealmId] = useState<string | null>(null);
+  const [dangerRealm, setDangerRealm] = useState<SecretRealm | null>(null);
 
   if (!character || !explorationOpen) return null;
 
@@ -372,13 +388,17 @@ export function SecretRealmPanel() {
     if (busyRealmId || !character) return;
     const requirement = realm.entryRequirement;
     if (requirement && !hasRealmEntryRequirement(character, requirement)) {
-      toast.error('关窍未明', { description: `尚缺${requirement}，也可另寻破禁之法。` });
+      toast.error('\u5173\u7a8d\u672a\u660e', { description: `\u5c1a\u7f3a${requirement}\uff0c\u4e5f\u53ef\u53e6\u5bfb\u7834\u7981\u4e4b\u6cd5\u3002` });
       return;
     }
-    // 二次确认（高危险度秘境）
     if (realm.dangerLevel >= 7) {
-      if (!confirm(`「${realm.name}」危险度 ${realm.dangerLevel}/10，可能陨落！确认前往？`)) return;
+      setDangerRealm(realm);
+      return;
     }
+    await enterRealm(realm);
+  };
+
+  const enterRealm = async (realm: SecretRealm) => {
     setBusyRealmId(realm.id);
     setLoading(true);
     setError(null);

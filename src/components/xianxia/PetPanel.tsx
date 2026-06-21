@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -70,6 +71,7 @@ export function PetPanel() {
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [expandedPetId, setExpandedPetId] = useState<string | null>(null);
+  const [dismissTarget, setDismissTarget] = useState<{ id: string; name: string } | null>(null);
 
   if (!character) return null;
   const pets = character.pets || [];
@@ -108,9 +110,15 @@ export function PetPanel() {
     }
   };
 
-  const dismissPet = async (petId: string, petName: string) => {
+  const requestDismissPet = (petId: string, petName: string) => {
     if (busy) return;
-    if (!confirm(`确定要放生「${petName}」吗？此操作不可恢复。`)) return;
+    setDismissTarget({ id: petId, name: petName });
+  };
+
+  const dismissPet = async () => {
+    if (busy || !dismissTarget) return;
+    const petId = dismissTarget.id;
+    const petName = dismissTarget.name;
     setBusy(true);
     setLoading(true);
     setError(null);
@@ -125,12 +133,13 @@ export function PetPanel() {
         }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || '放生失败');
+      if (!data.success) throw new Error(data.error || '\u653e\u5f52\u5931\u8d25');
       if (data.state) setCharacter({ ...character, ...data.state });
-      toast.success(`已放生「${petName}」`);
-    } catch (err: any) {
-      setError(err?.message || '放生失败');
-      toast.error(err?.message || '放生失败');
+      toast.success(`\u5df2\u653e\u5f52\u300c${petName}\u300d`);
+      setDismissTarget(null);
+    } catch (e: any) {
+      setError(e.message);
+      toast.error('\u653e\u5f52\u5931\u8d25', { description: e.message });
     } finally {
       setBusy(false);
       setLoading(false);
@@ -138,6 +147,7 @@ export function PetPanel() {
   };
 
   return (
+    <>
     <Collapsible open={open} onOpenChange={setOpen}>
       <Card className="paper-texture">
         <CollapsibleTrigger asChild>
@@ -201,7 +211,7 @@ export function PetPanel() {
                         </span>
                         <span className="text-[9px] text-muted-foreground/70 shrink-0">Lv.{pet.level}</span>
                         <button
-                          onClick={() => dismissPet(pet.id, pet.name)}
+                          onClick={() => requestDismissPet(pet.id, pet.name)}
                           disabled={busy}
                           className="text-muted-foreground/40 hover:text-destructive transition-colors shrink-0"
                           title="放生"
@@ -365,5 +375,22 @@ export function PetPanel() {
         </CollapsibleContent>
       </Card>
     </Collapsible>
+    <AlertDialog open={Boolean(dismissTarget)} onOpenChange={(next) => !busy && !next && setDismissTarget(null)}>
+      <AlertDialogContent className="border-destructive/25 bg-background/95">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-serif-cn text-destructive">{'\u653e\u5f52\u7075\u5ba0\uff1f'}</AlertDialogTitle>
+          <AlertDialogDescription className="leading-6">
+            {dismissTarget ? `\u5c06\u300c${dismissTarget.name}\u300d\u653e\u5f52\u5c71\u91ce\u540e\uff0c\u5b83\u5c06\u4e0d\u518d\u968f\u4f60\u540c\u884c\u3002\u6b64\u4e3e\u65e0\u6cd5\u76f4\u63a5\u64a4\u56de\u3002` : ''}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={busy}>{'\u6682\u4e0d\u653e\u5f52'}</AlertDialogCancel>
+          <AlertDialogAction disabled={busy} onClick={dismissPet} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            {busy ? '\u653e\u5f52\u4e2d' : '\u786e\u8ba4\u653e\u5f52'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

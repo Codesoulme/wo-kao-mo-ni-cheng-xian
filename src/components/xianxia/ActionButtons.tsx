@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Store, Compass, ScrollText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -45,6 +46,7 @@ export function ActionButtons() {
   const advancingRef = useRef(false);
   const [autoCount, setAutoCount] = useState(0); // 0 = off, >0 = remaining years
   const [autoTotal, setAutoTotal] = useState(0);
+  const [restartOpen, setRestartOpen] = useState(false);
   const autoCancelRef = useRef(false);
 
   const syncLatestState = async (characterId: string) => {
@@ -301,18 +303,21 @@ export function ActionButtons() {
     autoCancelRef.current = true;
   };
 
-  const restart = () => {
-    if (!confirm('确定要重新开始吗？当前角色将被放弃。')) return;
+  const restart = () => setRestartOpen(true);
+
+  const confirmRestart = () => {
     autoCancelRef.current = true;
     setAutoCount(0);
     setAutoTotal(0);
     reset();
-    toast('已重置，可重新开始');
+    setRestartOpen(false);
+    toast('\u5df2\u91cd\u7f6e\uff0c\u53ef\u91cd\u65b0\u5f00\u59cb');
   };
 
   const isAutoRunning = autoCount > 0;
 
   return (
+    <>
     <div className="space-y-2">
       {/* 主推进按钮 + 一键十载 */}
       <div className="flex items-center gap-2">
@@ -436,5 +441,22 @@ export function ActionButtons() {
         </div>
       )}
     </div>
+    <AlertDialog open={restartOpen} onOpenChange={setRestartOpen}>
+      <AlertDialogContent className="border-destructive/25 bg-background/95">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-serif-cn text-destructive">{'\u653e\u5f03\u6b64\u4e16\uff1f'}</AlertDialogTitle>
+          <AlertDialogDescription className="leading-6">
+            {'\u5f53\u524d\u89d2\u8272\u5c06\u6682\u79bb\u73a9\u5bb6\u624b\u4e2d\u7684\u6f14\u7b97\uff0c\u5e76\u56de\u5230\u65b0\u7684\u5f00\u59cb\u3002\u8fd9\u4e00\u6b65\u4e0d\u4ee3\u8868\u6e05\u7a7a\u6574\u4e2a\u4e16\u754c\uff1b\u5982\u9700\u6e05\u7a7a\u6d4b\u8bd5\u4e16\u754c\uff0c\u8bf7\u5728\u5f00\u59cb\u9875\u4f7f\u7528\u300c\u91cd\u7f6e\u4e16\u754c\u300d\u3002'}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{'\u6682\u4e0d\u653e\u5f03'}</AlertDialogCancel>
+          <AlertDialogAction onClick={confirmRestart} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            {'\u786e\u8ba4\u653e\u5f03'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

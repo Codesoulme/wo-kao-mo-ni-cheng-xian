@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Heart, Sparkles, Sword, Shield, Zap, Clover, Brain, Coins, Star, MapPin, Users, GraduationCap, Flame, Info } from 'lucide-react';
 import { REALMS, ELEMENTS, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
 import { filterMeaningfulStatuses, isConstitutionStatus } from '@/lib/xianxia/engine';
+import { characterDisplayEntries, entriesForSlot, type DisplayEntry } from '@/lib/xianxia/display-registry';
 import { useState } from 'react';
 
 interface CharacterDetailSheetProps {
@@ -27,6 +28,9 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
   const meaningfulStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
   const constitutionStatuses = meaningfulStatuses.filter(isConstitutionStatus);
   const dynamicAttributes = (current.cultivationAttributes || []).filter((attr: any) => attr && attr.visible !== false && attr.name);
+  const detailDisplayEntries = entriesForSlot(characterDisplayEntries(current), 'characterDetail')
+    .filter((entry) => entry.kind !== 'status' || !constitutionStatuses.some((status: any) => status.id === entry.raw?.id || status.name === entry.raw?.name))
+    .slice(0, 8);
   const [selectedAttr, setSelectedAttr] = useState<AttributeInfo | null>(null);
 
   return (
@@ -227,11 +231,41 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             </div>
           </section>
 
+          {detailDisplayEntries.length > 0 && (
+            <section>
+              <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title={'\u663e\u5316\u4e4b\u76f8'} />
+              <div className="rounded-lg border border-border/60 p-3 mt-1.5 bg-card/40 space-y-1.5">
+                {detailDisplayEntries.map((entry) => (
+                  <DisplayEntryMiniCard key={entry.id} entry={entry} />
+                ))}
+              </div>
+            </section>
+          )}
 
         </div>
       </SheetContent>
       <AttributeInfoDialog info={selectedAttr} onOpenChange={(nextOpen) => !nextOpen && setSelectedAttr(null)} />
     </Sheet>
+  );
+}
+
+function displayEntryBorder(entry: DisplayEntry) {
+  if (entry.tone === 'rare') return 'border-purple-300/50 bg-purple-500/10';
+  if (entry.tone === 'bad' || entry.tone === 'danger') return 'border-red-300/50 bg-red-500/10';
+  if (entry.tone === 'good') return 'border-emerald-300/50 bg-emerald-500/10';
+  if (entry.tone === 'mystery') return 'border-amber-300/50 bg-amber-500/10';
+  return 'border-border/60 bg-background/50';
+}
+
+function DisplayEntryMiniCard({ entry }: { entry: DisplayEntry }) {
+  return (
+    <div className={`rounded-md border px-2 py-1.5 ${displayEntryBorder(entry)}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-serif-cn font-semibold truncate">{entry.displayLabel}</span>
+        <span className="text-[10px] text-muted-foreground shrink-0">{entry.displayGroup}</span>
+      </div>
+      {entry.description && <p className="text-[10px] text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">{entry.description}</p>}
+    </div>
   );
 }
 
