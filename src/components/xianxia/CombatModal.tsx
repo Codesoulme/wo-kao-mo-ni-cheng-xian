@@ -476,7 +476,7 @@ export function CombatModal() {
 
           {(!session || battleStarted || endResult) && (<div className="flex-1 min-h-0 flex flex-col gap-2">
           {/* Combat context is shown before entering battle, not repeated here. */}
-          {enemy && (
+          {enemy && !endResult && (
             <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/5 p-2.5 space-y-1.5 relative overflow-visible">
               {/* Task 22: 敌人伤害飘字 */}
               <FloatNumbersOverlay floats={floats.filter(f => f.target === 'enemy')} />
@@ -536,7 +536,7 @@ export function CombatModal() {
           </div>
 
           {/* 玩家信息（session 可能为 null——endResult 显示场景跳过） */}
-          {session && (
+          {session && !endResult && (
           <div className="shrink-0 rounded-lg border border-primary/30 bg-primary/5 p-2.5 space-y-1.5 relative overflow-visible">
             {/* Task 22: 玩家伤害飘字 */}
             <FloatNumbersOverlay floats={floats.filter(f => f.target === 'player')} />
@@ -615,7 +615,7 @@ export function CombatModal() {
           )}
 
           {/* 战斗日志（session 可能为 null——endResult 显示场景跳过） */}
-          {session && (
+          {session && !endResult && (
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="shrink-0 text-xs text-muted-foreground mb-1 px-1 font-serif-cn">
               战斗记录
@@ -665,6 +665,7 @@ export function CombatModal() {
               )}
               <Button
                 onClick={closeEndResult}
+                disabled={busy}
                 className="w-full h-9"
                 size="sm"
               >
