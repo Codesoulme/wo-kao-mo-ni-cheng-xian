@@ -77,6 +77,14 @@ export function CombatModal() {
   useEffect(() => { setSelTarget(null); setDismissedImpulse(null); }, [session?.id]);
 
   const isOngoing = !!session && session.status === 'ongoing';
+  useEffect(() => {
+    if (!isOngoing || endResult) {
+      autoBattleSessionRef.current = null;
+      setAutoBattle(false);
+      setOpenPalette(null);
+      setLoading(false);
+    }
+  }, [isOngoing, endResult, setLoading]);
   const hasCombatTarget = !!session?.enemies?.length && !!session.enemies[session.currentEnemyIdx ?? 0];
   const shouldRender = !!character && ((isOngoing && hasCombatTarget) || !!endResult);
   // 显示条件：战斗进行中 OR 有待展示的 endResult
@@ -154,6 +162,10 @@ export function CombatModal() {
         const status = data.state?.combatSession?.status || data.endStatus;
         const endedState = { ...character, ...data.state } as typeof character;
         const terminal = !endedState.alive || (endedState as any).ascended;
+        autoBattleSessionRef.current = null;
+        setAutoBattle(false);
+        setOpenPalette(null);
+        setLoading(false);
         setCharacter(endedState);
         // 终局（死亡/飞升）直接交给统一全局轮回结算，不再先弹战后小结面板，避免两个结算窗口。
         if (!terminal) {
@@ -232,6 +244,11 @@ export function CombatModal() {
       console.error('endCombat failed:', err);
       setEndResult({ status, narrative: '战场归于沉寂。' });
       setCharacter({ ...character, combatSession: null });
+    } finally {
+      autoBattleSessionRef.current = null;
+      setAutoBattle(false);
+      setOpenPalette(null);
+      setLoading(false);
     }
   };
 
