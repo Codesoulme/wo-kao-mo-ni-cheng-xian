@@ -6,6 +6,7 @@ import {
   CharacterState,
   AttributeChange,
   StatusEntry,
+  StatusEffect,
   ItemEntry,
   TechniqueProfile,
   TechniqueRequirement,
@@ -144,8 +145,8 @@ export function isStorageBag(item: ItemEntry): boolean {
 
 export function dbToState(c: DBCharacter): CharacterState {
   const rootInfo = SPIRITUAL_ROOTS[c.spiritualRoot as SpiritualRoot];
-  const equipped = parseEquippedJson(c.equippedJson || '[]');
-  const inventory = safeParse<ItemEntry[]>(c.inventoryJson, []);
+  const equipped = parseEquippedJson(c.equippedJson || '[]').map(normalizeCultivationBearingItem);
+  const inventory = safeParse<ItemEntry[]>(c.inventoryJson, []).map(normalizeCultivationBearingItem);
   const storageCapacity = c.storageCapacity ?? 5;
   // Task 20: 解析新字段
   const parsedPendingThreads = safeParse<PendingThread[]>(c.pendingThreadsJson || '[]', []);
@@ -663,7 +664,7 @@ function stripLootOwnerPrefix(name?: string): string {
   const match = text.match(/^(.{1,10})的(.{2,24})$/u);
   if (!match) return text;
   const [, owner, objectName] = match;
-  const ownerLooksLikeEnemy = /修|汉|客|匪|贼|妖|魔|邪|劫|道人|真人|老祖|敌|疤|牙|瘦|胖|黑衣|蒙面/.test(owner);
+  const ownerLooksLikeEnemy = /修|汉|客|徒|信使|匪|贼|妖|兽|狼|虎|蛇|蛛|狐|猿|魔|邪|劫|道人|真人|老祖|敌|疤|牙|瘦|胖|黑衣|蒙面/.test(owner);
   const objectLooksLikeLoot = /符|剑|刀|珠|环|甲|袍|幡|铃|镜|印|袋|丹|诀|经|玉简|法器|法宝|护/.test(objectName);
   return ownerLooksLikeEnemy && objectLooksLikeLoot ? objectName : text;
 }
@@ -2007,8 +2008,20 @@ function defaultScriptureMultiplier(rarity?: string): number {
   return multByRarity[rarity || ''] || 1.5;
 }
 
+function isArtifactTechniqueProfile(technique: ItemEntry['technique'] | undefined): boolean {
+  return !!technique && (technique.kind === 'artifact' || (Array.isArray(technique.artifactAbilities) && technique.artifactAbilities.length > 0));
+}
+
+function isAutoInjectedScriptureCultivationEffect(e: StatusEffect, rarity?: string): boolean {
+  if (e.target_attribute !== 'cultivationExp' || e.operation !== 'multiply') return false;
+  const desc = String(e.description || '');
+  const defaultMult = defaultScriptureMultiplier(rarity);
+  return /修习此功法|功法.*修为流转/.test(desc) || Math.abs(Number(e.value || 0) - defaultMult) < 0.0001;
+}
+
 function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
   const hasStorageEffect = (it.effects || []).some(e => e.target_attribute === 'storageCapacity' && e.operation === 'add' && e.value > 0);
+  const artifactByTechnique = isArtifactTechniqueProfile(it.technique);
   let itemType = it.item_type;
   if (!VALID_ITEM_TYPES_FOR_NORMALIZE.has(itemType)) {
     itemType = hasStorageEffect ? 'tool' : 'material';
@@ -2016,8 +2029,12 @@ function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
     itemType = 'tool';
   }
 
+  // 旧档兼容：曾有法宝/护符因名字或描述被误归为 scripture，并被补上“修习此功法”倍率。
+  // technique.kind/artifactAbilities 是更强事实；这类物品必须回到 artifact，不再当功法修炼。
+  if (artifactByTechnique) itemType = 'artifact';
+
   const isScriptureByName = SCRIPTURE_NAME_RE.test(`${it.name || ''}${it.description || ''}`);
-  if (isScriptureByName && itemType !== 'scripture') {
+  if (!artifactByTechnique && isScriptureByName && itemType !== 'scripture') {
     itemType = 'scripture';
   }
 
@@ -2027,6 +2044,10 @@ function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
     }
     return e;
   }) : [];
+
+  if (itemType === 'artifact') {
+    effects = effects.filter(e => !isAutoInjectedScriptureCultivationEffect(e, it.rarity as string));
+  }
 
   if (itemType === 'scripture' && !effects.some(e => e.target_attribute === 'cultivationExp' && e.operation === 'multiply')) {
     const mult = defaultScriptureMultiplier(it.rarity as string);
@@ -2038,7 +2059,7 @@ function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
     }];
   }
 
-  const base = { ...it, item_type: itemType as any, effects };
+  const base = { ...it, name: stripLootOwnerPrefix(it.name), item_type: itemType as any, effects };
   if (itemType === 'artifact') {
     const withTechnique = base.technique ? base : { ...base, technique: inferTechniqueProfile(base) };
     return describeArtifactAbilitiesOnItem(withTechnique);

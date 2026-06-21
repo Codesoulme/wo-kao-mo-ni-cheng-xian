@@ -937,6 +937,33 @@ function smokeCombatArtFallbackNames(): void {
 
 
 
+
+function smokeArtifactCultivationMisclassification(): void {
+  const state: any = normalizeCultivationState({
+    spiritualRoot: 'heavenly', rootDetail: '金天灵根', rootMultiplier: 3,
+    activeStatuses: [], inventory: [], pets: [], heartDemon: 0,
+    hp: 50, maxHp: 50, mp: 20, maxMp: 20,
+    equipped: [
+      {
+        id: 'old_bad_artifact', name: '黄牙瘦汉的残光护符', description: '内藏灵禁：残光护幕。', item_type: 'scripture', rarity: 'uncommon', source: '战利所得',
+        effects: [
+          { target_attribute: 'defense', operation: 'add', value: 16, description: '护身+16' },
+          { target_attribute: 'cultivationExp', operation: 'multiply', value: 1.7, description: '修习此功法，修为流转加速×1.7' },
+        ],
+        technique: { kind: 'artifact', artifactAbilities: [{ name: '残光护幕', description: '护身灵禁', trigger: 'auto', element: 'none', power: 1.1 }] },
+      },
+      { id: 'real_scripture', name: '斗法心得玉简', description: '修炼心得。', item_type: 'scripture', rarity: 'uncommon', source: '测试', effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.45, description: '参悟修行×1.45' }] },
+    ],
+  } as any);
+  const artifact = state.equipped.find((it: any) => it.id === 'old_bad_artifact');
+  assert(artifact?.item_type === 'artifact', 'artifact technique should override old scripture misclassification');
+  assert(artifact?.name === '残光护符', 'enemy possessive prefix should be stripped during normalization');
+  assert(!artifact?.effects?.some((e: any) => e.target_attribute === 'cultivationExp'), 'auto-injected scripture cultivation effect should be removed from artifact');
+  assert(!state.cultivationFactors.some((f: any) => f.name === '残光护符'), 'artifact should not appear as scripture cultivation factor');
+  assert(Math.abs(state.cultivationMultiplier - 4.35) < 0.001, 'only root and real scripture should multiply cultivation rate');
+  console.log(JSON.stringify({ smoke: 'artifact-cultivation-misclassification', passed: true, multiplier: state.cultivationMultiplier }));
+}
+
 function smokeCombatTacticalProjection() {
   let state: any = {
     id: 'tactical_smoke', name: '观势者', age: 23, realmName: '炼气二层', rootType: '五行杂灵根', rootMultiplier: 1,
@@ -1123,6 +1150,7 @@ async function main(): Promise<void> {
   smokeCombatSettlementSingleFlow();
   smokeDynamicCultivationAttributes();
   smokeCombatArtFallbackNames();
+  smokeArtifactCultivationMisclassification();
   smokeCombatTacticalProjection();
   smokeCombatStalemateBreakNode();
   smokeCombatTechniqueSpellSplit();
