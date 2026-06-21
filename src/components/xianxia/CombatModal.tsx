@@ -43,6 +43,7 @@ export function CombatModal() {
   const [battleStarted, setBattleStarted] = useState(false);
   const [openPalette, setOpenPalette] = useState<string | null>(null);
   const [selTarget, setSelTarget] = useState<number | null>(null);
+  const [dismissedImpulse, setDismissedImpulse] = useState<string | null>(null);
   const lastSessionIdRef = useRef<string | null>(null);
   const logScrollRef = useRef<HTMLDivElement | null>(null);
   // 上一次的 HP/MP 快照，用于计算差值生成飘字
@@ -72,7 +73,7 @@ export function CombatModal() {
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [session?.id, session?.log?.length, battleStarted, endResult?.status]);
-  useEffect(() => { setSelTarget(null); }, [session?.id]);
+  useEffect(() => { setSelTarget(null); setDismissedImpulse(null); }, [session?.id]);
 
   const isOngoing = !!session && session.status === 'ongoing';
   const hasCombatTarget = !!session?.enemies?.length && !!session.enemies[session.currentEnemyIdx ?? 0];
@@ -85,6 +86,8 @@ export function CombatModal() {
     ? selTarget
     : (session?.currentEnemyIdx ?? 0);
   const enemy = session?.enemies?.[enemyIdx];
+  const impulse = session?.pendingImpulse;
+  const impulseKey = impulse ? `${session?.round}|${impulse.kind}|${impulse.itemId || ''}|${(impulse.prompt || '').slice(0, 12)}` : null;
 
   // ====== 执行战斗行动 ======
   const doAction = async (action: CombatAction, payload?: { skillIdx?: number; itemId?: string; optionId?: string }) => {
@@ -710,6 +713,38 @@ export function CombatModal() {
         {/* 底部：行动按钮区（仅 ongoing 且未结束展示时显示） */}
         {isOngoing && battleStarted && !endResult && (
           <div className="relative shrink-0 border-t border-border/40 bg-card/40 p-2">
+            {impulse && impulseKey !== dismissedImpulse && (
+              impulse.kind === 'item' ? (
+                <div className="mb-2 rounded-md border-2 border-primary/50 bg-primary/10 p-2.5 space-y-2">
+                  <p className="text-[12px] leading-5 text-foreground/90 font-serif-cn xianxia-prose">{impulse.prompt}</p>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={busy}
+                      onClick={() => { setDismissedImpulse(impulseKey); doAction('item', { itemId: impulse.itemId }); }}
+                      className="flex-1 h-9 rounded-md border-2 border-primary/60 bg-primary/15 text-primary text-[12px] font-serif-cn font-semibold active:scale-95 disabled:opacity-40"
+                    >
+                      服用「{impulse.itemName}」
+                    </button>
+                    <button
+                      disabled={busy}
+                      onClick={() => setDismissedImpulse(impulseKey)}
+                      className="flex-1 h-9 rounded-md border border-border bg-muted/40 text-muted-foreground text-[12px] font-serif-cn active:scale-95 disabled:opacity-40"
+                    >
+                      暂且强撑，另寻他法
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-2 rounded-md border-2 border-amber-500/50 bg-amber-500/10 p-2.5 flex items-start gap-2">
+                  <span className="text-amber-600 text-sm leading-5 shrink-0">⚠</span>
+                  <p className="text-[12px] leading-5 text-foreground/90 font-serif-cn flex-1 xianxia-prose">
+                    {impulse.prompt}
+                    <span className="text-amber-600/80">　——以下方【应变】或【物用】化解此局。</span>
+                  </p>
+                  <button onClick={() => setDismissedImpulse(impulseKey)} className="text-[11px] text-muted-foreground shrink-0 self-start">知道了</button>
+                </div>
+              )
+            )}
             <div className="grid grid-cols-7 gap-1">
               <PaletteButton paletteKey="basicAttack" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('basicAttack', '\u653b\u4f10')} icon={<Swords className="w-3.5 h-3.5" />} tone="primary" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="technique" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('technique', '\u529f\u6cd5')} icon={<BookOpen className="w-3.5 h-3.5" />} tone="gold" busy={busy} onPick={runPaletteOption} />

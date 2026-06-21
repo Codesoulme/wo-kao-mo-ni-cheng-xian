@@ -3862,7 +3862,21 @@ export function executeCombatRoundWithProposal(
     playerHits: playerHitsResult,
     dialogue,
   };
-  const newSession: CombatSession = { ...session, enemies: enemiesWork, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp };
+  // 角色本能想法/应变关口：AI 提示玩家需决断的处境（仅战斗未结束时）
+  let pendingImpulse: CombatSession['pendingImpulse'];
+  const imp = proposal.playerImpulse;
+  if (!endStatus && imp && imp.prompt) {
+    if (imp.kind === 'item') {
+      const owned = (session.playerItems || []).find(it => it.itemId === imp.itemId) || (session.playerItems || []).find(it => it.name === imp.itemName);
+      pendingImpulse = owned
+        ? { kind: 'item', prompt: imp.prompt, itemId: owned.itemId, itemName: owned.name }
+        : { kind: 'contingency', prompt: imp.prompt };
+      if (!owned) audit.push('AI建议使用物品但未命中现有背包，已转为应变提示。');
+    } else {
+      pendingImpulse = { kind: 'contingency', prompt: imp.prompt };
+    }
+  }
+  const newSession: CombatSession = { ...session, enemies: enemiesWork, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp, pendingImpulse };
   if (endStatus === 'defeat') {
     const killer = enemyActions.filter(a => (a.damage || 0) > 0).sort((a, b) => (b.damage || 0) - (a.damage || 0))[0];
     return { state: { ...nextState, combatSession: newSession, hp: 0, mp: playerMp, alive: false, causeOfDeath: '战死于' + (killer?.name || legacyEnemy?.name || '敌手') + '之手' }, round, ended: true, endStatus };

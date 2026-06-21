@@ -1461,6 +1461,12 @@ function sanitizeCombatRoundProposal(raw: any): CombatRoundProposal {
       speaker: d?.speaker ? String(d.speaker).slice(0, 24) : undefined,
       text: d?.text ? String(d.text).slice(0, 120) : undefined,
     })).filter((d: any) => d.text).slice(0, 6) : undefined,
+     playerImpulse: raw?.playerImpulse && (raw.playerImpulse.prompt || raw.playerImpulse.itemId || raw.playerImpulse.itemName) ? {
+      kind: raw.playerImpulse.kind === 'item' ? 'item' as const : 'contingency' as const,
+      prompt: raw.playerImpulse.prompt ? String(raw.playerImpulse.prompt).slice(0, 160) : undefined,
+      itemId: raw.playerImpulse.itemId != null ? String(raw.playerImpulse.itemId) : undefined,
+      itemName: raw.playerImpulse.itemName ? String(raw.playerImpulse.itemName).slice(0, 40) : undefined,
+    } : undefined,
   };
 }
 
@@ -1615,7 +1621,12 @@ ${enemiesDesc}
 所选选项：${option ? `${option.name}（${option.description}）意图：${option.intent || '无'}` : '未指定具体选项'}
 法术：${skill ? `${skill.name}（耗灵力${skill.mpCost}，威力${skill.power}）${skill.description}` : '无'}
 物品：${item ? `${item.name}（${item.effect}）` : '无'}
+随身物品（可供角色临机取用或破解处境）：${(sessionBefore.playerItems || []).map(it => `${it.name}（${it.effect || it.description || ''}）[id=${it.itemId}]`).join('；') || '无'}
 ${aoeHint}
+【角色本能/应变】若这一拍过后角色陷入【需玩家亲自决断】的处境（如中迷幻、被控、中毒、识海受扰、濒危被围），请输出 playerImpulse：
+- 当随身物品里恰有一件可对症破解此处境的道具，且以角色心性此刻会本能地想取用，则 kind="item"，itemId 填该物品真实 id（只能用上方列出的物品，不可杜撰），itemName 填其名，prompt 用角色内心念头式的沉浸表达（如"迷烟入鼻，识海晃荡，怀中那枚清心丹隐隐发烫……"）。
+- 若没有对症之物，但局势正逼角色当机立断（突围、挣脱、舍物保命、行险一搏等），则 kind="contingency"，prompt 描述这一危急关口，留待玩家以应变/物品自行解决，不要替玩家决定。
+- 处境寻常、无需玩家特别决断时，省略 playerImpulse。
 战斗记忆：
 ${tacticMemory}
 
@@ -1636,6 +1647,7 @@ ${recentLog}
     {"enemyIdx": 0, "action": "该敌这一拍的动作", "actionType": "attack|skill|defend|flee|stunned", "damageToPlayer": 0}
   ],
   "dialogue": [{"speaker": "角色名或敌人名", "text": "简短台词"}],
+  "playerImpulse": {"kind": "item|contingency", "prompt": "角色内心念头式的沉浸描述", "itemId": "仅当kind=item，填上方真实物品id", "itemName": "物品名"},
   "narrative": "120-260字小说化战斗叙事，含动作、气机、转折，可穿插对话；禁止机械战报",
   "auditHints": ["可选：需要引擎特别留意的事实"]
 }

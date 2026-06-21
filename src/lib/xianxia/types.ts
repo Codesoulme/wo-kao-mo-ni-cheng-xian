@@ -582,6 +582,8 @@ export interface CombatRoundProposal {
   playerHits?: { enemyId?: string; enemyIdx?: number; damage?: number }[];
   // AI 生成的战斗对话
   dialogue?: { speaker?: string; text?: string }[];
+  // AI 推演：本节过后角色陷入需玩家决策的处境/本能想用某物的冲动
+  playerImpulse?: { kind?: 'item' | 'contingency'; prompt?: string; itemId?: string; itemName?: string };
 }
 
 export interface CombatSession {
@@ -643,6 +645,9 @@ export interface CombatSession {
     source: string;
     note: string;
   }[];
+  // 角色本能想法/应变关口：AI 判定玩家陷入需决策的处境（如中迷幻/被控/濒危）时产出；
+  // kind='item' 时附上一件玩家现有、可对症的道具，UI 弹窗让玩家决定是否使用；kind='contingency' 为应变提示横幅。
+  pendingImpulse?: { kind: 'item' | 'contingency'; prompt: string; itemId?: string; itemName?: string };
 }
 
 // ==================== AI 输出结构 (EngineCommand) ====================
