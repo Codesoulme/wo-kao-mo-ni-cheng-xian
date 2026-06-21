@@ -13,7 +13,15 @@ import { CustomSimulationDialog } from '@/components/xianxia/CustomSimulationDia
 import { SimulationHallDialog } from '@/components/xianxia/SimulationHallDialog';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 
-export function StartScreen() {
+export function StartScreen({
+  currentCharacterName,
+  onContinueCurrent,
+  onEnterGame,
+}: {
+  currentCharacterName?: string;
+  onContinueCurrent?: () => void;
+  onEnterGame?: () => void;
+} = {}) {
   const { setCharacter, setEvents, setChoices, setFateNodes, setLoading, selectedHeritage } = useGameStore();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -42,6 +50,7 @@ export function StartScreen() {
       setFateNodes(stateData.fateNodes);
       setEvents(stateData.events || []);
       setChoices(stateData.choices || []);
+      onEnterGame?.();
 
       toast.success('道途初启', {
         description: `${data.birth.name} · ${data.birth.rootDetail}`,
@@ -91,6 +100,17 @@ export function StartScreen() {
               onKeyDown={(e) => { if (e.key === 'Enter') start(); }}
             />
           </div>
+          {currentCharacterName && onContinueCurrent && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onContinueCurrent}
+              disabled={busy}
+              className="w-full h-10 font-serif-cn text-sm tracking-wider"
+            >
+              再续前缘 · {currentCharacterName}
+            </Button>
+          )}
           <Button
             onClick={start}
             disabled={busy}

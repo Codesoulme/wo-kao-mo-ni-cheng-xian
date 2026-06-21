@@ -41,6 +41,7 @@ export default function Home() {
   } = useGameStore();
   // 当有 pendingChoice 时自动聚焦到故事 Tab
   const [tab, setTab] = useState('story');
+  const [showHome, setShowHome] = useState(false);
   const hydrated = useHydrated();
   const combatSession = character?.combatSession;
   const combatResultPending = Boolean(combatSession && combatSession.status !== 'ongoing');
@@ -48,6 +49,20 @@ export default function Home() {
   const storyScrollRef = useRef<HTMLDivElement | null>(null);
   const storyScrollTopRef = useRef(0);
   const settlingCharacterIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (typeof window === 'undefined') return;
+    const syncHome = () => setShowHome(window.sessionStorage.getItem('xianxia-show-home') === '1');
+    syncHome();
+    window.addEventListener('xianxia:return-home', syncHome);
+    return () => window.removeEventListener('xianxia:return-home', syncHome);
+  }, [hydrated]);
+
+  const enterGame = () => {
+    if (typeof window !== 'undefined') window.sessionStorage.removeItem('xianxia-show-home');
+    setShowHome(false);
+  };
 
   useEffect(() => {
     if (effectiveTab !== 'story') return;
@@ -146,8 +161,12 @@ export default function Home() {
 
       {/* 主体内容 */}
       <main className="flex-1 overflow-hidden flex flex-col">
-        {!character ? (
-          <StartScreen />
+        {showHome || !character ? (
+          <StartScreen
+            currentCharacterName={character?.name}
+            onContinueCurrent={character ? enterGame : undefined}
+            onEnterGame={enterGame}
+          />
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col max-w-md mx-auto w-full">
             {/* 状态面板（常驻顶部 - 简化版） */}
@@ -226,23 +245,23 @@ export default function Home() {
       </main>
 
       {/* 底部干扰输入（常驻） */}
-      {character && character.alive && !pendingChoice && !combatResultPending && (
+      {character && !showHome && character.alive && !pendingChoice && !combatResultPending && (
         <div className="shrink-0 max-w-md mx-auto w-full">
           <InterfereInput />
         </div>
       )}
 
       {/* 选择弹窗 */}
-      <ChoiceModal />
+      {!showHome && <ChoiceModal />}
 
       {/* 战斗弹窗（全屏，最上层；combatSession.status='ongoing' 时显示） */}
-      <CombatModal />
+      {!showHome && <CombatModal />}
 
       {/* 坊市交易弹窗（z-[55]，介于 ChoiceModal 与 CombatModal 之间） */}
-      <MarketModal />
+      {!showHome && <MarketModal />}
 
       {/* 秘境探索弹窗（z-[55]，与坊市同层；探索结果 z-[60]） */}
-      <SecretRealmPanel />
+      {!showHome && <SecretRealmPanel />}
 
       {/* 轮回结算 */}
       <SettlementModal />

@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
+import { GameMenu } from '@/components/xianxia/GameMenu';
 
 // 战斗动作类型
 type CombatAction = 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee' | 'other';
@@ -435,13 +436,16 @@ export function CombatModal() {
         {/* 顶部：战斗标题 + 红色装饰边框（session 可能为 null——endResult 显示场景） */}
         <CardHeader className="pb-2 shrink-0 border-b-2 border-destructive/40 bg-destructive/5">
           <CardTitle className="text-base flex items-center gap-2 font-serif-cn text-destructive">
-            <Swords className="w-5 h-5" />
-            <span>⚔ {session?.contextTitle || '战斗'}</span>
-            {session && (
-              <Badge variant="outline" className="text-[10px] ml-auto border-destructive/40 text-destructive">
-                第 {session.round || 1} 回合
-              </Badge>
-            )}
+            <Swords className="w-5 h-5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">⚔ {session?.contextTitle || '战斗'}</span>
+            <div className="ml-auto flex items-center gap-1.5 shrink-0">
+              {session && (
+                <Badge variant="outline" className="text-[10px] border-destructive/40 text-destructive">
+                  第 {session.round || 1} 回合
+                </Badge>
+              )}
+              <GameMenu />
+            </div>
           </CardTitle>
           {session?.contextTitle && (
             <div className="text-xs text-foreground/80 font-serif-cn mt-1 flex items-center gap-1.5 flex-wrap">

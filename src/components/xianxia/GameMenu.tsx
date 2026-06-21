@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { RotateCcw, ScrollText, Info, Settings } from 'lucide-react';
+import { Home, RotateCcw, ScrollText, Info, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
 
@@ -29,6 +29,14 @@ export function GameMenu() {
   const [resetOpen, setResetOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
 
+
+  const handleReturnHome = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem('xianxia-show-home', '1');
+      window.dispatchEvent(new Event('xianxia:return-home'));
+    }
+    toast('已回到首页', { description: '当前此世仍已保存，可从首页继续。' });
+  };
 
   const handleReset = async () => {
     if (!character) return;
@@ -62,7 +70,7 @@ export function GameMenu() {
             <Settings className="w-3.5 h-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuContent align="end" className="z-[95] w-44">
           {character && (
             <DropdownMenuItem
               onClick={() => setAboutOpen(true)}
@@ -74,6 +82,15 @@ export function GameMenu() {
           )}
           <AIConfigDialog variant="menu" />
           {character && <DropdownMenuSeparator />}
+          {character && (
+            <DropdownMenuItem
+              onClick={handleReturnHome}
+              className="text-xs cursor-pointer"
+            >
+              <Home className="w-3.5 h-3.5 mr-2" />
+              <span>返回首页</span>
+            </DropdownMenuItem>
+          )}
           {character && (
             <DropdownMenuItem
               onClick={() => setResetOpen(true)}
