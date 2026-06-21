@@ -62,6 +62,7 @@ import {
   CausalEdge,
   EffectResolveTrace,
   CultivationAttributeEntry,
+  AlchemyAIOutcome,
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
@@ -1465,10 +1466,31 @@ function failedAlchemyResult(state: CharacterState, error: string): AlchemyResul
   return { state, ok: false, error, success: false, narrative: '', consumedMaterials: [], spiritStoneCost: 0, successRate: 0, contentRegistryTrace: [], contentRegistryWarnings: [] };
 }
 
+// 炼丹数值上限：按品阶限制 AI 给出的丹效数值，防止数值膨胀（引擎硬约束）
+const ALCHEMY_VALUE_CAP_BY_RARITY: Record<string, number> = { common: 30, uncommon: 80, rare: 180, epic: 400, legendary: 900, mythic: 2000 };
+const ALCHEMY_ALLOWED_TARGETS = new Set(['attack', 'defense', 'speed', 'luck', 'comprehension', 'hp', 'maxHp', 'mp', 'maxMp', 'cultivationExp']);
+function clampAlchemyEffects(effects: Array<{ target_attribute: string; operation: string; value: number; description: string }>, rarity: string): Array<{ target_attribute: string; operation: string; value: number; description: string }> {
+  const cap = ALCHEMY_VALUE_CAP_BY_RARITY[rarity] || 30;
+  const out: Array<{ target_attribute: string; operation: string; value: number; description: string }> = [];
+  for (const e of (effects || []).slice(0, 3)) {
+    if (!ALCHEMY_ALLOWED_TARGETS.has(e.target_attribute)) continue;
+    if (e.operation === 'multiply') {
+      const v = Math.max(1.02, Math.min(3.5, Number(e.value) || 1));
+      out.push({ target_attribute: e.target_attribute, operation: 'multiply', value: Number(v.toFixed(2)), description: e.description });
+    } else {
+      const v = Math.max(-cap, Math.min(cap, Math.round(Number(e.value) || 0)));
+      if (v === 0) continue;
+      out.push({ target_attribute: e.target_attribute, operation: 'add', value: v, description: e.description });
+    }
+  }
+  return out;
+}
+
 export function alchemy(
   state: CharacterState,
   materialIds: string[],
-  spiritStoneCost: number = 10
+  spiritStoneCost: number = 10,
+  aiOutcome?: AlchemyAIOutcome,
 ): AlchemyResult {
   if (materialIds.length < 2 || materialIds.length > 3) return failedAlchemyResult(state, '须选 2-3 味材料入炉');
   const uniqueMaterialIds = Array.from(new Set(materialIds));
@@ -1499,6 +1521,62 @@ export function alchemy(
     inventory: state.inventory.filter(item => !uniqueMaterialIds.includes(item.id)),
     spiritStones: state.spiritStones - spiritStoneCost,
   };
+
+  // ===== AI 主路径：若提供 AI 产出，引擎只做校验 / clamp / 落库，不再走写死公式 =====
+  if (aiOutcome) {
+    if (aiOutcome.success) {
+      let effects = clampAlchemyEffects(aiOutcome.effects || [], aiOutcome.rarity);
+      if (!effects.length) {
+        // AI 未给出有效效果时，用引擎元素表兜底，保证丹药有作用
+        effects = pillEffects(aiOutcome.mainElement === 'none' ? 'wood' : aiOutcome.mainElement, aiOutcome.rarity, materialHarmony.potencyMultiplier) as any;
+      }
+      const rawPill: ItemEntry = {
+        id: `item_pil_${aiOutcome.mainElement}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+        name: aiOutcome.pillName,
+        description: aiOutcome.pillDescription || '开炉炼成的丹药。',
+        item_type: 'consumable',
+        rarity: aiOutcome.rarity as any,
+        effects: effects as any,
+        source: '炼丹炉成丹',
+      };
+      const registered = registerItem(rawPill, { source: 'alchemy', existingIds: next.inventory.map(item => item.id) });
+      contentRegistryTrace.push(...registered.trace);
+      contentRegistryWarnings.push(...registered.warnings);
+      const pill = registered.content || rawPill;
+      next = addItems(next, [pill]);
+      next = normalizeCultivationState(next);
+      return {
+        state: next, ok: true, success: true,
+        narrative: aiOutcome.narrative || `炉火三转，一枚${aiOutcome.pillName}跃然而出。`,
+        product: pill, consumedMaterials: materials, spiritStoneCost, successRate,
+        contentRegistryTrace, contentRegistryWarnings, mainElement: aiOutcome.mainElement,
+      };
+    }
+    // AI 判定失败：炸炉 / 异变 / 废丹，按 AI 叙事产出一枚低阶产物
+    const failEffects = clampAlchemyEffects(aiOutcome.effects || [], 'common');
+    const rawFail: ItemEntry = {
+      id: `item_pil_fail_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      name: (aiOutcome.pillName && aiOutcome.pillName !== '无名丹') ? aiOutcome.pillName : '焦丹',
+      description: aiOutcome.pillDescription || '炉火失衡后凝成的残丹，药力驳杂。',
+      item_type: 'consumable',
+      rarity: 'common',
+      effects: (failEffects.length ? failEffects : [{ target_attribute: 'hp', operation: 'add', value: 5, description: '残丹余性，略复气血' }]) as any,
+      source: '炼丹失手所得',
+    };
+    const registeredFail = registerItem(rawFail, { source: 'alchemy', existingIds: next.inventory.map(item => item.id) });
+    contentRegistryTrace.push(...registeredFail.trace);
+    contentRegistryWarnings.push(...registeredFail.warnings);
+    const failPill = registeredFail.content || rawFail;
+    next = addItems(next, [failPill]);
+    next = normalizeCultivationState(next);
+    const failNarr = aiOutcome.narrative || `炉中火候骤乱，${materials.map(m => m.name).join('、')}的药性未能相融。`;
+    return {
+      state: next, ok: true, success: false,
+      narrative: aiOutcome.accident ? `${failNarr}（${aiOutcome.accident}）` : failNarr,
+      product: failPill, consumedMaterials: materials, spiritStoneCost, successRate,
+      contentRegistryTrace, contentRegistryWarnings, mainElement: 'waste',
+    };
+  }
 
   const roll = Math.random() * 100;
   const success = roll < successRate;
@@ -1583,6 +1661,34 @@ export function alchemy(
     contentRegistryWarnings,
     mainElement,
   };
+}
+
+// 炼丹前置参考：在不消耗材料的前提下，预算成功率 / 建议品阶 / 主导元素，供 AI 参考
+export function computeAlchemyHints(
+  state: CharacterState,
+  materialIds: string[],
+  spiritStoneCost: number,
+): { ok: boolean; error?: string; materials?: ItemEntry[]; baseSuccessRate?: number; suggestedRarity?: string; dominantElement?: string } {
+  const uniq = Array.from(new Set(materialIds));
+  if (uniq.length < 2 || uniq.length > 3) return { ok: false, error: '须选 2-3 味材料入炉' };
+  const materials: ItemEntry[] = [];
+  for (const id of uniq) {
+    const m = state.inventory.find(it => it.id === id);
+    if (!m) return { ok: false, error: '材料不在储物中' };
+    materials.push(m);
+  }
+  const comprehensionBonus = state.comprehension * 0.4;
+  const rootBonus = (state.rootMultiplier || 0) * 5;
+  const avgRarityIdx = materials.reduce((s, m) => s + Math.max(0, rarityIndex(m.rarity)), 0) / materials.length;
+  const harmony = computeAlchemyHarmony(materials);
+  const rarityBonus = avgRarityIdx * 8;
+  const costBonus = Math.min(12, Math.max(0, spiritStoneCost - 10) * 0.6);
+  const countPenalty = (materials.length - 2) * 5;
+  let rate = 30 + comprehensionBonus + rootBonus + rarityBonus + harmony.successBonus + costBonus - countPenalty;
+  rate = Math.max(10, Math.min(95, rate));
+  const suggestedIdx = Math.max(0, Math.min(RARITY_ORDER.length - 1, Math.round(avgRarityIdx) + harmony.rarityBoost));
+  const dom = Object.entries(harmony.elementScores).sort((a, b) => b[1] - a[1])[0]?.[0] || 'none';
+  return { ok: true, materials, baseSuccessRate: rate, suggestedRarity: RARITY_ORDER[suggestedIdx], dominantElement: dom };
 }
 
 // ==================== 突破处理 ====================

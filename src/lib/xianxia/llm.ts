@@ -26,7 +26,7 @@ import {
   CombatRound,
   CombatRoundProposal,
   CombatSession,
-  EventBlueprint, getRealmInfo} from './types';
+  EventBlueprint, AlchemyAIOutcome, getRealmInfo} from './types';
 import { ensureUniqueIds, filterMeaningfulStatuses } from './engine';
 import { deriveWorldFactStateProfile } from './event-scheduler';
 
@@ -1424,6 +1424,93 @@ ${item.equipNote ? '装备位置：' + item.equipNote : ''}
       narrative: `${actionZh}了${item.name}。`,
       cultivationInsight: curInsight,
     };
+  }
+}
+
+// ==================== 炼丹 AI 产出 ====================
+
+export async function generateAlchemyOutcome(
+  ctx: EngineStateContext,
+  materials: ItemEntry[],
+  hints: { baseSuccessRate: number; suggestedRarity: string; dominantElement: string; spiritStoneCost: number },
+): Promise<AlchemyAIOutcome | null> {
+  const sc = ctx.character;
+  const matList = materials.map(m => {
+    const eff = (m.effects || []).map(e => `${e.operation === 'multiply' ? '×' : '+'}${e.value} ${e.target_attribute}`).join('，') || '无显效';
+    return `${m.name}（${m.rarity}/${m.item_type}）：${m.description || ''}｜药性：${eff}`;
+  }).join('\n');
+
+  const system = `${IDENTITY_PROMPT}
+
+【当前场景：开炉炼丹】
+玩家投入数味材料与灵石开炉炼丹。你扮演天道，依据【材料药性·相性·品阶】【角色丹道造诣（悟性/灵根/境界）】【世界因果】判定这一炉的结果。
+
+判断要点：
+- 成丹与否由材料相性与火候掌控（悟性/境界/灵根契合）共同决定；引擎给出的成功率仅供参考，可结合因果上调或下调。
+- 材料药性相冲、品阶悬殊或造诣不足时，更易炸炉、出废丹或产生异变（丹成带毒、药力暴走反噬等）。
+- 成丹时丹名须自拟，禁止照搬材料名；丹效方向应与投入材料药性自洽（疗伤材料→偏回血，灵气/修为材料→偏增修为，攻伐材料→偏攻），并贴合产出品阶。
+- 失败时也要给出一枚产物（焦丹/异丹/毒丹等）及对应的少量或负面效果。
+
+严格 JSON 输出，不要任何解释性文字。`;
+
+  const user = `【炼丹者】
+${sc.name}，${sc.age}岁，${sc.realmName}${sc.realmMaxLevel > 0 ? `（${sc.realmLevel + 1}层）` : ''}
+灵根：${sc.rootDetail || sc.spiritualRoot}｜悟性：${sc.comprehension}
+所在：${sc.location}｜宗门：${sc.faction || '散修'}
+
+【入炉材料】
+${matList}
+灵石投入：${hints.spiritStoneCost}
+
+【引擎参考（仅供参考，可调整）】
+基准成功率：${Math.round(hints.baseSuccessRate)}%
+建议品阶档位：${hints.suggestedRarity}（可上下浮动一档，需因果支撑）
+主导元素倾向：${hints.dominantElement}
+
+请生成 JSON：
+{
+  "success": true 或 false,
+  "pillName": "自拟丹名（2-6字，勿照搬材料名）",
+  "pillDescription": "丹药说明（20-60字，沉浸式修仙口吻）",
+  "rarity": "common|uncommon|rare|epic|legendary|mythic 之一",
+  "mainElement": "fire|water|wood|metal|earth|none 之一",
+  "effects": [{ "target_attribute": "属性名", "operation": "add 或 multiply", "value": 数字, "description": "效果说明" }],
+  "narrative": "开炉过程叙事（40-100字，修仙口吻，体现成败与火候）",
+  "accident": "可选：若炸炉/异变/反噬，简述意外；正常成丹可省略"
+}
+
+可用属性：attack, defense, speed, luck, comprehension, hp, maxHp, mp, maxMp, cultivationExp
+- add 直接加数值；multiply 用于 cultivationExp 等倍率（取值 1.05~3.5）
+- 效果 1-2 条即可；数值会被引擎按品阶上限校正，不必追求极大
+- 严禁 JSON 转义问题：文本内不得出现裸双引号、裸换行符`;
+
+  try {
+    const content = await callLLMText(system, user);
+    const raw = parseJSON(content);
+    if (!raw || typeof raw !== 'object') return null;
+    const rarities = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+    const elements = ['fire', 'water', 'wood', 'metal', 'earth', 'none'];
+    const effects = Array.isArray(raw.effects)
+      ? raw.effects.filter((e: any) => e && e.target_attribute).map((e: any) => ({
+          target_attribute: String(e.target_attribute),
+          operation: e.operation === 'multiply' ? 'multiply' : 'add',
+          value: Number(e.value) || 0,
+          description: String(e.description || ''),
+        }))
+      : [];
+    return {
+      success: !!raw.success,
+      pillName: (String(raw.pillName || '').trim().slice(0, 12)) || '无名丹',
+      pillDescription: String(raw.pillDescription || '').slice(0, 200),
+      rarity: rarities.includes(raw.rarity) ? raw.rarity : 'common',
+      mainElement: elements.includes(raw.mainElement) ? raw.mainElement : 'none',
+      effects: effects as any,
+      narrative: String(raw.narrative || '').slice(0, 300),
+      accident: raw.accident ? String(raw.accident).slice(0, 200) : undefined,
+    } as AlchemyAIOutcome;
+  } catch (err: any) {
+    console.error('generateAlchemyOutcome failed:', err?.message || err);
+    return null;
   }
 }
 

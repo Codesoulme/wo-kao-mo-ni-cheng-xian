@@ -321,6 +321,20 @@ export interface ItemEntry {
   equipNote?: string;
 }
 
+// ==================== 炼丹 AI 产出（AI 主路径，引擎校验落库） ====================
+// AI 根据材料药性、相性、角色丹道造诣与世界因果产出炼丹结果；
+// 引擎只做材料/灵石校验、稀有度与数值 clamp、registerItem 落库，不再写死成功率与丹效公式。
+export interface AlchemyAIOutcome {
+  success: boolean;                  // 是否成丹（false=炸炉/异变/废丹）
+  pillName: string;                  // 自拟丹名（禁止照搬材料名）
+  pillDescription: string;           // 丹药说明（沉浸式）
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  mainElement: 'fire' | 'water' | 'wood' | 'metal' | 'earth' | 'none';
+  effects: StatusEffect[];           // 丹药效果（引擎按品阶 clamp 数值、过滤非法属性）
+  narrative: string;                 // 开炉叙事
+  accident?: string;                 // 可选：炸炉/异变/反噬说明
+}
+
 // ==================== 事件蓝图系统 (Task 20 - 解决事件单一化) ====================
 
 // 事件主题分类——每岁由引擎从蓝图池中按权重抽取一个主题，AI 必须围绕此主题生成事件

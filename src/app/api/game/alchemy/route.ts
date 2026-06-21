@@ -4,7 +4,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, alchemy, recordActionCausality, stateToResponse } from '@/lib/xianxia/engine';
+import { dbToState, alchemy, computeAlchemyHints, buildStateContext, recordActionCausality, stateToResponse } from '@/lib/xianxia/engine';
+import { generateAlchemyOutcome } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 
@@ -35,7 +36,27 @@ export async function POST(req: NextRequest) {
     const stateBeforeAlchemy = { ...state, inventory: [...state.inventory], equipped: [...(state.equipped || [])] };
 
     const cost = typeof spiritStoneCost === 'number' && spiritStoneCost > 0 ? spiritStoneCost : 10;
-    const result = alchemy(state, materialIds, cost);
+
+    // AI 主路径：先让 AI 按材料/丹道造诣/因果产出炼丹结果，引擎再校验落库；AI 失败则回退引擎公式
+    let aiOutcome = null as Awaited<ReturnType<typeof generateAlchemyOutcome>> | null;
+    const hints = computeAlchemyHints(state, materialIds, cost);
+    if (hints.ok && hints.materials) {
+      try {
+        const recentDb = await db.eventLog.findMany({ where: { characterId }, orderBy: { age: 'desc' }, take: 3 });
+        const recent = recentDb.reverse().map(e => ({ age: e.age, title: e.title, narrative: e.narrative }));
+        const ctx = buildStateContext(state, recent);
+        aiOutcome = await generateAlchemyOutcome(ctx, hints.materials, {
+          baseSuccessRate: hints.baseSuccessRate!,
+          suggestedRarity: hints.suggestedRarity!,
+          dominantElement: hints.dominantElement!,
+          spiritStoneCost: cost,
+        });
+      } catch (err: any) {
+        console.error('alchemy AI outcome failed, fallback to formula:', err?.message || err);
+      }
+    }
+
+    const result = alchemy(state, materialIds, cost, aiOutcome || undefined);
 
     if (!result.ok) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });
