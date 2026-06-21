@@ -102,14 +102,22 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
   );
 }
 
+function safeTimeLabelPart(value?: string) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return /\u6267\u884c\u7ea6\u5b9a|\u524d\u5f80|\u8ffd\u67e5|\u8ffd\u5bfb|\u63a2\u5165|\u5165\u5e02|\u8d74\u7ea6/.test(text) ? '' : text;
+}
+
 function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
   const worldLabel = event.worldTime?.label;
-  const segmentLabel = event.timeAdvance?.label;
-  const agePrefix = ageMeta.isContinuation ? '' : `${event.age}?`;
-  if (worldLabel && segmentLabel) return agePrefix ? `${agePrefix} ? ${segmentLabel}?${worldLabel}?` : `${segmentLabel}?${worldLabel}?`;
-  if (worldLabel) return agePrefix ? `${agePrefix}?${worldLabel}?` : `?${worldLabel}?`;
-  if (segmentLabel) return agePrefix ? `${agePrefix} ? ${segmentLabel}` : segmentLabel;
-  return agePrefix || '';
+  const segmentLabel = safeTimeLabelPart(event.timeAdvance?.label);
+  const ageText = ageMeta.isContinuation ? '' : `${event.age}\u5c81`;
+  const open = '\u3010';
+  const close = '\u3011';
+  if (worldLabel && segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}${open}${worldLabel}${close}` : `${segmentLabel}${open}${worldLabel}${close}`;
+  if (worldLabel) return ageText ? `${ageText}${open}${worldLabel}${close}` : `${open}${worldLabel}${close}`;
+  if (segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}` : segmentLabel;
+  return ageText || '';
 }
 
 export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true }: EventTimelineProps) {

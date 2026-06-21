@@ -5193,7 +5193,7 @@ function sanitizeThreadContinuationNarrative(text: string, fallback: string): st
   }
   cleaned = cleaned
     .replace(/[\s\u3000]+/g, ' ')
-    .replace(/^[,?;??\s]+/, '')
+    .replace(/^[\u002c\uff0c\u003b\uff1b\u3002\s]+/, '')
     .replace(/[\u002c\uff0c\u003b\uff1b]\s*[\u3002\uff01\uff1f]/g, '\u3002')
     .trim();
   return cleaned || fallback;
@@ -5202,24 +5202,29 @@ function sanitizeThreadContinuationNarrative(text: string, fallback: string): st
 export function buildThreadContinuationEvent(state: CharacterState, thread: PendingThread): any {
   const threadText = `${thread.title} ${thread.description} ${thread.followUpHint || ''}`;
   const realmName = inferStoryRealmName(threadText);
-  const isRealm = thread.category === 'exploration' || !!realmName || /\u79d8\u5883|\u6d6e\u9601|\u6d1e\u5e9c|\u9057\u8ff9|\u7981\u5730|\u7981\u5236|\u7834\u7981/.test(`${thread.title}${thread.description}`);
-  const isCompetition = thread.category === 'competition' || /\u6bd4\u8bd5|\u8003\u6838|\u5165\u95e8|\u4ed9\u95e8|\u64c2\u53f0/.test(`${thread.title}${thread.description}`);
-  const isPromise = thread.category === 'promise' || /\u7ea6|\u8bfa|\u627f\u8bfa|\u8fd8\u613f|\u8d74\u7ea6/.test(threadText);
-  const title = isRealm
-    ? (realmName || thread.title)
-    : isCompetition
-      ? `\u7ea6\u671f\u5df2\u81f3\u00b7${thread.title}`
-      : isPromise
-        ? `\u8d74\u7ea6\u00b7${thread.title}`
-        : thread.title;
+  const isVeryYoung = Number(state.age ?? 0) < 7;
+  const isRealm = !isVeryYoung && (thread.category === 'exploration' || !!realmName || /\u79d8\u5883|\u6d6e\u9601|\u6d1e\u5e9c|\u9057\u8ff9|\u7981\u5730|\u7981\u5236|\u7834\u7981/.test(`${thread.title}${thread.description}`));
+  const isCompetition = !isVeryYoung && (thread.category === 'competition' || /\u6bd4\u8bd5|\u8003\u6838|\u5165\u95e8|\u4ed9\u95e8|\u64c2\u53f0/.test(`${thread.title}${thread.description}`));
+  const isPromise = !isVeryYoung && (thread.category === 'promise' || /\u7ea6|\u8bfa|\u627f\u8bfa|\u8fd8\u613f|\u8d74\u7ea6/.test(threadText));
+  const title = isVeryYoung
+    ? thread.title
+    : isRealm
+      ? (realmName || thread.title)
+      : isCompetition
+        ? `\u7ea6\u671f\u5df2\u81f3\u00b7${thread.title}`
+        : isPromise
+          ? `\u8d74\u7ea6\u00b7${thread.title}`
+          : thread.title;
 
-  const fallbackNarrative = isRealm
-    ? `${state.name}\u4f9d\u7167\u624b\u4e2d\u4fe1\u7269\u4e0e\u5730\u52bf\u53d8\u5316\u91cd\u65b0\u8fa8\u8ba4\u95e8\u6237\u3002\u96fe\u6c14\u5f00\u5408\u4e4b\u95f4\uff0c\u65e7\u65e5\u6240\u89c1\u7ec8\u4e8e\u6709\u4e86\u53ef\u843d\u811a\u7684\u65b9\u4f4d\uff1b\u82e5\u8981\u518d\u8fdb\u4e00\u6b65\uff0c\u4ecd\u9700\u8c28\u614e\u8bd5\u63a2\u7981\u5236\u865a\u5b9e\u3002`
-    : isCompetition
-      ? `\u7ea6\u671f\u5df2\u8fd1\uff0c${state.name}\u6574\u5907\u8863\u88c5\u4e0e\u968f\u8eab\u5668\u7269\uff0c\u6309\u65f6\u524d\u53bb\u5e94\u8bd5\u3002\u573a\u4e2d\u4eba\u58f0\u6e10\u8d77\uff0c\u8fd9\u4e00\u573a\u6bd4\u8bd5\u5173\u7cfb\u5230\u80fd\u5426\u63a5\u7eed\u65e9\u5148\u7ed3\u4e0b\u7684\u4ed9\u9014\u673a\u7f18\u3002`
-      : isPromise
-        ? `${state.name}\u8bb0\u8d77\u65e9\u5148\u8bb8\u4e0b\u7684\u7ea6\u5b9a\uff0c\u6574\u7406\u884c\u88c5\u524d\u53bb\u8d74\u7ea6\u3002\u8def\u4e0a\u98ce\u8272\u5982\u5e38\uff0c\u5fc3\u4e2d\u5374\u591a\u4e86\u4e00\u5206\u5fc5\u987b\u4eb2\u81ea\u7ed9\u51fa\u7684\u4ea4\u4ee3\u3002`
-        : `${state.name}\u628a\u8fd9\u6869\u7275\u6302\u6682\u4e14\u6536\u8fdb\u5fc3\u5e95\uff0c\u8f6c\u800c\u4ece\u8eab\u8fb9\u53ef\u505a\u4e4b\u4e8b\u7740\u624b\u3002\u5c71\u98ce\u8fc7\u5904\uff0c\u65e7\u4e8b\u4e0d\u518d\u53ea\u662f\u5ff5\u5934\uff0c\u800c\u6210\u4e86\u5f80\u540e\u884c\u4e8b\u65f6\u5fc5\u987b\u63c2\u91cf\u7684\u4e00\u91cd\u56e0\u679c\u3002`;
+  const fallbackNarrative = isVeryYoung
+    ? `${state.name}\u5e74\u7eaa\u5c1a\u5c0f\uff0c\u5bf9\u201c\u7ea6\u5b9a\u201d\u4e0e\u201c\u524d\u5f80\u201d\u8fd8\u53ea\u662f\u61f5\u61c2\u7684\u559c\u60a6\u3002\u5927\u4eba\u5728\u65c1\u7167\u770b\u65f6\uff0c\u4ed6\u4e0e\u5c0f\u4f19\u4f34\u53c8\u5728\u9662\u8fb9\u73a9\u4e86\u4e00\u9635\uff0c\u628a\u6cb3\u7554\u3001\u87ba\u86f3\u548c\u4ed9\u4eba\u4f20\u95fb\u90fd\u5f53\u4f5c\u660e\u65e5\u7684\u70ed\u95f9\u76fc\u5934\u3002`
+    : isRealm
+      ? `${state.name}\u4f9d\u7167\u624b\u4e2d\u4fe1\u7269\u4e0e\u5730\u52bf\u53d8\u5316\u91cd\u65b0\u8fa8\u8ba4\u95e8\u6237\u3002\u96fe\u6c14\u5f00\u5408\u4e4b\u95f4\uff0c\u65e7\u65e5\u6240\u89c1\u7ec8\u4e8e\u6709\u4e86\u53ef\u843d\u811a\u7684\u65b9\u4f4d\uff1b\u82e5\u8981\u518d\u8fdb\u4e00\u6b65\uff0c\u4ecd\u9700\u8c28\u614e\u8bd5\u63a2\u7981\u5236\u865a\u5b9e\u3002`
+      : isCompetition
+        ? `\u7ea6\u671f\u5df2\u8fd1\uff0c${state.name}\u6574\u5907\u8863\u88c5\u4e0e\u968f\u8eab\u5668\u7269\uff0c\u6309\u65f6\u524d\u53bb\u5e94\u8bd5\u3002\u573a\u4e2d\u4eba\u58f0\u6e10\u8d77\uff0c\u8fd9\u4e00\u573a\u6bd4\u8bd5\u5173\u7cfb\u5230\u80fd\u5426\u63a5\u7eed\u65e9\u5148\u7ed3\u4e0b\u7684\u4ed9\u9014\u673a\u7f18\u3002`
+        : isPromise
+          ? `${state.name}\u8bb0\u8d77\u65e9\u5148\u8bb8\u4e0b\u7684\u7ea6\u5b9a\uff0c\u6574\u7406\u884c\u88c5\u524d\u53bb\u8d74\u7ea6\u3002\u8def\u4e0a\u98ce\u8272\u5982\u5e38\uff0c\u5fc3\u4e2d\u5374\u591a\u4e86\u4e00\u5206\u5fc5\u987b\u4eb2\u81ea\u7ed9\u51fa\u7684\u4ea4\u4ee3\u3002`
+          : `${state.name}\u628a\u8fd9\u6869\u7275\u6302\u6682\u4e14\u6536\u8fdb\u5fc3\u5e95\uff0c\u8f6c\u800c\u4ece\u8eab\u8fb9\u53ef\u505a\u4e4b\u4e8b\u7740\u624b\u3002\u5c71\u98ce\u8fc7\u5904\uff0c\u65e7\u4e8b\u4e0d\u518d\u53ea\u662f\u5ff5\u5934\uff0c\u800c\u6210\u4e86\u5f80\u540e\u884c\u4e8b\u65f6\u5fc5\u987b\u63c2\u91cf\u7684\u4e00\u91cd\u56e0\u679c\u3002`;
 
   const narrative = sanitizeThreadContinuationNarrative(fallbackNarrative, fallbackNarrative);
   return {
