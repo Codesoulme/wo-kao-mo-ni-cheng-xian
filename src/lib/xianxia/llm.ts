@@ -544,7 +544,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
   "breakthroughTargetRealm": null,
   "breakthroughTargetLevel": null,
   "realmProfilePatch": null,
-  "extraEvents": [{"title":"??????","narrative":"????","eventType":"normal","timeAdvance":{"amount":3,"unit":"month","label":"???","reason":"????","ageDeltaYears":0,"elapsedDays":90},"actionProjections":[]}],
+  "extraEvents": [{"title":"\u540c\u5c81\u7eed\u7f18","narrative":"\u4e09\u6708\u4e4b\u540e\uff0c\u524d\u4e8b\u81ea\u7136\u56de\u54cd\u3002","eventType":"normal","timeAdvance":{"amount":3,"unit":"month","label":"\u4e09\u6708\u540e","reason":"\u627f\u63a5\u540c\u5e74\u56e0\u7f18","ageDeltaYears":0,"elapsedDays":90},"actionProjections":[]}],
   "causedDeath": false,
   "causedAscension": false,
   "newNpcs": [],
