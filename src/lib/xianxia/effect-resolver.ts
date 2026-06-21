@@ -23,6 +23,14 @@ function normalizeDelta(value: unknown): number {
   return Math.round(n);
 }
 
+const ELEMENT_ATTR_TO_KEY: Record<string, 'metal' | 'wood' | 'water' | 'fire' | 'earth'> = {
+  elementMetal: 'metal',
+  elementWood: 'wood',
+  elementWater: 'water',
+  elementFire: 'fire',
+  elementEarth: 'earth',
+};
+
 export function resolveAttributeChanges(
   state: CharacterState,
   changes: AttributeChange[],
@@ -50,7 +58,10 @@ export function resolveAttributeChanges(
       continue;
     }
 
-    const before = Number((next as any)[attr] ?? 0);
+    const elementKey = ELEMENT_ATTR_TO_KEY[attr];
+    const before = elementKey
+      ? Number(next.elements?.[elementKey] ?? 0)
+      : Number((next as any)[attr] ?? 0);
     let delta = normalizeDelta(raw.delta);
     if (attr === 'cultivationExp' && options.applyCultivationMultiplier !== false && next.cultivationMultiplier > 0 && delta > 0) {
       const scaled = Math.round(delta * next.cultivationMultiplier);
@@ -81,7 +92,11 @@ export function resolveAttributeChanges(
       });
     }
 
-    (next as any)[attr] = after;
+    if (elementKey) {
+      next.elements = { ...(next.elements || { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 }), [elementKey]: after };
+    } else {
+      (next as any)[attr] = after;
+    }
     const applied = { attribute: attr, delta, reason: raw.reason || source };
     appliedChanges.push(applied);
     trace.push({
