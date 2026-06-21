@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, deriveCultivationAttributes } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
@@ -837,6 +837,51 @@ function smokeCombatArtFallbackNames(): void {
   log('combat-art-fallback-names', { passed: true, names: names.join('|') });
 }
 
+
+function smokeCombatTechniqueSpellSplit(): void {
+  const rawState: any = {
+    spiritualRoot: 'common', realm: 'qi_refining', realmLevel: 2, comprehension: 60,
+    elements: { metal: 35, wood: 35, water: 35, fire: 35, earth: 35 },
+    activeStatuses: [], inventory: [],
+    equipped: [
+      { id: 'scripture_cloud', name: '\u4e91\u6c34\u517b\u6c14\u8bc0', description: '\u4e91\u6c34\u884c\u6c14\u6cd5\u95e8\u3002', item_type: 'scripture', rarity: 'uncommon', effects: [] },
+      { id: 'artifact_pearl', name: '\u6f6e\u7eb9\u62a4\u73e0', description: '\u6c34\u8272\u62a4\u8eab\u6cd5\u73e0\u3002', item_type: 'artifact', rarity: 'rare', effects: [], technique: { kind: 'artifact', artifactAbilities: [{ name: '\u6f6e\u606f\u6c34\u5e55', description: '\u6cd5\u73e0\u6d8c\u51fa\u6c34\u5e55\u62a4\u4f53\u3002', trigger: 'auto', element: 'water', power: 1.4 }] } },
+    ],
+  };
+  const state: any = normalizeCultivationState(rawState);
+  const session: any = {
+    id: 'combat_split', enemies: [{ name: '\u8bd5\u5251\u5080\u5121', hp: 80, maxHp: 80, attack: 10, defense: 4, speed: 5 }], currentEnemyIdx: 0, round: 1, log: [], status: 'ongoing', startAge: 20,
+    playerHp: 100, playerMaxHp: 100, playerMp: 80, playerMaxMp: 80, playerAttack: 18, playerDefense: 10, playerSpeed: 8,
+    playerSkills: buildLearnedCombatArts(state), playerItems: [],
+  };
+  const palette = buildCombatActionPalette(state, session);
+  assert(palette.technique?.label === '\u529f\u6cd5', 'combat palette should expose a separate technique group');
+  assert(palette.technique.options.some((option: any) => option.itemId === 'scripture_cloud'), 'scripture-derived combat art should appear under technique');
+  assert(!palette.spell.options.some((option: any) => option.itemId === 'scripture_cloud'), 'scripture-derived technique should not be mixed into spell group');
+  assert(palette.spell.options.some((option: any) => option.itemId === 'artifact_pearl' && option.source === 'artifact'), 'artifact innate ability should remain available as spell-like artifact art');
+  log('combat-technique-spell-split', { passed: true, technique: palette.technique.options.map((o: any) => o.name).join('|'), spell: palette.spell.options.map((o: any) => o.name).join('|') });
+}
+
+function smokeEnemyLootArtifactNaming(): void {
+  const state: any = normalizeCultivationState({
+    spiritualRoot: 'common', realm: 'qi_refining', realmLevel: 3, comprehension: 50,
+    elements: { metal: 30, wood: 30, water: 30, fire: 30, earth: 30 },
+    activeStatuses: [], equipped: [], inventory: [],
+  } as any);
+  const session: any = {
+    id: 'loot_names', status: 'victory', currentEnemyIdx: 0, round: 3, log: [], startAge: 20,
+    playerHp: 80, playerMaxHp: 100, playerMp: 40, playerMaxMp: 60, playerAttack: 20, playerDefense: 8, playerSpeed: 8,
+    enemies: [{ name: '\u6f6e\u6c50\u52ab\u4fee', description: '\u64c5\u4f7f\u6c34\u6cd5\u7684\u52ab\u4fee', hp: 0, maxHp: 90, attack: 18, defense: 8, speed: 8, realm: 'qi_refining' }],
+  };
+  const spoils = buildCombatVictorySpoils(state, session);
+  const artifact: any = spoils.items.find((item: any) => item.item_type === 'artifact' && item.name.includes('\u62a4'));
+  assert(!!artifact, 'victory spoils should include a carried artifact from cultivator enemies');
+  assert(artifact.name !== '\u593a\u6765\u7684\u62a4\u8eab\u6cd5\u5668', 'enemy carried artifact should not use the old generic fixed name');
+  assert(String(artifact.description || '').includes('\u5185\u85cf\u7075\u7981'), 'artifact description should expose innate ability in-world');
+  assert(artifact.technique?.artifactAbilities?.length, 'loot artifact should carry innate artifact ability metadata');
+  log('enemy-loot-artifact-naming', { passed: true, name: artifact.name, ability: artifact.technique.artifactAbilities[0].name });
+}
+
 function smokeAiDrivenCombatActionPalette(): void {
   const state: any = {
     id: 'c-palette',
@@ -894,6 +939,8 @@ async function main(): Promise<void> {
   smokeCombatSettlementSingleFlow();
   smokeDynamicCultivationAttributes();
   smokeCombatArtFallbackNames();
+  smokeCombatTechniqueSpellSplit();
+  smokeEnemyLootArtifactNaming();
   smokeAiDrivenCombatActionPalette();
   smokeTechniqueSpellNaming();
   smokeWorldEventConsequences();

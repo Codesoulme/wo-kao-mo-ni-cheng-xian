@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Swords, Heart, Sparkles, Shield, Footprints, ChevronDown, FlaskConical, Loader2, Zap,
+  Swords, Heart, Sparkles, Shield, Footprints, ChevronDown, FlaskConical, Loader2, Zap, BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -275,22 +275,35 @@ export function CombatModal() {
     return { ...sk, name: replacement.name || item?.name || sk?.name, description: replacement.description || item?.description || sk?.description };
   };
 
+  const combatArtDisplayKind = (sk: any): 'technique' | 'spell' | 'artifact' => {
+    if (sk?.sourceType === 'artifact') return 'artifact';
+    const item = sourceItems.find((it: any) => it.id && it.id === sk?.itemId);
+    if (item?.item_type === 'artifact') return 'artifact';
+    if (item?.item_type === 'scripture') return 'technique';
+    return 'spell';
+  };
+
   const makeFallbackCombatPalette = () => {
     if (!session) return null;
-    const skillOptions = (session.playerSkills || []).slice(0, 8).map((rawSkill: any, idx: number) => {
+    const techniqueOptions: any[] = [];
+    const spellOptions: any[] = [];
+    (session.playerSkills || []).slice(0, 8).forEach((rawSkill: any, idx: number) => {
       const sk = repairSkillForDisplay(rawSkill, idx);
-      return {
-      id: 'skill-' + idx,
-      name: sk.name || '\u672a\u540d\u672f',
-      description: sk.description || '\u8c03\u52a8\u5df2\u4f1a\u672f\u6cd5\u5e94\u6218\u3002',
-      actionType: 'spell',
-      source: sk.sourceType === 'artifact' ? 'artifact' : 'spell',
-      enabled: session.playerMp >= (sk.mpCost || 0),
-      disabledReason: session.playerMp < (sk.mpCost || 0) ? '\u7075\u529b\u4e0d\u8db3\u3002' : undefined,
-      skillIdx: idx,
-      itemId: sk.itemId,
-      mpCost: sk.mpCost || 0,
-    };
+      const kind = combatArtDisplayKind(sk);
+      const option = {
+        id: 'skill-' + idx,
+        name: sk.name || '\u672a\u540d\u672f',
+        description: sk.description || (kind === 'technique' ? '\u501f\u529f\u6cd5\u884c\u6c14\u8def\u6570\u5e94\u6218\u3002' : '\u8c03\u52a8\u5df2\u4f1a\u672f\u6cd5\u5e94\u6218\u3002'),
+        actionType: kind === 'technique' ? 'technique' : 'spell',
+        source: kind === 'artifact' ? 'artifact' : kind,
+        enabled: session.playerMp >= (sk.mpCost || 0),
+        disabledReason: session.playerMp < (sk.mpCost || 0) ? '\u7075\u529b\u4e0d\u8db3\u3002' : undefined,
+        skillIdx: idx,
+        itemId: sk.itemId,
+        mpCost: sk.mpCost || 0,
+      };
+      if (kind === 'technique') techniqueOptions.push(option);
+      else spellOptions.push(option);
     });
     const itemOptions = (session.playerItems || []).map((it: any) => ({
       id: 'item-' + it.itemId,
@@ -315,7 +328,8 @@ export function CombatModal() {
     ];
     return {
       basicAttack: { enabled: basicOptions.some((o: any) => o.enabled), label: '\u653b\u4f10', options: basicOptions },
-      spell: { enabled: skillOptions.some((o: any) => o.enabled), label: '\u6cd5\u672f', disabledReason: skillOptions.length ? '\u7075\u529b\u4e0d\u8db3\u3002' : '\u6682\u65e0\u53ef\u7528\u672f\u6cd5\u3002', options: skillOptions },
+      technique: { enabled: techniqueOptions.some((o: any) => o.enabled), label: '\u529f\u6cd5', disabledReason: techniqueOptions.length ? '\u7075\u529b\u4e0d\u8db3\u3002' : '\u6682\u65e0\u53ef\u7528\u529f\u6cd5\u3002', options: techniqueOptions },
+      spell: { enabled: spellOptions.some((o: any) => o.enabled), label: '\u6cd5\u672f', disabledReason: spellOptions.length ? '\u7075\u529b\u4e0d\u8db3\u3002' : '\u6682\u65e0\u53ef\u7528\u6cd5\u672f\u3002', options: spellOptions },
       defense: { enabled: defenseOptions.some((o: any) => o.enabled), label: '\u5b88\u5fa1', options: defenseOptions },
       item: { enabled: itemOptions.some((o: any) => o.enabled), label: '\u7269\u7528', disabledReason: itemOptions.length ? '\u6b64\u523b\u96be\u4ee5\u53d6\u7528\u3002' : '\u6682\u65e0\u53ef\u7528\u4e4b\u7269\u3002', options: itemOptions },
       other: { enabled: otherOptions.some((o: any) => o.enabled), label: '\u5e94\u53d8', options: otherOptions },
@@ -328,7 +342,7 @@ export function CombatModal() {
     const storedGroup = storedPalette?.[key];
     const fallbackGroup = fallbackPalette?.[key];
     const storedOptions = storedGroup?.options || [];
-    const repairedStoredOptions = key === 'spell'
+    const repairedStoredOptions = (key === 'spell' || key === 'technique')
       ? storedOptions.map((option: any) => {
           const idx = typeof option?.skillIdx === 'number'
             ? option.skillIdx
@@ -344,12 +358,13 @@ export function CombatModal() {
     if (!storedGroup || !repairedStoredOptions.length || !hasUsableStoredOption) {
       return fallbackGroup || storedGroup || { enabled: false, label: key, options: [] };
     }
-    return key === 'spell' ? { ...storedGroup, options: repairedStoredOptions } : storedGroup;
+    return (key === 'spell' || key === 'technique') ? { ...storedGroup, options: repairedStoredOptions } : storedGroup;
   };
   const palette: any = {
     ...(fallbackPalette || {}),
     ...(storedPalette || {}),
     basicAttack: mergePaletteGroup('basicAttack'),
+    technique: mergePaletteGroup('technique'),
     spell: mergePaletteGroup('spell'),
     defense: mergePaletteGroup('defense'),
     item: mergePaletteGroup('item'),
@@ -357,7 +372,7 @@ export function CombatModal() {
   };
   const groupOf = (key: string, fallbackLabel: string) => palette?.[key] || { enabled: false, label: fallbackLabel, options: [] };
   const actionFromOption = (option: any): CombatAction => {
-    if (option?.actionType === 'spell') return 'skill';
+    if (option?.actionType === 'spell' || option?.actionType === 'technique') return 'skill';
     if (option?.actionType === 'item') return 'item';
     if (option?.actionType === 'talisman') return 'talisman';
     if (option?.actionType === 'defense') return 'defend';
@@ -649,9 +664,10 @@ export function CombatModal() {
         {/* 底部：行动按钮区（仅 ongoing 且未结束展示时显示） */}
         {isOngoing && battleStarted && !endResult && (
           <div className="relative shrink-0 border-t border-border/40 bg-card/40 p-2">
-            <div className="grid grid-cols-6 gap-1">
+            <div className="grid grid-cols-7 gap-1">
               <PaletteButton paletteKey="basicAttack" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('basicAttack', '\u653b\u4f10')} icon={<Swords className="w-3.5 h-3.5" />} tone="primary" busy={busy} onPick={runPaletteOption} />
-              <PaletteButton paletteKey="spell" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('spell', '\u6cd5\u672f')} icon={<Sparkles className="w-3.5 h-3.5" />} tone="gold" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton paletteKey="technique" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('technique', '\u529f\u6cd5')} icon={<BookOpen className="w-3.5 h-3.5" />} tone="gold" busy={busy} onPick={runPaletteOption} />
+              <PaletteButton paletteKey="spell" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('spell', '\u6cd5\u672f')} icon={<Sparkles className="w-3.5 h-3.5" />} tone="blue" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="defense" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('defense', '\u5b88\u5fa1')} icon={<Shield className="w-3.5 h-3.5" />} tone="neutral" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="item" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('item', '\u7269\u7528')} icon={<FlaskConical className="w-3.5 h-3.5" />} tone="green" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="other" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('other', '\u5e94\u53d8')} icon={<Zap className="w-3.5 h-3.5" />} tone="purple" busy={busy} onPick={runPaletteOption} />
@@ -695,13 +711,14 @@ export function CombatModal() {
 
 // 紧凑行动按钮组件
 
-function PaletteButton({ paletteKey, openPalette, setOpenPalette, group, icon, tone, busy, onPick }: { paletteKey: string; openPalette: string | null; setOpenPalette: (key: string | null) => void; group: any; icon: React.ReactNode; tone: 'primary' | 'gold' | 'neutral' | 'green' | 'purple'; busy?: boolean; onPick: (option: any) => void }) {
+function PaletteButton({ paletteKey, openPalette, setOpenPalette, group, icon, tone, busy, onPick }: { paletteKey: string; openPalette: string | null; setOpenPalette: (key: string | null) => void; group: any; icon: React.ReactNode; tone: 'primary' | 'gold' | 'blue' | 'neutral' | 'green' | 'purple'; busy?: boolean; onPick: (option: any) => void }) {
   const options = group?.options || [];
   const enabledOptions = options.filter((o: any) => o.enabled);
   const disabled = busy || !group?.enabled || enabledOptions.length === 0;
   const toneClasses: Record<string, string> = {
     primary: 'border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary/60 text-primary',
     gold: 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/60 text-amber-700 dark:text-amber-400',
+    blue: 'border-sky-500/40 bg-sky-500/5 hover:bg-sky-500/10 hover:border-sky-500/60 text-sky-700 dark:text-sky-400',
     neutral: 'border-amber-500/40 bg-amber-500/5 hover:bg-amber-500/10 hover:border-amber-500/60 text-amber-700 dark:text-amber-400',
     green: 'border-green-500/40 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500/60 text-green-700 dark:text-green-400',
     purple: 'border-purple-500/40 bg-purple-500/5 hover:bg-purple-500/10 hover:border-purple-500/60 text-purple-700 dark:text-purple-400',

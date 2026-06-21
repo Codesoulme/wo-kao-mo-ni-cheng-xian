@@ -775,6 +775,46 @@ function fallbackTechniqueAbility(item: ItemEntry, source: 'scripture' | 'artifa
   return { name, description, element, trigger };
 }
 
+
+function describeArtifactAbilitiesOnItem(item: ItemEntry): ItemEntry {
+  if (item.item_type !== 'artifact') return item;
+  const profile = item.technique || inferTechniqueProfile(item);
+  const abilities = profile?.artifactAbilities || [];
+  if (!abilities.length) return item;
+  const abilityText = abilities.slice(0, 2)
+    .map(ability => `${ability.name || '\u672a\u540d\u7075\u7981'}\uff1a${ability.description || '\u6b64\u7269\u5185\u85cf\u53ef\u50ac\u53d1\u7684\u7075\u7981\u672f\u5f0f\u3002'}`)
+    .join('\uff1b');
+  const baseDesc = item.description || '\u4e00\u4ef6\u6765\u5386\u672a\u660e\u7684\u6cd5\u5668\u3002';
+  if (baseDesc.includes('\u5185\u85cf\u7075\u7981') || baseDesc.includes('\u81ea\u5e26\u672f\u5f0f')) return { ...item, technique: profile };
+  return { ...item, technique: profile, description: `${baseDesc}\u5185\u85cf\u7075\u7981\uff1a${abilityText}` };
+}
+
+function combatArtKind(art: { sourceType?: string; itemId?: string }, state: CharacterState): 'technique' | 'spell' | 'artifact' {
+  if (art.sourceType === 'artifact') return 'artifact';
+  const item = art.itemId ? (state.equipped || []).find(it => it.id === art.itemId) : undefined;
+  if (item?.item_type === 'artifact') return 'artifact';
+  if (item?.item_type === 'scripture') return 'technique';
+  return 'spell';
+}
+
+function buildSkillCombatOption(sk: NonNullable<CombatSession['playerSkills']>[number], idx: number, kind: 'technique' | 'spell' | 'artifact', session: CombatSession, sealed: boolean): CombatActionOption {
+  return {
+    id: `skill-${idx}`,
+    name: sk.name,
+    description: sk.description || (kind === 'technique' ? '\u501f\u529f\u6cd5\u884c\u6c14\u8def\u6570\u5e94\u6218\u3002' : '\u50ac\u52a8\u5df2\u638c\u63e1\u7684\u672f\u5f0f\u3002'),
+    actionType: kind === 'technique' ? 'technique' : 'spell',
+    source: kind === 'artifact' ? 'artifact' : kind,
+    enabled: !sealed && session.playerMp >= (sk.mpCost || 0),
+    disabledReason: sealed ? '\u7075\u529b\u53d7\u5236\uff0c\u96be\u4ee5\u6210\u5f62\u3002' : session.playerMp < (sk.mpCost || 0) ? '\u6cd5\u529b\u4e0d\u8db3\u3002' : undefined,
+    skillIdx: idx,
+    itemId: sk.itemId,
+    mpCost: sk.mpCost || 0,
+    risk: sk.adaptation != null && sk.adaptation < 0.7 ? '\u9002\u914d\u4e0d\u8db3\uff0c\u53ef\u80fd\u53cd\u566c\u6216\u5a01\u529b\u6298\u635f\u3002' : undefined,
+    requiredItems: sk.itemId ? [sk.itemId] : undefined,
+    tags: [kind],
+  };
+}
+
 function normalizeTechniqueProfile(item: ItemEntry, profile: TechniqueProfile): TechniqueProfile {
   const source = item.item_type === 'artifact' ? 'artifact' : 'scripture';
   const fallback = fallbackTechniqueAbility(item, source);
@@ -993,6 +1033,25 @@ function enemyLootTier(enemy: CombatEnemy, state: CharacterState): number {
   return Math.max(0, Math.min(2, playerRealmIdx));
 }
 
+
+function enemyGearLootProfile(enemy: CombatEnemy, tier: number): { name: string; description: string; itemType: ItemEntry['item_type']; effectTarget: string; ability: ArtifactAbility } {
+  const text = `${enemy.name || ''} ${enemy.description || ''}`;
+  const title = String(enemy.name || '\u654c\u4fee').replace(/^(\u8499\u9762|\u9ed1\u8863|\u90aa\u4fee|\u52ab\u4fee)/u, '').trim() || '\u654c\u4fee';
+  if (/\u5251|\u5251\u4fee/.test(text)) {
+    return { name: `${title}\u9057\u4e0b\u7684\u88c2\u9e23\u5251`, description: `\u4ece${title}\u624b\u4e2d\u593a\u4e0b\u7684\u98de\u5251\uff0c\u5251\u810a\u6709\u65b0\u88c2\uff0c\u4ecd\u80fd\u55e1\u9e23\u4f24\u654c\u3002`, itemType: 'weapon', effectTarget: 'attack', ability: { name: '\u88c2\u9e23\u5251\u6c14', description: '\u50ac\u52a8\u65f6\u5251\u8eab\u53d1\u51fa\u88c2\u9e23\uff0c\u653e\u51fa\u4e00\u9053\u950b\u9510\u5251\u6c14\u3002', trigger: 'active', element: 'metal', power: 1.15 + tier * 0.25 } };
+  }
+  if (/\u9b54|\u90aa|\u8840/.test(text)) {
+    return { name: `${title}\u7684\u8840\u7eb9\u62a4\u7b26`, description: `\u4ece${title}\u8eab\u4e0a\u627e\u5230\u7684\u8840\u7eb9\u6cd5\u5668\uff0c\u51f6\u715e\u672a\u6563\uff0c\u796d\u70bc\u540e\u53ef\u62a4\u4f53\uff0c\u4e5f\u53ef\u80fd\u6270\u52a8\u5fc3\u795e\u3002`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '\u8840\u7eb9\u715e\u5e55', description: '\u6cd5\u5668\u81ea\u884c\u6d6e\u8d77\u8840\u8272\u5149\u5e55\uff0c\u66ff\u4e3b\u4eba\u6321\u4e0b\u4e00\u6ce2\u653b\u52bf\u3002', trigger: 'auto', element: 'fire', power: 1.1 + tier * 0.2 } };
+  }
+  if (/\u6c34|\u6f6e|\u51b0|\u6c5f|\u6cb3/.test(text)) {
+    return { name: `${title}\u7684\u6f6e\u7eb9\u62a4\u73e0`, description: `\u4ece${title}\u9057\u7269\u4e2d\u53d6\u5f97\u7684\u6c34\u8272\u6cd5\u73e0\uff0c\u5185\u91cc\u6709\u6f6e\u58f0\u56de\u54cd\uff0c\u5c1a\u672a\u5728\u6597\u6cd5\u4e2d\u788e\u88c2\u3002`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '\u6f6e\u606f\u6c34\u5e55', description: '\u6cd5\u73e0\u6d8c\u51fa\u4e00\u5c42\u6f6e\u606f\u6c34\u5e55\uff0c\u80fd\u7f13\u53bb\u6765\u88ad\u529b\u9053\u3002', trigger: 'auto', element: 'water', power: 1.1 + tier * 0.2 } };
+  }
+  if (/\u6728|\u85e4|\u82b1|\u8349|\u9752/.test(text)) {
+    return { name: `${title}\u7684\u9752\u85e4\u62a4\u8155`, description: `\u4ece${title}\u8eab\u4fa7\u53d6\u4e0b\u7684\u9752\u85e4\u6cd5\u5668\uff0c\u85e4\u7eb9\u5c1a\u80fd\u968f\u7075\u673a\u8212\u5c55\u3002`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '\u9752\u85e4\u7ed5\u8eab', description: '\u62a4\u8155\u4e2d\u751f\u51fa\u7075\u85e4\u865a\u5f71\uff0c\u7f20\u7ed5\u8eab\u5468\u5206\u62c5\u653b\u52bf\u3002', trigger: 'auto', element: 'wood', power: 1.05 + tier * 0.2 } };
+  }
+  return { name: `${title}\u7684\u6b8b\u5149\u62a4\u7b26`, description: `\u4ece${title}\u8eab\u4e0a\u641c\u5f97\u7684\u62a4\u8eab\u6cd5\u5668\uff0c\u867d\u7ecf\u6597\u6cd5\u9707\u8361\uff0c\u6838\u5fc3\u7075\u7981\u5c1a\u53ef\u91cd\u65b0\u796d\u70bc\u3002`, itemType: 'artifact', effectTarget: 'defense', ability: { name: '\u6b8b\u5149\u62a4\u5e55', description: '\u6cd5\u5668\u4e2d\u6b8b\u5b58\u7684\u7075\u5149\u5c55\u5f00\u6210\u8584\u5e55\uff0c\u66ff\u4e3b\u4eba\u5378\u53bb\u90e8\u5206\u653b\u52bf\u3002', trigger: 'auto', element: 'none', power: 1 + tier * 0.18 } };
+}
+
 function buildEnemyCarriedLoot(enemy: CombatEnemy, state: CharacterState, enemyIndex: number): { items: ItemEntry[]; spiritStones: number } {
   const text = `${enemy.name || ''} ${enemy.description || ''}`;
   const tier = enemyLootTier(enemy, state);
@@ -1000,8 +1059,10 @@ function buildEnemyCarriedLoot(enemy: CombatEnemy, state: CharacterState, enemyI
   const betterRarity = clampRarityIndex(tier);
   const source = `${enemy.name || '敌修'}遗物`;
   const items: ItemEntry[] = [];
-  const addItem = (name: string, description: string, item_type: ItemEntry['item_type'], rarity: ItemRarity, effects: any[], suffix: string) => {
-    items.push({ id: makeLootId(`loot_${enemyIndex}_${suffix}`), name, description, item_type, rarity, effects, source });
+  const addItem = (name: string, description: string, item_type: ItemEntry['item_type'], rarity: ItemRarity, effects: any[], suffix: string, technique?: TechniqueProfile) => {
+    const item: ItemEntry = { id: makeLootId(`loot_${enemyIndex}_${suffix}`), name, description, item_type, rarity, effects, source };
+    if (technique) item.technique = technique;
+    items.push(describeArtifactAbilitiesOnItem(item));
   };
 
   const title = enemy.name || '敌修';
@@ -1017,13 +1078,15 @@ function buildEnemyCarriedLoot(enemy: CombatEnemy, state: CharacterState, enemyI
       [{ target_attribute: 'storageCapacity', operation: 'add', value: Math.max(8, 8 + tier * 10), description: `储物上限+${Math.max(8, 8 + tier * 10)}` }],
       'bag'
     );
+    const gear = enemyGearLootProfile(enemy, tier);
     addItem(
-      /剑|剑修/.test(text) ? '染血飞剑' : /魔|邪|血/.test(text) ? '血纹短刃' : '夺来的护身法器',
-      /魔|邪|血/.test(text) ? '刃上血纹未灭，仍残存几分凶煞灵机。' : '虽经斗法震荡，核心禁制尚未崩坏，可重新祭炼。',
-      /剑|刃|刀/.test(text) ? 'weapon' : 'artifact',
+      gear.name,
+      gear.description,
+      gear.itemType,
       betterRarity,
-      [{ target_attribute: /剑|刃|刀/.test(text) ? 'attack' : 'defense', operation: 'add', value: Math.max(6, 8 + tier * 8), description: /剑|刃|刀/.test(text) ? `攻伐+${Math.max(6, 8 + tier * 8)}` : `护身+${Math.max(6, 8 + tier * 8)}` }],
-      'gear'
+      [{ target_attribute: gear.effectTarget, operation: 'add', value: Math.max(6, 8 + tier * 8), description: gear.effectTarget === 'attack' ? `攻伐+${Math.max(6, 8 + tier * 8)}` : `护身+${Math.max(6, 8 + tier * 8)}` }],
+      'gear',
+      gear.itemType === 'artifact' ? { kind: 'artifact', artifactAbilities: [gear.ability], traits: [{ name: '随身灵禁', description: '此物本属敌修防身所用，夺得后需重新祭炼才能完全驱使。' }] } : undefined
     );
     addItem(
       tier >= 2 ? '回元丹' : '疗伤散',
@@ -1803,7 +1866,11 @@ function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
   }
 
   const base = { ...it, item_type: itemType as any, effects };
-  if ((itemType === 'scripture' || itemType === 'artifact') && !base.technique) {
+  if (itemType === 'artifact') {
+    const withTechnique = base.technique ? base : { ...base, technique: inferTechniqueProfile(base) };
+    return describeArtifactAbilitiesOnItem(withTechnique);
+  }
+  if (itemType === 'scripture' && !base.technique) {
     return { ...base, technique: inferTechniqueProfile(base) };
   }
   return base;
@@ -2986,21 +3053,16 @@ export function buildCombatActionPalette(state: CharacterState, session: CombatS
     });
   }
 
-  const spellOptions = skills.slice(0, 8).map((sk, idx): CombatActionOption => ({
-    id: `skill-${idx}`,
-    name: sk.name,
-    description: sk.description || '催动已掌握的术式。',
-    actionType: 'spell',
-    source: sk.sourceType === 'artifact' ? 'artifact' : 'spell',
-    enabled: !sealed && session.playerMp >= (sk.mpCost || 0),
-    disabledReason: sealed ? '灵力受制，术式难以成形。' : session.playerMp < (sk.mpCost || 0) ? '法力不足。' : undefined,
-    skillIdx: idx,
-    itemId: sk.itemId,
-    mpCost: sk.mpCost || 0,
-    risk: sk.adaptation != null && sk.adaptation < 0.7 ? '适配不足，可能反噬或威力折损。' : undefined,
-    requiredItems: sk.itemId ? [sk.itemId] : undefined,
-    tags: ['spell'],
-  }));
+  const techniqueOptions: CombatActionOption[] = [];
+  const spellOptions: CombatActionOption[] = [];
+  const artifactSpellOptions: CombatActionOption[] = [];
+  skills.slice(0, 8).forEach((sk, idx) => {
+    const kind = combatArtKind(sk, state);
+    const option = buildSkillCombatOption(sk, idx, kind, session, sealed);
+    if (kind === 'technique') techniqueOptions.push(option);
+    else if (kind === 'artifact') artifactSpellOptions.push(option);
+    else spellOptions.push(option);
+  });
 
   const defenseOptions: CombatActionOption[] = [{
     id: 'defense-guard',
@@ -3059,7 +3121,8 @@ export function buildCombatActionPalette(state: CharacterState, session: CombatS
 
   return {
     basicAttack: { enabled: basicOptions.some(o => o.enabled), label: '普攻', disabledReason: basicOptions.some(o => o.enabled) ? undefined : (restrained ? '当前受制，常规攻伐难以施展。' : '暂无可用普攻。'), options: basicOptions },
-    spell: { enabled: spellOptions.some(o => o.enabled), label: '法术', disabledReason: spellOptions.length ? '当前法术受限。' : '暂无可用法术。', options: spellOptions },
+    technique: { enabled: techniqueOptions.some(o => o.enabled), label: '功法', disabledReason: techniqueOptions.length ? '当前功法运转受限。' : '暂无可用功法。', options: techniqueOptions },
+    spell: { enabled: [...spellOptions, ...artifactSpellOptions].some(o => o.enabled), label: '法术', disabledReason: (spellOptions.length || artifactSpellOptions.length) ? '当前法术受限。' : '暂无可用法术。', options: [...spellOptions, ...artifactSpellOptions] },
     defense: { enabled: defenseOptions.some(o => o.enabled), label: '防御', options: defenseOptions },
     item: { enabled: itemOptions.some(o => o.enabled), label: '物品', disabledReason: itemOptions.length ? '当前难以取用物品。' : '暂无可用物品。', options: itemOptions },
     other: { enabled: otherOptions.some(o => o.enabled), label: '应变', options: otherOptions },

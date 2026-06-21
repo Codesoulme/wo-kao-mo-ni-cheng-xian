@@ -453,9 +453,9 @@ export interface QuestEntry {
 // ==================== 战斗系统 (Task 20) ====================
 
 
-export type CombatActionGroupKey = 'basicAttack' | 'spell' | 'defense' | 'item' | 'other';
-export type CombatActionOptionType = 'basic_attack' | 'spell' | 'defense' | 'item' | 'talisman' | 'other' | 'flee';
-export type CombatActionOptionSource = 'body' | 'weapon' | 'spell' | 'artifact' | 'armor' | 'item' | 'environment' | 'social' | 'pet' | 'status' | 'ai';
+export type CombatActionGroupKey = 'basicAttack' | 'technique' | 'spell' | 'defense' | 'item' | 'other';
+export type CombatActionOptionType = 'basic_attack' | 'technique' | 'spell' | 'defense' | 'item' | 'talisman' | 'other' | 'flee';
+export type CombatActionOptionSource = 'body' | 'weapon' | 'technique' | 'spell' | 'artifact' | 'armor' | 'item' | 'environment' | 'social' | 'pet' | 'status' | 'ai';
 
 // AI action palette: the combat UI is a projection of AI/world-state affordances.
 // The engine validates hard facts (owned items, costs, statuses) instead of hard-coding all creative choices.
@@ -488,6 +488,7 @@ export interface CombatActionGroup {
 
 export interface CombatActionPalette {
   basicAttack: CombatActionGroup;
+  technique: CombatActionGroup;
   spell: CombatActionGroup;
   defense: CombatActionGroup;
   item: CombatActionGroup;
