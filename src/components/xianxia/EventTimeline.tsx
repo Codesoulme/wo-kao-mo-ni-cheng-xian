@@ -105,9 +105,9 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
 function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
   const worldLabel = event.worldTime?.label;
   const segmentLabel = event.timeAdvance?.label;
-  if (worldLabel && segmentLabel) return ageMeta.isContinuation ? `${segmentLabel}?${worldLabel}?` : `${event.age}? ? ${segmentLabel}?${worldLabel}?`;
+  if (worldLabel && segmentLabel) return ageMeta.isContinuation ? `${segmentLabel}【${worldLabel}】` : `${event.age}岁 · ${segmentLabel}【${worldLabel}】`;
   if (worldLabel) return ageMeta.isContinuation ? `续记【${worldLabel}】` : `${event.age}岁【${worldLabel}】`;
-  if (segmentLabel) return ageMeta.isContinuation ? segmentLabel : `${event.age}? ? ${segmentLabel}`;
+  if (segmentLabel) return ageMeta.isContinuation ? segmentLabel : `${event.age}岁 · ${segmentLabel}`;
   return ageMeta.isContinuation ? '同岁续记' : `${event.age}岁`;
 }
 

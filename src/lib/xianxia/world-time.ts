@@ -88,7 +88,7 @@ export function clampTimeAdvance(raw: any, fallback?: TimeAdvance): TimeAdvance 
 export function defaultTimeLabel(unit: TimeAdvanceUnit, amount: number) {
   if (unit === 'moment') return '片刻后';
   if (unit === 'hour') return amount <= 2 ? '少顷' : `${amount}个时辰后`;
-  if (unit === 'day') return amount === 1 ? '??' : `${amount}??`;
+  if (unit === 'day') return amount === 1 ? '翌日' : `${amount}日后`;
   if (unit === 'month') return amount === 1 ? '一月后' : `${amount}月后`;
   if (unit === 'season') return amount === 1 ? '一季后' : `${amount}季后`;
   if (unit === 'year') return amount === 1 ? '一年后' : `${amount}年后`;
