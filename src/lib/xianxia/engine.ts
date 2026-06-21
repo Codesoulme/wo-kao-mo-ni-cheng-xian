@@ -5176,25 +5176,61 @@ export function getSameYearThreads(state: CharacterState): PendingThread[] {
   ).slice(0, 2);
 }
 
+const INTERNAL_THREAD_NARRATIVE_PHRASES = [
+  '\u5faa\u7740\u65e7\u8ff9\u4e0e\u65e7\u7ea6\u7ee7\u7eed\u8ffd\u7d22',
+  '\u524d\u7f18\u6b63\u5f85\u4e86\u7ed3',
+  '\u8fd9\u6861\u524d\u7f18\u6b63\u5f85\u4e86\u7ed3',
+  '\u6b64\u4e8b\u5e76\u672a\u968f\u4e0a\u4e00\u6bb5\u7ecf\u5386\u6563\u53bb',
+  '\u6536\u62e2\u6240\u5f97\u7ebf\u7d22',
+  '\u53cd\u590d\u63e3\u6469',
+  '\u540e\u7eed\u627f\u63a5\u63d0\u793a',
+];
+
+function sanitizeThreadContinuationNarrative(text: string, fallback: string): string {
+  let cleaned = String(text || '').trim();
+  for (const phrase of INTERNAL_THREAD_NARRATIVE_PHRASES) {
+    cleaned = cleaned.split(phrase).join('');
+  }
+  cleaned = cleaned
+    .replace(/[\s\u3000]+/g, ' ')
+    .replace(/^[,?;??\s]+/, '')
+    .replace(/[\u002c\uff0c\u003b\uff1b]\s*[\u3002\uff01\uff1f]/g, '\u3002')
+    .trim();
+  return cleaned || fallback;
+}
+
 export function buildThreadContinuationEvent(state: CharacterState, thread: PendingThread): any {
-  const realmName = inferStoryRealmName(`${thread.title} ${thread.description} ${thread.followUpHint || ''}`);
-  const isRealm = thread.category === 'exploration' || !!realmName || /秘境|浮阁|洞府|遗迹|禁地|禁制|破禁/.test(`${thread.title}${thread.description}`);
-  const isCompetition = thread.category === 'competition' || /比试|考核|入门|仙门|擂台/.test(`${thread.title}${thread.description}`);
-  const title = isRealm ? (realmName || thread.title) : isCompetition ? `约期已至·${thread.title}` : thread.title;
-  const narrative = isRealm
-    ? `${thread.description}此事并未随上一段经历散去。${state.name}收拢所得线索，反复揣摩${thread.followUpHint || '其中关窍'}；若要真正深入，还需凭信物、地势或另一条破禁之法再寻入口。`
+  const threadText = `${thread.title} ${thread.description} ${thread.followUpHint || ''}`;
+  const realmName = inferStoryRealmName(threadText);
+  const isRealm = thread.category === 'exploration' || !!realmName || /\u79d8\u5883|\u6d6e\u9601|\u6d1e\u5e9c|\u9057\u8ff9|\u7981\u5730|\u7981\u5236|\u7834\u7981/.test(`${thread.title}${thread.description}`);
+  const isCompetition = thread.category === 'competition' || /\u6bd4\u8bd5|\u8003\u6838|\u5165\u95e8|\u4ed9\u95e8|\u64c2\u53f0/.test(`${thread.title}${thread.description}`);
+  const isPromise = thread.category === 'promise' || /\u7ea6|\u8bfa|\u627f\u8bfa|\u8fd8\u613f|\u8d74\u7ea6/.test(threadText);
+  const title = isRealm
+    ? (realmName || thread.title)
     : isCompetition
-      ? `${thread.description}约期已近，${state.name}没有把此事抛在脑后。她整备衣装与随身法器，按约前去应试；这一场比试不只是胜负，更关系到能否接续早先结下的仙途机缘。`
-      : `${thread.description}${state.name}循着旧迹与旧约继续追索，这桁前缘正待了结。`;
+      ? `\u7ea6\u671f\u5df2\u81f3\u00b7${thread.title}`
+      : isPromise
+        ? `\u8d74\u7ea6\u00b7${thread.title}`
+        : thread.title;
+
+  const fallbackNarrative = isRealm
+    ? `${state.name}\u4f9d\u7167\u624b\u4e2d\u4fe1\u7269\u4e0e\u5730\u52bf\u53d8\u5316\u91cd\u65b0\u8fa8\u8ba4\u95e8\u6237\u3002\u96fe\u6c14\u5f00\u5408\u4e4b\u95f4\uff0c\u65e7\u65e5\u6240\u89c1\u7ec8\u4e8e\u6709\u4e86\u53ef\u843d\u811a\u7684\u65b9\u4f4d\uff1b\u82e5\u8981\u518d\u8fdb\u4e00\u6b65\uff0c\u4ecd\u9700\u8c28\u614e\u8bd5\u63a2\u7981\u5236\u865a\u5b9e\u3002`
+    : isCompetition
+      ? `\u7ea6\u671f\u5df2\u8fd1\uff0c${state.name}\u6574\u5907\u8863\u88c5\u4e0e\u968f\u8eab\u5668\u7269\uff0c\u6309\u65f6\u524d\u53bb\u5e94\u8bd5\u3002\u573a\u4e2d\u4eba\u58f0\u6e10\u8d77\uff0c\u8fd9\u4e00\u573a\u6bd4\u8bd5\u5173\u7cfb\u5230\u80fd\u5426\u63a5\u7eed\u65e9\u5148\u7ed3\u4e0b\u7684\u4ed9\u9014\u673a\u7f18\u3002`
+      : isPromise
+        ? `${state.name}\u8bb0\u8d77\u65e9\u5148\u8bb8\u4e0b\u7684\u7ea6\u5b9a\uff0c\u6574\u7406\u884c\u88c5\u524d\u53bb\u8d74\u7ea6\u3002\u8def\u4e0a\u98ce\u8272\u5982\u5e38\uff0c\u5fc3\u4e2d\u5374\u591a\u4e86\u4e00\u5206\u5fc5\u987b\u4eb2\u81ea\u7ed9\u51fa\u7684\u4ea4\u4ee3\u3002`
+        : `${state.name}\u628a\u8fd9\u6869\u7275\u6302\u6682\u4e14\u6536\u8fdb\u5fc3\u5e95\uff0c\u8f6c\u800c\u4ece\u8eab\u8fb9\u53ef\u505a\u4e4b\u4e8b\u7740\u624b\u3002\u5c71\u98ce\u8fc7\u5904\uff0c\u65e7\u4e8b\u4e0d\u518d\u53ea\u662f\u5ff5\u5934\uff0c\u800c\u6210\u4e86\u5f80\u540e\u884c\u4e8b\u65f6\u5fc5\u987b\u63c2\u91cf\u7684\u4e00\u91cd\u56e0\u679c\u3002`;
+
+  const narrative = sanitizeThreadContinuationNarrative(fallbackNarrative, fallbackNarrative);
   return {
     title,
     narrative,
     eventType: isCompetition ? 'normal' : isRealm ? 'exploration' : 'normal',
-    changes: isCompetition ? [{ attribute: 'reputation', delta: 1, reason: '守约赴试' }] : [],
+    changes: isCompetition ? [{ attribute: 'reputation', delta: 1, reason: '\u5b88\u7ea6\u8d74\u8bd5' }] : [],
     newStatuses: isRealm ? [{
       id: `status_thread_${thread.id}_${Date.now().toString(36)}`,
-      name: realmName ? `${realmName}线索` : '秘境线索',
-      description: thread.followUpHint || '这段线索仍可引向后续探索。',
+      name: realmName ? `${realmName}\u7ebf\u7d22` : '\u79d8\u5883\u7ebf\u7d22',
+      description: thread.followUpHint || '\u8fd9\u6bb5\u7ebf\u7d22\u4ecd\u53ef\u5f15\u5411\u540e\u7eed\u63a2\u7d22\u3002',
       category: 'quest',
       rarity: 'uncommon',
       duration: -1,
@@ -5202,11 +5238,11 @@ export function buildThreadContinuationEvent(state: CharacterState, thread: Pend
       effects: [],
     }] : [],
     newItems: [], removedItemIds: [], newEquippedItems: [], equipItemIds: [], unequipItemIds: [],
-    memory: `${state.age}岁续写线索：${thread.title}`,
+    memory: `${state.age}\u5c81\u7eed\u5199\u7ebf\u7d22\uff1a${thread.title}`,
     cultivationInsight: '',
     hasChoice: false, choice: null, triggeredBreakthrough: false, causedDeath: false, causedAscension: false,
     newThreads: [],
-    advanceThreads: [{ id: thread.id, progressDelta: isRealm ? 35 : 50, note: '同年后续已展开' }],
+    advanceThreads: [{ id: thread.id, progressDelta: isRealm ? 35 : 50, note: '\u540c\u5e74\u540e\u7eed\u5df2\u5c55\u5f00' }],
     completeThreadIds: isCompetition ? [thread.id] : [],
     failThreadIds: [],
     triggerCombat: null,
