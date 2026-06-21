@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
             score: fallback.score,
           },
         }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('settlement ai timeout')), 6000)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('settlement ai timeout')), 20000)),
       ]);
       const selected = fallback.options
         .filter((option) => ai.optionIds.includes(option.id))

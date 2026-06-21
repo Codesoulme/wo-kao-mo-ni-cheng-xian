@@ -25,8 +25,7 @@ import {
   CombatRound,
   CombatRoundProposal,
   CombatSession,
-  EventBlueprint,
-} from './types';
+  EventBlueprint, getRealmInfo} from './types';
 import { ensureUniqueIds, filterMeaningfulStatuses } from './engine';
 import { deriveWorldFactStateProfile } from './event-scheduler';
 
@@ -1486,7 +1485,7 @@ export async function generateSettlementEvaluation(args: {
   const user = `【角色】
 姓名：${character.name}
 年岁：${character.age}/${character.lifespan}
-境界：${character.realmName || character.realm} ${character.realmLevel ? `${character.realmLevel + 1}层` : ''}
+境界：${character.realmName || getRealmInfo(character.realm)?.name || character.realm} ${character.realmLevel ? `${character.realmLevel + 1}层` : ''}
 灵根：${character.rootDetail || character.spiritualRoot}
 结局：${character.ascended ? '飞升' : character.causeOfDeath || '此世终了'}
 灵石：${character.spiritStones || 0}

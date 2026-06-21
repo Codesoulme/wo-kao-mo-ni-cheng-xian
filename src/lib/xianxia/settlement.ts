@@ -7,6 +7,7 @@ import type {
   SettlementResult,
   SimulationHallRecord,
 } from '@/lib/xianxia/store';
+import { getRealmInfo } from '@/lib/xianxia/types';
 
 const RARITY_WEIGHT: Record<HeritageRarity, number> = {
   common: 1,
@@ -139,15 +140,27 @@ export function generateSettlementResult(character: CharacterState, events: Game
   const ending = character.ascended ? 'ascension' : 'death';
   const title = character.ascended ? '羽化登真，名录仙碑' : '尘缘已尽，轮回将启';
   const rootText = character.rootDetail || character.spiritualRoot || '灵根未显';
-  const realmText = character.realmName || (character.realm === 'mortal' ? '凡人' : character.realm) || '凡身未蜕';
+  const realmText = character.realmName || getRealmInfo(character.realm as any)?.name || '凡身未蜕';
   const ageText = (character.age || 0) > 0 ? `行至${character.age}岁` : '此世方启';
-  const keyEvents = events
+  const sortedEvents = events
     .filter((event) => event.title || event.narrative)
-    .slice(-6)
-    .map((event) => `${event.age}岁“${event.title || '无名旧事'}”`);
-  const eventTrail = keyEvents.length
-    ? `其一世可考之迹，有${keyEvents.join('，')}。`
-    : '其一世尚未留下足够多的年岁旧事，仙路仍如未展之卷。';
+    .slice()
+    .sort((a, b) => (a.age || 0) - (b.age || 0));
+  const firstEvent = sortedEvents[0];
+  const lifeDeeds = sortedEvents.slice(-5).map((event) => {
+    const gist = String(event.narrative || '').replace(/\s+/g, '').replace(/[。！？；，、]+$/, '').slice(0, 28);
+    const titleText = event.title || '旧事';
+    return gist
+      ? `${event.age}岁，${titleText}，${gist}${gist.length >= 28 ? '…' : ''}`
+      : `${event.age}岁，${titleText}`;
+  });
+  const originText = firstEvent
+    ? `早年以${rootText}入道，${firstEvent.age}岁遇“${firstEvent.title || '初入修行'}”，自此踏上修仙之路。`
+    : `以${rootText}赋，早年踏上修仙之路。`;
+  const deedText = lifeDeeds.length
+    ? `其平生可考者：${lifeDeeds.join('；')}。`
+    : '此世年岁旧事尚浅，仙路才刚展开。';
+  const realmJourneyText = `修为最高曾至${realmText}${character.realmLevel ? `第${character.realmLevel + 1}层` : ''}，${ageText}。`;
   const endingText = character.ascended
     ? `终能叩开天门，踏破${realmText}之限，名入仙碑。`
     : character.causeOfDeath === '主动放下此世因果'
@@ -155,7 +168,8 @@ export function generateSettlementResult(character: CharacterState, events: Game
       : character.causeOfDeath
         ? `终因${character.causeOfDeath}而止，道途有憾，却仍有未散旧缘可入轮回。`
         : '此段道途暂归尘烟，虽未抵彼岸，仍有旧物旧缘可随轮回而去。';
-  const summary = `${character.name}，${rootText}，${ageText}，最高曾至${realmText}${character.realmLevel ? `第${character.realmLevel + 1}层` : ''}。${eventTrail}${endingText}`.slice(0, 520);
+  const summary = `${character.name}，${rootText}。${originText}${realmJourneyText}${deedText}${endingText}`.slice(0, 520);
+
 
   const rawOptions = [
     ...inventory.map((item) => itemToHeritage(item, score, item?.source || '随身旧物')),
