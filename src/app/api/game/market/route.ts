@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import {
   addItems,
+  buildStateContext,
   dbToState,
   normalizeCultivationState,
   recordActionCausality,
@@ -14,6 +15,7 @@ import {
   stateToResponse,
 } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { generateMarketOfferings } from '@/lib/xianxia/llm';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerItem } from '@/lib/xianxia/content-registry';
 import type { AttributeChange } from '@/lib/xianxia/types';
@@ -185,7 +187,15 @@ export async function POST(req: NextRequest) {
     let state = dbToState(char as any);
 
     if (action === 'list') {
-      const items = generateMarketItems(state.realm);
+      let items = generateMarketItems(state.realm);
+      try {
+        const recentDb = await db.eventLog.findMany({ where: { characterId }, orderBy: { age: 'desc' }, take: 3 });
+        const recent = recentDb.reverse().map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType }));
+        const aiMarket = await generateMarketOfferings(buildStateContext(state, recent));
+        if (aiMarket?.items?.length) items = aiMarket.items;
+      } catch (err: any) {
+        console.error('market AI offerings failed, fallback to pool:', err?.message || err);
+      }
       const sellable = state.inventory.map(it => ({
         ...it,
         sellPrice: Math.max(1, Math.floor(estimateValue(it) * 0.6)),

@@ -335,6 +335,45 @@ export interface AlchemyAIOutcome {
   accident?: string;                 // 可选：炸炉/异变/反噬说明
 }
 
+// ==================== AI 生成子系统内容（AI 主路径，引擎校验落库） ====================
+export interface MarketAIItem extends ItemEntry { price: number; reason?: string }
+export interface MarketAIOutcome { items: MarketAIItem[]; marketName?: string; atmosphere?: string }
+
+export interface AuctionAIOutcome {
+  title: string;
+  invitation: string;
+  lots: { item: ItemEntry; startingPrice: number; seller: string; desireTags: string[] }[];
+  bidders: { name: string; realm: string; assets: number; desireTags: string[]; temperament: 'calm' | 'proud' | 'greedy' | 'secretive' | 'reckless' }[];
+}
+
+export interface CombatLootAIOutcome { items: ItemEntry[]; spiritStones: number; narrativeHint?: string }
+
+export interface PetBondAIOutcome {
+  name: string;
+  species: PetSpecies;
+  description: string;
+  rarity: Pet['rarity'];
+  element: Pet['element'];
+  hp: number; attack: number; defense: number; speed: number;
+  loyalty: number; satiety: number;
+  sourceAcquired: string;
+  skill: Pet['skill'];
+  traits?: string[];
+  passiveHint?: string;
+  narrative: string;
+}
+
+export interface PetCareAIOutcome {
+  satietyDelta: number;
+  loyaltyDelta: number;
+  expDelta: number;
+  levelDelta?: number;
+  attackDelta?: number;
+  defenseDelta?: number;
+  maxHpDelta?: number;
+  narrative: string;
+}
+
 // ==================== 事件蓝图系统 (Task 20 - 解决事件单一化) ====================
 
 // 事件主题分类——每岁由引擎从蓝图池中按权重抽取一个主题，AI 必须围绕此主题生成事件
@@ -1266,6 +1305,9 @@ export interface Pet {
   // 来源
   sourceAcquired: string;    // 如何获得（"收服于青云山""前辈相赠"等）
   acquiredAge: number;       // 获得时的年龄
+  // AI 生成的个体特性 / 被动倾向（仅作叙事与轻量加成参考，具体数值仍由引擎 clamp）
+  traits?: string[];
+  passiveHint?: string;
   // 主动技能（每只灵宠一个主动技能，参战时使用）
   skill: {
     name: string;            // 技能名（如"幻影分身""毒雾""烈焰冲击"）

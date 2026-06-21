@@ -26,7 +26,7 @@ import {
   CombatRound,
   CombatRoundProposal,
   CombatSession,
-  EventBlueprint, AlchemyAIOutcome, getRealmInfo} from './types';
+  EventBlueprint, AlchemyAIOutcome, MarketAIOutcome, AuctionAIOutcome, CombatLootAIOutcome, PetBondAIOutcome, PetCareAIOutcome, Pet, getRealmInfo} from './types';
 import { ensureUniqueIds, filterMeaningfulStatuses } from './engine';
 import { deriveWorldFactStateProfile } from './event-scheduler';
 
@@ -1512,6 +1512,169 @@ ${matList}
     console.error('generateAlchemyOutcome failed:', err?.message || err);
     return null;
   }
+}
+
+// ==================== AI 内容生成：坊市 / 拍卖 / 战利品 / 灵宠 ====================
+
+const AI_RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+const AI_ITEM_TYPES = ['weapon', 'armor', 'accessory', 'consumable', 'material', 'scripture', 'tool', 'artifact'];
+const AI_EFFECT_TARGETS = new Set(['attack', 'defense', 'speed', 'luck', 'comprehension', 'hp', 'maxHp', 'mp', 'maxMp', 'cultivationExp', 'storageCapacity']);
+function sanitizeAiEffects(raw: any, limit = 3): any[] {
+  return Array.isArray(raw) ? raw.slice(0, limit).filter(e => e && AI_EFFECT_TARGETS.has(String(e.target_attribute))).map(e => ({
+    target_attribute: String(e.target_attribute),
+    operation: e.operation === 'multiply' ? 'multiply' : 'add',
+    value: e.operation === 'multiply' ? Math.max(1.02, Math.min(3.5, Number(e.value) || 1.05)) : Math.max(-5000, Math.min(5000, Math.round(Number(e.value) || 0))),
+    description: String(e.description || '灵机变化').slice(0, 80),
+  })).filter(e => e.operation === 'multiply' || e.value !== 0) : [];
+}
+function sanitizeAiItem(raw: any, source: string, fallbackName = '无名灵物'): ItemEntry {
+  const rarity = AI_RARITIES.includes(raw?.rarity) ? raw.rarity : 'common';
+  const itemType = AI_ITEM_TYPES.includes(raw?.item_type) ? raw.item_type : 'material';
+  return {
+    id: String(raw?.id || `${source}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
+    name: String(raw?.name || fallbackName).slice(0, 24),
+    description: String(raw?.description || '来历未明的灵物。').slice(0, 180),
+    item_type: itemType as ItemEntry['item_type'],
+    rarity: rarity as ItemEntry['rarity'],
+    effects: sanitizeAiEffects(raw?.effects),
+    source,
+  };
+}
+
+export async function generateMarketOfferings(ctx: EngineStateContext): Promise<MarketAIOutcome | null> {
+  const sc = ctx.character;
+  const system = `${IDENTITY_PROMPT}
+
+【当前场景：坊市货品生成】
+你要根据角色所在地点、境界、近期因果、世界局势生成此刻坊市可见货品。面板只是展示你的货品输出；引擎会校验价格、物品结构和效果数值。
+严格 JSON 输出。`;
+  const recent = ctx.recentEvents.slice(-3).map(e => `${e.age}岁·${e.title}:${e.narrative.slice(0, 80)}`).join('\n') || '无';
+  const facts = (ctx.worldFacts || []).slice(0, 6).map(f => `${f.kind}:${f.title}`).join('，') || '无';
+  const user = `角色：${sc.name}，${sc.realmName}，灵石${sc.spiritStones}，所在${sc.location}，名声${sc.reputation}
+近期事件：
+${recent}
+世界事实：${facts}
+
+请生成 6-9 件坊市货品 JSON：
+{
+  "marketName":"坊市/摊位名",
+  "atmosphere":"20-60字坊市氛围",
+  "items":[{"name":"物名","description":"说明","item_type":"weapon|armor|accessory|consumable|material|scripture|tool|artifact","rarity":"common|uncommon|rare|epic|legendary|mythic","price":价格数字,"effects":[{"target_attribute":"属性","operation":"add|multiply","value":数字,"description":"效果"}],"reason":"为何此地会卖此物"}]
+}
+价格要符合角色阶段和当地供需；不要只给固定入门货。`;
+  try {
+    const raw = parseJSON(await callLLMText(system, user));
+    const items = Array.isArray(raw?.items) ? raw.items.slice(0, 9).map((it: any, idx: number) => ({
+      ...sanitizeAiItem({ ...it, id: `market_ai_${Date.now().toString(36)}_${idx}` }, '坊市'),
+      price: Math.max(1, Math.min(999999, Math.round(Number(it.price) || 10))),
+      reason: it.reason ? String(it.reason).slice(0, 120) : undefined,
+    })) : [];
+    return items.length ? { marketName: String(raw.marketName || '').slice(0, 40), atmosphere: String(raw.atmosphere || '').slice(0, 120), items } : null;
+  } catch (err: any) { console.error('generateMarketOfferings failed:', err?.message || err); return null; }
+}
+
+export async function generateAuctionContent(ctx: EngineStateContext): Promise<AuctionAIOutcome | null> {
+  const sc = ctx.character;
+  const system = `${IDENTITY_PROMPT}
+
+【当前场景：拍卖会内容生成】
+你要生成一场轻量拍卖会的拍品、竞拍者和入场邀请。流程由引擎主持，内容由你根据地点、境界、因果生成。严格 JSON 输出。`;
+  const threads = (ctx.pendingThreads || []).slice(0, 5).map(t => `${t.title}:${t.description.slice(0, 60)}`).join('\n') || '无';
+  const user = `角色：${sc.name}，${sc.realmName}，灵石${sc.spiritStones}，所在${sc.location}，气运${sc.luck}
+未了因缘：
+${threads}
+
+请生成 JSON：
+{"title":"拍卖会名","invitation":"入场邀约（40-90字）","lots":[{"item":{物品字段同 ItemEntry，不要 id},"startingPrice":起价,"seller":"寄拍方","desireTags":["标签"]}],"bidders":[{"name":"竞拍者名","realm":"境界","assets":灵石资产,"desireTags":["偏好"],"temperament":"calm|proud|greedy|secretive|reckless"}]}
+拍品 4-6 件；竞拍者 4-6 人；高价值物应能牵动后续因果。`;
+  try {
+    const raw = parseJSON(await callLLMText(system, user));
+    const lots = Array.isArray(raw?.lots) ? raw.lots.slice(0, 6).map((lot: any) => ({
+      item: sanitizeAiItem(lot.item || lot, '拍卖会', '拍卖灵物'),
+      startingPrice: Math.max(5, Math.min(999999, Math.round(Number(lot.startingPrice) || 30))),
+      seller: String(lot.seller || '寄拍修士').slice(0, 30),
+      desireTags: Array.isArray(lot.desireTags) ? lot.desireTags.slice(0, 6).map(String) : [],
+    })) : [];
+    const temps = ['calm', 'proud', 'greedy', 'secretive', 'reckless'];
+    const bidders = Array.isArray(raw?.bidders) ? raw.bidders.slice(0, 6).map((b: any) => ({
+      name: String(b.name || '无名竞拍者').slice(0, 18), realm: String(b.realm || '散修').slice(0, 20),
+      assets: Math.max(20, Math.min(999999, Math.round(Number(b.assets) || 200))),
+      desireTags: Array.isArray(b.desireTags) ? b.desireTags.slice(0, 8).map(String) : [],
+      temperament: temps.includes(b.temperament) ? b.temperament : 'calm',
+    })) : [];
+    return lots.length && bidders.length ? { title: String(raw.title || '暗香拍卖').slice(0, 40), invitation: String(raw.invitation || '').slice(0, 160), lots, bidders } as any : null;
+  } catch (err: any) { console.error('generateAuctionContent failed:', err?.message || err); return null; }
+}
+
+export async function generateCombatLootProposal(ctx: EngineStateContext, session: CombatSession): Promise<CombatLootAIOutcome | null> {
+  if (session.status !== 'victory') return null;
+  const enemies = (session.enemies || []).map(e => `${e.name}(${e.realm || '未知'}):${e.description || ''}`).join('\n');
+  const system = `${IDENTITY_PROMPT}
+
+【当前场景：战后战利品提案】
+根据敌人身份、境界、携带资源、战斗损毁情况生成合理战利品。引擎会校验物品结构、去重、储物和灵石。严格 JSON 输出。`;
+  const user = `角色：${ctx.character.name}，${ctx.character.realmName}，地点${ctx.character.location}
+击败敌人：
+${enemies}
+
+请生成 JSON：{"items":[ItemEntry字段，不要id，最多6件],"spiritStones":灵石数,"narrativeHint":"战利品如何得来（30-80字）"}
+应优先给敌人合理携带且未毁坏的装备、法器、丹药、储物袋、材料；不要只给无用碎片。`;
+  try {
+    const raw = parseJSON(await callLLMText(system, user));
+    const items = Array.isArray(raw?.items) ? raw.items.slice(0, 6).map((it: any) => sanitizeAiItem(it, '战利所得', '战利灵物')) : [];
+    return { items, spiritStones: Math.max(0, Math.min(999999, Math.round(Number(raw?.spiritStones) || 0))), narrativeHint: raw?.narrativeHint ? String(raw.narrativeHint).slice(0, 160) : undefined };
+  } catch (err: any) { console.error('generateCombatLootProposal failed:', err?.message || err); return null; }
+}
+
+export async function generatePetBond(ctx: EngineStateContext, requested?: { species?: string; rarity?: string }): Promise<PetBondAIOutcome | null> {
+  const sc = ctx.character;
+  const species = requested?.species || '自定';
+  const rarity = requested?.rarity || '自定';
+  const system = `${IDENTITY_PROMPT}
+
+【当前场景：灵宠结缘】
+根据角色地点、境界、因果与玩家请求生成一只独特灵宠。引擎会校验物种、品阶和数值范围。严格 JSON 输出。`;
+  const user = `角色：${sc.name}，${sc.realmName}，所在${sc.location}，灵根${sc.rootDetail || sc.spiritualRoot}
+玩家倾向：species=${species}, rarity=${rarity}
+
+输出 JSON：{"name":"灵宠名","species":"fox|wolf|snake|turtle|eagle|ape|spider|butterfly|fish|tiger|phoenix|dragon","description":"描述","rarity":"common|uncommon|rare|epic|legendary|mythic","element":"metal|wood|water|fire|earth","hp":数值,"attack":数值,"defense":数值,"speed":数值,"loyalty":0-100,"satiety":0-100,"sourceAcquired":"如何结缘","skill":{"name":"技能名","description":"技能描述","power":倍率,"cooldown":回合},"traits":["特性"],"passiveHint":"被动倾向","narrative":"结缘叙事（40-100字）"}`;
+  try {
+    const raw = parseJSON(await callLLMText(system, user));
+    const speciesList = ['fox','wolf','snake','turtle','eagle','ape','spider','butterfly','fish','tiger','phoenix','dragon'];
+    const elements = ['metal','wood','water','fire','earth'];
+    const rarities = AI_RARITIES;
+    return {
+      name: String(raw.name || '灵兽').slice(0, 18),
+      species: (speciesList.includes(raw.species) ? raw.species : 'fox') as any,
+      description: String(raw.description || '').slice(0, 180),
+      rarity: (rarities.includes(raw.rarity) ? raw.rarity : 'uncommon') as any,
+      element: (elements.includes(raw.element) ? raw.element : 'wood') as any,
+      hp: Number(raw.hp) || 60, attack: Number(raw.attack) || 10, defense: Number(raw.defense) || 6, speed: Number(raw.speed) || 10,
+      loyalty: Number(raw.loyalty) || 70, satiety: Number(raw.satiety) || 80,
+      sourceAcquired: String(raw.sourceAcquired || '灵缘结契').slice(0, 80),
+      skill: { name: String(raw.skill?.name || '灵息护主').slice(0, 20), description: String(raw.skill?.description || '').slice(0, 120), power: Number(raw.skill?.power) || 1.2, cooldown: Number(raw.skill?.cooldown) || 3 },
+      traits: Array.isArray(raw.traits) ? raw.traits.slice(0, 5).map(String) : [],
+      passiveHint: raw.passiveHint ? String(raw.passiveHint).slice(0, 120) : undefined,
+      narrative: String(raw.narrative || '').slice(0, 220),
+    } as PetBondAIOutcome;
+  } catch (err: any) { console.error('generatePetBond failed:', err?.message || err); return null; }
+}
+
+export async function generatePetCareOutcome(ctx: EngineStateContext, pet: Pet, item: ItemEntry): Promise<PetCareAIOutcome | null> {
+  const system = `${IDENTITY_PROMPT}
+
+【当前场景：灵宠喂养反应】
+根据灵宠血脉、当前状态和喂养物药性，生成本次喂养的成长反应。引擎会 clamp 数值并消耗物品。严格 JSON 输出。`;
+  const eff = (item.effects || []).map(e => `${e.target_attribute}${e.operation}${e.value}`).join('，') || '无显效';
+  const user = `角色：${ctx.character.name}
+灵宠：${pet.name}（${pet.species}/${pet.rarity}），忠诚${pet.loyalty}，饱食${pet.satiety}，等级${pet.level}，特性${(pet.traits || []).join('、') || '无'}
+喂养物：${item.name}（${item.rarity}/${item.item_type}）${item.description}｜效果:${eff}
+
+输出 JSON：{"satietyDelta":数字,"loyaltyDelta":数字,"expDelta":数字,"levelDelta":数字可0,"attackDelta":数字可0,"defenseDelta":数字可0,"maxHpDelta":数字可0,"narrative":"喂养叙事（40-100字）"}`;
+  try {
+    const raw = parseJSON(await callLLMText(system, user));
+    return { satietyDelta: Number(raw.satietyDelta) || 0, loyaltyDelta: Number(raw.loyaltyDelta) || 0, expDelta: Number(raw.expDelta) || 0, levelDelta: Number(raw.levelDelta) || 0, attackDelta: Number(raw.attackDelta) || 0, defenseDelta: Number(raw.defenseDelta) || 0, maxHpDelta: Number(raw.maxHpDelta) || 0, narrative: String(raw.narrative || '').slice(0, 220) };
+  } catch (err: any) { console.error('generatePetCareOutcome failed:', err?.message || err); return null; }
 }
 
 

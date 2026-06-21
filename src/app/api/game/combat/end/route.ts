@@ -17,11 +17,11 @@ import {
   recordActionCausality,
   refreshWorldFacts,
 } from '@/lib/xianxia/engine';
-import { generateCombatEndNarrative } from '@/lib/xianxia/llm';
+import { generateCombatEndNarrative, generateCombatLootProposal } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerItem, registerMany, registerThread } from '@/lib/xianxia/content-registry';
-import type { AttributeChange } from '@/lib/xianxia/types';
+import type { AttributeChange, CombatLootAIOutcome } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
 export const runtime = 'nodejs';
@@ -113,7 +113,16 @@ export async function POST(req: NextRequest) {
     const contentRegistryWarnings: string[] = [];
     const appliedChanges: AttributeChange[] = [];
 
-    const endResult = endCombat(state, true);
+    let aiLoot: CombatLootAIOutcome | null = null;
+    if (endStatus === 'victory') {
+      try {
+        const recentDb = await db.eventLog.findMany({ where: { characterId }, orderBy: { age: 'desc' }, take: 3 });
+        const recent = recentDb.reverse().map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType }));
+        aiLoot = await generateCombatLootProposal(buildStateContext(state, recent), session);
+      } catch (err: any) { console.error('combat loot AI proposal failed, fallback to engine loot:', err?.message || err); }
+    }
+
+    const endResult = endCombat(state, true, aiLoot);
     state = endResult.state;
     const appliedDrops = endResult.drops || [];
     const lootedSpiritStones = Math.max(0, Number(endResult.spiritStones || 0));

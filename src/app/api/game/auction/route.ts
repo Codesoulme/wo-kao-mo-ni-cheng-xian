@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import {
   addItems,
+  buildStateContext,
   addThreads,
   appendCausalGraph,
   causalId,
@@ -16,9 +17,10 @@ import {
   upsertNpcs,
 } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { generateAuctionContent } from '@/lib/xianxia/llm';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerItem, registerMany, registerNpc, registerThread } from '@/lib/xianxia/content-registry';
-import type { AttributeChange, CausalEdge, CausalNode, CharacterState, ItemEntry, PendingThread, WorldNpc } from '@/lib/xianxia/types';
+import type { AttributeChange, AuctionAIOutcome, CausalEdge, CausalNode, CharacterState, ItemEntry, PendingThread, WorldNpc } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 import { z } from 'zod';
 
@@ -201,8 +203,17 @@ function priceFor(seed: typeof LOT_SEEDS[number], luck: number) {
   return Math.max(5, Math.round(base * luckDiscount));
 }
 
-function buildAuctionSession(state: ReturnType<typeof dbToState>): AuctionSession {
+function buildAuctionSession(state: ReturnType<typeof dbToState>, aiContent?: any): AuctionSession {
   const location = state.location || '坊市偏楼';
+  if (aiContent?.lots?.length && aiContent?.bidders?.length) {
+    const lots = aiContent.lots.slice(0, 6).map((raw: any) => ({
+      id: makeId('lot'), item: { ...raw.item, id: makeId('auction_item'), source: raw.item?.source || '拍卖会' },
+      startingPrice: Math.max(5, Math.round(Number(raw.startingPrice) || 30)), currentBid: Math.max(5, Math.round(Number(raw.startingPrice) || 30)),
+      seller: raw.seller || '寄拍修士', desireTags: Array.isArray(raw.desireTags) ? raw.desireTags : [],
+    }));
+    const bidders = aiContent.bidders.slice(0, 6).map((raw: any) => ({ id: makeId('bidder'), name: raw.name, realm: raw.realm, assets: Math.max(20, Math.round(Number(raw.assets) || 200)), desireTags: Array.isArray(raw.desireTags) ? raw.desireTags : [], temperament: raw.temperament as AuctionBidder['temperament'] }));
+    return { kind: 'auction-lite', id: makeId('auction'), title: aiContent.title || `${location}暗香拍卖`, age: state.age, location, invitation: aiContent.invitation || `入夜后，${location}有素笺递至，请${state.name}赴一场小拍。`, lots, bidders };
+  }
   const lots = LOT_SEEDS.slice(0, 5).map((seed, idx) => {
     const item: ItemEntry = {
       id: makeId('auction_item'),
@@ -496,7 +507,13 @@ export async function POST(req: NextRequest) {
     let session = loadAuctionSession(char!.pendingChoiceJson || '');
 
     if (action === 'invite') {
-      session = buildAuctionSession(state);
+      let aiAuction: AuctionAIOutcome | null = null;
+      try {
+        const recentDb = await db.eventLog.findMany({ where: { characterId }, orderBy: { age: 'desc' }, take: 3 });
+        const recent = recentDb.reverse().map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType }));
+        aiAuction = await generateAuctionContent(buildStateContext(state, recent));
+      } catch (err: any) { console.error('auction AI content failed, fallback to seeds:', err?.message || err); }
+      session = buildAuctionSession(state, aiAuction);
       await db.character.update({
         where: { id: characterId },
         data: {

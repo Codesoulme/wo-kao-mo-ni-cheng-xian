@@ -63,6 +63,9 @@ import {
   EffectResolveTrace,
   CultivationAttributeEntry,
   AlchemyAIOutcome,
+  CombatLootAIOutcome,
+  PetBondAIOutcome,
+  PetCareAIOutcome,
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
@@ -1137,16 +1140,25 @@ function buildEnemyCarriedLoot(enemy: CombatEnemy, state: CharacterState, enemyI
   return { items: [...safeExplicitLoot, ...items], spiritStones };
 }
 
-export function buildCombatVictorySpoils(state: CharacterState, session: CombatSession): { items: ItemEntry[]; spiritStones: number } {
+export function buildCombatVictorySpoils(state: CharacterState, session: CombatSession, aiLoot?: CombatLootAIOutcome | null): { items: ItemEntry[]; spiritStones: number } {
   if (!session || session.status !== 'victory') return { items: [], spiritStones: 0 };
-  const enemies = session.enemies || [];
   const allItems: ItemEntry[] = [];
   let spiritStones = 0;
-  enemies.forEach((enemy, idx) => {
-    const loot = buildEnemyCarriedLoot(enemy, state, idx);
-    allItems.push(...loot.items);
-    spiritStones += loot.spiritStones;
-  });
+
+  // AI 主路径：战后由 AI 根据敌人身份/境界/携带资源生成战利品，引擎只去重、补 id、clamp 灵石。
+  if (aiLoot && (Array.isArray(aiLoot.items) || Number(aiLoot.spiritStones) > 0)) {
+    allItems.push(...(aiLoot.items || []).map((it, idx) => ({ ...it, id: it.id || makeLootId(`ai_loot_${idx}`), source: it.source || '战利所得' })));
+    spiritStones += Math.max(0, Math.floor(Number(aiLoot.spiritStones || 0)));
+  } else {
+    // AI 失败时才回退旧的敌人关键词模板。
+    const enemies = session.enemies || [];
+    enemies.forEach((enemy, idx) => {
+      const loot = buildEnemyCarriedLoot(enemy, state, idx);
+      allItems.push(...loot.items);
+      spiritStones += loot.spiritStones;
+    });
+  }
+
   const triggerDrops = Array.isArray(session.victoryDrops) ? session.victoryDrops : [];
   allItems.push(...triggerDrops.map((it, idx) => ({ ...it, id: it.id || makeLootId(`drop_${idx}`), source: it.source || '战利所得' })));
 
@@ -1156,7 +1168,7 @@ export function buildCombatVictorySpoils(state: CharacterState, session: CombatS
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).slice(0, Math.max(4, 6 + enemies.length * 3));
+  }).slice(0, Math.max(4, 6 + (session.enemies || []).length * 3));
   return { items: deduped, spiritStones };
 }
 
@@ -3992,14 +4004,14 @@ export function executeCombatRoundWithProposal(
   return { state: { ...nextState, combatSession: newSession, hp: playerHp, mp: playerMp }, round, ended: !!endStatus, endStatus, victoryDrops: endStatus === 'victory' ? session.victoryDrops : undefined };
 }
 
-export function endCombat(state: CharacterState, applyDrops: boolean = true): { state: CharacterState; drops: ItemEntry[]; result: 'victory' | 'defeat' | 'fled' | 'ongoing' | null; spiritStones?: number } {
+export function endCombat(state: CharacterState, applyDrops: boolean = true, aiLoot?: CombatLootAIOutcome | null): { state: CharacterState; drops: ItemEntry[]; result: 'victory' | 'defeat' | 'fled' | 'ongoing' | null; spiritStones?: number } {
   if (!state.combatSession) return { state, drops: [], result: null, spiritStones: 0 };
   const session = state.combatSession;
   let next: CharacterState = { ...state, combatSession: null };
   let drops: ItemEntry[] = [];
   let spiritStones = 0;
   if (applyDrops && session.status === 'victory') {
-    const spoils = buildCombatVictorySpoils(state, session);
+    const spoils = buildCombatVictorySpoils(state, session, aiLoot);
     drops = spoils.items;
     spiritStones = spoils.spiritStones;
     if (drops.length) next = addItems(next, drops);
@@ -4639,7 +4651,29 @@ export function createPet(
   sourceAcquired: string,
   acquiredAge: number,
   customSkill?: Partial<Pet['skill']>,
+  aiBond?: PetBondAIOutcome | null,
 ): Pet {
+  if (aiBond) {
+    const clamp = (v: number, min: number, max: number, fallback: number) => Math.max(min, Math.min(max, Math.round(Number(v) || fallback)));
+    return {
+      id: `pet_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      name: aiBond.name || name || '灵兽',
+      species: aiBond.species || species,
+      description: aiBond.description || description || '循缘而来的灵宠。',
+      rarity: aiBond.rarity || rarity,
+      realm,
+      hp: clamp(aiBond.hp, 20, 1200, 60), maxHp: clamp(aiBond.hp, 20, 1200, 60),
+      attack: clamp(aiBond.attack, 1, 500, 10), defense: clamp(aiBond.defense, 0, 500, 6), speed: clamp(aiBond.speed, 1, 500, 10),
+      element: aiBond.element || 'wood',
+      loyalty: clamp(aiBond.loyalty, 0, 100, 70), satiety: clamp(aiBond.satiety, 0, 100, 80),
+      level: 1, exp: 0, expToLevel: 100,
+      sourceAcquired: aiBond.sourceAcquired || sourceAcquired,
+      acquiredAge,
+      traits: aiBond.traits || [],
+      passiveHint: aiBond.passiveHint,
+      skill: { name: aiBond.skill?.name || '灵息护主', description: aiBond.skill?.description || '以灵息护持主人。', power: Math.max(0.5, Math.min(5, Number(aiBond.skill?.power) || 1.2)), cooldown: Math.max(1, Math.min(8, Math.round(Number(aiBond.skill?.cooldown) || 3))) },
+    };
+  }
   const template = PET_SPECIES_TEMPLATES[species];
   const rarityMul = PET_RARITY_MULTIPLIER[rarity] || 1.0;
   // 境界加成：每境界 +20% 基础属性
@@ -4703,6 +4737,7 @@ export function feedPet(
   state: CharacterState,
   petId: string,
   itemId: string,
+  aiCare?: PetCareAIOutcome | null,
 ): { state: CharacterState; ok: boolean; error?: string; pet?: Pet } {
   const pet = (state.pets || []).find(p => p.id === petId);
   if (!pet) return { state, ok: false, error: '灵宠不存在' };
@@ -4712,7 +4747,26 @@ export function feedPet(
   if (item.item_type !== 'material' && item.item_type !== 'consumable' && item.item_type !== 'tool') {
     return { state, ok: false, error: '该物品不适合喂养灵宠' };
   }
-  // 按稀有度计算喂养价值
+  if (aiCare) {
+    const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Math.round(Number(v) || 0)));
+    const levelDelta = clamp(aiCare.levelDelta || 0, 0, 3);
+    const maxHpDelta = clamp(aiCare.maxHpDelta || 0, -20, 120) + levelDelta * 8;
+    const updatedPet: Pet = {
+      ...pet,
+      satiety: Math.max(0, Math.min(100, pet.satiety + clamp(aiCare.satietyDelta, -20, 80))),
+      loyalty: Math.max(0, Math.min(100, pet.loyalty + clamp(aiCare.loyaltyDelta, -30, 60))),
+      level: Math.max(1, pet.level + levelDelta),
+      exp: Math.max(0, pet.exp + clamp(aiCare.expDelta, 0, 300)),
+      attack: Math.max(0, pet.attack + clamp(aiCare.attackDelta || 0, -10, 80) + levelDelta * 2),
+      defense: Math.max(0, pet.defense + clamp(aiCare.defenseDelta || 0, -10, 80) + levelDelta),
+      maxHp: Math.max(1, pet.maxHp + maxHpDelta),
+      hp: Math.min(Math.max(1, pet.maxHp + maxHpDelta), Math.max(0, pet.hp + maxHpDelta)),
+    };
+    const newInventory = state.inventory.filter(it => it.id !== itemId);
+    const newPets = state.pets.map(p => p.id === petId ? updatedPet : p);
+    return { state: { ...state, pets: newPets, inventory: newInventory }, ok: true, pet: updatedPet };
+  }
+  // AI 失败时按稀有度公式兜底计算喂养价值
   const rarityValue: Record<string, number> = { common: 15, uncommon: 25, rare: 40, epic: 60, legendary: 80, mythic: 100 };
   const feedValue = rarityValue[item.rarity] || 15;
   // 更新灵宠

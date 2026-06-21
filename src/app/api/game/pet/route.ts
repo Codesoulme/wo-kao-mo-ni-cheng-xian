@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import {
   addPet,
+  buildStateContext,
   createPet,
   dbToState,
   dismissPet,
@@ -16,8 +17,9 @@ import {
   stateToResponse,
 } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { generatePetBond, generatePetCareOutcome } from '@/lib/xianxia/llm';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
-import type { AttributeChange, CharacterState, Pet } from '@/lib/xianxia/types';
+import type { AttributeChange, CharacterState, Pet, PetBondAIOutcome, PetCareAIOutcome } from '@/lib/xianxia/types';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -158,7 +160,15 @@ export async function POST(req: NextRequest) {
       }
       const beforePet = state.pets.find(p => p.id === petId);
       const item = state.inventory.find(it => it.id === itemId);
-      const r = feedPet(state, petId, itemId);
+      let aiCare: PetCareAIOutcome | null = null;
+      if (beforePet && item) {
+        try {
+          const recentDb = await db.eventLog.findMany({ where: { characterId }, orderBy: { age: 'desc' }, take: 3 });
+          const recent = recentDb.reverse().map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType }));
+          aiCare = await generatePetCareOutcome(buildStateContext(state, recent), beforePet, item);
+        } catch (err: any) { console.error('pet care AI failed, fallback to rarity formula:', err?.message || err); }
+      }
+      const r = feedPet(state, petId, itemId, aiCare);
       if (!r.ok) return NextResponse.json({ success: false, error: r.error }, { status: 400 });
       state = normalizeCultivationState(refreshWorldFacts(r.state, 'pet-feed'));
       pet = r.pet;
@@ -177,11 +187,17 @@ export async function POST(req: NextRequest) {
       const validRarities = ['common','uncommon','rare','epic','legendary','mythic'] as const;
       const sp = (validSpecies as readonly string[]).includes(species || '') ? species as any : 'fox';
       const ra = (validRarities as readonly string[]).includes(rarity || '') ? rarity as any : 'uncommon';
-      const newPet = createPet(sp, ra, state.realm as any, '', '', '灵缘结契', state.age);
+      let aiBond: PetBondAIOutcome | null = null;
+      try {
+        const recentDb = await db.eventLog.findMany({ where: { characterId }, orderBy: { age: 'desc' }, take: 3 });
+        const recent = recentDb.reverse().map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType }));
+        aiBond = await generatePetBond(buildStateContext(state, recent), { species, rarity });
+      } catch (err: any) { console.error('pet bond AI failed, fallback to species template:', err?.message || err); }
+      const newPet = createPet(sp, ra, state.realm as any, aiBond?.name || '', aiBond?.description || '', aiBond?.sourceAcquired || '灵缘结契', state.age, aiBond?.skill, aiBond);
       state = normalizeCultivationState(refreshWorldFacts(addPet(state, newPet), 'pet-summon'));
       pet = newPet;
       appliedChanges.push({ attribute: 'pets', delta: 1, reason: `结缘${newPet.name}` } as any);
-      narrative = `林间灵机微动，一只${newPet.name}循缘而至，与${state.name}结下同行之约。`;
+      narrative = aiBond?.narrative || `林间灵机微动，一只${newPet.name}循缘而至，与${state.name}结下同行之约。`;
     }
 
     state = recordActionCausality(state, {
