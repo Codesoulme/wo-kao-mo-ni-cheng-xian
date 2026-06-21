@@ -81,10 +81,10 @@ export function StatusList() {
               ) : (
                 <>
                   {identityStatuses.length > 0 && (
-                    <StatusGroup title="??" items={identityStatuses} />
+                    <StatusGroup title="\u8eab\u4efd" items={identityStatuses} />
                   )}
                   {fateStatuses.length > 0 && (
-                    <StatusGroup title="??" items={fateStatuses} />
+                    <StatusGroup title="\u4ed9\u7f18" items={fateStatuses} />
                   )}
                   {buffStatuses.length > 0 && (
                     <StatusGroup title="增益" items={buffStatuses} />
@@ -139,7 +139,7 @@ function classifyStatus(status: any): 'identity' | 'fate' | 'buff' | 'debuff' {
 }
 
 function displayCategoryLabel(status: any): string {
-  if (classifyStatus(status) === 'fate') return '??';
+  if (classifyStatus(status) === 'fate') return '\u4ed9\u7f18';
   if (classifyStatus(status) === 'buff') return '增益';
   if (classifyStatus(status) === 'debuff') return '减益';
   return CATEGORY_LABEL[status?.category] || status?.category || '状态';

@@ -23,7 +23,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
   const rootMultiplier = Number.isFinite(Number(current.rootMultiplier)) ? Number(current.rootMultiplier) : (rootInfo?.multiplier ?? 0);
   const rootDescription = rootInfo?.description || '\u6b64\u7075\u6839\u5c1a\u65e0\u8be6\u7ec6\u8bb0\u8f7d\uff0c\u4ecd\u5f85\u540e\u7eed\u56e0\u7f18\u663e\u5316\u3002';
   const lifespanLeft = current.lifespan - current.age;
-  const genderLabel = current.gender === 'male' ? '?' : current.gender === 'female' ? '?' : current.gender || '??';
+  const genderLabel = current.gender === 'male' ? '\u7537' : current.gender === 'female' ? '\u5973' : current.gender || '\u672a\u8bc6';
   const meaningfulStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
   const constitutionStatuses = meaningfulStatuses.filter(isConstitutionStatus);
   const dynamicAttributes = (current.cultivationAttributes || []).filter((attr: any) => attr && attr.visible !== false && attr.name);
