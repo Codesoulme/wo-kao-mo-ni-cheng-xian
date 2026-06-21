@@ -15,6 +15,7 @@ import {
   ItemEntry,
   ChoicePrompt,
   SpiritualRoot,
+  SpiritualRootChange,
   SPIRITUAL_ROOTS,
   Element,
   ELEMENTS,
@@ -847,6 +848,7 @@ ${chosenText}
 }
 
 可修改属性白名单：${ctx.availableAttributes.join(', ')}
+灵根若因洗髓、传承、体质觉醒等明确因果发生改变，不要写进 changes；必须使用 spiritualRootChange，格式为 {"spiritualRoot":"mixed|common|pure|heavenly|chaos|none", "rootDetail":"玩家可见的中文灵根名", "reason":"中文因果"}；无改变填 null。
 newStatuses：若选择结果造成持续状态/机缘/伤势/心境变化，必须生成状态，顶部会显示；同时必须考虑已有状态对选择结果的影响，不要只写在叙事里。
 nextChoice：仅当选择结果需要玩家立即继续决定时使用，例如进入拍卖会后给出下一轮出价/观望/放弃选项；结构同 {prompt, options:[{text,hint}]}，最多4项。普通选择结果请填 null。
 equipItemIds / unequipItemIds / newEquippedItems：用于选择后立即装备/卸下/创造性合成物品（详见 advance 场景规则）。
@@ -913,6 +915,7 @@ ${playerInput}
 }
 
 可修改属性白名单：${ctx.availableAttributes.join(', ')}
+灵根若因洗髓、传承、体质觉醒等明确因果发生改变，不要写进 changes；必须使用 spiritualRootChange，格式为 {"spiritualRoot":"mixed|common|pure|heavenly|chaos|none", "rootDetail":"玩家可见的中文灵根名", "reason":"中文因果"}；无改变填 null。
 newStatuses：若玩家行动带来持续状态/机缘/伤势/心境变化，必须生成状态，顶部会显示；同时必须考虑已有状态对行动结果的影响，不要只写在叙事里。
 注意：overreach 与 rule_manipulation 必须 accepted=false，changes 必须为空数组。
 action/dialogue 的 changes 要克制，单次干扰 ±1~±30 属性，不可一次性突破或飞升。
@@ -1792,6 +1795,7 @@ function sanitizeEventOutput(raw: any, currentAge = 0): AIEventOutput {
     completeThreadIds: Array.isArray(raw?.completeThreadIds) ? raw.completeThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
     failThreadIds: Array.isArray(raw?.failThreadIds) ? raw.failThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
     triggerCombat: sanitizeTriggerCombat(raw?.triggerCombat),
+    spiritualRootChange: sanitizeSpiritualRootChange(raw?.spiritualRootChange),
   };
 }
 
@@ -1948,6 +1952,17 @@ function sanitizeChoicePrompt(raw: any): ChoicePrompt | undefined {
   return { prompt: prompt.slice(0, 800), options };
 }
 
+function sanitizeSpiritualRootChange(raw: any): SpiritualRootChange | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const root = String(raw.spiritualRoot || '');
+  if (!['mixed','common','pure','heavenly','chaos','none'].includes(root)) return undefined;
+  return {
+    spiritualRoot: root as SpiritualRoot,
+    rootDetail: raw.rootDetail ? String(raw.rootDetail).slice(0, 48) : undefined,
+    reason: raw.reason ? String(raw.reason).slice(0, 120) : '灵根生变',
+  };
+}
+
 function sanitizeChoiceOutput(raw: any): ChoiceResultOutput {
   const changes: AttributeChange[] = Array.isArray(raw?.changes) ? raw.changes.map((c: any) => ({
     attribute: String(c.attribute || ''),
@@ -1981,6 +1996,7 @@ function sanitizeChoiceOutput(raw: any): ChoiceResultOutput {
     completeThreadIds: Array.isArray(raw?.completeThreadIds) ? raw.completeThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
     failThreadIds: Array.isArray(raw?.failThreadIds) ? raw.failThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
     triggerCombat: sanitizeTriggerCombat(raw?.triggerCombat),
+    spiritualRootChange: sanitizeSpiritualRootChange(raw?.spiritualRootChange),
   } as ChoiceResultOutput;
 }
 
@@ -2023,6 +2039,7 @@ function sanitizeInterfereOutput(raw: any, currentAge = 0): InterfereOutput {
     completeThreadIds: accepted && Array.isArray(raw?.completeThreadIds) ? raw.completeThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
     failThreadIds: accepted && Array.isArray(raw?.failThreadIds) ? raw.failThreadIds.map((x: any) => String(x)).filter(Boolean) : [],
     triggerCombat: accepted ? sanitizeTriggerCombat(raw?.triggerCombat) : undefined,
+    spiritualRootChange: accepted ? sanitizeSpiritualRootChange(raw?.spiritualRootChange) : undefined,
   };
 }
 
