@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useGameStore } from '@/lib/xianxia/store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,6 +48,7 @@ const STATUS_STYLE: Record<string, {
 export function PendingThreadsCard() {
   const { character } = useGameStore();
   const [showAll, setShowAll] = useState(false);
+  const [expandedThreadIds, setExpandedThreadIds] = useState<Record<string, boolean>>({});
   if (!character) return null;
 
   const sourceThreads = Array.isArray(character.pendingThreads) && character.pendingThreads.length > 0
@@ -83,6 +84,9 @@ export function PendingThreadsCard() {
               const style = STATUS_STYLE[t.status] || STATUS_STYLE.pending;
               const age = character.age || 0;
               const progress = Math.max(0, Math.min(100, t.progress || 0));
+                const threadKey = String(t.id || `${t.title || 'thread'}-${i}`);
+                const expanded = Boolean(expandedThreadIds[threadKey]);
+                const description = sanitizeThreadText(t.description || '');
               return (
                 <div
                   key={t.id || i}
@@ -109,10 +113,24 @@ export function PendingThreadsCard() {
                     </span>
                   </div>
 
-                  {t.description && (
-                    <p className="text-[11px] text-foreground/70 font-serif-cn leading-relaxed line-clamp-2 xianxia-readable">
-                      {sanitizeThreadText(t.description)}
-                    </p>
+                  {description && (
+                    <div className="space-y-1">
+                      <p className={cn(
+                        "text-[11px] text-foreground/70 font-serif-cn leading-relaxed xianxia-readable",
+                        !expanded && "line-clamp-2",
+                      )}>
+                        {description}
+                      </p>
+                      {description.length > 52 && (
+                        <button
+                          type="button"
+                          onClick={() => setExpandedThreadIds(prev => ({ ...prev, [threadKey]: !expanded }))}
+                          className="text-[10px] text-primary/80 hover:text-primary"
+                        >
+                          {expanded ? '\u6536\u8d77' : '\u5c55\u5f00\u5168\u6587'}
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   <div>
@@ -208,14 +226,32 @@ function threadTimeText(t: any, age: number): string {
 
 function sanitizeThreadText(text: string): string {
   return String(text || '')
-    .replace(/deadline/gi, '约期')
-    .replace(/pending/gi, '待续')
-    .replace(/quest/gi, '因缘')
-    .replace(/thread/gi, '线头')
-    .replace(/角色应主动/g, '心中已有念头，欲')
-    .replace(/不能被后续流年遗忘/g, '仍不可轻放')
-    .replace(/后续流年/g, '来年岁月')
+    .replace(/deadline/gi, '\u7ea6\u671f')
+    .replace(/pending/gi, '\u5f85\u7eed')
+    .replace(/quest/gi, '\u56e0\u7f18')
+    .replace(/thread/gi, '\u7ebf\u5934')
+    .replace(new RegExp('\\u6b64\\u524d\\u5929\\u9053\\u5e72\\u9884\\u4f7f([^\\uff1a:\\uff0c,\\u3002\\s]+)\\u7ecf\\u5386\\u4e86[\\uff1a:\\uff0c,\\u3002\\s]*', 'g'), '$1\u66fe\u7ecf')
+    .replace(new RegExp('\\u5929\\u9053\\u5e72\\u9884\\u4f7f([^\\uff1a:\\uff0c,\\u3002\\s]+)\\u7ecf\\u5386\\u4e86[\\uff1a:\\uff0c,\\u3002\\s]*', 'g'), '$1\u66fe\u7ecf')
+    .replace(new RegExp('\\u6b64\\u524d\\u5929\\u9053\\u5e72\\u9884', 'g'), '\u6b64\u524d')
+    .replace(new RegExp('\\u524d\\u5929\\u9053\\u5e72\\u9884', 'g'), '\u6b64\u524d')
+    .replace(new RegExp('\\u5929\\u9053\\u5e72\\u9884', 'g'), '\u56e0\u7f18\u7275\u52a8')
+    .replace(new RegExp('\\u89d2\\u8272\\u5e94\\u4e3b\\u52a8', 'g'), '\u5fc3\u4e2d\u5df2\u6709\u5ff5\u5934\uff0c\u6b32')
+    .replace(new RegExp('\\u4e0d\\u80fd\\u88ab\\u540e\\u7eed\\u6d41\\u5e74\\u9057\\u5fd8', 'g'), '\u4ecd\u4e0d\u53ef\u8f7b\u653e')
+    .replace(new RegExp('\\u540e\\u7eed\\u6d41\\u5e74', 'g'), '\u6765\u5e74\u5c81\u6708')
     .trim();
+}
+
+function displayThreadTitle(t: any): string {
+  const rawTitle = sanitizeThreadText(t.title || '');
+  const text = sanitizeThreadText(`${t.description || ''} ${t.followUpHint || ''} ${t.sourceEventTitle || ''}`);
+  const bloodScripture = new RegExp('\\u6b8b\\u7f3a\\u8840\\u715e\\u8bc0|\\u8840\\u715e\\u8bc0');
+  const badTitle = new RegExp('\\u4f59\\u6ce2|\\u7528.*\\u8840\\u715e\\u8bc0');
+  if (bloodScripture.test(text) && badTitle.test(rawTitle)) {
+    const repairHint = new RegExp('\\u6574\\u7406|\\u4e92\\u8865|\\u4fee\\u8865|\\u5408\\u5377|\\u8865\\u5168|\\u6b8b\\u53e5|\\u4e24\\u672c|\\u4e24\\u5377');
+    if (repairHint.test(text)) return '\u6574\u7406\u6b8b\u7f3a\u8840\u715e\u8bc0';
+    return '\u4fee\u8865\u8840\u715e\u8bc0';
+  }
+  return rawTitle.replace(new RegExp('^\\u7528(.{2,18})\\u4f59\\u6ce2$'), '$1\u540e\u7eed') || '\u65e0\u540d\u56e0\u7f18';
 }
 
 function sortThreads(threads: any[]): any[] {

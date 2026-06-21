@@ -19,11 +19,13 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
   const current = liveCharacter?.id === character.id ? liveCharacter : character;
   const realmInfo = REALMS.find(r => r.id === current.realm);
   const rootInfo = SPIRITUAL_ROOTS[current.spiritualRoot as keyof typeof SPIRITUAL_ROOTS];
+  const rootName = current.rootDetail || rootInfo?.name || current.spiritualRoot || '????';
+  const rootMultiplier = Number.isFinite(Number(current.rootMultiplier)) ? Number(current.rootMultiplier) : (rootInfo?.multiplier ?? 0);
+  const rootDescription = rootInfo?.description || '???????????????????????????????';
   const lifespanLeft = current.lifespan - current.age;
-  const genderLabel = current.gender === 'male' ? '男' : current.gender === 'female' ? '女' : current.gender || '未知';
+  const genderLabel = current.gender === 'male' ? '?' : current.gender === 'female' ? '?' : current.gender || '??';
   const meaningfulStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
   const constitutionStatuses = meaningfulStatuses.filter(isConstitutionStatus);
-  const visibleStatuses = meaningfulStatuses.filter(status => !isConstitutionStatus(status));
   const dynamicAttributes = (current.cultivationAttributes || []).filter((attr: any) => attr && attr.visible !== false && attr.name);
   const [selectedAttr, setSelectedAttr] = useState<AttributeInfo | null>(null);
 
@@ -101,17 +103,17 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             <button type="button" onClick={() => setSelectedAttr(ATTRIBUTE_INFO.spiritualRoot)} className="w-full text-left rounded-lg border border-border/60 p-3 mt-1.5 bg-card/40 transition hover:border-primary/40 hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/30">
               <div className="flex items-center justify-between mb-1">
                 <span className="font-serif-cn font-semibold text-sm" style={{
-                  color: current.rootMultiplier >= 1.5 ? '#c8453c' : current.rootMultiplier >= 0.8 ? '#2e5c8a' : undefined,
+                  color: rootMultiplier >= 1.5 ? '#c8453c' : rootMultiplier >= 0.8 ? '#2e5c8a' : undefined,
                 }}>
-                  {current.rootDetail}
+                  {rootName}
                 </span>
-                {current.rootMultiplier > 0 && (
+                {rootMultiplier > 0 && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
                     修炼 ×{current.rootMultiplier}
                   </span>
                 )}
               </div>
-              <p className="text-[11px] text-muted-foreground">{rootInfo?.description}</p>
+              <p className="text-[11px] text-muted-foreground">{rootDescription}</p>
               <p className="mt-1 text-[10px] text-primary/70 flex items-center gap-1"><Info className="w-3 h-3" />点按查看影响</p>
             </button>
 
@@ -225,31 +227,6 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             </div>
           </section>
 
-          {/* 状态摘要 */}
-          <section>
-            <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title={`状态 (${visibleStatuses.length})`} />
-            <div className="rounded-lg border border-border/60 p-2 mt-1.5 bg-card/40">
-              {visibleStatuses.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-2">尚无状态</p>
-              ) : (
-                <div className="flex flex-wrap gap-1">
-                  {visibleStatuses.map((s: any, i: number) => (
-                    <span
-                      key={i}
-                      className="text-[10px] px-1.5 py-0.5 rounded border"
-                      style={{
-                        borderColor: `${RARITY_COLORS[s.rarity] || '#6b7280'}40`,
-                        color: RARITY_COLORS[s.rarity] || '#6b7280',
-                        background: `${RARITY_COLORS[s.rarity] || '#6b7280'}10`,
-                      }}
-                    >
-                      {s.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </section>
 
         </div>
       </SheetContent>

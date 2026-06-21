@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, endCombat } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
@@ -787,6 +787,103 @@ function smokeTechniqueSpellNaming(): void {
   log('technique-spell-naming', { passed: true, artifact: artifactArt?.name, scripture: scriptureArt?.name });
 }
 
+
+function smokeCombatFleeNoSpoils(): void {
+  const rawState: any = {
+    id: 'smoke_flee_no_spoils',
+    name: 'Smoke Flee',
+    age: 18,
+    gender: 'male',
+    background: 'commoner',
+    spiritualRoot: 'common',
+    rootDetail: '???',
+    rootMultiplier: 0.35,
+    realm: 'qi_refining',
+    realmLevel: 1,
+    cultivation: 0,
+    cultivationExp: 0,
+    hp: 20,
+    maxHp: 20,
+    mp: 10,
+    maxMp: 10,
+    lifespan: 80,
+    comprehension: 5,
+    luck: 5,
+    spiritStones: 0,
+    inventory: [],
+    equipped: [],
+    activeStatuses: [],
+    eventsLog: [],
+    pendingThreads: [],
+    alive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    combatSession: {
+      id: 'combat_fled_smoke',
+      status: 'fled',
+      enemyName: 'Smoke Bandit',
+      enemyRealm: 'qi_refining',
+      enemyRealmLevel: 1,
+      enemyMaxHp: 10,
+      enemyAttack: 1,
+      enemyDefense: 1,
+      log: [],
+      round: 1,
+      playerHp: 20,
+      enemyHp: 1,
+      startedAtAge: 18,
+    },
+  };
+  const state: any = normalizeCultivationState(rawState);
+  const ended = endCombat(state, true);
+  assert(ended.result === 'fled', 'flee result should remain fled');
+  assert(ended.drops.length === 0, 'flee should not grant drops');
+  assert((ended.spiritStones || 0) === 0, 'flee should not grant spirit stones');
+  assert((ended.state.inventory || []).length === 0, 'flee should not add inventory loot');
+  log('combat-flee-no-spoils', { passed: true, result: ended.result });
+}
+
+function smokeIdentityNormalization(): void {
+  const rawState: any = {
+    id: 'smoke_identity',
+    name: 'Smoke Identity',
+    age: 18,
+    gender: 'female',
+    background: 'commoner',
+    spiritualRoot: 'common',
+    rootDetail: '???',
+    rootMultiplier: 0.35,
+    realm: 'qi_refining',
+    realmLevel: 1,
+    cultivation: 0,
+    cultivationExp: 0,
+    hp: 20,
+    maxHp: 20,
+    mp: 10,
+    maxMp: 10,
+    lifespan: 80,
+    comprehension: 5,
+    luck: 5,
+    spiritStones: 0,
+    inventory: [],
+    equipped: [],
+    eventsLog: [],
+    pendingThreads: [],
+    alive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    activeStatuses: [
+      { id: 'id_old', name: 'candidate sect servant', description: 'candidate sect servant', category: 'identity', rarity: 'common', duration: -1, source: 'smoke', effects: [] },
+      { id: 'id_new', name: 'formal sect servant', description: 'formal sect servant', category: 'identity', rarity: 'common', duration: -1, source: 'smoke', effects: [] },
+    ],
+  };
+  const state: any = normalizeCultivationState(rawState);
+  const names = state.activeStatuses.map((s: any) => s.name);
+  assert(names.includes('formal sect servant'), 'newer formal identity should remain');
+  assert(!names.includes('candidate sect servant'), 'stale candidate identity should be removed');
+  log('identity-normalization', { passed: true, names });
+}
+
 function smokeCombatSettlementSingleFlow(): void {
   const source = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf8');
   assert(source.includes('const isTerminal = !nextCharacter.alive || nextCharacter.ascended;'), 'combat modal should detect terminal combat result');
@@ -936,6 +1033,8 @@ async function main(): Promise<void> {
   smokeTechniqueRequirements();
   smokeNoProtagonistShieldPrompt();
   smokeConstitutionProfiles();
+  smokeCombatFleeNoSpoils();
+  smokeIdentityNormalization();
   smokeCombatSettlementSingleFlow();
   smokeDynamicCultivationAttributes();
   smokeCombatArtFallbackNames();

@@ -53,6 +53,59 @@ function fmtEffectZh(eff: any): string {
   return formatItemEffectLabel(eff);
 }
 
+function ArtSection({ title, emptyText, items, total, kindLabel, icon, openDetail }: {
+  title: string;
+  emptyText: string;
+  items: any[];
+  total: number;
+  kindLabel: string;
+  icon: 'book' | 'wand';
+  openDetail: (item: any) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground px-1">
+        <span>{title}</span>
+        <span>{items.length}/{total}</span>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-[11px] text-muted-foreground text-center py-2 rounded-md border border-dashed border-border/60">{emptyText}</p>
+      ) : items.map((art, i) => {
+        const color = RARITY_COLORS[art.rarity] || '#6b7280';
+        const Icon = icon === 'wand' ? Wand2 : BookOpen;
+        return (
+          <div
+            key={art.id || i}
+            className="rounded-md border p-2 cursor-pointer transition-all hover:bg-muted/30"
+            style={{ borderColor: `${color}40`, background: `${color}08` }}
+            onClick={() => openDetail(art)}
+          >
+            <div className="flex items-center justify-between gap-2 mb-0.5">
+              <span className="flex items-center gap-1.5 min-w-0">
+                <Icon className="w-3.5 h-3.5 shrink-0" style={{ color }} />
+                <span className="text-xs font-semibold font-serif-cn truncate" style={{ color }}>
+                  {art.name}
+                </span>
+              </span>
+              <span className="text-[9px] px-1 rounded shrink-0" style={{ background: `${color}20`, color }}>
+                {kindLabel}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
+              {art.description || '此术含而未发，斗法时可调动其灵机。'}
+            </p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary">耗灵 {art.mpCost}</span>
+              <span className="text-[9px] px-1 py-0.5 rounded bg-accent/10 text-accent">威势 ?{art.power.toFixed(1)}</span>
+              {art.equipNote && <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">{art.equipNote}</span>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // 判定物品是否是储物袋（含 storageCapacity 效果的 tool）
 function isStorageBag(item: any): boolean {
   if (!item || item.item_type !== 'tool') return false;
@@ -134,15 +187,18 @@ export function InventoryPanel() {
     .sort((a, b) => b.__idx - a.__idx);
   const visibleSpecialStatuses = showAllSpecial ? specialStatuses : specialStatuses.slice(0, 3);
 
-  // 习得的法术：当前已装备/修习的功法、法宝可在斗法中施展
-  const learnedArts = equippedNewest
-    .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
-    .map(it => ({
-      ...it,
-      mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
-      power: 1 + ((['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) >= 0 ? ['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) : 0) * 0.5),
-    }));
-  const visibleArts = showAllArts ? learnedArts : learnedArts.slice(0, 3);
+  const artPower = (it: any) => 1 + ((['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) >= 0 ? ['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) : 0) * 0.5);
+  const artMpCost = (it: any) => Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10)));
+  // 功法与法术分开展示：功法在上，法宝灵禁/自带术式在下。
+  const learnedTechniques = equippedNewest
+    .filter(it => it.item_type === 'scripture')
+    .map(it => ({ ...it, mpCost: artMpCost(it), power: artPower(it) }));
+  const learnedSpells = equippedNewest
+    .filter(it => it.item_type === 'artifact')
+    .map(it => ({ ...it, mpCost: artMpCost(it), power: artPower(it) }));
+  const learnedArts = [...learnedTechniques, ...learnedSpells];
+  const visibleTechniques = showAllArts ? learnedTechniques : learnedTechniques.slice(0, 3);
+  const visibleSpells = showAllArts ? learnedSpells : learnedSpells.slice(0, 3);
   const toggleBagGroup = (type: string) => setExpandedBagGroups(prev => ({ ...prev, [type]: !prev[type] }));
 
   return (
@@ -249,56 +305,45 @@ export function InventoryPanel() {
         </CardContent>
       </Card>
 
-      {/* ==================== 习得的法术 ==================== */}
+      {/* ==================== 功法与法术 ==================== */}
       <Card className="paper-texture">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center justify-between">
             <span className="flex items-center gap-2">
-              <Wand2 className="w-4 h-4 text-primary" />
-              习得的法术
+              <BookOpen className="w-4 h-4 text-primary" />
+              功法·法术
             </span>
             <Badge variant="secondary" className="text-[10px]">
               {learnedArts.length} 门
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0 space-y-1.5">
+        <CardContent className="pt-0 space-y-3">
           {learnedArts.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-3">
-              尚未修习可用于斗法的功法或法宝。装备功法、法宝后，此处会显现可施展之术。
+              尚未修习可用于斗法的功法或法宝。装备功法、法宝后，此处会显现可参悟与施展之术。
             </p>
           ) : (
-            visibleArts.map((art, i) => {
-              const color = RARITY_COLORS[art.rarity] || '#6b7280';
-              return (
-                <div
-                  key={art.id || i}
-                  className="rounded-md border p-2 cursor-pointer transition-all hover:bg-muted/30"
-                  style={{ borderColor: `${color}40`, background: `${color}08` }}
-                  onClick={() => openDetail(art)}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <span className="flex items-center gap-1.5 min-w-0">
-                      <BookOpen className="w-3.5 h-3.5 shrink-0" style={{ color }} />
-                      <span className="text-xs font-semibold font-serif-cn truncate" style={{ color }}>
-                        {art.name}
-                      </span>
-                    </span>
-                    <span className="text-[9px] px-1 rounded shrink-0" style={{ background: `${color}20`, color }}>
-                      {art.item_type === 'artifact' ? '法宝术' : '功法术'}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed line-clamp-2">
-                    {art.description || '此术含而未发，斗法时可调动其灵机。'}
-                  </p>
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary">耗灵 {art.mpCost}</span>
-                    <span className="text-[9px] px-1 py-0.5 rounded bg-accent/10 text-accent">威势 ×{art.power.toFixed(1)}</span>
-                    {art.equipNote && <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">{art.equipNote}</span>}
-                  </div>
-                </div>
-              );
-            })
+            <>
+              <ArtSection
+                title="功法"
+                emptyText="尚未装备功法。"
+                items={visibleTechniques}
+                total={learnedTechniques.length}
+                kindLabel="功法"
+                icon="book"
+                openDetail={openDetail}
+              />
+              <ArtSection
+                title="法术"
+                emptyText="尚无法宝灵禁或自带术式。"
+                items={visibleSpells}
+                total={learnedSpells.length}
+                kindLabel="法宝术"
+                icon="wand"
+                openDetail={openDetail}
+              />
+            </>
           )}
           {learnedArts.length > 3 && (
             <button
@@ -306,7 +351,7 @@ export function InventoryPanel() {
               className="w-full text-[10px] text-muted-foreground hover:text-primary flex items-center justify-center gap-1 py-1"
             >
               <ChevronDown className={cn("w-3 h-3 transition-transform", showAllArts && "rotate-180")} />
-              {showAllArts ? '收起法术' : `展开其余 ${learnedArts.length - 3} 门法术`}
+              {showAllArts ? '收起功法法术' : `展开其余 ${Math.max(0, learnedArts.length - 3)} 门`}
             </button>
           )}
         </CardContent>

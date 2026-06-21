@@ -620,6 +620,7 @@ export function normalizeCultivationState(state: CharacterState): CharacterState
     mp: Math.max(0, Math.min(Number(state.mp ?? 0), Math.max(0, Number(state.maxMp ?? 0)))),
     inventory: (state.inventory || []).map(normalizeCultivationBearingItem),
     equipped: (state.equipped || []).map(normalizeCultivationBearingItem),
+    activeStatuses: normalizeIdentityStatuses(filterMeaningfulStatuses(state.activeStatuses || [])),
   };
   const rate = computeEffectiveCultivationRate(normalizedState);
   return {
@@ -1786,13 +1787,52 @@ export function filterMeaningfulStatuses(statuses: StatusEntry[]): StatusEntry[]
   }));
 }
 
+function identityRank(status: Partial<StatusEntry>): number {
+  const text = `${status.name || ''} ${status.description || ''} ${status.source || ''}`;
+  const lower = text.toLowerCase();
+  let rank = 0;
+  if (new RegExp('\u5019\u8865|\u89c1\u4e60|\u8bd5\u5f79|\u4e34\u65f6').test(text) || /candidate|trainee|temporary/.test(lower)) rank = Math.max(rank, 1);
+  if (new RegExp('\u6b63\u5f0f|\u5916\u95e8|\u5185\u95e8|\u6267\u4e8b|\u771f\u4f20|\u957f\u8001|\u4f9b\u5949|\u638c\u95e8|\u5b97\u4e3b').test(text) || /formal|outer|inner|elder|master/.test(lower)) rank = Math.max(rank, 2);
+  if (new RegExp('\u6b63\u5f0f').test(text) || /formal/.test(lower)) rank = Math.max(rank, 3);
+  return rank;
+}
+
+function identityFamily(status: Partial<StatusEntry>): string {
+  const text = `${status.name || ''} ${status.description || ''} ${status.source || ''}`;
+  const lower = text.toLowerCase();
+  if (new RegExp('\u6742\u5f79|\u5916\u95e8|\u5185\u95e8|\u6267\u4e8b|\u771f\u4f20|\u957f\u8001|\u4f9b\u5949|\u638c\u95e8|\u5b97\u4e3b|\u5b97\u95e8|\u5f1f\u5b50').test(text) || /sect|servant|disciple/.test(lower)) return 'sect-role';
+  if (new RegExp('\u5e08\u5f92|\u5e08\u627f|\u5e08\u7236|\u5e08\u5c0a|\u5f92\u5f1f').test(text) || /lineage|teacher|apprentice/.test(lower)) return 'lineage-role';
+  if (new RegExp('\u6563\u4fee').test(text) || /rogue cultivator/.test(lower)) return 'cultivator-role';
+  return `identity:${String(status.name || '').replace(new RegExp('\u5019\u8865|\u89c1\u4e60|\u8bd5\u5f79|\u6b63\u5f0f|\u4e34\u65f6', 'g'), '').replace(/candidate|trainee|temporary|formal/gi, '')}`;
+}
+
+export function normalizeIdentityStatuses(statuses: StatusEntry[]): StatusEntry[] {
+  const bestByFamily = new Map<string, { status: StatusEntry; idx: number; rank: number }>();
+  const passthrough: { status: StatusEntry; idx: number }[] = [];
+  for (const [idx, status] of (statuses || []).entries()) {
+    if (status?.category !== 'identity') {
+      passthrough.push({ status, idx });
+      continue;
+    }
+    const family = identityFamily(status);
+    const rank = identityRank(status);
+    const existing = bestByFamily.get(family);
+    if (!existing || rank > existing.rank || (rank === existing.rank && idx > existing.idx)) {
+      bestByFamily.set(family, { status, idx, rank });
+    }
+  }
+  return [...passthrough, ...bestByFamily.values().map(v => ({ status: v.status, idx: v.idx }))]
+    .sort((a, b) => a.idx - b.idx)
+    .map(v => v.status);
+}
+
 export function addStatuses(state: CharacterState, statuses: StatusEntry[]): CharacterState {
   const meaningful = filterMeaningfulStatuses(statuses || []);
   if (!meaningful.length) return state;
   const existingIds = new Set(state.activeStatuses.map(s => s.id));
   const existingNames = new Set(state.activeStatuses.map(s => s.name));
   const newStatuses = meaningful.filter(s => !existingIds.has(s.id) && !existingNames.has(s.name));
-  return { ...state, activeStatuses: [...state.activeStatuses, ...newStatuses] };
+  return { ...state, activeStatuses: normalizeIdentityStatuses([...state.activeStatuses, ...newStatuses]) };
 }
 
 export function tickStatusDurations(state: CharacterState): CharacterState {
@@ -1802,7 +1842,7 @@ export function tickStatusDurations(state: CharacterState): CharacterState {
     duration: s.duration === -1 ? -1 : s.duration - 1,
   }));
   const alive = ticked.filter(s => s.duration === -1 || s.duration > 0);
-  return { ...state, activeStatuses: filterMeaningfulStatuses(alive) };
+  return { ...state, activeStatuses: normalizeIdentityStatuses(filterMeaningfulStatuses(alive)) };
 }
 
 // 每岁自然恢复：身体与灵息会自行回转，但只恢复少量。

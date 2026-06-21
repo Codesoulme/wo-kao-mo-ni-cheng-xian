@@ -11,7 +11,7 @@ import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
 import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
 import { CultivationSpeedCard } from '@/components/xianxia/CultivationSpeedCard';
-import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
+import { filterMeaningfulStatuses, isConstitutionStatus } from '@/lib/xianxia/engine';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280',
@@ -43,9 +43,11 @@ export function StatusList() {
   if (!character) return null;
 
   const visibleStatuses = filterMeaningfulStatuses(character.activeStatuses || [])
+    .filter((s: any) => !isConstitutionStatus(s))
     .map((s: any, idx: number) => ({ ...s, __idx: idx }))
     .sort((a: any, b: any) => (b.__idx ?? 0) - (a.__idx ?? 0));
-  const coreStatuses = visibleStatuses.filter(s => classifyStatus(s) === 'core');
+  const identityStatuses = visibleStatuses.filter(s => classifyStatus(s) === 'identity');
+  const fateStatuses = visibleStatuses.filter(s => classifyStatus(s) === 'fate');
   const buffStatuses = visibleStatuses.filter(s => classifyStatus(s) === 'buff');
   const debuffStatuses = visibleStatuses.filter(s => classifyStatus(s) === 'debuff');
 
@@ -78,8 +80,11 @@ export function StatusList() {
                 <p className="text-xs text-muted-foreground text-center py-4">尚无状态</p>
               ) : (
                 <>
-                  {coreStatuses.length > 0 && (
-                    <StatusGroup title="身份·仙缘" items={coreStatuses} />
+                  {identityStatuses.length > 0 && (
+                    <StatusGroup title="??" items={identityStatuses} />
+                  )}
+                  {fateStatuses.length > 0 && (
+                    <StatusGroup title="??" items={fateStatuses} />
                   )}
                   {buffStatuses.length > 0 && (
                     <StatusGroup title="增益" items={buffStatuses} />
@@ -111,26 +116,30 @@ export function StatusList() {
 }
 
 
-function classifyStatus(status: any): 'core' | 'buff' | 'debuff' {
+function classifyStatus(status: any): 'identity' | 'fate' | 'buff' | 'debuff' {
   const text = `${status?.name || ''}${status?.description || ''}${status?.source || ''}`;
   const effects = Array.isArray(status?.effects) ? status.effects : [];
-  const hasNegative = status?.category === 'debuff' || /毒|伤|虚弱|侵扰|反噬|诅咒|减|损|不利/.test(text)
-    || effects.some((e: any) => Number(e?.value ?? e?.delta ?? 0) < 0 || /降低|减少|削弱|受损|伤|毒|虚弱|不利|减/.test(`${e?.description || ''}${e?.attribute || ''}`));
+  const negativeText = new RegExp('\\u6bd2|\\u4f24|\\u865a\\u5f31|\\u4fb5\\u6270|\\u53cd\\u566c|\\u8bc5\\u5492|\\u51cf|\\u635f|\\u4e0d\\u5229');
+  const negativeEffect = new RegExp('\\u964d\\u4f4e|\\u51cf\\u5c11|\\u524a\\u5f31|\\u53d7\\u635f|\\u4f24|\\u6bd2|\\u865a\\u5f31|\\u4e0d\\u5229|\\u51cf');
+  const hasNegative = status?.category === 'debuff' || negativeText.test(text)
+    || effects.some((e: any) => Number(e?.value ?? e?.delta ?? 0) < 0 || negativeEffect.test(`${e?.description || ''}${e?.attribute || ''}`));
   if (hasNegative) return 'debuff';
 
-  const isFateLike = status?.category === 'identity' || status?.category === 'special' || status?.category === 'quest'
-    || /仙缘|机缘|因缘|秘境|传承|线索|潮|禁|门径|识门|悟息|玉片|残简|楼心|雾楼/.test(text);
+  if (status?.category === 'identity') return 'identity';
+  const fateText = new RegExp('\\u4ed9\\u7f18|\\u673a\\u7f18|\\u56e0\\u7f18|\\u79d8\\u5883|\\u4f20\\u627f|\\u7ebf\\u7d22|\\u6f6e|\\u7981|\\u95e8\\u5f84|\\u8bc6\\u95e8|\\u609f\\u606f|\\u7389\\u7247|\\u6b8b\\u7b80|\\u697c\\u5fc3|\\u96fe\\u697c');
+  const isFateLike = status?.category === 'special' || status?.category === 'quest' || fateText.test(text);
+  const positiveEffect = new RegExp('\\u63d0\\u5347|\\u589e\\u52a0|\\u589e\\u5f3a|\\u6062\\u590d|\\u62a4\\u6301|\\u52a0|\\u5fae\\u589e');
   const hasPositive = status?.category === 'buff' || status?.category === 'attribute'
-    || effects.some((e: any) => Number(e?.value ?? e?.delta ?? 0) > 0 || /提升|增加|增强|恢复|护持|加|微增/.test(`${e?.description || ''}${e?.attribute || ''}`));
+    || effects.some((e: any) => Number(e?.value ?? e?.delta ?? 0) > 0 || positiveEffect.test(`${e?.description || ''}${e?.attribute || ''}`));
 
-  if (isFateLike && status?.category !== 'buff' && !(status?.category === 'attribute' && hasPositive)) return 'core';
-  if (status?.category === 'skill' && !effects.length) return 'core';
+  if (isFateLike && status?.category !== 'buff' && !(status?.category === 'attribute' && hasPositive)) return 'fate';
+  if (status?.category === 'skill' && !effects.length) return 'fate';
   if (hasPositive || status?.category === 'skill') return 'buff';
-  return 'core';
+  return 'fate';
 }
 
 function displayCategoryLabel(status: any): string {
-  if (classifyStatus(status) === 'core' && status?.category !== 'identity') return '仙缘';
+  if (classifyStatus(status) === 'fate') return '??';
   if (classifyStatus(status) === 'buff') return '增益';
   if (classifyStatus(status) === 'debuff') return '减益';
   return CATEGORY_LABEL[status?.category] || status?.category || '状态';

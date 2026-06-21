@@ -164,14 +164,18 @@ export async function POST(req: NextRequest) {
       );
       narrative = llmResult.narrative || '';
 
-      const registeredItems = registerMany(llmResult.newItems || [], registerItem, {
-        source: 'combat-end',
-        age: state.age,
-        existingIds: [...state.inventory, ...(state.equipped || []), ...appliedDrops].map(item => item.id),
-      });
-      contentRegistryTrace.push(...registeredItems.trace);
-      contentRegistryWarnings.push(...registeredItems.warnings);
-      llmNewItems = registeredItems.accepted;
+      if (endStatus === 'victory') {
+        const registeredItems = registerMany(llmResult.newItems || [], registerItem, {
+          source: 'combat-end',
+          age: state.age,
+          existingIds: [...state.inventory, ...(state.equipped || []), ...appliedDrops].map(item => item.id),
+        });
+        contentRegistryTrace.push(...registeredItems.trace);
+        contentRegistryWarnings.push(...registeredItems.warnings);
+        llmNewItems = registeredItems.accepted;
+      } else {
+        llmNewItems = [];
+      }
 
       const registeredThreads = registerMany(llmResult.newThreads || [], registerThread, {
         source: 'combat-end',
