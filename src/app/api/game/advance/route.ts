@@ -7,6 +7,7 @@ import { executeAIEvent, checkLifespan, applyChanges, stateToResponse, tryBreakt
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-log';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
+import { getRealmInfo } from '@/lib/xianxia/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -98,12 +99,23 @@ export async function POST(req: NextRequest) {
         result.newRealm = br.newRealm;
         result.breakthroughMajor = Boolean(br.major);
         // 突破后追加叙事提示（附加到原 narrative 后）
-        const breakthroughText = br.major
-          ? `修为圆满，水到渠成，你破开大关，踏入新境域。`
-          : `修为圆满，水到渠成，你气脉更进一步，晋至${finalState.realmLevel + 1}层。`;
+        const realmNameBL = getRealmInfo(finalState.realm).name;
+        let blSeed = 0; const blStr = `${characterId}|${finalState.age}|bl`;
+        for (let bi = 0; bi < blStr.length; bi++) blSeed = (blSeed * 31 + blStr.charCodeAt(bi)) >>> 0;
+        const blMajor = [
+          `修为水到渠成，瓶颈再难束缚，你顺势冲开大关，跻身${realmNameBL}。`,
+          `灵机盈极而溢，关隘轰然洞开，你一举踏入${realmNameBL}之境。`,
+          `积淡已足，再不强求，修为自行破关，登临${realmNameBL}。`,
+        ];
+        const blMinor = [
+          `修为圆满，气脉再通一节，你顺势更进一层，晋至${finalState.realmLevel}层。`,
+          `灵息盈满，淤塞自解，你的修为悄然更进，晋至${finalState.realmLevel}层。`,
+          `水到渠成，不假外力，你的境界稳稳推进，晋至${finalState.realmLevel}层。`,
+        ];
+        const breakthroughText = br.major ? blMajor[blSeed % blMajor.length] : blMinor[blSeed % blMinor.length];
         aiOutput.narrative = aiOutput.narrative + `
 
-【天道感应】${breakthroughText}`;
+${breakthroughText}`;
         aiOutput.triggeredBreakthrough = true;
       }
     }
@@ -311,14 +323,34 @@ ${narrative || ''}`);
         e.eventType === 'breakthrough' && isSuccessfulBreakthroughText(e.title, e.narrative)
       );
       if (!alreadyHasSuccessEvent) {
-        const targetLayer = typeof result.breakthroughSteps === 'number' && result.breakthroughSteps > 1
-          ? `连进${result.breakthroughSteps}层`
-          : (result.breakthroughMajor ? '踏入新境' : '更进一层');
+        const bSteps = typeof result.breakthroughSteps === 'number' && result.breakthroughSteps > 1 ? result.breakthroughSteps : 1;
+        const realmName = getRealmInfo(finalState.realm).name;
+        const elPairs: [('metal' | 'wood' | 'water' | 'fire' | 'earth'), string][] = [['metal', '金锐之气'], ['wood', '木灵之气'], ['water', '水润之气'], ['fire', '炙烈之气'], ['earth', '厚土之气']];
+        let domEl = elPairs[0];
+        for (const pr of elPairs) { if (finalState.elements[pr[0]] > finalState.elements[domEl[0]]) domEl = pr; }
+        const flavor = domEl[1];
+        const cName = finalState.name || '你';
+        const seedStr = `${characterId}|${finalState.age}|${finalState.realm}|${finalState.realmLevel}`;
+        let seed = 0; for (let si2 = 0; si2 < seedStr.length; si2++) seed = (seed * 31 + seedStr.charCodeAt(si2)) >>> 0;
+        const majorTail = bSteps > 1 ? `一举连进${bSteps}层，跻身${realmName}` : `跻身${realmName}`;
+        const majorNarr = [
+          `${cName}收束多年因果，气机翻涌如潮。最后一道关隘在心念间松动，周身灵息轰然贯通，旧壳寸寸剥落，${majorTail}。`,
+          `这一夜，${cName}周身灵机暴涨，${flavor}沿经脉奔流，冲开淤塞已久的窍穴。识海豁然开朗，旧境如残壳褐去，${majorTail}。`,
+          `积淡水到渠成。${cName}屏息凝神，任灵潮一寸寸冲刷瓶颈，只听轰然一震，道基重铸，${majorTail}。`,
+          `${cName}盘膝枯坐，引天地灵气灌体。瓶颈在反复冲撞下骤然碎裂，神魂为之一清，${majorTail}。`,
+          `因果汇成一线，时机稍纵即逸。${cName}催动全身修为撞向关隘，剧痛过后是前所未有的通透，旧境崩解，${majorTail}。`,
+        ];
+        const minorNarr = [
+          `${cName}的修持水到渠成，闭目调息间，浮动的灵机被一寸寸纳入丹田，气脉渐次清明，修为更进一层。`,
+          `一道淤涩在${cName}经脉中悄然化开，${flavor}随之顺畅流转，周身轻盈几分，修为更进一层。`,
+          `${cName}心神沉入静定，将连日所悟尽数熔炼入体，灵息盈满窍穴，气脉再通一节。`,
+          `不急不躁，${cName}稳稳压住翻涌气机，待其自然沉淀。睁眼时丹田较往日凝实许多，修为更进一层。`,
+        ];
+        const majorTitles = ['破境成功', '登阶破境', '道境新成'];
+        const minorTitles = ['气脉贯通', '修为更进', '境界微进', '灵台澄明'];
         eventDrafts.push({
-          title: result.breakthroughMajor ? '破境成功' : '气脉贯通',
-          narrative: result.breakthroughMajor
-            ? `先前诸般因果终于汇成一线。你收束心神，压住翻涌气机，待最后一道关隘松动，周身灵息轰然贯通，旧境如壳裂去，自此${targetLayer}。`
-            : `先前的修持在此刻水到渠成。你闭目调息，将浮动灵机一寸寸纳入丹田，待滞涩尽化，气脉清明，自此${targetLayer}。`,
+          title: result.breakthroughMajor ? majorTitles[seed % majorTitles.length] : minorTitles[seed % minorTitles.length],
+          narrative: result.breakthroughMajor ? majorNarr[seed % majorNarr.length] : minorNarr[seed % minorNarr.length],
           eventType: 'breakthrough',
           effects: [],
         });
