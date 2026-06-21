@@ -61,15 +61,47 @@ interface SellableItem {
 export function MarketModal() {
   const { character, marketOpen, setMarketOpen, setCharacter } = useGameStore();
   const [tab, setTab] = useState<'buy' | 'sell'>('buy');
-  const [loading, setLoading] = useState(false);
+  const [marketLoading, setMarketLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [marketItems, setMarketItems] = useState<MarketItem[]>([]);
   const [sellableItems, setSellableItems] = useState<SellableItem[]>([]);
 
-  // 当弹窗打开时拉取坊市列表
-  const fetchList = useCallback(async () => {
-    if (!character) return;
-    setLoading(true);
+  const estimateSellPrice = useCallback((item: any): number => {
+    const rarityBase: Record<string, number> = {
+      common: 5, uncommon: 20, rare: 80, epic: 300, legendary: 1000, mythic: 5000,
+    };
+    let base = rarityBase[item?.rarity] || 5;
+    const effects = Array.isArray(item?.effects) ? item.effects : [];
+    if (effects.some((e: any) => e.target_attribute === 'cultivationExp' && e.operation === 'multiply')) base *= 2;
+    const capEff = effects.find((e: any) => e.target_attribute === 'storageCapacity');
+    if (capEff) base += (Number(capEff.value) || 0) * 3;
+    return Math.max(1, Math.floor(base * 0.6));
+  }, []);
+
+  const buildSellableItems = useCallback((inventory: any[] = []): SellableItem[] => (inventory || []).map(it => ({
+    ...it,
+    sellPrice: estimateSellPrice(it),
+  })), [estimateSellPrice]);
+
+  const marketCacheKey = character ? `xianxia-market-stock:${character.id}:${character.age}` : '';
+
+  // 坊市货架：同一角色同一年只在第一次进入时刷新；买卖、切页、重开弹窗都沿用当年货架。
+  const fetchMarketItems = useCallback(async () => {
+    if (!character || !marketCacheKey) return;
+    const cached = typeof window !== 'undefined' ? window.localStorage.getItem(marketCacheKey) : null;
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed?.items)) {
+          setMarketItems(parsed.items);
+          return;
+        }
+      } catch {
+        window.localStorage.removeItem(marketCacheKey);
+      }
+    }
+
+    setMarketLoading(true);
     try {
       const res = await fetch('/api/game/market', {
         method: 'POST',
@@ -78,28 +110,30 @@ export function MarketModal() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '加载坊市失败');
-      setMarketItems(data.marketItems || []);
-      setSellableItems(data.sellableItems || []);
+      const items = data.marketItems || [];
+      setMarketItems(items);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(marketCacheKey, JSON.stringify({ characterId: character.id, age: character.age, items }));
+      }
     } catch (err: any) {
       toast.error('坊市加载失败', { description: err.message });
       setMarketOpen(false);
     } finally {
-      setLoading(false);
+      setMarketLoading(false);
     }
-  }, [character, setMarketOpen]);
+  }, [character?.id, character?.age, marketCacheKey, setMarketOpen]);
 
   useEffect(() => {
     if (marketOpen && character) {
-      fetchList();
+      setSellableItems(buildSellableItems(character.inventory || []));
+      fetchMarketItems();
     }
-    // 关闭时清理
+    // 关闭时清理临时操作态；货架缓存保留到下一年份自然换新。
     if (!marketOpen) {
-      setMarketItems([]);
-      setSellableItems([]);
       setBusyId(null);
       setTab('buy');
     }
-  }, [marketOpen, character, fetchList]);
+  }, [marketOpen, character?.id, character?.age, character?.inventory?.length, buildSellableItems, fetchMarketItems]);
 
   if (!character || !marketOpen) return null;
 
@@ -142,8 +176,15 @@ export function MarketModal() {
       if (!data.success) throw new Error(data.error || '购买失败');
       // 更新角色状态（spiritStones + inventory 都会更新）
       setCharacter({ ...character, ...data.state });
-      // 从坊市列表移除该物品
-      setMarketItems(prev => prev.filter(it => it.id !== item.id));
+      // 从坊市列表移除该物品，并同步当年货架缓存，避免购买后重新刷新。
+      setMarketItems(prev => {
+        const next = prev.filter(it => it.id !== item.id);
+        if (typeof window !== 'undefined' && marketCacheKey) {
+          window.localStorage.setItem(marketCacheKey, JSON.stringify({ characterId: character.id, age: character.age, items: next }));
+        }
+        return next;
+      });
+      setSellableItems(buildSellableItems(data.state?.inventory || []));
       toast.success('购入成功', {
         description: `得「${data.boughtItem?.name || item.name}」，耗灵石 ${data.price}`,
       });
@@ -237,7 +278,7 @@ export function MarketModal() {
             {/* 购买 Tab */}
             <TabsContent value="buy" className="flex-1 min-h-0 overflow-hidden m-0 data-[state=inactive]:hidden flex flex-col">
               <div className="flex-1 min-h-0 overflow-y-auto xianxia-scroll px-3 pt-2 pb-8 space-y-2 overscroll-contain">
-                {loading ? (
+                {marketLoading ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                     <Loader2 className="w-5 h-5 animate-spin mb-2" />
                     <p className="text-xs font-serif-cn">坊市开张中...</p>
@@ -343,12 +384,7 @@ export function MarketModal() {
             {/* 出售 Tab */}
             <TabsContent value="sell" className="flex-1 min-h-0 overflow-hidden m-0 data-[state=inactive]:hidden flex flex-col">
               <div className="flex-1 min-h-0 overflow-y-auto xianxia-scroll px-3 pt-2 pb-8 space-y-2 overscroll-contain">
-                {loading ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                    <Loader2 className="w-5 h-5 animate-spin mb-2" />
-                    <p className="text-xs font-serif-cn">清点行囊中...</p>
-                  </div>
-                ) : sellableItems.length === 0 ? (
+                {sellableItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                     <Package className="w-8 h-8 mb-2 opacity-40" />
                     <p className="text-xs font-serif-cn">身无长物</p>
