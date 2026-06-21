@@ -280,6 +280,7 @@ interface GameState {
   setWorldCalendar: (world: WorldCalendarState) => void;
   advanceWorldCalendar: (time?: TimeAdvance | null) => WorldCalendarState;
   addWorldLegacy: (record: WorldLegacyRecord) => void;
+  resetWorldLocal: () => void;
   reset: () => void;
 }
 
@@ -369,6 +370,15 @@ export const useGameStore = create<GameState>()(
       addWorldLegacy: (record) => set((s) => ({
         worldLegacies: [record, ...s.worldLegacies.filter((it) => it.id !== record.id)].slice(0, 80),
       })),
+      resetWorldLocal: () => set({
+        character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
+        loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null, lastInterfereAge: null,
+        selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
+        explorationOpen: false, lastExploration: null, settlementResult: null,
+        heritageVault: [], selectedHeritage: {}, hallOfSimulations: [],
+        worldCalendar: { eraName: '????', calendarYear: 5000, elapsedDays: 0 },
+        worldLegacies: [],
+      }),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
         loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null, lastInterfereAge: null,

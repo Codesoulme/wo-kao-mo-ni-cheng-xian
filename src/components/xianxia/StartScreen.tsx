@@ -9,6 +9,7 @@ import { Sparkles, Mountain, Feather } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
+import { ResetWorldButton } from '@/components/xianxia/ResetWorldButton';
 import { CustomSimulationDialog } from '@/components/xianxia/CustomSimulationDialog';
 import { SimulationHallDialog } from '@/components/xianxia/SimulationHallDialog';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
@@ -133,6 +134,7 @@ export function StartScreen({
             <SimulationHallDialog />
           </div>
           <AIConfigDialog variant="start" />
+          <ResetWorldButton />
         </CardContent>
       </Card>
     </div>
