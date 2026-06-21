@@ -42,6 +42,7 @@ export function CombatModal() {
   // 先让玩家读完事件缘由，再进入战斗操作界面
   const [battleStarted, setBattleStarted] = useState(false);
   const [openPalette, setOpenPalette] = useState<string | null>(null);
+  const [selTarget, setSelTarget] = useState<number | null>(null);
   const lastSessionIdRef = useRef<string | null>(null);
   const logScrollRef = useRef<HTMLDivElement | null>(null);
   // 上一次的 HP/MP 快照，用于计算差值生成飘字
@@ -71,6 +72,7 @@ export function CombatModal() {
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
   }, [session?.id, session?.log?.length, battleStarted, endResult?.status]);
+  useEffect(() => { setSelTarget(null); }, [session?.id]);
 
   const isOngoing = !!session && session.status === 'ongoing';
   const hasCombatTarget = !!session?.enemies?.length && !!session.enemies[session.currentEnemyIdx ?? 0];
@@ -79,7 +81,9 @@ export function CombatModal() {
   // （endResult 在 setCharacter 清掉 combatSession 后才展示，所以即使 session=null 也要渲染）
 
   // 当前攻击的敌人（session 可能为 null——endResult 显示场景）
-  const enemyIdx = session?.currentEnemyIdx ?? 0;
+  const enemyIdx = (selTarget != null && (session?.enemies?.[selTarget]?.hp ?? 0) > 0)
+    ? selTarget
+    : (session?.currentEnemyIdx ?? 0);
   const enemy = session?.enemies?.[enemyIdx];
 
   // ====== 执行战斗行动 ======
@@ -95,7 +99,7 @@ export function CombatModal() {
         body: JSON.stringify({
           characterId: character.id,
           action,
-          payload: payload || {},
+          payload: { ...(payload || {}), targetEnemyIdx: enemyIdx },
         }),
       });
       const data = await res.json();
@@ -509,10 +513,14 @@ export function CombatModal() {
               {session && session.enemies.length > 1 && (
                 <div className="flex flex-wrap gap-1 pt-1">
                   {session.enemies.map((e: any, i: number) => (
-                    <span
+                    <button
                       key={i}
+                      type="button"
+                      disabled={e.hp <= 0}
+                      onClick={() => { if (e.hp > 0) setSelTarget(i); }}
                       className={cn(
-                        "text-[9px] px-1.5 py-0.5 rounded border",
+                        "text-[9px] px-1.5 py-0.5 rounded border transition-colors",
+                        e.hp > 0 && "cursor-pointer hover:bg-destructive/10",
                         i === enemyIdx
                           ? "border-destructive bg-destructive/15 text-destructive font-semibold"
                           : e.hp <= 0
@@ -520,8 +528,8 @@ export function CombatModal() {
                           : "border-border bg-muted/30 text-muted-foreground"
                       )}
                     >
-                      {e.name}{e.hp <= 0 ? '·亡' : ''}
-                    </span>
+                                            {e.name}{e.hp <= 0 ? '（已殁）' : ''}
+                    </button>
                   ))}
                 </div>
               )}
@@ -635,6 +643,29 @@ export function CombatModal() {
                       <p className="text-sm leading-6 text-foreground/90 font-serif-cn xianxia-prose">
                         {r.narrative}
                       </p>
+                    )}
+                    {Array.isArray(r.dialogue) && r.dialogue.length > 0 && (
+                      <div className="space-y-0.5 pl-1.5 border-l-2 border-primary/30">
+                        {r.dialogue.map((d: any, di: number) => (
+                          <p key={di} className="text-[11px] text-foreground/75 font-serif-cn">
+                            <span className="text-primary/80">{d.speaker}</span>：「{d.text}」
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {Array.isArray(r.enemyActions) && r.enemyActions.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {r.enemyActions.map((a: any, ai: number) => (
+                          <span key={ai} className={cn(
+                            "text-[9px] px-1.5 py-0.5 rounded border",
+                            a.dead ? "border-muted bg-muted/30 text-muted-foreground line-through"
+                              : a.actionType === 'stunned' ? "border-amber-500/40 bg-amber-500/10 text-amber-600"
+                              : "border-destructive/30 bg-destructive/5 text-destructive/80"
+                          )}>
+                            {a.name}·{a.action}
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))

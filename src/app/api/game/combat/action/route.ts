@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
         skillIdx: z.number().optional(),
         itemId: z.string().optional(),
         optionId: z.string().optional(),
+        targetEnemyIdx: z.number().optional(),
       }).optional(),
     }).safeParse(body);
 
@@ -166,6 +167,12 @@ export async function POST(req: NextRequest) {
 
     if (!state.combatSession || state.combatSession.status !== 'ongoing') {
       return NextResponse.json({ success: false, error: '当前无进行中的战斗' }, { status: 400 });
+    }
+
+    // 目标切换：玩家可指定这一手针对的敌人（仅限存活敌人）
+    const tIdx = payload?.targetEnemyIdx;
+    if (typeof tIdx === 'number' && tIdx >= 0 && tIdx < (state.combatSession.enemies?.length || 0) && (state.combatSession.enemies[tIdx]?.hp ?? 0) > 0) {
+      state.combatSession.currentEnemyIdx = tIdx;
     }
 
     const sessionBefore = state.combatSession;

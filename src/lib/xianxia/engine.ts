@@ -3698,7 +3698,6 @@ export function executeCombatRoundWithProposal(
   audit.push(...bound.audit);
   let playerHp = session.playerHp;
   let playerMp = Math.max(0, session.playerMp - bound.mpCost);
-  let enemyHp = enemy.hp;
   const playerActionType = combatPlayerActionTypeFromAction(action);
   const observeWeakness = action === 'other' && (selectedOption?.id === 'other-observe-opening' || selectedOption?.id === 'defense-focus' || (selectedOption?.tags || []).includes('observe'));
   if (observeWeakness) {
@@ -3741,43 +3740,133 @@ export function executeCombatRoundWithProposal(
     playerHeal = clampCombatNumber(proposal.playerHeal, 0, healCap);
     playerHp = Math.min(session.playerMaxHp, playerHp + playerHeal);
   }
-  enemyHp = Math.max(0, enemyHp - playerDamageDealt);
-  const fleeAllowed = action === 'flee' || selectedOption?.actionType === 'flee';
-  const fleeSpeedChance = Math.max(0.08, Math.min(0.92, 0.35 + (session.playerSpeed - enemy.speed) * 0.025));
-  const fleeSuccess = fleeAllowed && proposal.fleeOutcome === 'success' && fleeSpeedChance >= 0.18;
-  if (proposal.fleeOutcome === 'success' && !fleeAllowed) audit.push('AI裁决提出脱战，但玩家行动不是遁走，引擎拒绝脱战。');
-  let enemyDamageDealt = 0;
-  let endStatus: CombatActionResult['endStatus'] | undefined;
-  if (fleeSuccess) endStatus = 'fled';
-  else if (enemyHp <= 0) endStatus = session.enemies.every((e, i) => i === session.currentEnemyIdx || e.hp <= 0) ? 'victory' : undefined;
-  else if (session.enemyStunned) audit.push('敌方受压制，本回合未能反击。');
-  else {
-    const defenseFactor = action === 'defend' ? 0.55 : action === 'other' ? 0.8 : 1;
-    const maxEnemyDamage = Math.max(0, Math.floor((enemy.attack - session.playerDefense * 0.35) * 1.6 * defenseFactor));
-    enemyDamageDealt = clampCombatNumber(proposal.enemyDamage, 0, maxEnemyDamage);
-    if (Number(proposal.enemyDamage || 0) > maxEnemyDamage) audit.push('AI裁决敌方伤害 ' + proposal.enemyDamage + ' 超过事实上限 ' + maxEnemyDamage + '，已截断。');
-    if (session.talismanDefenseActive && session.talismanDefenseActive > 0) {
-      const blocked = Math.min(enemyDamageDealt, session.talismanDefenseActive);
-      enemyDamageDealt -= blocked;
-      if (blocked > 0) audit.push('护身符力抵消 ' + blocked + ' 点伤势。');
+  // ---- 玩家命中：单体目标或群攻 ----
+  const enemiesWork = session.enemies.map(e => ({ ...e }));
+  const aliveAtStart = enemiesWork.map((e, i) => ({ e, i })).filter(x => x.e.hp > 0).map(x => x.i);
+  const playerHitsResult: NonNullable<CombatRound['playerHits']> = [];
+  const resolveEnemyIdx = (b: { enemyId?: string; enemyIdx?: number }): number => {
+    if (b.enemyId != null) { const j = enemiesWork.findIndex(e => e.id === b.enemyId); if (j >= 0) return j; }
+    if (b.enemyIdx != null && b.enemyIdx >= 0 && b.enemyIdx < enemiesWork.length) return b.enemyIdx;
+    return -1;
+  };
+  const aoeHits = Array.isArray(proposal.playerHits) ? proposal.playerHits : [];
+  if (aoeHits.length > 0 && (action === 'attack' || action === 'skill')) {
+    for (const h of aoeHits) {
+      const idx = resolveEnemyIdx(h);
+      if (idx < 0 || enemiesWork[idx].hp <= 0) continue;
+      const tgt = enemiesWork[idx];
+      const cap = maxFactBoundedPlayerDamage(nextState, session, tgt, action, payload, selectedOption).maxDamage;
+      const dmg = clampCombatNumber(h.damage, 0, cap);
+      tgt.hp = Math.max(0, tgt.hp - dmg);
+      playerHitsResult.push({ enemyIdx: idx, name: tgt.name, damage: dmg, hpAfter: tgt.hp, dead: tgt.hp <= 0 });
     }
-    playerHp = Math.max(0, playerHp - enemyDamageDealt);
+    audit.push('群攻：玩家本节波及 ' + playerHitsResult.length + ' 名敌人。');
+  } else {
+    const tIdx = session.currentEnemyIdx;
+    const tgt = enemiesWork[tIdx];
+    if (tgt && tgt.hp > 0 && playerDamageDealt > 0) {
+      tgt.hp = Math.max(0, tgt.hp - playerDamageDealt);
+      playerHitsResult.push({ enemyIdx: tIdx, name: tgt.name, damage: playerDamageDealt, hpAfter: tgt.hp, dead: tgt.hp <= 0 });
+    }
+  }
+
+  // ---- 逃脱判定 ----
+  const fleeAllowed = action === 'flee' || selectedOption?.actionType === 'flee';
+  const fleeSpeedChance = Math.max(0.08, Math.min(0.92, 0.35 + (session.playerSpeed - (enemy?.speed || 0)) * 0.025));
+  const fleeSuccess = fleeAllowed && proposal.fleeOutcome === 'success' && fleeSpeedChance >= 0.18;
+  if (proposal.fleeOutcome === 'success' && !fleeAllowed) audit.push('AI提议逃脱，但本动作不是逃跑，已拒绝。');
+
+  // ---- 所有存活敌人各自行动 ----
+  const enemyActions: NonNullable<CombatRound['enemyActions']> = [];
+  let totalEnemyDamage = 0;
+  let endStatus: CombatActionResult['endStatus'] | undefined;
+  if (fleeSuccess) {
+    endStatus = 'fled';
+  } else {
+    const beats = Array.isArray(proposal.enemyBeats) ? proposal.enemyBeats : [];
+    const beatByIdx = new Map<number, (typeof beats)[number]>();
+    for (const b of beats) { const idx = resolveEnemyIdx(b); if (idx >= 0 && !beatByIdx.has(idx)) beatByIdx.set(idx, b); }
+    for (const idx of aliveAtStart) {
+      const e = enemiesWork[idx];
+      if (e.hp <= 0) {
+        enemyActions.push({ enemyIdx: idx, name: e.name, action: '力竭倒下', actionType: 'down', damage: 0, hpAfter: 0, dead: true });
+        continue;
+      }
+      const b = beatByIdx.get(idx);
+      const stunnedTarget = !!session.enemyStunned && idx === session.currentEnemyIdx;
+      let actionLabel = b?.action ? String(b.action).slice(0, 40) : '趁势进攻';
+      let actType = b?.actionType ? String(b.actionType).slice(0, 24) : 'attack';
+      let dmg = 0;
+      if (stunnedTarget) {
+        actionLabel = '被符箓震慑，未能发难';
+        actType = 'stunned';
+        audit.push(e.name + ' 被压制，本节未能发难。');
+      } else if (actType !== 'defend' && actType !== 'flee' && actType !== 'stunned' && actType !== 'down') {
+        const defenseFactor = action === 'defend' ? 0.55 : action === 'other' ? 0.8 : 1;
+        const maxEnemyDamage = Math.max(0, Math.floor((e.attack - session.playerDefense * 0.35) * 1.6 * defenseFactor));
+        dmg = clampCombatNumber(b?.damageToPlayer, 0, maxEnemyDamage);
+        if (b == null) {
+          dmg = Math.min(maxEnemyDamage, Math.max(1, Math.floor(maxEnemyDamage * 0.6)));
+          actionLabel = '趁势进攻';
+          audit.push(e.name + ' 未获 AI 单独裁定，按趁势进攻兜底。');
+        }
+      }
+      totalEnemyDamage += dmg;
+      enemyActions.push({ enemyIdx: idx, name: e.name, action: actionLabel, actionType: actType, damage: dmg, hpAfter: e.hp, dead: false });
+    }
+    if (session.talismanDefenseActive && session.talismanDefenseActive > 0 && totalEnemyDamage > 0) {
+      const blocked = Math.min(totalEnemyDamage, session.talismanDefenseActive);
+      totalEnemyDamage -= blocked;
+      if (blocked > 0) audit.push('符箓护体抵挡 ' + blocked + ' 点伤势。');
+    }
+    playerHp = Math.max(0, playerHp - totalEnemyDamage);
     if (playerHp <= 0) endStatus = 'defeat';
+    else if (enemiesWork.every(e => e.hp <= 0)) endStatus = 'victory';
   }
   session.talismanDefenseActive = undefined;
   session.enemyStunned = undefined;
+
+  // ---- 目标失效则自动切换到下一个存活敌人 ----
   let currentEnemyIdx = session.currentEnemyIdx;
-  const updatedEnemies = session.enemies.map((e, i) => i === session.currentEnemyIdx ? { ...e, hp: enemyHp } : e);
-  if (!endStatus && enemyHp <= 0) {
-    const nextIdx = updatedEnemies.findIndex((e, i) => i > session.currentEnemyIdx && e.hp > 0);
-    if (nextIdx >= 0) { currentEnemyIdx = nextIdx; audit.push('当前敌手倒下，引擎切换到 ' + updatedEnemies[nextIdx].name + '。'); }
-    else endStatus = 'victory';
+  if (!enemiesWork[currentEnemyIdx] || enemiesWork[currentEnemyIdx].hp <= 0) {
+    const nextIdx = enemiesWork.findIndex(e => e.hp > 0);
+    if (nextIdx >= 0) { currentEnemyIdx = nextIdx; audit.push('当前目标倒下，自动转向 ' + enemiesWork[nextIdx].name + '。'); }
   }
-  const narrativeBase = String(proposal.narrative || '').trim().slice(0, 320) || (bound.playerActionDesc + '，与' + enemy.name + '交错一合。');
-  const narrative = weaknessNote ? (weaknessNote + narrativeBase).slice(0, 380) : narrativeBase;
-  const round: CombatRound = { round: session.round, playerAction: String(proposal.playerActionLabel || bound.playerActionDesc).slice(0, 40), playerActionType, playerDamage: playerDamageDealt, playerHeal, enemyAction: proposal.enemyAction ? String(proposal.enemyAction).slice(0, 40) : undefined, enemyActionType: proposal.enemyActionType ? String(proposal.enemyActionType).slice(0, 24) : undefined, enemyDamage: enemyDamageDealt, narrative, playerHpAfter: playerHp, enemyHpAfter: enemyHp, playerMpAfter: playerMp, aiAudit: audit.length ? audit.slice(0, 8) : ['AI裁决已通过引擎硬事实审计。'] };
-  const newSession: CombatSession = { ...session, enemies: updatedEnemies, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp };
-  if (endStatus === 'defeat') return { state: { ...nextState, combatSession: newSession, hp: 0, mp: playerMp, alive: false, causeOfDeath: '战斗中为' + enemy.name + '所败' }, round, ended: true, endStatus };
+
+  // 兼容旧单敌字段
+  const legacyEnemy = enemiesWork[session.currentEnemyIdx] || enemiesWork[currentEnemyIdx];
+  const legacyEnemyAction = enemyActions.find(a => a.enemyIdx === session.currentEnemyIdx) || enemyActions[0];
+
+  const dialogue = Array.isArray(proposal.dialogue)
+    ? proposal.dialogue.map(d => ({ speaker: String(d.speaker || '').slice(0, 24), text: String(d.text || '').slice(0, 120) })).filter(d => d.text).slice(0, 6)
+    : undefined;
+
+  const narrativeBase = String(proposal.narrative || '').trim().slice(0, 360) || (bound.playerActionDesc + '，与众敌斗在一处。');
+  const narrative = weaknessNote ? (weaknessNote + narrativeBase).slice(0, 420) : narrativeBase;
+
+  const round: CombatRound = {
+    round: session.round,
+    playerAction: String(proposal.playerActionLabel || bound.playerActionDesc).slice(0, 40),
+    playerActionType,
+    playerDamage: playerHitsResult.reduce((s, h) => s + h.damage, 0),
+    playerHeal,
+    enemyAction: legacyEnemyAction?.action,
+    enemyActionType: legacyEnemyAction?.actionType,
+    enemyDamage: totalEnemyDamage,
+    narrative,
+    playerHpAfter: playerHp,
+    enemyHpAfter: legacyEnemy?.hp ?? 0,
+    playerMpAfter: playerMp,
+    aiAudit: audit.length ? audit.slice(0, 10) : ['AI提议已通过引擎事实校验。'],
+    enemyActions,
+    playerHits: playerHitsResult,
+    dialogue,
+  };
+  const newSession: CombatSession = { ...session, enemies: enemiesWork, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp };
+  if (endStatus === 'defeat') {
+    const killer = enemyActions.filter(a => (a.damage || 0) > 0).sort((a, b) => (b.damage || 0) - (a.damage || 0))[0];
+    return { state: { ...nextState, combatSession: newSession, hp: 0, mp: playerMp, alive: false, causeOfDeath: '战死于' + (killer?.name || legacyEnemy?.name || '敌手') + '之手' }, round, ended: true, endStatus };
+  }
   return { state: { ...nextState, combatSession: newSession, hp: playerHp, mp: playerMp }, round, ended: !!endStatus, endStatus, victoryDrops: endStatus === 'victory' ? session.victoryDrops : undefined };
 }
 

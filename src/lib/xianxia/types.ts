@@ -477,6 +477,8 @@ export interface CombatActionOption {
   requiredStatuses?: string[];
   forbiddenStatuses?: string[];
   tags?: string[];
+  // 意图作用范围：AI/引擎用于提示该动作是单体还是群攻；AI 仍可根据法术性质决定实际波及范围。
+  targetScope?: 'single' | 'aoe';
 }
 
 export interface CombatActionGroup {
@@ -538,6 +540,20 @@ export interface CombatRound {
   enemyHpAfter: number;
   playerMpAfter?: number;
   aiAudit?: string[];         // Engine audit trace for AI combat adjudication
+  // 本节拍中所有参战敷人各自的行动（AI 推演、引擎 clamp 后落库）
+  enemyActions?: {
+    enemyIdx: number;
+    name: string;
+    action: string;
+    actionType?: string;
+    damage?: number;        // 对玩家造成的伤害
+    hpAfter: number;        // 该敌本节结束后血量
+    dead?: boolean;
+  }[];
+  // 玩家本节命中的敌人（可多个=群攻）
+  playerHits?: { enemyIdx: number; name: string; damage: number; hpAfter: number; dead?: boolean }[];
+  // 战斗对话（丰富叙事感，可选）
+  dialogue?: { speaker: string; text: string }[];
 }
 
 // AI proposes a structured combat adjudication; the engine clamps and persists the authoritative result.
@@ -554,6 +570,18 @@ export interface CombatRoundProposal {
   fleeOutcome?: 'success' | 'failed';
   narrative?: string;
   auditHints?: string[];
+  // AI 推演：本节所有存活敌人各自的行动（多敌同台）
+  enemyBeats?: {
+    enemyId?: string;
+    enemyIdx?: number;
+    action?: string;
+    actionType?: string;
+    damageToPlayer?: number;
+  }[];
+  // AI 推演：玩家这一手命中的敌人与各自伤害（群攻/波及）
+  playerHits?: { enemyId?: string; enemyIdx?: number; damage?: number }[];
+  // AI 生成的战斗对话
+  dialogue?: { speaker?: string; text?: string }[];
 }
 
 export interface CombatSession {

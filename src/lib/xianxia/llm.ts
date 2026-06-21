@@ -1445,6 +1445,22 @@ function sanitizeCombatRoundProposal(raw: any): CombatRoundProposal {
     fleeOutcome: raw?.fleeOutcome === 'success' ? 'success' : raw?.fleeOutcome === 'failed' ? 'failed' : undefined,
     narrative: raw?.narrative ? String(raw.narrative).slice(0, 320) : undefined,
     auditHints: Array.isArray(raw?.auditHints) ? raw.auditHints.map((x: any) => String(x).slice(0, 80)).filter(Boolean).slice(0, 4) : [],
+    enemyBeats: Array.isArray(raw?.enemyBeats) ? raw.enemyBeats.map((b: any) => ({
+      enemyId: b?.enemyId != null ? String(b.enemyId) : undefined,
+      enemyIdx: b?.enemyIdx == null ? undefined : Math.max(0, Math.floor(Number(b.enemyIdx) || 0)),
+      action: b?.action ? String(b.action).slice(0, 40) : undefined,
+      actionType: b?.actionType ? String(b.actionType).slice(0, 24) : undefined,
+      damageToPlayer: Math.max(0, Math.floor(Number(b?.damageToPlayer) || 0)),
+    })).slice(0, 12) : undefined,
+    playerHits: Array.isArray(raw?.playerHits) ? raw.playerHits.map((h: any) => ({
+      enemyId: h?.enemyId != null ? String(h.enemyId) : undefined,
+      enemyIdx: h?.enemyIdx == null ? undefined : Math.max(0, Math.floor(Number(h.enemyIdx) || 0)),
+      damage: Math.max(0, Math.floor(Number(h?.damage) || 0)),
+    })).slice(0, 12) : undefined,
+    dialogue: Array.isArray(raw?.dialogue) ? raw.dialogue.map((d: any) => ({
+      speaker: d?.speaker ? String(d.speaker).slice(0, 24) : undefined,
+      text: d?.text ? String(d.text).slice(0, 120) : undefined,
+    })).filter((d: any) => d.text).slice(0, 6) : undefined,
   };
 }
 
@@ -1550,66 +1566,80 @@ export async function generateCombatRoundProposal(args: {
   const sc = ctx.character;
   const enemy = sessionBefore.enemies?.[sessionBefore.currentEnemyIdx];
   const palette = sessionBefore.actionPalette;
-  const allOptions = palette ? [palette.basicAttack, palette.spell, palette.defense, palette.item, palette.other].flatMap(g => g?.options || []) : [];
+  const allOptions = palette ? [palette.basicAttack, palette.technique, palette.spell, palette.defense, palette.item, palette.other].flatMap(g => g?.options || []) : [];
   const option = payload?.optionId ? allOptions.find(o => o.id === payload.optionId) : undefined;
   const skill = option?.skillIdx != null ? sessionBefore.playerSkills?.[option.skillIdx] : payload?.skillIdx != null ? sessionBefore.playerSkills?.[payload.skillIdx] : undefined;
   const item = payload?.itemId ? (sessionBefore.playerItems || []).find(it => it.itemId === payload.itemId) : undefined;
-  const recentLog = (sessionBefore.log || []).slice(-3).map(r => `第${r.round}合：${r.narrative}`).join('\n') || '尚无旧回合。';
+  const recentLog = (sessionBefore.log || []).slice(-3).map(r => `第${r.round}合：${r.narrative}`).join('\n') || '（尚无旧回合）';
   const tacticMemory = (sessionBefore.tacticalInsights || [])
-    .filter((x: any) => x.enemyIdx === sessionBefore.currentEnemyIdx && x.stacks > 0 && x.expiresRound >= sessionBefore.round)
-    .map((x: any) => `${x.kind === 'weakness' ? '破绽' : x.kind}x${x.stacks}：${x.note || ''}（至第${x.expiresRound}合）`)
-    .join('\n') || '暂无战术记忆。';
+    .filter((x: any) => x.stacks > 0 && x.expiresRound >= sessionBefore.round)
+    .map((x: any) => `针对[${x.enemyIdx}]：${x.kind === 'weakness' ? '破绽' : x.kind}x${x.stacks}（${x.note || ''}，限第${x.expiresRound}合）`)
+    .join('\n') || '（暂无战术洞察）';
+  const aliveEnemies = (sessionBefore.enemies || []).map((e, i) => ({ e, i })).filter(x => x.e.hp > 0);
+  const enemiesDesc = aliveEnemies
+    .map(({ e, i }) => `[${i}] ${e.name}（${e.realm || '未知境界'}，气血${e.hp}/${e.maxHp} 攻${e.attack} 御${e.defense} 速${e.speed}）${(e.nextActionDesc || e.nextAction) ? `｜意图：${e.nextActionDesc || e.nextAction}` : ''}${e.description ? ` ｜${e.description}` : ''}`)
+    .join('\n') || '（无存活敌人）';
+  const targetIdx = sessionBefore.currentEnemyIdx;
+  const targetDesc = enemy && enemy.hp > 0 ? `[${targetIdx}] ${enemy.name}` : '（未指定明确目标，按战场局势推演）';
+  const isAoe = option?.targetScope === 'aoe' || (option?.tags || []).includes('aoe');
+  const aoeHint = isAoe ? '本动作为【群攻】：请用 playerHits 给出命中的多个敌人与各自伤害，可只波及部分敌人。' : '本动作默认作用于上方指定目标；如法术性质天然波及他人，可酌情用 playerHits。';
+  const statusDesc = (ctx.activeStatuses || []).map(s => s.name).join('、') || '无特殊状态';
 
   const system = `${IDENTITY_PROMPT}
 
-你是战斗回合裁决的 AI 提案层。你根据场景、角色状态、玩家动作、敌我硬事实，提出结构化回合结果。
+【你正在推演一个修仙战斗节拍】你根据场景、角色状态、玩家这一手的意图，推演这一拍里【所有参战者】的行动，并产出结构化结果与小说化叙事。引擎只做事实校验与数值边界，你负责世界内合理的推演。
 硬规则：
-- 你只提出裁决，最终生效由引擎审计、截断、落库。
-- 不得凭空创造玩家未拥有的物品、术法、护盾、复活、秒杀。
-- 伤害、回复、法力消耗必须符合敌我强弱、动作来源和当前状态；强敌可以重伤或杀死玩家。
-- 若玩家尝试逃走，fleeOutcome 只能按速度、处境、封锁合理判断。
-- narrative 写小说化战斗过程，必须和数字一致，但不要写成“你造成X点伤害，敌人反扑造成Y点伤害”的流水账。
-- narrative 参考修仙小说战斗词库：剑光、刀芒、符火、灵压、罡风、血雾、护体灵光、法器嗡鸣、衣袍猎猎、碎石飞溅、雨幕/江雾/夜色、经脉震颤、虎口发麻、气血翻涌、破绽一闪、身形错步、贴地掠出、余波震开。
-- narrative 优先按“起手意图 → 招式轨迹/法术异象 → 格挡/闪避/破绽 → 环境反应 → 伤势或局势变化”来写；数值只作为幕后事实，可转写成“气血一滞、护光暗淡、臂上见血、脚步踉跄”。
-- narrative 不要暴露系统、AI、公式、判定、血量数字；除非剧情很需要，否则不要直接写具体伤害数字。
+- 这是多方混战：玩家这一手之后，【所有存活的敌人】都会各自行动一次（攻击/施法/防御/逃跑/被压制/掠阵等），不是只有一个敌人还手。请为每个存活敌人在 enemyBeats 里各给一条（用 enemyIdx 对应上方编号）。
+- 敌人行动要贴合各自身份、境界、性格与战场局势：弱者可能怯战、退避、求饶或趁乱偷袭；悍勇者拼命强攻；群敌会围攻、夹击、抢攻、护住同伴或牵制玩家。
+- 不要主角光环：敌我实力悬殊时，敌方可合力重创甚至击杀玩家；玩家被控、被压制、被多人缠住时，这一拍可能只能挨打、被动招架或仅能护身。
+- 数值不可凭空夸大，受双方攻防、境界差、资源、状态约束；引擎会按事实上限 clamp，超出会被截断。
+- 玩家若指定攻击某目标，playerDamage 作用于该目标；若是群攻，用 playerHits 给出命中的多个敌人与各自伤害。
+- 逃跑只能在玩家这一手是逃跑动作时判定 fleeOutcome，并按速度、被缠程度、敌众寡综合判断。
+- narrative 写成小说化战斗段落：动作、气机、招式轨迹、环境、心理与转折俱全；可穿插简短对话（敌人叫阵、玩家冷喝、同伴提醒），对话同时单独放进 dialogue 数组。
+- 严禁机械战报：不得出现"造成X点伤害""受到X点伤害""HP""扣血""本回合""结算""公式"等字样；数值只作为幕后事实，叙事一律文学化转写（如"血光迸现""真气一窒""踉跄半步"）。
 严格只返回 JSON。`;
 
   const user = `角色：${sc.name}，${sc.age}岁，${sc.realmName}
-气血/法力：${sessionBefore.playerHp}/${sessionBefore.playerMaxHp}，${sessionBefore.playerMp}/${sessionBefore.playerMaxMp}
-战力：攻${sessionBefore.playerAttack} 防${sessionBefore.playerDefense} 速${sessionBefore.playerSpeed}
-状态：${(ctx.activeStatuses || []).map(s => s.name).join('、') || '无显著状态'}
+气血/灵力：${sessionBefore.playerHp}/${sessionBefore.playerMaxHp}，${sessionBefore.playerMp}/${sessionBefore.playerMaxMp}
+战斗属性：攻${sessionBefore.playerAttack} 御${sessionBefore.playerDefense} 速${sessionBefore.playerSpeed}
+状态：${statusDesc}
 
-战斗缘起：${sessionBefore.contextTitle || '遭逢战斗'}
+战斗缘由：${sessionBefore.contextTitle || '遭遇战斗'}
 ${sessionBefore.contextNarrative || ''}
 
-当前敌手：${enemy ? `${enemy.name}（${enemy.realm || '未知境界'}） 气血${enemy.hp}/${enemy.maxHp} 攻${enemy.attack} 防${enemy.defense} 速${enemy.speed}。${enemy.description || ''}` : '无'}
-敌方意图：${enemy?.nextActionDesc || enemy?.nextAction || '由你按场景判断'}
+存活敌人（共${aliveEnemies.length}）：
+${enemiesDesc}
 
+玩家这一手针对的目标：${targetDesc}
 玩家本回合动作：${action}
-动作选项：${option ? `${option.name}：${option.description}；意图：${option.intent || '无'}` : '未指定动作选项'}
-术法：${skill ? `${skill.name}，法力消耗${skill.mpCost}，威力${skill.power}。${skill.description}` : '无'}
-物品：${item ? `${item.name}：${item.effect}` : '无'}
-战术记忆：
+所选选项：${option ? `${option.name}（${option.description}）意图：${option.intent || '无'}` : '未指定具体选项'}
+法术：${skill ? `${skill.name}（耗灵力${skill.mpCost}，威力${skill.power}）${skill.description}` : '无'}
+物品：${item ? `${item.name}（${item.effect}）` : '无'}
+${aoeHint}
+战斗记忆：
 ${tacticMemory}
 
-近三回合：
+最近回合：
 ${recentLog}
 
 返回 JSON：
 {
-  "playerActionLabel": "玩家动作名，20字内",
+  "playerActionLabel": "玩家动作描述（≤20字）",
   "playerActionType": "attack|skill|item|defend|flee",
   "playerDamage": 0,
+  "playerHits": [{"enemyIdx": 0, "damage": 0}],
   "playerHeal": 0,
   "mpCost": 0,
   "consumeItem": true,
   "fleeOutcome": "success|failed",
-  "enemyAction": "敌方动作名",
-  "enemyActionType": "attack|skill|defend|flee|stunned",
-  "enemyDamage": 0,
-  "narrative": "80-180字，像修仙小说战斗段落；写清动作、法术异象、攻防转换、伤势/局势变化；禁止流水账式‘造成X点伤害/敌人反扑造成Y点伤害’",
-  "auditHints": ["你认为需要引擎特别核验的事实"]
-}`;
+  "enemyBeats": [
+    {"enemyIdx": 0, "action": "该敌这一拍的动作", "actionType": "attack|skill|defend|flee|stunned", "damageToPlayer": 0}
+  ],
+  "dialogue": [{"speaker": "角色名或敌人名", "text": "简短台词"}],
+  "narrative": "120-260字小说化战斗叙事，含动作、气机、转折，可穿插对话；禁止机械战报",
+  "auditHints": ["可选：需要引擎特别留意的事实"]
+}
+要求：enemyBeats 必须覆盖【所有存活敌人】，每个敌人一条（用 enemyIdx 对应编号）；单体攻击可省略 playerHits 只填 playerDamage，群攻则用 playerHits。`;
   const content = await callLLMText(system, user);
   return sanitizeCombatRoundProposal(parseJSON(content));
 }
