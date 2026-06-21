@@ -180,6 +180,8 @@ interface GameState {
   lastChange: { attribute: string; delta: number; reason: string }[] | null;
   lastBreakthrough: { newRealm: string } | null;
   lastInterfere: { classification: string; accepted: boolean; narrative: string } | null;
+  // 干预冷却：上次成功干预时的年龄（十载一次）
+  lastInterfereAge: number | null;
 
   // 新增：事件详情抽屉
   selectedEventId: string | null;
@@ -209,6 +211,7 @@ interface GameState {
   setLastChange: (c: any[] | null) => void;
   setLastBreakthrough: (b: any | null) => void;
   setLastInterfere: (i: any | null) => void;
+  setLastInterfereAge: (age: number | null) => void;
   setSelectedEventId: (id: string | null) => void;
   setBreakthroughCeremony: (b: BreakthroughCeremony | null) => void;
   // Task 21-d-1：坊市弹窗开关
@@ -240,6 +243,7 @@ export const useGameStore = create<GameState>()(
       lastChange: null,
       lastBreakthrough: null,
       lastInterfere: null,
+      lastInterfereAge: null,
       selectedEventId: null,
       breakthroughCeremony: null,
       marketOpen: false,
@@ -262,6 +266,7 @@ export const useGameStore = create<GameState>()(
       setLastChange: (c) => set({ lastChange: c }),
       setLastBreakthrough: (b) => set({ lastBreakthrough: b }),
       setLastInterfere: (i) => set({ lastInterfere: i }),
+      setLastInterfereAge: (age) => set({ lastInterfereAge: age }),
       setSelectedEventId: (id) => set({ selectedEventId: id }),
       setBreakthroughCeremony: (b) => set({ breakthroughCeremony: b }),
       setMarketOpen: (open) => set({ marketOpen: open }),
@@ -293,7 +298,7 @@ export const useGameStore = create<GameState>()(
       })),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
-        loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null,
+        loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null, lastInterfereAge: null,
         selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
         explorationOpen: false, lastExploration: null, settlementResult: null,
       }),
@@ -302,6 +307,7 @@ export const useGameStore = create<GameState>()(
       name: 'xianxia-game',
       partialize: (s) => ({
         character: s.character,
+        lastInterfereAge: s.lastInterfereAge,
         heritageVault: s.heritageVault,
         selectedHeritage: s.selectedHeritage,
         hallOfSimulations: s.hallOfSimulations,
