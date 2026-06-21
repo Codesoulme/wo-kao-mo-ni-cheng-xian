@@ -188,15 +188,13 @@ ${breakthroughText}`;
           removedItemIds: continuationOutput.removedItemIds,
         });
         const continuationTimeAdvance = clampTimeAdvance((continuationOutput as any).timeAdvance, { amount: 1, unit: 'month', label: '月余后', reason: '同年因缘续写', ageDeltaYears: 0, elapsedDays: 30 });
-        const continuationWorldTime = worldTimeStamp(advanceWorldCalendar(worldCalendar, continuationTimeAdvance));
         const continuationActions = deriveActionProjections({ title: continuationOutput.title, narrative: continuationOutput.narrative, eventType: continuationOutput.eventType, threads: finalState.pendingThreads || [] });
         sameYearContinuationDrafts.push({
           title: continuationOutput.title,
           narrative: continuationOutput.narrative,
           eventType: continuationOutput.eventType || 'normal',
-          effects: [...continuationEffects, hiddenEventMeta({ timeAdvance: continuationTimeAdvance, worldTime: continuationWorldTime, actionProjections: continuationActions })],
+          effects: continuationEffects,
           timeAdvance: continuationTimeAdvance,
-          worldTime: continuationWorldTime,
           actionProjections: continuationActions,
         });
       }
@@ -323,6 +321,10 @@ ${narrative || ''}`);
       }),
     );
 
+    let eventWorldCalendarCursor = worldCalendar;
+    let finalWorldCalendar = worldCalendar;
+    let finalWorldTime = worldTime;
+
     const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[]; timeAdvance?: any; worldTime?: any; actionProjections?: any[] }[] = [{
       // 主事件只记录这一段时日发生的因果；不要因为最终数值成功突破，就把“冲关前夜/开始冲关”提前包装成已破境。
       title: aiOutput.title,
@@ -336,7 +338,10 @@ ${narrative || ''}`);
 
     for (const extra of aiOutput.extraEvents || []) {
       const extraTimeAdvance = extra.timeAdvance ? clampTimeAdvance(extra.timeAdvance, timeAdvance) : undefined;
-      const extraWorldTime = extraTimeAdvance ? worldTimeStamp(advanceWorldCalendar(worldCalendar, extraTimeAdvance)) : worldTime;
+      if (extraTimeAdvance) eventWorldCalendarCursor = advanceWorldCalendar(eventWorldCalendarCursor, extraTimeAdvance);
+      const extraWorldTime = extraTimeAdvance ? worldTimeStamp(eventWorldCalendarCursor) : finalWorldTime;
+      finalWorldCalendar = eventWorldCalendarCursor;
+      finalWorldTime = extraWorldTime;
       const extraActions = sanitizeActionProjections(extra.actionProjections);
       eventDrafts.push({
         title: extra.title,
@@ -349,7 +354,15 @@ ${narrative || ''}`);
       });
     }
     for (const continuation of sameYearContinuationDrafts) {
-      eventDrafts.push(continuation);
+      if (continuation.timeAdvance) eventWorldCalendarCursor = advanceWorldCalendar(eventWorldCalendarCursor, continuation.timeAdvance);
+      const continuationWorldTime = continuation.timeAdvance ? worldTimeStamp(eventWorldCalendarCursor) : finalWorldTime;
+      finalWorldCalendar = eventWorldCalendarCursor;
+      finalWorldTime = continuationWorldTime;
+      eventDrafts.push({
+        ...continuation,
+        worldTime: continuationWorldTime,
+        effects: [...continuation.effects, hiddenEventMeta({ timeAdvance: continuation.timeAdvance, worldTime: continuationWorldTime, actionProjections: continuation.actionProjections })],
+      });
     }
 
     // 若引擎最终确认已经突破，单独追加一条破境成功记载。
@@ -430,8 +443,8 @@ ${narrative || ''}`);
       rejectedChanges: result.rejectedChanges,
       breakthrough: result.breakthroughHappened ? { newRealm: result.newRealm, major: Boolean(result.breakthroughMajor), steps: result.breakthroughSteps || 1 } : null,
       timeAdvance,
-      worldCalendar,
-      worldTime,
+      worldCalendar: finalWorldCalendar,
+      worldTime: finalWorldTime,
       actionProjections: baseActionProjections,
       hasChoice: aiOutput.hasChoice,
       choice: aiOutput.choice,
