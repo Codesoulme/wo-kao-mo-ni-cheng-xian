@@ -144,8 +144,13 @@ export function CombatModal() {
       // 若战斗结束，先立刻进入结果态，避免 combatSession.status 已非 ongoing 而结果叙事尚未返回时闪回叙事页。
       if (data.ended) {
         const status = data.state?.combatSession?.status || data.endStatus;
-        setEndResult({ status, narrative: '战局尘埃落定，余波仍在胸臆间回荡……' });
-        setCharacter({ ...character, ...data.state });
+        const endedState = { ...character, ...data.state } as typeof character;
+        const terminal = !endedState.alive || (endedState as any).ascended;
+        setCharacter(endedState);
+        // 终局（死亡/飞升）直接交给统一全局轮回结算，不再先弹战后小结面板，避免两个结算窗口。
+        if (!terminal) {
+          setEndResult({ status, narrative: '战局尘埃落定，余波仍在胸臆间回荡……' });
+        }
         await endCombat(status);
       } else {
         // 更新角色（含 combatSession）
