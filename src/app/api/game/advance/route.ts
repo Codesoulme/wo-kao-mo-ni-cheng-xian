@@ -108,9 +108,9 @@ export async function POST(req: NextRequest) {
           `积淡已足，再不强求，修为自行破关，登临${realmNameBL}。`,
         ];
         const blMinor = [
-          `修为圆满，气脉再通一节，你顺势更进一层，晋至${finalState.realmLevel}层。`,
-          `灵息盈满，淤塞自解，你的修为悄然更进，晋至${finalState.realmLevel}层。`,
-          `水到渠成，不假外力，你的境界稳稳推进，晋至${finalState.realmLevel}层。`,
+          `修为圆满，气脉再通一节，你顺势更进一层，晋至${finalState.realmLevel + 1}层。`,
+          `灵息盈满，淤塞自解，你的修为悄然更进，晋至${finalState.realmLevel + 1}层。`,
+          `水到渠成，不假外力，你的境界稳稳推进，晋至${finalState.realmLevel + 1}层。`,
         ];
         const breakthroughText = br.major ? blMajor[blSeed % blMajor.length] : blMinor[blSeed % blMinor.length];
         aiOutput.narrative = aiOutput.narrative + `
