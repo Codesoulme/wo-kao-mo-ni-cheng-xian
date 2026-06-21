@@ -753,7 +753,11 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
 
 【储物袋容量规则——重要】
 - 玩家初始无储物袋，最多只能携带 5 件物品（${invCount}/${storageCap}件${hasBag ? '，已有储物袋' : '，无储物袋'}）
-- 若 ${invCount} 已达或超过 ${storageCap}，本岁不可再给 newItems（除非先给一个储物袋扩容，或剧情中物品被消耗让出位置）
+- 背包已满（${invCount}≥${storageCap}）又出现值得收取的新物品时，不要简单丢弃新物或硬性拒绝：角色应按【物品价值+自身性格+情感牵挂】权衡取舍——保留更珍贵、更稀有或角色更在意之物，把次要物品通过 removedItemIds 移除（卖出换灵石、丢弃、赠予同门/恩人/亲友均可），并在 narrative 中自然写出这次取舍的心理与抱负。
+- 卖出物品应让 spiritStones 相应增加（changes 里加 spiritStones delta，写明卖给谁/坊市）；赠予/丢弃则无灵石收益但可推进人情或心境。
+- 加入 newItems 的件数若会超出容量，必须用 removedItemIds 移除至少同样多的物品，使收尾后 inventory 不超过 ${storageCap}。
+- 若角色【根本没有储物袋】且屡屡受困于携带上限，应让角色自发想办法解决：留意坊市/拍卖会购入储物袋、从击败的对手或秘境中夺取、求师门同门相赠、以物易物等；可落为未决线索或角色意图，在合适年份承接。
+- 不要出现“储物袋已满，无法再装新物”这类游戏系统式硬提示；一切以角色在修仙世界中的真实应对来叙事。
 - 储物袋本身是 tool 类物品，effects 含 storageCapacity add；获得后 capacity 增加，且储物袋不占容量
 - 高境界可给更高级储物袋（如"玄铁储物戒指"扩容 +30）
 

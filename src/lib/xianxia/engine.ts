@@ -3866,6 +3866,13 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     ].slice(0, 24);
   }
 
+  // 3.5 AI 联动：移除/破坏物品（如战斗中武器被毁、丹药被消耗）
+  if (aiOutput.removedItemIds && aiOutput.removedItemIds.length) {
+    const rem = removeItemsByIds(next, aiOutput.removedItemIds);
+    next = rem.state;
+    collectItemResolve(rem);
+  }
+
   // 3. 新物品先经过 ContentRegistry Lite 统一校验/补全，再进入背包系统
   {
     const rawNew = aiOutput.newItems || [];
@@ -3879,13 +3886,6 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
       contentRegistryWarnings.push(...registered.warnings);
       next = addItems(next, registered.accepted);
     }
-  }
-
-  // 3.5 AI 联动：移除/破坏物品（如战斗中武器被毁、丹药被消耗）
-  if (aiOutput.removedItemIds && aiOutput.removedItemIds.length) {
-    const rem = removeItemsByIds(next, aiOutput.removedItemIds);
-    next = rem.state;
-    collectItemResolve(rem);
   }
 
   // 3.6 AI 联动：直接放入已装备的物品（AI 创造性装备：项链·储物戒指串等）
