@@ -979,6 +979,7 @@ export interface EngineStateContext {
     realm: string;
     realmName: string;
     realmLevel: number;
+    realmMaxLevel: number;
     cultivationExp: number;
     expToBreak: number;
     elements: { metal: number; wood: number; water: number; fire: number; earth: number };

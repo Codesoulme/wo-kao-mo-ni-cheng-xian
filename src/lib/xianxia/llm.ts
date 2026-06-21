@@ -408,7 +408,7 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean, qualit
 角色：${sc.name}（${sc.gender === 'male' ? '男' : '女'}），${sc.age}岁
 寿元：${sc.lifespan}岁（剩余约${sc.lifespan - sc.age}岁）
 灵根：${sc.rootDetail || sc.spiritualRoot}
-境界：${sc.realmName}${sc.realmLevel > 0 ? `（${sc.realmLevel}层）` : ''}
+境界：${sc.realmName}${sc.realmMaxLevel > 0 ? `（${sc.realmLevel + 1}层）` : ''}
 修为：${sc.cultivationExp}/${sc.expToBreak}（修炼速度：${multDesc}，你给出的 cultivationExp 正向增量会被该倍率放大）
 五行倾向：${elements}
 生命：${sc.hp}/${sc.maxHp}  灵力：${sc.mp}/${sc.maxMp}
@@ -801,7 +801,7 @@ cultivationInsight 文本规则：
 function buildChoosePrompt(ctx: EngineStateContext, choicePrompt: string, chosenText: string): string {
   const sc = ctx.character;
   return `【状态快照区】
-角色：${sc.name}，${sc.age}岁，${sc.realmName}（${sc.realmLevel}层）
+角色：${sc.name}，${sc.age}岁，${sc.realmName}${sc.realmMaxLevel > 0 ? `（${sc.realmLevel + 1}层）` : ''}
 修为：${sc.cultivationExp}/${sc.expToBreak}  寿元：${sc.lifespan}
 灵根：${sc.rootDetail || sc.spiritualRoot}
 所在：${sc.location}  宗门：${sc.faction || '散修'}
@@ -868,7 +868,7 @@ function buildInterferePrompt(ctx: EngineStateContext, playerInput: string): str
   const hasBag = invCount > 0 && ctx.inventory.some(i => i.item_type === 'tool' && (i.effects || []).some(e => e.target_attribute === 'storageCapacity'));
   const storageDesc = `${invCount}/${storageCap}件${hasBag ? '（已有储物袋）' : '（无储物袋，上限 5 件）'}`;
   return `【状态快照区】
-角色：${sc.name}，${sc.age}岁，${sc.realmName}（${sc.realmLevel}层）
+角色：${sc.name}，${sc.age}岁，${sc.realmName}${sc.realmMaxLevel > 0 ? `（${sc.realmLevel + 1}层）` : ''}
 修为：${sc.cultivationExp}/${sc.expToBreak}  寿元：${sc.lifespan}
 灵根：${sc.rootDetail || sc.spiritualRoot}
 所在：${sc.location}  宗门：${sc.faction || '散修'}
@@ -1378,7 +1378,7 @@ export async function generateItemActionNarrative(
 严格 JSON 输出。`;
 
   const user = `【状态快照】
-角色：${sc.name}，${sc.age}岁，${sc.realmName}（${sc.realmLevel}层）
+角色：${sc.name}，${sc.age}岁，${sc.realmName}${sc.realmMaxLevel > 0 ? `（${sc.realmLevel + 1}层）` : ''}
 灵根：${sc.rootDetail || sc.spiritualRoot}
 修为：${sc.cultivationExp}/${sc.expToBreak}（修炼速度：${mult.toFixed(2)}倍）
 所在：${sc.location}  宗门：${sc.faction || '散修'}

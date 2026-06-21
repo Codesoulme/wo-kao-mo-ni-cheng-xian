@@ -2068,6 +2068,7 @@ export function buildStateContext(
       realm: state.realm,
       realmName: realmInfo.name,
       realmLevel: state.realmLevel,
+      realmMaxLevel: realmInfo.levels,
       cultivationExp: state.cultivationExp,
       expToBreak: state.expToBreak,
       elements: state.elements || { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
