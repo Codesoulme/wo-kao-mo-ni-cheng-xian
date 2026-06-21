@@ -376,7 +376,7 @@ export const useGameStore = create<GameState>()(
         selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
         explorationOpen: false, lastExploration: null, settlementResult: null,
         heritageVault: [], selectedHeritage: {}, hallOfSimulations: [],
-        worldCalendar: { eraName: '????', calendarYear: 5000, elapsedDays: 0 },
+        worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
         worldLegacies: [],
       }),
       reset: () => set({

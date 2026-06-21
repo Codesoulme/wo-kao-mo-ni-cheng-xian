@@ -1,5 +1,5 @@
 // POST /api/game/reset-world
-// ??????????????????????????? localStorage ?????????
+// Clear local test world. Browser localStorage is cleared by the client button.
 
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
@@ -25,6 +25,6 @@ export async function POST() {
 
     return NextResponse.json({ success: true, cleared: result });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err?.message || '??????' }, { status: 500 });
+    return NextResponse.json({ success: false, error: err?.message || '重置世界失败' }, { status: 500 });
   }
 }
