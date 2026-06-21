@@ -507,6 +507,7 @@ export interface QuestEntry {
 
 
 export type CombatActionGroupKey = 'basicAttack' | 'technique' | 'spell' | 'defense' | 'item' | 'other';
+export type CombatTempo = 'pressing' | 'stalemate' | 'opening' | 'danger' | 'flee_window' | 'turning' | 'chaos';
 export type CombatActionOptionType = 'basic_attack' | 'technique' | 'spell' | 'defense' | 'item' | 'talisman' | 'other' | 'flee';
 export type CombatActionOptionSource = 'body' | 'weapon' | 'technique' | 'spell' | 'artifact' | 'armor' | 'item' | 'environment' | 'social' | 'pet' | 'status' | 'ai';
 
@@ -541,6 +542,15 @@ export interface CombatActionGroup {
   options: CombatActionOption[];
 }
 
+export interface CombatTacticalSituation {
+  tempo: CombatTempo;
+  advantage: 'player' | 'enemy' | 'even' | 'unclear';
+  reason: string;
+  playerOpening?: string;
+  enemyPressure?: string;
+  suggestedFocus?: string;
+}
+
 export interface CombatActionPalette {
   basicAttack: CombatActionGroup;
   technique: CombatActionGroup;
@@ -548,8 +558,9 @@ export interface CombatActionPalette {
   defense: CombatActionGroup;
   item: CombatActionGroup;
   other: CombatActionGroup;
-  generatedBy: 'engine-fallback' | 'ai';
+  generatedBy: 'engine-fallback' | 'ai' | 'hybrid';
   sceneHint?: string;
+  tacticalSituation?: CombatTacticalSituation;
 }
 
 export interface CultivationAttributeEntry {
@@ -607,6 +618,7 @@ export interface CombatRound {
   playerHits?: { enemyIdx: number; name: string; damage: number; hpAfter: number; dead?: boolean }[];
   // 战斗对话（丰富叙事感，可选）
   dialogue?: { speaker: string; text: string }[];
+  tacticalSituation?: CombatTacticalSituation;
 }
 
 // AI proposes a structured combat adjudication; the engine clamps and persists the authoritative result.
@@ -637,6 +649,8 @@ export interface CombatRoundProposal {
   dialogue?: { speaker?: string; text?: string }[];
   // AI 推演：本节过后角色陷入需玩家决策的处境/本能想用某物的冲动
   playerImpulse?: { kind?: 'item' | 'contingency'; prompt?: string; itemId?: string; itemName?: string };
+  tacticalSituation?: Partial<CombatTacticalSituation>;
+  nextActions?: Partial<CombatActionOption>[];
 }
 
 export interface CombatSession {
@@ -657,6 +671,10 @@ export interface CombatSession {
   playerSkills?: { itemId?: string; name: string; description: string; mpCost: number; power: number; element?: ElementType | 'none'; adaptation?: number; sourceType?: string }[];
   // AI/engine current action palette: UI renders available interactions from this, not fixed combat assumptions.
   actionPalette?: CombatActionPalette;
+  // AI/engine validated current battlefield read; UI displays it as world-state, not debug info.
+  tacticalSituation?: CombatTacticalSituation;
+  // AI proposed, engine-validated临场动作。面板只是投影这些可行动作。
+  aiActionOptions?: CombatActionOption[];
   // 玩家可用的丹药（从 inventory 的 consumable 提取）
   playerItems?: { itemId: string; name: string; description: string; effect: string }[];
   // 战斗胜利后掉落（由 AI 在结束叙事中给出，引擎在 endCombat 中应用）

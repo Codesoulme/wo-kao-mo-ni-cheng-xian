@@ -261,6 +261,9 @@ export function CombatModal() {
   // 战斗日志：最近 5 条，最新在底部
 
   const recentLog: any[] = session ? (session.log || []).slice(-5) : [];
+  const tacticalSituation: any = (session as any)?.tacticalSituation || recentLog[recentLog.length - 1]?.tacticalSituation || null;
+  const tempoLabels: Record<string, string> = { pressing: '乘势', stalemate: '僵持', opening: '破绽', danger: '危局', flee_window: '可遁', turning: '转机', chaos: '乱战' };
+  const advantageLabels: Record<string, string> = { player: '我方占势', enemy: '敌势逼人', even: '难分高下', unclear: '胜负未明' };
 
   // 玩家可用法术
   const skills: any[] = session?.playerSkills || [];
@@ -635,6 +638,26 @@ export function CombatModal() {
           </div>
           )}
 
+          {session && !endResult && tacticalSituation && (
+            <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-2 space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-600 font-serif-cn font-semibold">战势</span>
+                  <span className="text-xs font-serif-cn font-semibold text-foreground">{tempoLabels[tacticalSituation.tempo] || '战势'}</span>
+                  <span className="text-[10px] text-muted-foreground">· {advantageLabels[tacticalSituation.advantage] || '胜负未明'}</span>
+                </div>
+                {tacticalSituation.suggestedFocus && <span className="text-[10px] text-purple-600/80 font-serif-cn truncate max-w-[44%]">宜：{tacticalSituation.suggestedFocus}</span>}
+              </div>
+              {tacticalSituation.reason && <p className="text-[11px] leading-5 text-foreground/85 font-serif-cn xianxia-prose">{tacticalSituation.reason}</p>}
+              {(tacticalSituation.playerOpening || tacticalSituation.enemyPressure) && (
+                <div className="flex flex-wrap gap-1">
+                  {tacticalSituation.playerOpening && <span className="text-[9px] px-1.5 py-0.5 rounded border border-green-500/30 bg-green-500/5 text-green-700 dark:text-green-300">破口：{tacticalSituation.playerOpening}</span>}
+                  {tacticalSituation.enemyPressure && <span className="text-[9px] px-1.5 py-0.5 rounded border border-red-500/30 bg-red-500/5 text-red-600">压迫：{tacticalSituation.enemyPressure}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* 战斗日志（session 可能为 null——endResult 显示场景跳过） */}
           {session && !endResult && (
           <div className="flex-1 min-h-0 flex flex-col">
@@ -844,6 +867,7 @@ function PaletteButton({ paletteKey, openPalette, setOpenPalette, group, icon, t
                 {option.name}
                 {option.mpCost > 0 && <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-700">-{option.mpCost}灵</span>}
                 {option.targetScope === 'aoe' && <span className="text-[9px] px-1 rounded bg-purple-500/15 text-purple-600">群攻</span>}
+                {(option.tags || []).includes('ai-context') && <span className="text-[9px] px-1 rounded bg-purple-500/15 text-purple-600">临机</span>}
               </div>
               <div className="text-[10px] text-muted-foreground line-clamp-2">{option.enabled ? option.description : (option.disabledReason || option.description)}</div>
               {option.risk && <div className="text-[10px] text-red-500/80 truncate">险：{option.risk}</div>}

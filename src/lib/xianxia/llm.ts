@@ -1694,6 +1694,9 @@ export async function generatePetCareOutcome(ctx: EngineStateContext, pet: Pet, 
 
 function sanitizeCombatRoundProposal(raw: any): CombatRoundProposal {
   const allowedActionTypes = new Set(['attack', 'skill', 'item', 'defend', 'flee', 'scripture']);
+  const allowedTempos = new Set(['pressing', 'stalemate', 'opening', 'danger', 'flee_window', 'turning', 'chaos']);
+  const allowedAdvantages = new Set(['player', 'enemy', 'even', 'unclear']);
+  const sanitizeActionType = (value: any): any => ['basic_attack', 'defense', 'other', 'flee', 'item', 'talisman', 'technique', 'spell'].includes(String(value || '')) ? String(value) : 'other';
   return {
     playerActionLabel: raw?.playerActionLabel ? String(raw.playerActionLabel).slice(0, 40) : undefined,
     playerActionType: allowedActionTypes.has(raw?.playerActionType) ? raw.playerActionType : undefined,
@@ -1723,6 +1726,27 @@ function sanitizeCombatRoundProposal(raw: any): CombatRoundProposal {
       speaker: d?.speaker ? String(d.speaker).slice(0, 24) : undefined,
       text: d?.text ? String(d.text).slice(0, 120) : undefined,
     })).filter((d: any) => d.text).slice(0, 6) : undefined,
+    tacticalSituation: raw?.tacticalSituation ? {
+      tempo: allowedTempos.has(raw.tacticalSituation.tempo) ? raw.tacticalSituation.tempo : 'chaos',
+      advantage: allowedAdvantages.has(raw.tacticalSituation.advantage) ? raw.tacticalSituation.advantage : 'unclear',
+      reason: raw.tacticalSituation.reason ? String(raw.tacticalSituation.reason).slice(0, 90) : '',
+      playerOpening: raw.tacticalSituation.playerOpening ? String(raw.tacticalSituation.playerOpening).slice(0, 80) : undefined,
+      enemyPressure: raw.tacticalSituation.enemyPressure ? String(raw.tacticalSituation.enemyPressure).slice(0, 80) : undefined,
+      suggestedFocus: raw.tacticalSituation.suggestedFocus ? String(raw.tacticalSituation.suggestedFocus).slice(0, 60) : undefined,
+    } : undefined,
+    nextActions: Array.isArray(raw?.nextActions) ? raw.nextActions.map((a: any, idx: number) => ({
+      id: a?.id ? String(a.id).slice(0, 48) : `ai-action-${idx}`,
+      name: a?.name ? String(a.name).slice(0, 18) : '临机应变',
+      description: a?.description ? String(a.description).slice(0, 90) : '顺着当前战势临机处置。',
+      actionType: sanitizeActionType(a?.actionType),
+      source: 'ai' as const,
+      enabled: a?.enabled === false ? false : true,
+      disabledReason: a?.disabledReason ? String(a.disabledReason).slice(0, 50) : undefined,
+      mpCost: a?.mpCost == null ? 0 : Math.max(0, Math.floor(Number(a.mpCost) || 0)),
+      risk: a?.risk ? String(a.risk).slice(0, 50) : undefined,
+      intent: a?.intent ? String(a.intent).slice(0, 70) : undefined,
+      tags: Array.isArray(a?.tags) ? a.tags.map((x: any) => String(x).slice(0, 20)).filter(Boolean).slice(0, 5) : ['ai-context'],
+    })).filter((a: any) => a.name && a.description).slice(0, 5) : undefined,
      playerImpulse: raw?.playerImpulse && (raw.playerImpulse.prompt || raw.playerImpulse.itemId || raw.playerImpulse.itemName) ? {
       kind: raw.playerImpulse.kind === 'item' ? 'item' as const : 'contingency' as const,
       prompt: raw.playerImpulse.prompt ? String(raw.playerImpulse.prompt).slice(0, 160) : undefined,
@@ -1865,6 +1889,8 @@ export async function generateCombatRoundProposal(args: {
 - 玩家若指定攻击某目标，playerDamage 作用于该目标；若是群攻，用 playerHits 给出命中的多个敌人与各自伤害。
 - 逃跑只能在玩家这一手是逃跑动作时判定 fleeOutcome，并按速度、被缠程度、敌众寡综合判断。
 - narrative 写成小说化战斗段落：动作、气机、招式轨迹、环境、心理与转折俱全；可穿插简短对话（敌人叫阵、玩家冷喝、同伴提醒），对话同时单独放进 dialogue 数组。
+- 必须给 tacticalSituation：判断当前战势节奏（压制、僵持、破绽、濒危、脱身窗口、反转、混乱）、谁占优、原因、玩家可抓的破口、敌方压力。
+- 必须给 nextActions 2-4 个【下一拍临场动作】：它们是 UI 面板的交互投影，应根据当前战势自然生成，例如诱敌露绽、借地形拉开、以法器硬换、佯败脱身；不要只给固定普攻。除非使用真实背包物，否则 actionType 优先用 other/defense/flee/basic_attack。
 - 严禁机械战报：不得出现"造成X点伤害""受到X点伤害""HP""扣血""本回合""结算""公式"等字样；数值只作为幕后事实，叙事一律文学化转写（如"血光迸现""真气一窒""踉跄半步"）。
 严格只返回 JSON。`;
 
@@ -1912,6 +1938,8 @@ ${recentLog}
     {"enemyIdx": 0, "action": "该敌这一拍的动作", "actionType": "attack|skill|defend|flee|stunned", "damageToPlayer": 0}
   ],
   "dialogue": [{"speaker": "角色名或敌人名", "text": "简短台词"}],
+  "tacticalSituation": {"tempo": "pressing|stalemate|opening|danger|flee_window|turning|chaos", "advantage": "player|enemy|even|unclear", "reason": "战势判断原因", "playerOpening": "玩家可抓破口", "enemyPressure": "敌方压力", "suggestedFocus": "下一拍建议方向"},
+  "nextActions": [{"id": "短id", "name": "临场动作名", "description": "为何此刻可行", "actionType": "other|defense|flee|basic_attack", "intent": "动作意图", "risk": "可选风险", "mpCost": 0, "tags": ["ai-context"]}],
   "playerImpulse": {"kind": "item|contingency", "prompt": "角色内心念头式的沉浸描述", "itemId": "仅当kind=item，填上方真实物品id", "itemName": "物品名"},
   "narrative": "120-260字小说化战斗叙事，含动作、气机、转折，可穿插对话；禁止机械战报",
   "auditHints": ["可选：需要引擎特别留意的事实"]

@@ -44,6 +44,7 @@ import {
   CombatSession,
   CombatActionOption,
   CombatActionPalette,
+  CombatActionGroupKey,
   Formation,
   FormationType,
   Pet,
@@ -3298,7 +3299,7 @@ export function buildCombatActionPalette(state: CharacterState, session: CombatS
   }
   otherOptions.push({ id: 'other-flee', name: '伺机脱身', description: '借地形或烟尘尝试脱离战场。', actionType: 'flee', source: 'environment', enabled: true, mpCost: 0, tags: ['flee'] });
 
-  return {
+  const palette: CombatActionPalette = {
     basicAttack: { enabled: basicOptions.some(o => o.enabled), label: '普攻', disabledReason: basicOptions.some(o => o.enabled) ? undefined : (restrained ? '当前受制，常规攻伐难以施展。' : '暂无可用普攻。'), options: basicOptions },
     technique: { enabled: techniqueOptions.some(o => o.enabled), label: '功法', disabledReason: techniqueOptions.length ? '当前功法运转受限。' : '暂无可用功法。', options: techniqueOptions },
     spell: { enabled: [...spellOptions, ...artifactSpellOptions].some(o => o.enabled), label: '法术', disabledReason: (spellOptions.length || artifactSpellOptions.length) ? '当前法术受限。' : '暂无可用法术。', options: [...spellOptions, ...artifactSpellOptions] },
@@ -3307,7 +3308,9 @@ export function buildCombatActionPalette(state: CharacterState, session: CombatS
     other: { enabled: otherOptions.some(o => o.enabled), label: '应变', options: otherOptions },
     generatedBy: 'engine-fallback',
     sceneHint: restrained ? '当前行动受束缚影响，AI 可生成解除、拖延、神识或环境应变。' : undefined,
+    tacticalSituation: session.tacticalSituation,
   };
+  return mergeAiOptionsIntoPalette(palette, session.aiActionOptions, session.tacticalSituation);
 }
 
 function isStalemateBreakerOption(option?: CombatActionOption): boolean {
@@ -3332,6 +3335,111 @@ function buildStalemateImpulse(session: CombatSession, enemy?: CombatEnemy, stre
     ? `你与${target}又一次错身而过，攻势被护身灵光磨散，对方也难真正逼入要害。这样耗下去，只会把灵力与耐心一并拖干；必须改换打法，寻破绽、诱其露形，或趁势脱身。`
     : `你察觉这场交锋一时陷入僵持：硬攻难入，对方也难一举压倒你。若继续照旧出手，恐怕只是徒耗气机；此刻该换个破局法子。`;
   return { kind: 'contingency', reason: 'stalemate', prompt: text };
+}
+
+function deriveFallbackTacticalSituation(session: CombatSession, round: CombatRound, stalemateStreak = 0): NonNullable<CombatSession['tacticalSituation']> {
+  const playerDamage = Math.max(0, Number(round.playerDamage || 0));
+  const enemyDamage = Math.max(0, Number(round.enemyDamage || 0));
+  const playerHpPct = session.playerMaxHp > 0 ? session.playerHp / session.playerMaxHp : 1;
+  let tempo: NonNullable<CombatSession['tacticalSituation']>['tempo'] = 'chaos';
+  let advantage: NonNullable<CombatSession['tacticalSituation']>['advantage'] = 'unclear';
+  if (stalemateStreak >= 3 || (playerDamage <= 2 && enemyDamage <= 2)) { tempo = 'stalemate'; advantage = 'even'; }
+  else if (playerHpPct <= 0.35 || enemyDamage >= Math.max(8, playerDamage * 2)) { tempo = 'danger'; advantage = 'enemy'; }
+  else if (playerDamage >= Math.max(8, enemyDamage * 2)) { tempo = 'pressing'; advantage = 'player'; }
+  else if ((round.playerHits || []).some(h => h.dead) || round.playerHeal) { tempo = 'turning'; advantage = 'player'; }
+  const reason = tempo === 'stalemate'
+    ? '双方护势与身法互相抵住，硬拼难以打开局面。'
+    : tempo === 'danger'
+      ? '敌方压力正在逼近要害，需要尽快守御、脱身或反制。'
+      : tempo === 'pressing'
+        ? '这一拍攻势压住了对方气机，可趁势扩大战果。'
+        : '战场气机仍在剧烈变化，需观察下一处破口。';
+  return {
+    tempo,
+    advantage,
+    reason,
+    playerOpening: tempo === 'stalemate' ? '诱其护势换气，或借地形逼其移步。' : undefined,
+    enemyPressure: tempo === 'danger' ? '敌方攻势已逼近气血与护体薄处。' : undefined,
+    suggestedFocus: tempo === 'stalemate' ? '改用应变破局' : tempo === 'danger' ? '守御或脱身' : tempo === 'pressing' ? '趁势追击' : '观势再动',
+  };
+}
+
+function sanitizeTacticalSituation(proposal: CombatRoundProposal, fallback: NonNullable<CombatSession['tacticalSituation']>): NonNullable<CombatSession['tacticalSituation']> {
+  const raw = proposal.tacticalSituation || {};
+  const tempos = new Set(['pressing', 'stalemate', 'opening', 'danger', 'flee_window', 'turning', 'chaos']);
+  const advantages = new Set(['player', 'enemy', 'even', 'unclear']);
+  return {
+    tempo: tempos.has(raw.tempo as any) ? raw.tempo as any : fallback.tempo,
+    advantage: advantages.has(raw.advantage as any) ? raw.advantage as any : fallback.advantage,
+    reason: String(raw.reason || fallback.reason).slice(0, 100),
+    playerOpening: raw.playerOpening ? String(raw.playerOpening).slice(0, 90) : fallback.playerOpening,
+    enemyPressure: raw.enemyPressure ? String(raw.enemyPressure).slice(0, 90) : fallback.enemyPressure,
+    suggestedFocus: raw.suggestedFocus ? String(raw.suggestedFocus).slice(0, 70) : fallback.suggestedFocus,
+  };
+}
+
+function validateAiCombatActions(state: CharacterState, session: CombatSession, proposal: CombatRoundProposal): CombatActionOption[] {
+  const actions = Array.isArray(proposal.nextActions) ? proposal.nextActions : [];
+  const validTypes = new Set(['basic_attack', 'defense', 'other', 'flee', 'item', 'talisman', 'technique', 'spell']);
+  const seen = new Set<string>();
+  return actions.map((raw, idx): CombatActionOption | null => {
+    const actionType = validTypes.has(String(raw.actionType || '')) ? raw.actionType as CombatActionOption['actionType'] : 'other';
+    const name = String(raw.name || '').trim().slice(0, 18);
+    const description = String(raw.description || '').trim().slice(0, 100);
+    if (!name || !description) return null;
+    const option: CombatActionOption = {
+      id: 'ai-' + String(raw.id || name || idx).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32) + '-' + idx,
+      name,
+      description,
+      actionType,
+      source: 'ai',
+      enabled: raw.enabled !== false,
+      disabledReason: raw.disabledReason ? String(raw.disabledReason).slice(0, 60) : undefined,
+      mpCost: Math.max(0, Math.min(session.playerMp, Math.floor(Number(raw.mpCost || 0)))) || 0,
+      risk: raw.risk ? String(raw.risk).slice(0, 60) : undefined,
+      intent: raw.intent ? String(raw.intent).slice(0, 80) : description,
+      tags: Array.from(new Set([...(Array.isArray(raw.tags) ? raw.tags.map(String) : []), 'ai-context'])).slice(0, 6),
+    };
+    if ((actionType === 'item' || actionType === 'talisman') && raw.itemId) {
+      const item = state.inventory.find(it => it.id === raw.itemId);
+      if (!item) return null;
+      option.itemId = item.id;
+      option.requiredItems = [item.id];
+    } else if (actionType === 'item' || actionType === 'talisman') {
+      return null;
+    }
+    if ((actionType === 'technique' || actionType === 'spell') && raw.skillIdx != null) {
+      const skillIdx = Math.floor(Number(raw.skillIdx));
+      if (!session.playerSkills?.[skillIdx]) return null;
+      option.skillIdx = skillIdx;
+    } else if (actionType === 'technique' || actionType === 'spell') {
+      option.actionType = 'other';
+      option.tags = Array.from(new Set([...(option.tags || []), 'converted-art-intent']));
+    }
+    if (seen.has(option.id)) option.id += '-' + seen.size;
+    seen.add(option.id);
+    return option;
+  }).filter(Boolean).slice(0, 5) as CombatActionOption[];
+}
+
+function mergeAiOptionsIntoPalette(palette: CombatActionPalette, aiOptions?: CombatActionOption[], tacticalSituation?: NonNullable<CombatSession['tacticalSituation']>): CombatActionPalette {
+  if (!aiOptions?.length && !tacticalSituation) return palette;
+  const next: CombatActionPalette = { ...palette, generatedBy: aiOptions?.length ? 'hybrid' : palette.generatedBy, tacticalSituation };
+  const add = (key: CombatActionGroupKey, option: CombatActionOption) => {
+    const group = next[key];
+    const exists = group.options.some(o => o.id === option.id);
+    const options = exists ? group.options : [option, ...group.options];
+    next[key] = { ...group, enabled: options.some(o => o.enabled), options };
+  };
+  for (const option of aiOptions || []) {
+    if (option.actionType === 'basic_attack') add('basicAttack', option);
+    else if (option.actionType === 'defense') add('defense', option);
+    else if (option.actionType === 'item' || option.actionType === 'talisman') add('item', option);
+    else if (option.actionType === 'technique') add('technique', option);
+    else if (option.actionType === 'spell') add('spell', option);
+    else add('other', option);
+  }
+  return next;
 }
 
 function validateCombatActionOption(state: CharacterState, session: CombatSession, option?: CombatActionOption): { ok: boolean; reason?: string } {
@@ -4028,6 +4136,11 @@ export function executeCombatRoundWithProposal(
   };
   const stalemateStreak = !endStatus ? recentCombatLowProgressStreak(session, round, selectedOption) : 0;
   if (stalemateStreak >= 3) audit.push(`连续${stalemateStreak}拍难分胜负，引擎判为僵局并触发破局时停。`);
+  const fallbackTacticalSituation = deriveFallbackTacticalSituation(session, round, stalemateStreak);
+  const tacticalSituation = sanitizeTacticalSituation(proposal, fallbackTacticalSituation);
+  round.tacticalSituation = tacticalSituation;
+  const aiActionOptions = !endStatus ? validateAiCombatActions(nextState, session, proposal) : [];
+  if (aiActionOptions.length) audit.push('AI临场动作已通过引擎校验并投影到战斗面板。');
 
   // 角色本能想法/应变关口：AI 提示玩家需决断的处境（仅战斗未结束时）
   let pendingImpulse: CombatSession['pendingImpulse'];
@@ -4044,7 +4157,7 @@ export function executeCombatRoundWithProposal(
     }
   }
   if (!endStatus && stalemateStreak >= 3 && !pendingImpulse) pendingImpulse = buildStalemateImpulse(session, legacyEnemy, stalemateStreak);
-  const newSession: CombatSession = { ...session, enemies: enemiesWork, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp, pendingImpulse, stalemateStreak: pendingImpulse?.reason === 'stalemate' ? stalemateStreak : stalemateStreak };
+  const newSession: CombatSession = { ...session, enemies: enemiesWork, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp, pendingImpulse, stalemateStreak, tacticalSituation, aiActionOptions };
   newSession.actionPalette = buildCombatActionPalette(nextState, newSession);
   if (endStatus === 'defeat') {
     const killer = enemyActions.filter(a => (a.damage || 0) > 0).sort((a, b) => (b.damage || 0) - (a.damage || 0))[0];

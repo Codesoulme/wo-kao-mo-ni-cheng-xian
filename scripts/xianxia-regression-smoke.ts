@@ -936,6 +936,35 @@ function smokeCombatArtFallbackNames(): void {
 
 
 
+
+function smokeCombatTacticalProjection() {
+  let state: any = {
+    id: 'tactical_smoke', name: '观势者', age: 23, realmName: '炼气二层', rootType: '五行杂灵根', rootMultiplier: 1,
+    spiritStones: 0, inventory: [], equipped: [], statuses: [], eventLog: [], hp: 90, maxHp: 90, mp: 45, maxMp: 45, attack: 18, defense: 14, speed: 13,
+    combatSession: {
+      id: 'combat_tactical_smoke', enemies: [{ id: 'blade_rogue', name: '短刃劫修', description: '脚步飘忽，护身薄弱。', hp: 70, maxHp: 70, attack: 15, defense: 8, speed: 12 }],
+      currentEnemyIdx: 0, round: 1, log: [], status: 'ongoing', startAge: 23,
+      playerHp: 90, playerMaxHp: 90, playerMp: 45, playerMaxMp: 45, playerAttack: 18, playerDefense: 14, playerSpeed: 13, playerSkills: [], playerItems: [],
+    },
+  } as any;
+  const proposal = {
+    playerActionLabel: '错步逼近', playerActionType: 'attack' as const, playerDamage: 6,
+    enemyBeats: [{ enemyIdx: 0, action: '横刃退守', actionType: 'defend', damageToPlayer: 0 }],
+    tacticalSituation: { tempo: 'opening' as const, advantage: 'player' as const, reason: '敌人退守时右肩护势短暂散开。', playerOpening: '右肩护势换气', suggestedFocus: '趁破绽逼其移步' },
+    nextActions: [
+      { id: 'press-shoulder', name: '逼肩夺步', description: '顺着右肩护势空隙压上半步，迫其阵脚再乱。', actionType: 'other' as const, intent: '沿破绽扩大优势', tags: ['opening'] },
+      { id: 'feint-flee', name: '佯退诱追', description: '故意后撤半丈，引其短刃追出护势。', actionType: 'other' as const, risk: '若敌人不追，攻势会暂缓。', tags: ['ai-context'] },
+    ],
+    narrative: '你错步贴近，逼得短刃劫修横刃退守；他右肩护势在换气时微微一散，露出一线可乘之机。',
+  };
+  state = executeCombatRoundWithProposal(state, 'attack', { optionId: 'basic-body-strike' }, proposal).state;
+  const session = state.combatSession!;
+  assert(session.tacticalSituation?.tempo === 'opening', 'AI tactical tempo should persist on combat session');
+  assert(session.actionPalette?.other.options.some((o: any) => o.name === '逼肩夺步' && (o.tags || []).includes('ai-context')), 'AI next actions should project into action palette');
+  assert(session.log[0].tacticalSituation?.playerOpening === '右肩护势换气', 'round log should preserve tactical read');
+  console.log(JSON.stringify({ smoke: 'combat-tactical-projection', passed: true, tempo: session.tacticalSituation.tempo, option: session.actionPalette.other.options[0].name }));
+}
+
 function smokeCombatStalemateBreakNode() {
   let state: any = {
     id: 'stalemate_smoke',
@@ -1094,6 +1123,7 @@ async function main(): Promise<void> {
   smokeCombatSettlementSingleFlow();
   smokeDynamicCultivationAttributes();
   smokeCombatArtFallbackNames();
+  smokeCombatTacticalProjection();
   smokeCombatStalemateBreakNode();
   smokeCombatTechniqueSpellSplit();
   smokeEnemyLootArtifactNaming();
