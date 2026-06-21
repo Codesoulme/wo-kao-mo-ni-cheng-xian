@@ -34,6 +34,7 @@ export function CombatModal() {
   const { character, setCharacter, addEvent, setLoading, setError, setSettlementResult } = useGameStore();
   const [busy, setBusy] = useState(false);
   const [autoBattle, setAutoBattle] = useState(false);
+  const autoBattleSessionRef = useRef<string | null>(null);
   // 战斗结束后短暂展示结果界面（玩家点"了结"按钮关闭）
   const [endResult, setEndResult] = useState<{ status: string; narrative: string } | null>(null);
   // Task 22: 伤害飘字
@@ -54,9 +55,15 @@ export function CombatModal() {
     const hasCombatProgress = !!session && ((session.round || 1) > 1 || (session.log || []).length > 0);
     if (sessionId !== lastSessionIdRef.current) {
       lastSessionIdRef.current = sessionId;
+      autoBattleSessionRef.current = null;
+      setAutoBattle(false);
       setBattleStarted(hasCombatProgress);
     } else if (hasCombatProgress && !battleStarted) {
       setBattleStarted(true);
+    }
+    if (!battleStarted) {
+      autoBattleSessionRef.current = null;
+      setAutoBattle(false);
     }
   }, [session?.id, session?.round, session?.log?.length, battleStarted]);
   useEffect(() => {
@@ -365,10 +372,11 @@ export function CombatModal() {
       || groups.flatMap((g: any) => g.options || []).find((o: any) => o.enabled && !String(o.id || '').includes('flee'));
   };
   useEffect(() => {
-    if (!autoBattle || busy || !isOngoing || !battleStarted || endResult || halfHpOrLower) return;
+    if (!autoBattle || autoBattleSessionRef.current !== session?.id || busy || !isOngoing || !battleStarted || endResult || halfHpOrLower) return;
     const timer = setTimeout(() => {
       const option = chooseAutoOption();
       if (!option) {
+        autoBattleSessionRef.current = null;
         setAutoBattle(false);
         toast.warning('自运已止', { description: '此刻没有稳妥可用的行动。' });
         return;
@@ -376,7 +384,7 @@ export function CombatModal() {
       runPaletteOption(option);
     }, 650);
     return () => clearTimeout(timer);
-  }, [autoBattle, busy, isOngoing, battleStarted, endResult, halfHpOrLower, session?.round]);
+  }, [autoBattle, busy, isOngoing, battleStarted, endResult, halfHpOrLower, session?.id, session?.round]);
 
   if (!shouldRender) return null;
 
@@ -428,7 +436,7 @@ export function CombatModal() {
               )}
               </div>
               <Button
-                onClick={() => setBattleStarted(true)}
+                onClick={() => { autoBattleSessionRef.current = null; setAutoBattle(false); setBattleStarted(true); }}
                 className="w-full h-9 font-serif-cn shrink-0"
                 variant="destructive"
               >
@@ -653,7 +661,11 @@ export function CombatModal() {
                     toast.warning('不可自运', { description: '气血不足半数，请亲自决断。' });
                     return;
                   }
-                  setAutoBattle(v => !v);
+                  setAutoBattle(v => {
+                    const next = !v;
+                    autoBattleSessionRef.current = next ? (session?.id || null) : null;
+                    return next;
+                  });
                 }}
                 disabled={busy || halfHpOrLower}
                 className={cn(
