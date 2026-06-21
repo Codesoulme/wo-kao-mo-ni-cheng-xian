@@ -173,7 +173,7 @@ export interface GameEvent {
   // Task 20: 事件蓝图（advance route 返回；用于 EventTimeline 显示主题 chip）
   blueprint?: { category: string; name: string };
   timeAdvance?: TimeAdvance;
-  worldTime?: WorldCalendarState & { label?: string; monthName?: string; day?: number; phase?: string };
+  worldTime?: WorldCalendarState & { label?: string; displayLabel?: string; monthName?: string; day?: number; phase?: string };
   actionProjections?: ActionProjection[];
 }
 

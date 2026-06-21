@@ -102,15 +102,11 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
   );
 }
 
-function safeTimeLabelPart(value?: string) {
-  const text = String(value || '').trim();
-  if (!text) return '';
-  return /\u6267\u884c\u7ea6\u5b9a|\u524d\u5f80|\u8ffd\u67e5|\u8ffd\u5bfb|\u63a2\u5165|\u5165\u5e02|\u8d74\u7ea6/.test(text) ? '' : text;
-}
-
 function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
+  const displayLabel = String(event.worldTime?.displayLabel || '').trim();
+  if (displayLabel) return displayLabel;
   const worldLabel = event.worldTime?.label;
-  const segmentLabel = safeTimeLabelPart(event.timeAdvance?.label);
+  const segmentLabel = String(event.timeAdvance?.label || '').trim();
   const ageText = ageMeta.isContinuation ? '' : `${event.age}\u5c81`;
   const open = '\u3010';
   const close = '\u3011';

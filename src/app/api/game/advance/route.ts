@@ -8,7 +8,7 @@ import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-log';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { getRealmInfo } from '@/lib/xianxia/types';
-import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, hiddenEventMeta, sanitizeActionProjections, worldTimeStamp } from '@/lib/xianxia/world-time';
+import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, formatWorldTimeDisplay, hiddenEventMeta, sanitizeActionProjections, worldTimeStamp } from '@/lib/xianxia/world-time';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -324,22 +324,28 @@ ${narrative || ''}`);
     let eventWorldCalendarCursor = worldCalendar;
     let finalWorldCalendar = worldCalendar;
     let finalWorldTime = worldTime;
+    const stampEventTime = (stamp: any, advance: any, includeAge: boolean) => ({
+      ...stamp,
+      displayLabel: formatWorldTimeDisplay({ age: finalState.age, timeAdvance: advance, worldTime: stamp, includeAge }),
+    });
+    const stampedWorldTime = stampEventTime(worldTime, timeAdvance, true);
+    finalWorldTime = stampedWorldTime;
 
     const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[]; timeAdvance?: any; worldTime?: any; actionProjections?: any[] }[] = [{
       // 主事件只记录这一段时日发生的因果；不要因为最终数值成功突破，就把“冲关前夜/开始冲关”提前包装成已破境。
       title: aiOutput.title,
       narrative: aiOutput.narrative,
       eventType: isFateNode ? 'fate_node' : visibleEventType(aiOutput.eventType, aiOutput.title, aiOutput.narrative),
-      effects: [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime, actionProjections: baseActionProjections })],
+      effects: [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime: stampedWorldTime, actionProjections: baseActionProjections })],
       timeAdvance,
-      worldTime,
+      worldTime: stampedWorldTime,
       actionProjections: baseActionProjections,
     }];
 
     for (const extra of aiOutput.extraEvents || []) {
       const extraTimeAdvance = extra.timeAdvance ? clampTimeAdvance(extra.timeAdvance, timeAdvance) : undefined;
       if (extraTimeAdvance) eventWorldCalendarCursor = advanceWorldCalendar(eventWorldCalendarCursor, extraTimeAdvance);
-      const extraWorldTime = extraTimeAdvance ? worldTimeStamp(eventWorldCalendarCursor) : finalWorldTime;
+      const extraWorldTime = extraTimeAdvance ? stampEventTime(worldTimeStamp(eventWorldCalendarCursor), extraTimeAdvance, false) : finalWorldTime;
       finalWorldCalendar = eventWorldCalendarCursor;
       finalWorldTime = extraWorldTime;
       const extraActions = sanitizeActionProjections(extra.actionProjections);
@@ -355,7 +361,7 @@ ${narrative || ''}`);
     }
     for (const continuation of sameYearContinuationDrafts) {
       if (continuation.timeAdvance) eventWorldCalendarCursor = advanceWorldCalendar(eventWorldCalendarCursor, continuation.timeAdvance);
-      const continuationWorldTime = continuation.timeAdvance ? worldTimeStamp(eventWorldCalendarCursor) : finalWorldTime;
+      const continuationWorldTime = continuation.timeAdvance ? stampEventTime(worldTimeStamp(eventWorldCalendarCursor), continuation.timeAdvance, false) : finalWorldTime;
       finalWorldCalendar = eventWorldCalendarCursor;
       finalWorldTime = continuationWorldTime;
       eventDrafts.push({
