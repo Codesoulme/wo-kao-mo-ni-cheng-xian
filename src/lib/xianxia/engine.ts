@@ -813,6 +813,8 @@ function buildSkillCombatOption(sk: NonNullable<CombatSession['playerSkills']>[n
     risk: sk.adaptation != null && sk.adaptation < 0.7 ? '\u9002\u914d\u4e0d\u8db3\uff0c\u53ef\u80fd\u53cd\u566c\u6216\u5a01\u529b\u6298\u635f\u3002' : undefined,
     requiredItems: sk.itemId ? [sk.itemId] : undefined,
     tags: [kind],
+    // 软提示：名称/描述含群攻语义时标为 aoe，供 UI 与 AI 参考；AI 仍可根据法术性质决定实际波及。
+    targetScope: /群|范围|横扫|席卷|波及|全场|漫天|笼罩|风暴|燎原|万剑|阵|爆|扇/.test(`${sk.name || ''}${sk.description || ''}`) ? 'aoe' : undefined,
   };
 }
 
@@ -4835,12 +4837,12 @@ export function buildThreadContinuationEvent(state: CharacterState, thread: Pend
   const realmName = inferStoryRealmName(`${thread.title} ${thread.description} ${thread.followUpHint || ''}`);
   const isRealm = thread.category === 'exploration' || !!realmName || /秘境|浮阁|洞府|遗迹|禁地|禁制|破禁/.test(`${thread.title}${thread.description}`);
   const isCompetition = thread.category === 'competition' || /比试|考核|入门|仙门|擂台/.test(`${thread.title}${thread.description}`);
-  const title = isRealm ? `余波再起·${realmName || thread.title}` : isCompetition ? `约期已至·${thread.title}` : `因果续起·${thread.title}`;
+  const title = isRealm ? (realmName || thread.title) : isCompetition ? `约期已至·${thread.title}` : thread.title;
   const narrative = isRealm
     ? `${thread.description}此事并未随上一段经历散去。${state.name}收拢所得线索，反复揣摩${thread.followUpHint || '其中关窍'}；若要真正深入，还需凭信物、地势或另一条破禁之法再寻入口。`
     : isCompetition
-      ? `${thread.description}约期已近，${state.name}没有把此事抛在脑后。她整备衣装与随身法器，按约前去应试；这一场比试不只是胜负，更关系到能否接上前文所开的仙途。`
-      : `${thread.description}前事余波在这一日重新牵动。${state.name}循着旧约与旧迹继续追索，使这段因果没有半途断线。`;
+      ? `${thread.description}约期已近，${state.name}没有把此事抛在脑后。她整备衣装与随身法器，按约前去应试；这一场比试不只是胜负，更关系到能否接续早先结下的仙途机缘。`
+      : `${thread.description}${state.name}循着旧迹与旧约继续追索，这桁前缘正待了结。`;
   return {
     title,
     narrative,

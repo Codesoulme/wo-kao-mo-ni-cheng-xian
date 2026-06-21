@@ -160,8 +160,13 @@ export function CombatModal() {
         }
         await endCombat(status);
       } else {
-        // 更新角色（含 combatSession）
         setCharacter({ ...character, ...data.state });
+        // 时停：若出现需玩家亲自决断的关口（物品冲动/应变），自运立即停下，交还控制权
+        if (data.state?.combatSession?.pendingImpulse && autoBattleSessionRef.current) {
+          autoBattleSessionRef.current = null;
+          setAutoBattle(false);
+          toast.info('时停', { description: '局势需你亲自定夺，自运已停。' });
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -833,6 +838,7 @@ function PaletteButton({ paletteKey, openPalette, setOpenPalette, group, icon, t
               <div className="text-xs font-semibold font-serif-cn flex items-center gap-1">
                 {option.name}
                 {option.mpCost > 0 && <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-700">-{option.mpCost}灵</span>}
+                {option.targetScope === 'aoe' && <span className="text-[9px] px-1 rounded bg-purple-500/15 text-purple-600">群攻</span>}
               </div>
               <div className="text-[10px] text-muted-foreground line-clamp-2">{option.enabled ? option.description : (option.disabledReason || option.description)}</div>
               {option.risk && <div className="text-[10px] text-red-500/80 truncate">险：{option.risk}</div>}

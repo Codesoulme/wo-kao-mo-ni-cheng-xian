@@ -100,7 +100,7 @@ export function PendingThreadsCard() {
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span className={cn('shrink-0', style.color)}>{style.icon}</span>
                       <span className={cn('text-xs font-bold font-serif-cn truncate', style.color)}>
-                        {t.title || '无名因缘'}
+                        {displayThreadTitle(t)}
                       </span>
                     </div>
                     <span className={cn(
@@ -235,6 +235,9 @@ function sanitizeThreadText(text: string): string {
     .replace(new RegExp('\\u6b64\\u524d\\u5929\\u9053\\u5e72\\u9884', 'g'), '\u6b64\u524d')
     .replace(new RegExp('\\u524d\\u5929\\u9053\\u5e72\\u9884', 'g'), '\u6b64\u524d')
     .replace(new RegExp('\\u5929\\u9053\\u5e72\\u9884', 'g'), '\u56e0\u7f18\u7275\u52a8')
+    .replace(/[。，]?(后续流年|来年岁月)?需承接此因果[，,]?不可无故转向[。]?/g, '')
+    .replace(/前事余波在这一日重新牵动[。]?/g, '')
+    .replace(/使这段因果没有半途断线[。]?/g, '')
     .replace(new RegExp('\\u89d2\\u8272\\u5e94\\u4e3b\\u52a8', 'g'), '\u5fc3\u4e2d\u5df2\u6709\u5ff5\u5934\uff0c\u6b32')
     .replace(new RegExp('\\u4e0d\\u80fd\\u88ab\\u540e\\u7eed\\u6d41\\u5e74\\u9057\\u5fd8', 'g'), '\u4ecd\u4e0d\u53ef\u8f7b\u653e')
     .replace(new RegExp('\\u540e\\u7eed\\u6d41\\u5e74', 'g'), '\u6765\u5e74\u5c81\u6708')
