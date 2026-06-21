@@ -3165,7 +3165,7 @@ function armorLikeItems(state: CharacterState): ItemEntry[] {
 
 function optionById(palette: CombatActionPalette | undefined, optionId?: string): CombatActionOption | undefined {
   if (!palette || !optionId) return undefined;
-  for (const group of [palette.basicAttack, palette.spell, palette.defense, palette.item, palette.other]) {
+  for (const group of [palette.basicAttack, palette.technique, palette.spell, palette.defense, palette.item, palette.other]) {
     const found = group.options.find(o => o.id === optionId);
     if (found) return found;
   }
@@ -3290,6 +3290,12 @@ export function buildCombatActionPalette(state: CharacterState, session: CombatS
     });
   }
   otherOptions.push({ id: 'other-observe-opening', name: '观隙寻机', description: '暂缓强攻，观察敌人气机、法器与防护破绽。', actionType: 'other', source: 'ai', enabled: true, mpCost: 0, intent: '寻找下一轮机会', tags: ['observe'] });
+  if (session.pendingImpulse?.reason === 'stalemate' || (session.stalemateStreak || 0) >= 2) {
+    otherOptions.unshift(
+      { id: 'other-stalemate-lure', name: '诱其露绽', description: '不再硬拼，以虚招与身位诱对方护势换气，争取下一拍破绽。', actionType: 'other', source: 'ai', enabled: true, mpCost: 0, intent: '打破僵持，诱使敌人露出护身或站位破绽', tags: ['observe', 'stalemate-breaker'] },
+      { id: 'other-stalemate-risk', name: '行险破局', description: '冒险压近或催动异招，赌一线转机；若判断失误，可能反受其制。', actionType: 'other', source: 'ai', enabled: true, mpCost: Math.min(8, Math.max(0, Math.floor(session.playerMaxMp * 0.06))), risk: '若时机不合，可能被敌人抓住破绽。', intent: '用高风险手段打破互耗僵局', tags: ['stalemate-breaker', 'risk'] }
+    );
+  }
   otherOptions.push({ id: 'other-flee', name: '伺机脱身', description: '借地形或烟尘尝试脱离战场。', actionType: 'flee', source: 'environment', enabled: true, mpCost: 0, tags: ['flee'] });
 
   return {
@@ -3302,6 +3308,30 @@ export function buildCombatActionPalette(state: CharacterState, session: CombatS
     generatedBy: 'engine-fallback',
     sceneHint: restrained ? '当前行动受束缚影响，AI 可生成解除、拖延、神识或环境应变。' : undefined,
   };
+}
+
+function isStalemateBreakerOption(option?: CombatActionOption): boolean {
+  return !!option && ((option.tags || []).includes('stalemate-breaker') || String(option.id || '').startsWith('other-stalemate-'));
+}
+
+function recentCombatLowProgressStreak(session: CombatSession, round: CombatRound, selectedOption?: CombatActionOption): number {
+  if (round.playerActionType === 'flee' || isStalemateBreakerOption(selectedOption)) return 0;
+  const playerDamage = Math.max(0, Number(round.playerDamage || 0));
+  const enemyDamage = Math.max(0, Number(round.enemyDamage || 0));
+  const meaningfulHit = playerDamage >= 4 || enemyDamage >= 4;
+  const meaningfulState = (round.playerHeal || 0) > 0 || (round.playerHits || []).some(h => h.dead) || (round.enemyActions || []).some(a => a.dead || a.actionType === 'stunned' || a.actionType === 'flee');
+  if (meaningfulHit || meaningfulState) return 0;
+  const previous = (session.log || []).slice(-2);
+  const previousLow = previous.filter(r => Math.max(0, Number(r.playerDamage || 0)) <= 2 && Math.max(0, Number(r.enemyDamage || 0)) <= 2 && !(r.playerHits || []).some(h => h.dead)).length;
+  return Math.max(Number(session.stalemateStreak || 0), previousLow) + 1;
+}
+
+function buildStalemateImpulse(session: CombatSession, enemy?: CombatEnemy, streak = 0): NonNullable<CombatSession['pendingImpulse']> {
+  const target = enemy?.name || session.enemies?.[session.currentEnemyIdx]?.name || '敌手';
+  const text = streak >= 4
+    ? `你与${target}又一次错身而过，攻势被护身灵光磨散，对方也难真正逼入要害。这样耗下去，只会把灵力与耐心一并拖干；必须改换打法，寻破绽、诱其露形，或趁势脱身。`
+    : `你察觉这场交锋一时陷入僵持：硬攻难入，对方也难一举压倒你。若继续照旧出手，恐怕只是徒耗气机；此刻该换个破局法子。`;
+  return { kind: 'contingency', reason: 'stalemate', prompt: text };
 }
 
 function validateCombatActionOption(state: CharacterState, session: CombatSession, option?: CombatActionOption): { ok: boolean; reason?: string } {
@@ -3996,6 +4026,9 @@ export function executeCombatRoundWithProposal(
     playerHits: playerHitsResult,
     dialogue,
   };
+  const stalemateStreak = !endStatus ? recentCombatLowProgressStreak(session, round, selectedOption) : 0;
+  if (stalemateStreak >= 3) audit.push(`连续${stalemateStreak}拍难分胜负，引擎判为僵局并触发破局时停。`);
+
   // 角色本能想法/应变关口：AI 提示玩家需决断的处境（仅战斗未结束时）
   let pendingImpulse: CombatSession['pendingImpulse'];
   const imp = proposal.playerImpulse;
@@ -4003,14 +4036,16 @@ export function executeCombatRoundWithProposal(
     if (imp.kind === 'item') {
       const owned = (session.playerItems || []).find(it => it.itemId === imp.itemId) || (session.playerItems || []).find(it => it.name === imp.itemName);
       pendingImpulse = owned
-        ? { kind: 'item', prompt: imp.prompt, itemId: owned.itemId, itemName: owned.name }
-        : { kind: 'contingency', prompt: imp.prompt };
+        ? { kind: 'item', prompt: imp.prompt, itemId: owned.itemId, itemName: owned.name, reason: 'danger' }
+        : { kind: 'contingency', prompt: imp.prompt, reason: 'unknown' };
       if (!owned) audit.push('AI建议使用物品但未命中现有背包，已转为应变提示。');
     } else {
-      pendingImpulse = { kind: 'contingency', prompt: imp.prompt };
+      pendingImpulse = { kind: 'contingency', prompt: imp.prompt, reason: 'danger' };
     }
   }
-  const newSession: CombatSession = { ...session, enemies: enemiesWork, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp, pendingImpulse };
+  if (!endStatus && stalemateStreak >= 3 && !pendingImpulse) pendingImpulse = buildStalemateImpulse(session, legacyEnemy, stalemateStreak);
+  const newSession: CombatSession = { ...session, enemies: enemiesWork, currentEnemyIdx, round: session.round + 1, log: [...session.log, round], status: endStatus || 'ongoing', playerHp, playerMp, pendingImpulse, stalemateStreak: pendingImpulse?.reason === 'stalemate' ? stalemateStreak : stalemateStreak };
+  newSession.actionPalette = buildCombatActionPalette(nextState, newSession);
   if (endStatus === 'defeat') {
     const killer = enemyActions.filter(a => (a.damage || 0) > 0).sort((a, b) => (b.damage || 0) - (a.damage || 0))[0];
     return { state: { ...nextState, combatSession: newSession, hp: 0, mp: playerMp, alive: false, causeOfDeath: '战死于' + (killer?.name || legacyEnemy?.name || '敌手') + '之手' }, round, ended: true, endStatus };

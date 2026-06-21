@@ -1852,6 +1852,7 @@ export async function generateCombatRoundProposal(args: {
   const isAoe = option?.targetScope === 'aoe' || (option?.tags || []).includes('aoe');
   const aoeHint = isAoe ? '本动作为【群攻】：请用 playerHits 给出命中的多个敌人与各自伤害，可只波及部分敌人。' : '本动作默认作用于上方指定目标；如法术性质天然波及他人，可酌情用 playerHits。';
   const statusDesc = (ctx.activeStatuses || []).map(s => s.name).join('、') || '无特殊状态';
+  const impulseDesc = sessionBefore.pendingImpulse?.prompt ? `${sessionBefore.pendingImpulse.reason === 'stalemate' ? '破局关口' : '应变关口'}：${sessionBefore.pendingImpulse.prompt}` : '无';
 
   const system = `${IDENTITY_PROMPT}
 
@@ -1888,7 +1889,9 @@ ${aoeHint}
 【角色本能/应变】若这一拍过后角色陷入【需玩家亲自决断】的处境（如中迷幻、被控、中毒、识海受扰、濒危被围），请输出 playerImpulse：
 - 当随身物品里恰有一件可对症破解此处境的道具，且以角色心性此刻会本能地想取用，则 kind="item"，itemId 填该物品真实 id（只能用上方列出的物品，不可杜撰），itemName 填其名，prompt 用角色内心念头式的沉浸表达（如"迷烟入鼻，识海晃荡，怀中那枚清心丹隐隐发烫……"）。
 - 若没有对症之物，但局势正逼角色当机立断（突围、挣脱、舍物保命、行险一搏等），则 kind="contingency"，prompt 描述这一危急关口，留待玩家以应变/物品自行解决，不要替玩家决定。
+- 若当前关口是“破局关口”或最近回合显示互耗僵持，本拍应优先推演破局尝试、诱敌露绽、脱身窗口或代价升级；不要继续写双方无意义硬拼。
 - 处境寻常、无需玩家特别决断时，省略 playerImpulse。
+当前关口：${impulseDesc}
 战斗记忆：
 ${tacticMemory}
 

@@ -166,7 +166,7 @@ export function CombatModal() {
         if (data.state?.combatSession?.pendingImpulse && autoBattleSessionRef.current) {
           autoBattleSessionRef.current = null;
           setAutoBattle(false);
-          toast.info('时停', { description: '局势需你亲自定夺，自运已停。' });
+          toast.info(data.state?.combatSession?.pendingImpulse?.reason === 'stalemate' ? '破局时停' : '时停', { description: data.state?.combatSession?.pendingImpulse?.reason === 'stalemate' ? '战局陷入僵持，请亲自选择破局之法。' : '局势需你亲自定夺，自运已停。' });
         }
       }
     } catch (err: any) {
@@ -745,11 +745,11 @@ export function CombatModal() {
                   </div>
                 </div>
               ) : (
-                <div className="mb-2 rounded-md border-2 border-amber-500/50 bg-amber-500/10 p-2.5 flex items-start gap-2">
-                  <span className="text-amber-600 text-sm leading-5 shrink-0">⚠</span>
+                <div className={cn("mb-2 rounded-md border-2 p-2.5 flex items-start gap-2", impulse.reason === 'stalemate' ? "border-purple-500/50 bg-purple-500/10" : "border-amber-500/50 bg-amber-500/10")}>
+                  <span className={cn("text-sm leading-5 shrink-0", impulse.reason === 'stalemate' ? "text-purple-600" : "text-amber-600")}>{impulse.reason === 'stalemate' ? '✦' : '⚠'}</span>
                   <p className="text-[12px] leading-5 text-foreground/90 font-serif-cn flex-1 xianxia-prose">
                     {impulse.prompt}
-                    <span className="text-amber-600/80">　——以下方【应变】或【物用】化解此局。</span>
+                    <span className={cn(impulse.reason === 'stalemate' ? "text-purple-600/80" : "text-amber-600/80")}>　——以下方【应变】或【物用】化解此局。</span>
                   </p>
                   <button onClick={() => setDismissedImpulse(impulseKey)} className="text-[11px] text-muted-foreground shrink-0 self-start">知道了</button>
                 </div>

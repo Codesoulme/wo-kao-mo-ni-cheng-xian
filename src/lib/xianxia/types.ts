@@ -700,7 +700,9 @@ export interface CombatSession {
   }[];
   // 角色本能想法/应变关口：AI 判定玩家陷入需决策的处境（如中迷幻/被控/濒危）时产出；
   // kind='item' 时附上一件玩家现有、可对症的道具，UI 弹窗让玩家决定是否使用；kind='contingency' 为应变提示横幅。
-  pendingImpulse?: { kind: 'item' | 'contingency'; prompt: string; itemId?: string; itemName?: string };
+  pendingImpulse?: { kind: 'item' | 'contingency'; prompt: string; itemId?: string; itemName?: string; reason?: 'danger' | 'stalemate' | 'control' | 'unknown' };
+  // 连续低进展交锋计数；用于识别互相破不了防、日志重复、只剩机械消耗的僵局，并触发 AI/玩家破局时停。
+  stalemateStreak?: number;
 }
 
 // ==================== AI 输出结构 (EngineCommand) ====================

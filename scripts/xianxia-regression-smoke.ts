@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, endCombat } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, endCombat, executeCombatRoundWithProposal } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
@@ -935,6 +935,62 @@ function smokeCombatArtFallbackNames(): void {
 }
 
 
+
+function smokeCombatStalemateBreakNode() {
+  let state: any = {
+    id: 'stalemate_smoke',
+    name: '试战者',
+    age: 22,
+    realmName: '炼气一层',
+    rootType: '五行杂灵根',
+    rootMultiplier: 1,
+    spiritStones: 0,
+    inventory: [],
+    equipped: [],
+    statuses: [],
+    eventLog: [],
+    hp: 80,
+    maxHp: 80,
+    mp: 40,
+    maxMp: 40,
+    attack: 8,
+    defense: 45,
+    speed: 10,
+    combatSession: {
+      id: 'combat_stalemate_smoke',
+      enemies: [{ id: 'iron_guard', name: '铁甲散修', description: '护体法器厚重，攻势沉稳。', hp: 80, maxHp: 80, attack: 8, defense: 45, speed: 8 }],
+      currentEnemyIdx: 0,
+      round: 1,
+      log: [],
+      status: 'ongoing',
+      startAge: 22,
+      playerHp: 80,
+      playerMaxHp: 80,
+      playerMp: 40,
+      playerMaxMp: 40,
+      playerAttack: 8,
+      playerDefense: 45,
+      playerSpeed: 10,
+      playerSkills: [],
+      playerItems: [],
+    },
+  } as any;
+  const proposal = {
+    playerActionLabel: '试探攻势',
+    playerActionType: 'attack' as const,
+    playerDamage: 1,
+    enemyBeats: [{ enemyIdx: 0, action: '沉甲迫近', actionType: 'attack', damageToPlayer: 1 }],
+    narrative: '两人气机相撞，护身灵光彼此磨过，谁也未能真正撕开对方门户。',
+  };
+  state = executeCombatRoundWithProposal(state, 'attack', { optionId: 'basic-body-strike' }, proposal).state;
+  state = executeCombatRoundWithProposal(state, 'attack', { optionId: 'basic-body-strike' }, proposal).state;
+  state = executeCombatRoundWithProposal(state, 'attack', { optionId: 'basic-body-strike' }, proposal).state;
+  const session = state.combatSession!;
+  assert(session.pendingImpulse?.reason === 'stalemate', 'low-progress combat should trigger stalemate break impulse');
+  assert((session.actionPalette?.other.options || []).some((o: any) => (o.tags || []).includes('stalemate-breaker')), 'stalemate should expose breaker options in 应变');
+  console.log(JSON.stringify({ smoke: 'combat-stalemate-break-node', passed: true, prompt: session.pendingImpulse.prompt.slice(0, 24) }));
+}
+
 function smokeCombatTechniqueSpellSplit(): void {
   const rawState: any = {
     spiritualRoot: 'common', realm: 'qi_refining', realmLevel: 2, comprehension: 60,
@@ -1038,6 +1094,7 @@ async function main(): Promise<void> {
   smokeCombatSettlementSingleFlow();
   smokeDynamicCultivationAttributes();
   smokeCombatArtFallbackNames();
+  smokeCombatStalemateBreakNode();
   smokeCombatTechniqueSpellSplit();
   smokeEnemyLootArtifactNaming();
   smokeAiDrivenCombatActionPalette();
