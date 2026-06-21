@@ -92,7 +92,7 @@ export function InterfereInput() {
   };
 
   return (
-    <div className="border-t border-border/60 bg-card/95 backdrop-blur px-3 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+    <div className="relative border-t border-border/60 bg-card/95 backdrop-blur px-3 py-2.5 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1 shrink-0">
           {onCooldown ? (
@@ -121,8 +121,9 @@ export function InterfereInput() {
         </Button>
       </div>
       {busy && (
-        <div className="text-[10px] text-muted-foreground mt-1 px-1 animate-pulse">
-          {'\u6b63\u5728\u63a8\u6f14\u5929\u673a\u2026'}
+        <div className="pointer-events-none absolute left-1/2 -top-2 z-20 -translate-x-1/2 -translate-y-full flex items-center gap-1.5 rounded-full border border-primary/40 bg-background/90 px-3 py-1.5 text-[11px] font-serif-cn text-primary shadow-lg backdrop-blur animate-pulse">
+          <Zap className="w-3 h-3 animate-pulse" />
+          {'\u5929\u9053\u6743\u8861\u4e2d\u2026'}
         </div>
       )}
       {!busy && onCooldown && (

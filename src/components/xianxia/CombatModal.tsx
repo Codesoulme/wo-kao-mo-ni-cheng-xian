@@ -405,7 +405,16 @@ export function CombatModal() {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <Card className="w-full max-w-md paper-texture border-destructive/50 shadow-2xl flex flex-col h-[100dvh] sm:h-[96vh] rounded-none sm:rounded-lg sm:my-2 overflow-hidden">
+      <Card className="relative w-full max-w-md paper-texture border-destructive/50 shadow-2xl flex flex-col h-[100dvh] sm:h-[96vh] rounded-none sm:rounded-lg sm:my-2 overflow-hidden">
+        {/* 战斗 AI 运算悬浮层：不占布局，悬浮于场景中央 */}
+        {busy && (
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+            <div className="flex items-center gap-2 rounded-full border border-destructive/40 bg-background/85 px-4 py-2 text-xs font-serif-cn text-destructive shadow-lg backdrop-blur animate-pulse">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {'招式催动中…'}
+            </div>
+          </div>
+        )}
         {/* 顶部：战斗标题 + 红色装饰边框（session 可能为 null——endResult 显示场景） */}
         <CardHeader className="pb-2 shrink-0 border-b-2 border-destructive/40 bg-destructive/5">
           <CardTitle className="text-base flex items-center gap-2 font-serif-cn text-destructive">
@@ -696,12 +705,6 @@ export function CombatModal() {
               </button>
             </div>
 
-            {busy && (
-              <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-[calc(100%+0.35rem)] rounded-full border border-border/60 bg-background/90 px-2.5 py-1 text-[10px] text-muted-foreground shadow-sm backdrop-blur animate-pulse">
-                <Loader2 className="w-3 h-3 inline mr-1 animate-spin" />
-                招式催动中...
-              </div>
-            )}
           </div>
         )}
       </Card>
