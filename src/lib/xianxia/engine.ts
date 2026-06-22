@@ -5503,11 +5503,17 @@ export function getDiscoveredStoryRealms(state: CharacterState): SecretRealm[] {
     .slice(0, 5);
 }
 
+function isLocalSameYearThread(thread: PendingThread, age: number): boolean {
+  if (thread.dueInSameYear || thread.deadlineAge <= age) return true;
+  const text = `${thread.title || ''}${thread.description || ''}${thread.followUpHint || ''}`;
+  return /今年|本年|当年|不久|三月|数月|半年|入夜|当夜|夜里|黄昏|清晨|翌日|转日|临走前|临行|临别|走前|离开前/.test(text);
+}
+
 export function getSameYearThreads(state: CharacterState): PendingThread[] {
   const age = state.age;
   return (state.pendingThreads || []).filter(t =>
     (t.status === 'pending' || t.status === 'urgent') &&
-    (t.dueInSameYear || t.deadlineAge <= age) &&
+    isLocalSameYearThread(t, age) &&
     t.progress < 100
   ).slice(0, 2);
 }

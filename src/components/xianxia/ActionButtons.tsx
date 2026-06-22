@@ -23,7 +23,7 @@ function latestActionProjections(events: GameEvent[]) {
 const ATTR_LABEL: Record<string, string> = {
   age: '年龄', lifespan: '寿元', cultivationExp: '修为',
   hp: '生命', maxHp: '生命上限', mp: '灵力', maxMp: '灵力上限',
-  attack: '攻击', defense: '防御', speed: '速度',
+  attack: '\u7834\u52bf', defense: '\u62a4\u6301', speed: '\u673a\u53d8',
   luck: '气运', comprehension: '悟性',
   spiritStones: '灵石', reputation: '声望',
 };
@@ -89,9 +89,9 @@ export function ActionButtons() {
     const boosts: { label: string; value: number }[] = [];
     if (newState.maxHp > oldChar.maxHp) boosts.push({ label: '生命上限', value: newState.maxHp - oldChar.maxHp });
     if (newState.maxMp > oldChar.maxMp) boosts.push({ label: '灵力上限', value: newState.maxMp - oldChar.maxMp });
-    if (newState.attack > oldChar.attack) boosts.push({ label: '攻击', value: newState.attack - oldChar.attack });
-    if (newState.defense > oldChar.defense) boosts.push({ label: '防御', value: newState.defense - oldChar.defense });
-    if (newState.speed > oldChar.speed) boosts.push({ label: '速度', value: newState.speed - oldChar.speed });
+    if (newState.attack > oldChar.attack) boosts.push({ label: '\u7834\u52bf', value: newState.attack - oldChar.attack });
+    if (newState.defense > oldChar.defense) boosts.push({ label: '\u62a4\u6301', value: newState.defense - oldChar.defense });
+    if (newState.speed > oldChar.speed) boosts.push({ label: '\u673a\u53d8', value: newState.speed - oldChar.speed });
     if (newState.lifespan > oldChar.lifespan) boosts.push({ label: '寿元', value: newState.lifespan - oldChar.lifespan });
 
     setBreakthroughCeremony({

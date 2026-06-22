@@ -1,4 +1,4 @@
-﻿import { readFileSync } from 'fs';
+import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
@@ -11,6 +11,29 @@ function assert(condition: unknown, message: string): void {
 
 function log(name: string, data: Record<string, unknown>): void {
   console.log(JSON.stringify({ smoke: name, ...data }));
+}
+
+
+function smokeSameYearThreadTimeInference(): void {
+  const state: any = {
+    age: 1,
+    pendingThreads: [{
+      id: 'thread_trader_whistle',
+      title: '\u884c\u811a\u5546\u7559\u7ea6',
+      description: '\u884c\u811a\u5546\u4e34\u8d70\u524d\u585e\u7ed9\u5362\u77e5\u79cb\u4e00\u679a\u94dc\u54e8\uff0c\u8bf4\u82e5\u65e5\u540e\u5bfb\u5230\u98de\u5c71\u53ef\u51ed\u6b64\u627e\u4ed6\u6253\u542c\u3002',
+      category: 'promise',
+      startAge: 1,
+      deadlineAge: 4,
+      status: 'pending',
+      progress: 0,
+      dueInSameYear: false,
+    }],
+  };
+  const threads = getSameYearThreads(state);
+  assert(threads.length === 1, 'local parting thread should be treated as same-year continuation');
+  const continuation = buildThreadContinuationEvent(state, threads[0]);
+  assert(continuation.timeAdvance?.ageDeltaYears === 0, 'same-year continuation should not advance age');
+  log('same-year-thread-time-inference', { passed: true, title: threads[0].title, ageDeltaYears: continuation.timeAdvance?.ageDeltaYears });
 }
 
 function smokeSchedulerContinuity(): void {
@@ -1212,6 +1235,7 @@ function smokeAiDrivenCombatActionPalette(): void {
 
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
+  smokeSameYearThreadTimeInference();
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
   smokeNarrativeContract();
