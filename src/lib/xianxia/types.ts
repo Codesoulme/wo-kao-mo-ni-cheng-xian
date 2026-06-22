@@ -28,6 +28,22 @@ export interface RealmTraits {
   riskTags: string[];
 }
 
+
+export interface CombatProjectionTraits {
+  force: number;
+  guard: number;
+  agility: number;
+  spiritualAwareness: number;
+  soulStability: number;
+  bodyTenacity: number;
+  forceLabel: string;
+  guardLabel: string;
+  agilityLabel: string;
+  summary: string;
+  advantages: string[];
+  vulnerabilities: string[];
+}
+
 export interface RealmInfo {
   id: Realm;
   name: string;
@@ -1249,6 +1265,7 @@ export interface EngineStateContext {
     attack: number; defense: number; speed: number;
     cultivationAttributes?: CultivationAttributeEntry[];
     spiritualSense: number; soulStrength: number; physicalFoundation: number;
+    combatProjection?: CombatProjectionTraits;
     soulRealmName: string; soulRealmRank: number; soulRealmGap: string;
     luck: number; comprehension: number;
     spiritStones: number; reputation: number;
@@ -1354,6 +1371,16 @@ export interface CharacterState {
   hp: number; maxHp: number;
   mp: number; maxMp: number;
   attack: number; defense: number; speed: number;
+  // Legacy numeric fields remain stored as attack/defense/speed; visible projection is force/guard/agility.
+  combatProjection?: CombatProjectionTraits;
+  // Core cultivation attributes may grow asynchronously from mana realm.
+  spiritualSense?: number;
+  soulStrength?: number;
+  physicalFoundation?: number;
+  soulRealmName?: string;
+  soulRealmRank?: number;
+  soulRealmGap?: string;
+  realmTraits?: RealmTraits;
   // 当前战斗动作面板：由 AI/引擎生成，UI 只负责展示可交互内容
   cultivationAttributes?: CultivationAttributeEntry[];
   luck: number; comprehension: number;

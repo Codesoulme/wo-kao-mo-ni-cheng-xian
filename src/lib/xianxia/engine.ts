@@ -207,6 +207,16 @@ export function dbToState(c: DBCharacter): CharacterState {
   state.cultivationFactors = computeCultivationFactors(state);
   state.realmProfile = getRealmProfile(state);
   state.cultivationAttributes = deriveCultivationAttributes(state);
+  const coreAttrs = deriveCoreCultivationAttributes(state);
+  const soulRealm = deriveSoulRealm({ ...state, ...coreAttrs });
+  Object.assign(state, {
+    ...coreAttrs,
+    soulRealmName: soulRealm.name,
+    soulRealmRank: soulRealm.rank,
+    soulRealmGap: soulRealm.gap,
+    realmTraits: deriveRealmTraits(state),
+    combatProjection: deriveCombatProjection({ ...state, ...coreAttrs }),
+  });
   return state;
 }
 function cultivationAttributeCategory(category?: string): CultivationAttributeEntry['category'] {
@@ -352,6 +362,41 @@ export function deriveRealmTraits(state: CharacterState) {
     combatStyle: [...new Set([...(base.combatStyle || []), ...(patch.combatStyle || [])])].slice(0, 8),
     resourceNeeds: [...new Set([...(base.resourceNeeds || []), ...(patch.resourceNeeds || [])])].slice(0, 8),
     riskTags: [...new Set([...(base.riskTags || []), ...(patch.riskTags || [])])].slice(0, 8),
+  };
+}
+
+export function deriveCombatProjection(state: CharacterState) {
+  const core = deriveCoreCultivationAttributes(state);
+  const realmTraits = deriveRealmTraits(state);
+  const force = Math.max(0, Math.round((state.attack || 0) + core.spiritualSense * 0.12 + (state.comprehension || 0) * 0.08));
+  const guard = Math.max(0, Math.round((state.defense || 0) + core.physicalFoundation * 0.16 + core.soulStrength * 0.06));
+  const agility = Math.max(0, Math.round((state.speed || 0) + core.spiritualSense * 0.10 + (state.luck || 0) * 0.04));
+  const advantages = [
+    force >= guard && force >= agility ? '\u7834\u52bf\u504f\u76db' : '',
+    guard >= force && guard >= agility ? '\u62a4\u6301\u7a33\u539a' : '',
+    agility >= force && agility >= guard ? '\u673a\u53d8\u7075\u52a8' : '',
+    core.spiritualSense >= core.physicalFoundation + 30 ? '\u795e\u8bc6\u8d85\u524d' : '',
+    core.physicalFoundation >= core.spiritualSense + 30 ? '\u4f53\u9b44\u627f\u538b\u5f3a' : '',
+  ].filter(Boolean).slice(0, 4);
+  const vulnerabilities = [
+    core.soulStrength + 25 < core.spiritualSense ? '\u795e\u8bc6\u9510\u800c\u9b42\u9b44\u627f\u8f7d\u4e0d\u8db3' : '',
+    guard + 20 < force ? '\u653b\u950b\u8fc7\u76db\uff0c\u62a4\u6301\u504f\u8584' : '',
+    agility + 20 < guard ? '\u627f\u538b\u6709\u4f59\uff0c\u8f6c\u632a\u504f\u6162' : '',
+    (state.heartDemon || 0) >= 60 ? '\u5fc3\u9b54\u7275\u52a8\u795e\u9b42' : '',
+  ].filter(Boolean).slice(0, 4);
+  return {
+    force,
+    guard,
+    agility,
+    spiritualAwareness: core.spiritualSense,
+    soulStability: core.soulStrength,
+    bodyTenacity: core.physicalFoundation,
+    forceLabel: '\u7834\u52bf',
+    guardLabel: '\u62a4\u6301',
+    agilityLabel: '\u673a\u53d8',
+    summary: `${realmTraits.combatStyle?.[0] || '\u5faa\u52bf\u6597\u6cd5'}\uff1a\u7834\u52bf${force}\u3001\u62a4\u6301${guard}\u3001\u673a\u53d8${agility}`,
+    advantages,
+    vulnerabilities,
   };
 }
 
@@ -891,7 +936,7 @@ function cleanTechniqueBaseName(name?: string): string {
     .replace(/[\u300a\u300b<>]/g, '')
     .replace(/(玉简|心得|功法|法门|残篇|真经|经卷|剑经|经|诀|法|功|术|谱)$/u, '')
     .trim();
-  return (cleaned || raw || '\u7075\u673a').slice(0, 6);
+  return (cleaned || raw || '\u7075\u673a').slice(0, 12);
 }
 
 function fallbackScriptureAbilityName(item: ItemEntry, element: ElementType | 'none', text: string): string {
@@ -2400,6 +2445,7 @@ export function buildStateContext(
   const coreAttrs = deriveCoreCultivationAttributes(state);
   const soulRealm = deriveSoulRealm({ ...state, ...coreAttrs });
   const realmTraits = deriveRealmTraits(state);
+  const combatProjection = deriveCombatProjection({ ...state, ...coreAttrs });
   return {
     character: {
       name: state.name,
@@ -2422,6 +2468,7 @@ export function buildStateContext(
       spiritualSense: coreAttrs.spiritualSense,
       soulStrength: coreAttrs.soulStrength,
       physicalFoundation: coreAttrs.physicalFoundation,
+      combatProjection,
       soulRealmName: soulRealm.name,
       soulRealmRank: soulRealm.rank,
       soulRealmGap: soulRealm.gap,
@@ -4807,6 +4854,7 @@ export function stateToResponse(s: CharacterState) {
   const coreAttrs = deriveCoreCultivationAttributes(s);
   const soulRealm = deriveSoulRealm({ ...s, ...coreAttrs });
   const realmTraits = deriveRealmTraits(s);
+  const combatProjection = deriveCombatProjection({ ...s, ...coreAttrs });
   return {
     age: s.age,
     lifespan: s.lifespan,
@@ -4820,6 +4868,7 @@ export function stateToResponse(s: CharacterState) {
     spiritualSense: coreAttrs.spiritualSense,
     soulStrength: coreAttrs.soulStrength,
     physicalFoundation: coreAttrs.physicalFoundation,
+    combatProjection,
     soulRealmName: soulRealm.name,
     soulRealmRank: soulRealm.rank,
     soulRealmGap: soulRealm.gap,
@@ -5547,8 +5596,9 @@ export function buildThreadContinuationEvent(state: CharacterState, thread: Pend
     memory: `${state.age}\u5c81\u7eed\u5199\u7ebf\u7d22\uff1a${thread.title}`,
     cultivationInsight: '',
     hasChoice: false, choice: null, triggeredBreakthrough: false, causedDeath: false, causedAscension: false,
+    timeAdvance: { amount: isVeryYoung ? 1 : 3, unit: isVeryYoung ? 'day' : 'month', label: isVeryYoung ? '\u7fcc\u65e5' : '\u6570\u6708\u540e', reason: '\u627f\u63a5\u540c\u5c81\u56e0\u7f18', ageDeltaYears: 0, elapsedDays: isVeryYoung ? 1 : 90 },
     newThreads: [],
-    advanceThreads: [{ id: thread.id, progressDelta: isRealm ? 35 : 50, note: '\u540c\u5e74\u540e\u7eed\u5df2\u5c55\u5f00' }],
+    advanceThreads: [{ id: thread.id, progressDelta: isRealm ? 35 : 50, note: '\u540c\u5c81\u540e\u7eed\u5df2\u5c55\u5f00' }],
     completeThreadIds: isCompetition ? [thread.id] : [],
     failThreadIds: [],
     triggerCombat: null,

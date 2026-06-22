@@ -212,13 +212,18 @@ export function registerThread(raw: Partial<PendingThread> | any, context: Regis
     trace.push({ severity: 'warning', code: 'invalid_category', field: 'category', message: `invalid thread category ${rawCategory}, normalized to quest` });
   }
   const startAge = Math.round(safeNumber(raw.startAge, context.age ?? 0, 0, 99999, trace, 'startAge'));
-  const deadlineAge = Math.max(startAge, Math.round(safeNumber(raw.deadlineAge, startAge + 3, 0, 99999, trace, 'deadlineAge')));
+  const rawDeadlineAge = Math.max(startAge, Math.round(safeNumber(raw.deadlineAge, startAge + 3, 0, 99999, trace, 'deadlineAge')));
   const rawStatus = asText(raw.status, 'pending', 20) as PendingThread['status'];
   const status: PendingThread['status'] = ['pending', 'urgent', 'resolved', 'failed'].includes(rawStatus) ? rawStatus : 'pending';
+  const description = asText(raw.description, title, 400);
+  const followUpHint = raw.followUpHint ? asText(raw.followUpHint, '', 180) : undefined;
+  const localTimeText = `${title}${description}${followUpHint || ''}`;
+  const sameYear = Boolean(raw.dueInSameYear) || /今年|本年|当年|不久|三月|数月|半年|入夜|当夜|夜里|黄昏|清晨|翌日|转日|临走前|临行|临别|走前|离开前/.test(localTimeText);
+  const deadlineAge = sameYear ? startAge : rawDeadlineAge;
   const thread: PendingThread = {
     id: ensureId(raw, 'thread', existingIds, trace),
     title,
-    description: asText(raw.description, title, 400),
+    description,
     category,
     startAge,
     deadlineAge,
@@ -227,8 +232,8 @@ export function registerThread(raw: Partial<PendingThread> | any, context: Regis
     relatedMemoryIds: Array.isArray(raw.relatedMemoryIds) ? raw.relatedMemoryIds.map((x: unknown) => asText(x, '', 80)).filter(Boolean) : undefined,
     reward: raw.reward ? asText(raw.reward, '', 120) : undefined,
     failureCost: raw.failureCost ? asText(raw.failureCost, '', 120) : undefined,
-    dueInSameYear: Boolean(raw.dueInSameYear),
-    followUpHint: raw.followUpHint ? asText(raw.followUpHint, '', 180) : undefined,
+    dueInSameYear: sameYear,
+    followUpHint,
     sourceEventTitle: raw.sourceEventTitle ? asText(raw.sourceEventTitle, '', 80) : context.source,
     realmId: raw.realmId ? asText(raw.realmId, '', 80) : undefined,
   };

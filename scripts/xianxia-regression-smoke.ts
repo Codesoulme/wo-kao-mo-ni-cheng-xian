@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+﻿import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
@@ -699,7 +699,7 @@ async function smokeAuctionDbRoute(): Promise<void> {
   await call({ characterId: char.id, action: 'invite' });
   const enter = await call({ characterId: char.id, action: 'enter' });
   const keyLot = enter.auction.lots.find((lot: any) => lot.item?.name?.includes('铜钥')) || enter.auction.lots.at(-1);
-  const bid = await call({ characterId: char.id, action: 'bid', lotId: keyLot.id, bid: 5000 });
+  const bid = await call({ characterId: char.id, action: 'bid', lotId: keyLot.id, bid: 18000 });
   const fresh = await db.character.findUnique({ where: { id: char.id } });
   assert(fresh, 'auction db smoke character should exist after bid');
   const threads = JSON.parse(fresh!.pendingThreadsJson || '[]');
