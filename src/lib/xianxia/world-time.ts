@@ -81,8 +81,9 @@ export function clampTimeAdvance(raw: any, fallback?: TimeAdvance): TimeAdvance 
   const elapsedDays = Math.max(0, Math.min(36500 * 3, Math.round(Number(raw?.elapsedDays ?? fb.elapsedDays ?? naturalDays))));
   const naturalYears = Math.floor(elapsedDays / 365);
   const ageDeltaYears = Math.max(0, Math.min(300, Math.round(Number(raw?.ageDeltaYears ?? fb.ageDeltaYears ?? naturalYears))));
-  const label = String(raw?.label || fb.label || defaultTimeLabel(unit, amount)).slice(0, 24);
-  const reason = String(raw?.reason || fb.reason || '因缘自然推进').slice(0, 120);
+  const rawLabel = String(raw?.label || fb.label || '').slice(0, 36);
+  const label = cleanTimeSegmentLabel(rawLabel) || defaultTimeLabel(unit, amount);
+  const reason = String(raw?.reason || fb.reason || '\u56e0\u7f18\u81ea\u7136\u63a8\u8fdb').slice(0, 120);
   return { amount, unit, label, reason, ageDeltaYears, elapsedDays };
 }
 
@@ -100,7 +101,7 @@ export function defaultTimeLabel(unit: TimeAdvanceUnit, amount: number) {
 export function suggestTimeAdvance(args: { age: number; pendingThreads?: PendingThread[]; sameYearThread?: PendingThread | null; blueprint?: EventBlueprint | null }): TimeAdvance {
   const { age, pendingThreads = [], sameYearThread, blueprint } = args;
   if (sameYearThread?.dueInSameYear) {
-    return { amount: 3, unit: 'month', label: sameYearThread.followUpHint?.slice(0, 16) || '数月后', reason: `承接同年因缘：${sameYearThread.title}`, ageDeltaYears: 0, elapsedDays: 90 };
+    return { amount: 3, unit: 'month', label: '\u6570\u6708\u540e', reason: `\u627f\u63a5\u540c\u5e74\u56e0\u7f18\uff1a${sameYearThread.title}`, ageDeltaYears: 0, elapsedDays: 90 };
   }
   const urgent = pendingThreads
     .filter((t) => t.status === 'urgent' || (t.status === 'pending' && t.deadlineAge - age <= 1))
@@ -135,7 +136,11 @@ export function normalizeWorldCalendar(world?: Partial<WorldCalendarState>): Wor
 function cleanTimeSegmentLabel(value?: string) {
   const text = String(value || '').trim();
   if (!text) return '';
-  return /\u6267\u884c\u7ea6\u5b9a|\u524d\u5f80|\u8ffd\u67e5|\u8ffd\u5bfb|\u63a2\u5165|\u5165\u5e02|\u8d74\u7ea6/.test(text) ? '' : text.slice(0, 24);
+  const internalOrAction = /\u540c\u5e74\u7eed\u7bc7|\u7eed\u7bc7|\u6d41\u5e74\u56e0|\u547d\u8282\u70b9|\u6267\u884c\u7ea6\u5b9a|\u524d\u5f80|\u8ffd\u67e5|\u8ffd\u5bfb|\u63a2\u5165|\u5165\u5e02|\u8d74\u7ea6|\u6253\u542c|\u53ef\u5411|\u8be2\u95ee|\u5bfb\u8bbf|\u62dc\u8bbf|\u4fee\u58eb/.test(text);
+  if (internalOrAction) return '';
+  const hasTimeSignal = /\u540e|\u524d|\u95f4|\u65e5|\u591c|\u6668|\u66ae|\u6708|\u5e74|\u8f7d|\u5b63|\u65ec|\u7247\u523b|\u5c11\u9877|\u987b\u81fe|\u7fcc\u65e5|\u5f53\u591c|\u5b50\u65f6|\u5348\u65f6|\u6668\u949f|\u66ae\u9f13/.test(text);
+  if (!hasTimeSignal) return '';
+  return text.slice(0, 24);
 }
 
 export function formatWorldTimeDisplay(args: { age?: number; timeAdvance?: Partial<TimeAdvance>; worldTime?: Partial<WorldTimeStamp>; includeAge?: boolean }) {

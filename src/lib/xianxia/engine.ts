@@ -5184,7 +5184,20 @@ const INTERNAL_THREAD_NARRATIVE_PHRASES = [
   '\u6536\u62e2\u6240\u5f97\u7ebf\u7d22',
   '\u53cd\u590d\u63e3\u6469',
   '\u540e\u7eed\u627f\u63a5\u63d0\u793a',
+  '\u540c\u5e74\u7eed\u7bc7',
+  '\u6d41\u5e74\u56e0',
+  '\u7eed\u7bc7',
 ];
+
+function cleanVisibleThreadTitle(title?: string) {
+  const cleaned = String(title || '')
+    .replace(/\u6d41\u5e74\u56e0[\uff1a:]?/g, '')
+    .replace(/\u540c\u5e74\u7eed\u7bc7/g, '')
+    .replace(/\u7eed\u7bc7/g, '')
+    .replace(/^[\u002c\uff0c\u003b\uff1b\u3002\s]+/, '')
+    .trim();
+  return cleaned.slice(0, 24) || '\u65e7\u4e8b\u56de\u54cd';
+}
 
 function sanitizeThreadContinuationNarrative(text: string, fallback: string): string {
   let cleaned = String(text || '').trim();
@@ -5200,21 +5213,22 @@ function sanitizeThreadContinuationNarrative(text: string, fallback: string): st
 }
 
 export function buildThreadContinuationEvent(state: CharacterState, thread: PendingThread): any {
-  const threadText = `${thread.title} ${thread.description} ${thread.followUpHint || ''}`;
+  const visibleThreadTitle = cleanVisibleThreadTitle(thread.title);
+  const threadText = `${visibleThreadTitle} ${thread.description} ${thread.followUpHint || ''}`;
   const realmName = inferStoryRealmName(threadText);
   const isVeryYoung = Number(state.age ?? 0) < 7;
   const isRealm = !isVeryYoung && (thread.category === 'exploration' || !!realmName || /\u79d8\u5883|\u6d6e\u9601|\u6d1e\u5e9c|\u9057\u8ff9|\u7981\u5730|\u7981\u5236|\u7834\u7981/.test(`${thread.title}${thread.description}`));
   const isCompetition = !isVeryYoung && (thread.category === 'competition' || /\u6bd4\u8bd5|\u8003\u6838|\u5165\u95e8|\u4ed9\u95e8|\u64c2\u53f0/.test(`${thread.title}${thread.description}`));
   const isPromise = !isVeryYoung && (thread.category === 'promise' || /\u7ea6|\u8bfa|\u627f\u8bfa|\u8fd8\u613f|\u8d74\u7ea6/.test(threadText));
   const title = isVeryYoung
-    ? thread.title
+    ? visibleThreadTitle
     : isRealm
-      ? (realmName || thread.title)
+      ? (realmName || visibleThreadTitle)
       : isCompetition
-        ? `\u7ea6\u671f\u5df2\u81f3\u00b7${thread.title}`
+        ? `\u7ea6\u671f\u5df2\u81f3\u00b7${visibleThreadTitle}`
         : isPromise
-          ? `\u8d74\u7ea6\u00b7${thread.title}`
-          : thread.title;
+          ? `\u8d74\u7ea6\u00b7${visibleThreadTitle}`
+          : visibleThreadTitle;
 
   const fallbackNarrative = isVeryYoung
     ? `${state.name}\u5e74\u7eaa\u5c1a\u5c0f\uff0c\u5bf9\u201c\u7ea6\u5b9a\u201d\u4e0e\u201c\u524d\u5f80\u201d\u8fd8\u53ea\u662f\u61f5\u61c2\u7684\u559c\u60a6\u3002\u5927\u4eba\u5728\u65c1\u7167\u770b\u65f6\uff0c\u4ed6\u4e0e\u5c0f\u4f19\u4f34\u53c8\u5728\u9662\u8fb9\u73a9\u4e86\u4e00\u9635\uff0c\u628a\u6cb3\u7554\u3001\u87ba\u86f3\u548c\u4ed9\u4eba\u4f20\u95fb\u90fd\u5f53\u4f5c\u660e\u65e5\u7684\u70ed\u95f9\u76fc\u5934\u3002`
@@ -5239,7 +5253,7 @@ export function buildThreadContinuationEvent(state: CharacterState, thread: Pend
       category: 'quest',
       rarity: 'uncommon',
       duration: -1,
-      source: thread.title,
+      source: visibleThreadTitle,
       effects: [],
     }] : [],
     newItems: [], removedItemIds: [], newEquippedItems: [], equipItemIds: [], unequipItemIds: [],

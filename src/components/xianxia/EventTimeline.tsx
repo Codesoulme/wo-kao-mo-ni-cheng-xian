@@ -53,8 +53,42 @@ const BLUEPRINT_STYLE: Record<string, { bg: string; text: string; border: string
 };
 
 
+function hasInternalVisibleText(text?: string) {
+  return /\u6d41\u5e74\u56e0|\u540c\u5e74\u7eed\u7bc7|\u547d\u8282\u70b9|\u7eed\u7bc7/.test(String(text || ''));
+}
+
+function isActionLikeTimeSegment(text?: string) {
+  return /\u53ef\u5411|\u6253\u542c|\u8be2\u95ee|\u524d\u5f80|\u6267\u884c\u7ea6\u5b9a|\u8ffd\u67e5|\u8ffd\u5bfb|\u63a2\u5165|\u5165\u5e02|\u8d74\u7ea6|\u5bfb\u8bbf|\u62dc\u8bbf|\u4fee\u58eb/.test(String(text || ''));
+}
+
+function cleanVisibleNarrativeText(text?: string) {
+  return String(text || '')
+    .replace(/\u6d41\u5e74\u56e0[\uff1a:]?/g, '')
+    .replace(/\u540c\u5e74\u7eed\u7bc7/g, '')
+    .replace(/\u7eed\u7bc7/g, '')
+    .replace(/^[\u002c\uff0c\u003b\uff1b\u3002\s]+/, '')
+    .trim();
+}
+
+function cleanVisibleTimeLabel(label?: string) {
+  const raw = String(label || '').trim();
+  if (!raw) return '';
+  const bracketIndex = raw.indexOf('\u3010');
+  if (bracketIndex >= 0) {
+    const before = raw.slice(0, bracketIndex).trim();
+    const world = raw.slice(bracketIndex).trim();
+    const ageMatch = before.match(/^(\d+\u5c81)/);
+    const segment = before.replace(/^(\d+\u5c81)(\s*\u00b7\s*)?/, '').trim();
+    if (hasInternalVisibleText(segment) || isActionLikeTimeSegment(segment)) {
+      return `${ageMatch?.[1] || ''}${world}`;
+    }
+  }
+  return hasInternalVisibleText(raw) || isActionLikeTimeSegment(raw) ? '' : raw;
+}
+
+
 function splitNarrativeParagraphs(text?: string): string[] {
-  const raw = String(text || '').trim();
+  const raw = cleanVisibleNarrativeText(text);
   if (!raw) return [];
   const explicit = raw
     .split(/\n+/)
@@ -83,7 +117,7 @@ function splitNarrativeParagraphs(text?: string): string[] {
 }
 
 function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: string; name: string }; eventType?: string }) {
-  if (!blueprint) return null;
+  if (!blueprint || hasInternalVisibleText(blueprint.name)) return null;
   // “突破前夜/酝酿突破”是生成主题，不是玩家已成功突破的标签；成功破境只由 breakthrough 事件本身呈现。
   if (blueprint.category === 'cultivation' && /突破|冲关|破境/.test(blueprint.name || '') && eventType !== 'breakthrough') {
     return null;
@@ -103,10 +137,10 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
 }
 
 function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
-  const displayLabel = String(event.worldTime?.displayLabel || '').trim();
+  const displayLabel = cleanVisibleTimeLabel(event.worldTime?.displayLabel);
   if (displayLabel) return displayLabel;
   const worldLabel = event.worldTime?.label;
-  const segmentLabel = String(event.timeAdvance?.label || '').trim();
+  const segmentLabel = cleanVisibleTimeLabel(event.timeAdvance?.label);
   const ageText = ageMeta.isContinuation ? '' : `${event.age}\u5c81`;
   const open = '\u3010';
   const close = '\u3011';
