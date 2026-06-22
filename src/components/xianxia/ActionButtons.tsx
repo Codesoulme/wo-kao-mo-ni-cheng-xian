@@ -423,13 +423,13 @@ export function ActionButtons() {
       </div>
 
       {/* 行动投影：后端/AI 注册此刻可做之事，前端只负责投影 */}
-      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && aiOpportunity.projections.length > 0 && (
+      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && aiOpportunity.projections.filter((a: any) => a.kind !== 'thread').length > 0 && (
         <div className="space-y-1.5 rounded-lg border border-primary/15 bg-primary/5 p-2">
           <div className="text-[10px] text-muted-foreground font-serif-cn truncate">
             因缘所至：{aiOpportunity.sourceLabel}
           </div>
           <div className="grid gap-2" style={{ gridTemplateColumns: aiOpportunity.projections.length > 1 ? '1fr 1fr' : '1fr' }}>
-            {aiOpportunity.projections.map((action: any) => {
+            {aiOpportunity.projections.filter((action: any) => action.kind !== 'thread').map((action: any) => {
               const isMarket = action.kind === 'market' || action.kind === 'trade';
               const isExplore = action.kind === 'exploration';
               const Icon = isMarket ? Store : isExplore ? Compass : ScrollText;
