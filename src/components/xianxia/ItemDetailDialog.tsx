@@ -48,11 +48,14 @@ interface Props {
   /** 若是丹药，显示使用按钮 */
   canUse?: boolean;
   onUse?: () => void;
+  /** \u82e5\u662f\u50a8\u7269\u888b\u5185\u7269\u54c1\uff0c\u663e\u793a\u4e22\u5f03\u6309\u94ae */
+  canDiscard?: boolean;
+  onDiscard?: () => void;
 }
 
 export function ItemDetailDialog({
   item, open, onOpenChange,
-  equipped, onUnequip, canEquip, onEquip, canUse, onUse,
+  equipped, onUnequip, canEquip, onEquip, canUse, onUse, canDiscard, onDiscard,
 }: Props) {
   if (!item) return null;
   const color = RARITY_COLORS[item.rarity] || '#6b7280';
@@ -144,7 +147,7 @@ export function ItemDetailDialog({
         </div>
 
         {/* 底部操作栏 */}
-        {(canEquip || canUse || (equipped && onUnequip)) && (
+        {(canEquip || canUse || canDiscard || (equipped && onUnequip)) && (
           <div className="px-4 py-3 border-t flex gap-2 bg-muted/20">
             {canEquip && (
               <button
@@ -168,6 +171,14 @@ export function ItemDetailDialog({
                 className="flex-1 text-xs py-2 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors font-medium"
               >
                 卸下
+              </button>
+            )}
+            {canDiscard && (
+              <button
+                onClick={() => { onDiscard?.(); onOpenChange(false); }}
+                className="flex-1 text-xs py-2 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors font-medium"
+              >
+                丢弃
               </button>
             )}
           </div>

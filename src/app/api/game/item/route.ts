@@ -1,10 +1,10 @@
-﻿// POST /api/game/item
+// POST /api/game/item
 // 物品动作：装备、卸下、使用。动作结果经引擎校验，并写入可追踪审计。
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, equipItem, unequipItem, consumeItem, recordActionCausality, stateToResponse, buildStateContext, normalizeCultivationState } from '@/lib/xianxia/engine';
+import { dbToState, equipItem, unequipItem, consumeItem, removeItemsByIds, recordActionCausality, stateToResponse, buildStateContext, normalizeCultivationState } from '@/lib/xianxia/engine';
 import { generateItemActionNarrative } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
@@ -13,12 +13,13 @@ import { z } from 'zod';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-type ItemAction = 'equip' | 'unequip' | 'use';
+type ItemAction = 'equip' | 'unequip' | 'use' | 'discard';
 
 function actionVerb(action: ItemAction): string {
   if (action === 'equip') return '装备';
-  if (action === 'unequip') return '卸下';
-  return '使用';
+  if (action === 'unequip') return '\u5378\u4e0b';
+  if (action === 'discard') return '\u4e22\u5f03';
+  return '\u4f7f\u7528';
 }
 
 function persistableStateData(state: ReturnType<typeof dbToState>) {
@@ -79,7 +80,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const parsed = z.object({
       characterId: z.string(),
-      action: z.enum(['equip', 'unequip', 'use']),
+      action: z.enum(['equip', 'unequip', 'use', 'discard']),
       itemId: z.string().optional(),
     }).safeParse(body);
 
@@ -104,14 +105,34 @@ export async function POST(req: NextRequest) {
 
     if (!itemId) return NextResponse.json({ success: false, error: '缺少 itemId' }, { status: 400 });
 
-    const result = action === 'equip'
-      ? equipItem(state, itemId)
-      : action === 'unequip'
-        ? unequipItem(state, itemId)
-        : consumeItem(state, itemId);
+    const result = (() => {
+      if (action === 'equip') return equipItem(state, itemId);
+      if (action === 'unequip') return unequipItem(state, itemId);
+      if (action === 'use') return consumeItem(state, itemId);
+      const inBag = state.inventory.find(it => it.id === itemId);
+      if (!inBag) {
+        const equippedItem = (state.equipped || []).find(it => it.id === itemId);
+        return {
+          state,
+          ok: false,
+          error: equippedItem ? '\u5df2\u88c5\u5907\u7269\u54c1\u9700\u5148\u5378\u4e0b\u518d\u4e22\u5f03' : '\u7269\u54c1\u4e0d\u5728\u50a8\u7269\u888b\u4e2d',
+          appliedChanges: [],
+          rejectedChanges: [],
+          effectResolveTrace: [],
+          effectResolveWarnings: [],
+        };
+      }
+      const removed = removeItemsByIds(state, [itemId]);
+      return {
+        ...removed,
+        ok: removed.removed.length > 0,
+        item: removed.removed[0],
+        error: removed.removed.length > 0 ? undefined : '\u672a\u627e\u5230\u8981\u4e22\u5f03\u7684\u7269\u54c1',
+      };
+    })();
 
     state = result.state;
-    const message = result.ok ? `${actionVerb(action)}成功` : (result.error || `${actionVerb(action)}失败`);
+    const message = result.ok ? `${actionVerb(action)}\u6210\u529f` : (result.error || `${actionVerb(action)}\u5931\u8d25`);
     const appliedItem = result.item;
 
     if (!result.ok) {
@@ -119,26 +140,28 @@ export async function POST(req: NextRequest) {
     }
 
     let narrative = '';
-    try {
-      const recentEventsDb = await db.eventLog.findMany({
-        where: { characterId },
-        orderBy: { age: 'desc' },
-        take: 3,
-      });
-      const recentEvents = recentEventsDb.reverse().map(event => ({
-        age: event.age,
-        title: event.title,
-        narrative: event.narrative,
-      }));
-      const ctx = buildStateContext(state, recentEvents);
-      if (!appliedItem) throw new Error('item action produced no item');
-      const generated = await generateItemActionNarrative(ctx, action, appliedItem);
-      narrative = generated.narrative;
-      if (generated.cultivationInsight && generated.cultivationInsight.trim()) {
-        state.cultivationInsight = generated.cultivationInsight.trim();
+    if (action !== 'discard') {
+      try {
+        const recentEventsDb = await db.eventLog.findMany({
+          where: { characterId },
+          orderBy: { age: 'desc' },
+          take: 3,
+        });
+        const recentEvents = recentEventsDb.reverse().map(event => ({
+          age: event.age,
+          title: event.title,
+          narrative: event.narrative,
+        }));
+        const ctx = buildStateContext(state, recentEvents);
+        if (!appliedItem) throw new Error('item action produced no item');
+        const generated = await generateItemActionNarrative(ctx, action, appliedItem);
+        narrative = generated.narrative;
+        if (generated.cultivationInsight && generated.cultivationInsight.trim()) {
+          state.cultivationInsight = generated.cultivationInsight.trim();
+        }
+      } catch (err: any) {
+        console.error('item action narrative failed:', err?.message || err);
       }
-    } catch (err: any) {
-      console.error('item action narrative failed:', err?.message || err);
     }
 
     state = normalizeCultivationState(state);
@@ -149,7 +172,7 @@ export async function POST(req: NextRequest) {
       summary: narrative || message,
       tags: ['item', action],
       usedItems: action === 'use' && appliedItem ? [appliedItem] : [],
-      consumedItems: action === 'use' && appliedItem ? [appliedItem] : [],
+      consumedItems: (action === 'use' || action === 'discard') && appliedItem ? [appliedItem] : [],
       equippedItems: action === 'equip' && appliedItem ? [appliedItem] : [],
       unequippedItems: action === 'unequip' && appliedItem ? [appliedItem] : [],
     });
@@ -169,7 +192,7 @@ export async function POST(req: NextRequest) {
       data: persistableStateData(state),
     });
 
-    const removedItemIds = action === 'use' && appliedItem?.id ? [appliedItem.id] : [];
+    const removedItemIds = (action === 'use' || action === 'discard') && appliedItem?.id ? [appliedItem.id] : [];
     const displayEffects = buildEventDisplayEffects({
       before: stateBeforeAction,
       after: state,
@@ -180,7 +203,9 @@ export async function POST(req: NextRequest) {
     });
     const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
-    const fallbackNarrative = `${actionVerb(action)}${appliedItem?.name ? `「${appliedItem.name}」` : '此物'}后，气机随之微动。`;
+    const fallbackNarrative = action === 'discard'
+      ? `${appliedItem?.name ? `\u300c${appliedItem.name}\u300d` : '\u6b64\u7269'}\u5df2\u79bb\u5f00\u50a8\u7269\u888b\uff0c\u8eab\u4e0a\u8d1f\u7d2f\u968f\u4e4b\u4e00\u8f7b\u3002`
+      : `${actionVerb(action)}${appliedItem?.name ? `\u300c${appliedItem.name}\u300d` : '\u6b64\u7269'}\u540e\uff0c\u6c14\u673a\u968f\u4e4b\u5fae\u52a8\u3002`;
     try {
       await db.eventLog.create({
         data: {

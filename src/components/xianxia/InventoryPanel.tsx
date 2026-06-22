@@ -132,7 +132,7 @@ export function InventoryPanel() {
   const inventory: any[] = character.inventory || [];
   const activeStatuses: StatusEntry[] = filterMeaningfulStatuses(character.activeStatuses || []) as StatusEntry[];
 
-  const doAction = async (action: 'equip' | 'unequip' | 'use', payload: { itemId?: string }) => {
+  const doAction = async (action: 'equip' | 'unequip' | 'use' | 'discard', payload: { itemId?: string }) => {
     if (!character) return;
     const key = payload.itemId || action;
     setBusy(key);
@@ -155,6 +155,13 @@ export function InventoryPanel() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const discardItem = (item: any) => {
+    if (!item?.id) return;
+    const ok = window.confirm(`确定丢弃「${item.name || '此物'}」吗？丢弃后将从储物袋移除。`);
+    if (!ok) return;
+    doAction('discard', { itemId: item.id });
   };
 
   // 打开物品详情弹窗
@@ -474,7 +481,7 @@ export function InventoryPanel() {
                                     ))}
                                 </div>
                               )}
-                              {(canEquip || canUse) && (
+                              {(canEquip || canUse || !equippedList.some(eq => eq.id === item.id)) && (
                                 <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                                   {canEquip && (
                                     <button
@@ -496,6 +503,14 @@ export function InventoryPanel() {
                                       使用
                                     </button>
                                   )}
+                                  <button
+                                    onClick={() => discardItem(item)}
+                                    disabled={isBusy}
+                                    className="text-[10px] px-2 py-0.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                  >
+                                    {isBusy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <X className="w-2.5 h-2.5" />}
+                                    丢弃
+                                  </button>
                                 </div>
                               )}
                               {item.source && (
@@ -633,6 +648,8 @@ export function InventoryPanel() {
         onEquip={() => detailItem && doAction('equip', { itemId: detailItem.id })}
         canUse={detailItem?.item_type === 'consumable'}
         onUse={() => detailItem && doAction('use', { itemId: detailItem.id })}
+        canDiscard={detailItem ? !equippedList.some(it => it.id === detailItem.id) : false}
+        onDiscard={() => detailItem && discardItem(detailItem)}
       />
     </div>
   );

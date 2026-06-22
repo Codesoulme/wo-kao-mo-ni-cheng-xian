@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
@@ -13,6 +13,33 @@ function log(name: string, data: Record<string, unknown>): void {
   console.log(JSON.stringify({ smoke: name, ...data }));
 }
 
+
+function smokeDiscardStorageBagItem(): void {
+  const bag: any = {
+    id: 'bag_small',
+    name: '\u65e7\u50a8\u7269\u888b',
+    item_type: 'tool',
+    rarity: 'common',
+    description: '\u4e00\u53ea\u65e7\u50a8\u7269\u888b\u3002',
+    effects: [{ target_attribute: 'storageCapacity', operation: 'add', value: 6 }],
+  };
+  const herb: any = {
+    id: 'herb_wild',
+    name: '\u91ce\u7075\u8349',
+    item_type: 'material',
+    rarity: 'common',
+    description: '\u5c71\u91ce\u95f4\u91c7\u6765\u7684\u7075\u8349\u3002',
+    effects: [],
+  };
+  const state: any = { age: 3, inventory: [bag, herb], equipped: [], storageCapacity: 11, activeStatuses: [] };
+  const removedHerb = removeItemsByIds(state, ['herb_wild']);
+  assert(removedHerb.removed.length === 1, 'discard should remove inventory item');
+  assert(!removedHerb.state.inventory.some((it: any) => it.id === 'herb_wild'), 'discarded item should leave inventory');
+  const removedBag = removeItemsByIds(state, ['bag_small']);
+  assert(removedBag.removed.length === 1, 'discard should allow storage bag item');
+  assert(removedBag.state.storageCapacity === 5, 'discarding storage bag should recalculate capacity floor');
+  log('discard-storage-bag-item', { passed: true, cap: removedBag.state.storageCapacity, left: removedBag.state.inventory.length });
+}
 
 function smokeSameYearThreadTimeInference(): void {
   const state: any = {
@@ -1235,6 +1262,7 @@ function smokeAiDrivenCombatActionPalette(): void {
 
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
+  smokeDiscardStorageBagItem();
   smokeSameYearThreadTimeInference();
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
