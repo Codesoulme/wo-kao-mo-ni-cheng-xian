@@ -16,6 +16,16 @@ import {
 } from '@/lib/xianxia/types';
 import { AlchemyFurnace } from './AlchemyFurnace';
 import { ItemDetailDialog } from './ItemDetailDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { FormationPanel } from './FormationPanel';
 import { PetPanel } from './PetPanel';
 import { formatItemEffectLabel } from '@/lib/xianxia/display';
@@ -162,6 +172,7 @@ export function InventoryPanel() {
   const [expandedBagGroups, setExpandedBagGroups] = useState<Record<string, boolean>>({});
   const [detailItem, setDetailItem] = useState<any>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [discardTarget, setDiscardTarget] = useState<any>(null);
 
   if (!character) return null;
 
@@ -196,11 +207,17 @@ export function InventoryPanel() {
     }
   };
 
-  const discardItem = (item: any) => {
+  const requestDiscardItem = (item: any) => {
     if (!item?.id) return;
-    const ok = window.confirm(`确定丢弃「${item.name || '此物'}」吗？丢弃后将从储物袋移除。`);
-    if (!ok) return;
-    doAction('discard', { itemId: item.id });
+    setDiscardTarget(item);
+  };
+
+  const confirmDiscardItem = async () => {
+    if (!discardTarget?.id) return;
+    const targetId = discardTarget.id;
+    setDiscardTarget(null);
+    setDetailOpen(false);
+    await doAction('discard', { itemId: targetId });
   };
 
   // 打开物品详情弹窗
@@ -550,7 +567,7 @@ export function InventoryPanel() {
                                     </button>
                                   )}
                                   <button
-                                    onClick={() => discardItem(item)}
+                                    onClick={() => requestDiscardItem(item)}
                                     disabled={isBusy}
                                     className="text-[10px] px-2 py-0.5 rounded border border-destructive/40 text-destructive hover:bg-destructive/10 transition-colors flex items-center gap-1 disabled:opacity-50"
                                   >
@@ -695,8 +712,29 @@ export function InventoryPanel() {
         canUse={detailItem?.item_type === 'consumable'}
         onUse={() => detailItem && doAction('use', { itemId: detailItem.id })}
         canDiscard={detailItem ? !equippedList.some(it => it.id === detailItem.id) : false}
-        onDiscard={() => detailItem && discardItem(detailItem)}
+        onDiscard={() => detailItem && requestDiscardItem(detailItem)}
       />
+
+
+      <AlertDialog open={!!discardTarget} onOpenChange={(open) => !open && setDiscardTarget(null)}>
+        <AlertDialogContent className="border-destructive/30 bg-background/95 backdrop-blur">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">{`\u771f\u8981\u820d\u4e0b\u300c${discardTarget?.name || '\u6b64\u7269'}\u300d\u5417\uff1f`}</AlertDialogTitle>
+            <AlertDialogDescription className="leading-relaxed">
+              {"\u6b64\u7269\u4f1a\u4ece\u50a8\u7269\u888b\u4e2d\u79fb\u9664\u3002\u82e5\u53ea\u662f\u6682\u65f6\u7528\u4e0d\u4e0a\uff0c\u4e5f\u53ef\u7559\u5728\u888b\u4e2d\u7b49\u65e5\u540e\u518d\u5904\u7f6e\u3002"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{"\u518d\u60f3\u60f3"}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDiscardItem}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {"\u786e\u8ba4\u4e22\u5f03"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
