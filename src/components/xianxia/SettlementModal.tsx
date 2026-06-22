@@ -83,7 +83,7 @@ export function SettlementModal() {
       summary: settlementResult.summary,
       relicSeeds: heritageItems.map((item) => item.name).slice(0, 6),
       legendSeeds: settlementResult.hallRecord.notableDeeds.slice(0, 6),
-      createdAtWorldLabel: `${worldCalendar.eraName}${worldCalendar.calendarYear}?`,
+      createdAtWorldLabel: `${worldCalendar.eraName}${worldCalendar.calendarYear}`,
       updatedAt: new Date().toISOString(),
     });
     setSettlementResult(null);

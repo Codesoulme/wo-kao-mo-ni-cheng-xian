@@ -1,4 +1,4 @@
-// 修仙模拟器 - 引擎核心
+﻿// 修仙模拟器 - 引擎核心
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
@@ -756,7 +756,7 @@ function cleanTechniqueBaseName(name?: string): string {
   const raw = String(name || '').trim();
   const cleaned = raw
     .replace(/[\u300a\u300b<>]/g, '')
-    .replace(/(\u7389\u7b80|\u5fc3\u5f97|\u529f\u6cd5|\u6cd5\u95e8|\u6b8b\u7bc7|\u771f\u7ecf|\u7ecf\u5377|\u7ecf|\u8bc0|\u6cd5|\u529f|\u672f|\u8c31)$/u, '')
+    .replace(/(玉简|心得|功法|法门|残篇|真经|经卷|剑经|经|诀|法|功|术|谱)$/u, '')
     .trim();
   return (cleaned || raw || '\u7075\u673a').slice(0, 6);
 }
