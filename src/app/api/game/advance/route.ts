@@ -67,10 +67,6 @@ export async function POST(req: NextRequest) {
     const isFateNode = candidate.isFateNode;
     const fateNode = candidate.fateNode;
     const recentBlueprintCategories = candidate.recentBlueprintCategories || [];
-    const sameYearThreadIdsBeforeEvent = new Set(
-      getSameYearThreads(state).map((thread) => thread.id)
-    );
-
     // 引擎执行 AI 输出
     const stateBeforeEvent = { ...state };
     const result = executeAIEvent(state, aiOutput);
@@ -173,7 +169,7 @@ ${breakthroughText}`;
     // 自动追加一段同岁史册，避免“准备进仙门，下一年却跑路”这类断裂。
     const sameYearContinuationDrafts: { title: string; narrative: string; eventType: string; effects: any[]; timeAdvance?: any; worldTime?: any; actionProjections?: any[] }[] = [];
     if (!finalState.isAtChoice && !finalState.combatSession && finalState.alive && !finalState.ascended) {
-      const sameYearThreads = getSameYearThreads(finalState).filter((thread) => sameYearThreadIdsBeforeEvent.has(thread.id));
+      const sameYearThreads = getSameYearThreads(finalState);
       for (const thread of sameYearThreads) {
         const beforeContinuation = { ...finalState };
         const continuationOutput = buildThreadContinuationEvent(finalState, thread);

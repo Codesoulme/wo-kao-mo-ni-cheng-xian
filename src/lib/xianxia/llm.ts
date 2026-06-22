@@ -2303,7 +2303,7 @@ function sanitizeThreads(raw: any, currentAge: number): PendingThread[] {
     .map(t => {
       const startAge = Number(t.startAge) || currentAge;
       const rawDeadline = Number(t.deadlineAge);
-      const dueInSameYear = Boolean(t.dueInSameYear) || /\u4eca\u5e74|\u672c\u5e74|\u5f53\u5e74|\u4e0d\u4e45|\u4e09\u6708|\u6570\u6708|\u534a\u5e74|\u5165\u591c|\u5f53\u591c|\u591c\u91cc|\u9ec4\u660f|\u6e05\u6668|\u7fcc\u65e5|\u8f6c\u65e5|\u4e34\u8d70\u524d|\u4e34\u884c|\u4e34\u522b|\u8d70\u524d|\u79bb\u5f00\u524d/.test(`${t.title || ''}${t.description || ''}${t.followUpHint || ''}`);
+      const dueInSameYear = Boolean(t.dueInSameYear) || /\u4eca\u5e74|\u672c\u5e74|\u5f53\u5e74|\u4e0d\u4e45|\u4e09\u6708|\u6570\u6708|\u534a\u6708|\u6570\u65e5|\u51e0\u65e5|\u4e09\u65e5|\u4e24\u65e5|\u660e\u65e5|\u534a\u5e74|\u5165\u591c|\u5f53\u591c|\u591c\u91cc|\u9ec4\u660f|\u6e05\u6668|\u7fcc\u65e5|\u8f6c\u65e5|\u4e34\u8d70\u524d|\u4e34\u884c|\u4e34\u522b|\u8d70\u524d|\u79bb\u5f00\u524d/.test(`${t.title || ''}${t.description || ''}${t.followUpHint || ''}`);
       const deadlineAge = Number.isFinite(rawDeadline) ? rawDeadline : (dueInSameYear ? currentAge : currentAge + 1);
       return {
         id: String(t.id || `thread_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`),

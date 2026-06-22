@@ -150,6 +150,81 @@ function smokeSameYearThreadTimeInference(): void {
   log('same-year-thread-time-inference', { passed: true, title: threads[0].title, ageDeltaYears: continuation.timeAdvance?.ageDeltaYears });
 }
 
+
+function smokeSameTurnShortThreadContinuity(): void {
+  const baseState: any = {
+    name: '\u6731\u73a9',
+    age: 11,
+    lifespan: 80,
+    realm: 'mortal',
+    realmLevel: 0,
+    spiritualRoot: 'none',
+    rootDetail: '\u65e0\u7075\u6839',
+    cultivationExp: 0,
+    expToBreak: 100,
+    hp: 100,
+    maxHp: 100,
+    mp: 50,
+    maxMp: 50,
+    attack: 10,
+    defense: 5,
+    speed: 10,
+    luck: 50,
+    comprehension: 50,
+    spiritStones: 0,
+    reputation: 0,
+    alive: true,
+    ascended: false,
+    causeOfDeath: '',
+    faction: '',
+    master: '',
+    location: '\u69d0\u6811\u6751',
+    fateNodes: [],
+    isAtChoice: false,
+    activeStatuses: [],
+    inventory: [],
+    equipped: [],
+    storageCapacity: 5,
+    elements: { metal: 20, wood: 20, water: 20, fire: 20, earth: 20 },
+    pendingThreads: [],
+    characterIntents: [],
+    heartDemon: 0,
+  };
+  const output: any = {
+    title: '\u51c0\u624b\u518d\u542c\u4fee\u884c\u8bc0',
+    narrative: '\u8001\u4eba\u53eb\u6731\u73a9\u5148\u53bb\u51c0\u624b\uff0c\u56de\u6765\u4fbf\u542c\u4ed6\u8bb2\u4e00\u6bb5\u4fee\u884c\u8bc0\u3002',
+    eventType: 'normal',
+    changes: [],
+    newStatuses: [],
+    newItems: [],
+    memory: '',
+    hasChoice: false,
+    newThreads: [{
+      id: 'listen_formula_three_days',
+      title: '\u69d0\u7c7d\u4f20\u8baf\u5f15\u4ed9\u9014',
+      description: '\u4e09\u65e5\u540e\u518d\u6765\u542c\u4fee\u884c\u8bc0\uff0c\u4e0d\u5e94\u62d6\u5230\u4e0b\u4e00\u5e74\u3002',
+      category: 'quest',
+      startAge: 11,
+      deadlineAge: 11,
+      progress: 0,
+      dueInSameYear: true,
+      followUpHint: '\u4e09\u65e5\u540e\u56de\u5230\u69d0\u6811\u4e0b\u542c\u4fee\u884c\u8bc0\u3002',
+    }],
+    advanceThreads: [],
+    completeThreadIds: [],
+    failThreadIds: [],
+  };
+  const result = executeAIEvent(baseState, output);
+  const sameYearThreads = getSameYearThreads(result.state);
+  assert(sameYearThreads.some((thread: any) => thread.id === 'listen_formula_three_days'), 'new three-day thread should be eligible for same-turn same-year continuation');
+  const continuation = buildThreadContinuationEvent(result.state, sameYearThreads[0]);
+  assert(continuation.timeAdvance?.ageDeltaYears === 0, 'short teaching continuation should not advance age by one year');
+  assert(continuation.timeAdvance?.label === '\u4e09\u65e5\u540e', 'three-day teaching continuation should preserve short time label');
+  assert(/\u542c\u8bb2|\u542c\u8bc0|\u8bdd\u5934/.test(continuation.narrative), 'teaching continuation should describe listening/receiving the teaching, not another vague deferral');
+  assert(!/\u4eca\u5e74|\u4e00\u5e74\u540e/.test(continuation.narrative), 'teaching continuation should not sound like next-year summary');
+  log('same-turn-short-thread-continuity', { passed: true, label: continuation.timeAdvance.label, title: continuation.title });
+}
+
 function smokeThreadPromiseNoAdultTravelTemplate(): void {
   const state: any = {
     name: '\u6731\u73a9',
@@ -1443,6 +1518,7 @@ async function main(): Promise<void> {
   smokeEdibleRewardItemType();
   smokeDiscardStorageBagItem();
   smokeSameYearThreadTimeInference();
+  smokeSameTurnShortThreadContinuity();
   smokeThreadPromiseNoAdultTravelTemplate();
   smokeThreadGenericNoAbstractCausalityTemplate();
   smokeInlineNightTimeStamp();

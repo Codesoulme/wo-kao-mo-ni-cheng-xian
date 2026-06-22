@@ -5518,6 +5518,18 @@ export function getSameYearThreads(state: CharacterState): PendingThread[] {
   ).slice(0, 2);
 }
 
+
+function shortThreadTimeAdvance(threadText: string, isVeryYoung: boolean): any {
+  if (/三日后/.test(threadText)) return { amount: 3, unit: 'day', label: '三日后', reason: '承接短期因缘', ageDeltaYears: 0, elapsedDays: 3 };
+  if (/两日后/.test(threadText)) return { amount: 2, unit: 'day', label: '两日后', reason: '承接短期因缘', ageDeltaYears: 0, elapsedDays: 2 };
+  if (/数日后|几日后/.test(threadText)) return { amount: 5, unit: 'day', label: '数日后', reason: '承接短期因缘', ageDeltaYears: 0, elapsedDays: 5 };
+  if (/明日|翌日|转日/.test(threadText)) return { amount: 1, unit: 'day', label: '翌日', reason: '承接短期因缘', ageDeltaYears: 0, elapsedDays: 1 };
+  if (/半月后/.test(threadText)) return { amount: 15, unit: 'day', label: '半月后', reason: '承接短期因缘', ageDeltaYears: 0, elapsedDays: 15 };
+  if (/三月后/.test(threadText)) return { amount: 3, unit: 'month', label: '三月后', reason: '承接同岁因缘', ageDeltaYears: 0, elapsedDays: 90 };
+  if (/数月后/.test(threadText)) return { amount: 2, unit: 'month', label: '数月后', reason: '承接同岁因缘', ageDeltaYears: 0, elapsedDays: 60 };
+  return { amount: isVeryYoung ? 1 : 1, unit: isVeryYoung ? 'day' : 'month', label: isVeryYoung ? '翌日' : '月余后', reason: '承接同岁因缘', ageDeltaYears: 0, elapsedDays: isVeryYoung ? 1 : 30 };
+}
+
 const INTERNAL_THREAD_NARRATIVE_PHRASES = [
   '\u5faa\u7740\u65e7\u8ff9\u4e0e\u65e7\u7ea6\u7ee7\u7eed\u8ffd\u7d22',
   '\u524d\u7f18\u6b63\u5f85\u4e86\u7ed3',
@@ -5568,6 +5580,7 @@ export function buildThreadContinuationEvent(state: CharacterState, thread: Pend
   const isRealm = !isVeryYoung && (thread.category === 'exploration' || !!realmName || /\u79d8\u5883|\u6d6e\u9601|\u6d1e\u5e9c|\u9057\u8ff9|\u7981\u5730|\u7981\u5236|\u7834\u7981/.test(`${thread.title}${thread.description}`));
   const isCompetition = !isVeryYoung && (thread.category === 'competition' || /\u6bd4\u8bd5|\u8003\u6838|\u5165\u95e8|\u4ed9\u95e8|\u64c2\u53f0/.test(`${thread.title}${thread.description}`));
   const isPromise = !isVeryYoung && (thread.category === 'promise' || /\u7ea6|\u8bfa|\u627f\u8bfa|\u8fd8\u613f|\u8d74\u7ea6/.test(threadText));
+  const isTeachingFollowUp = /\u542c\u8bc0|\u6388\u8bc0|\u4f20\u8bc0|\u4fee\u884c\u8bc0|\u5fc3\u6cd5|\u53e3\u8bc0|\u542c\u4fee|\u542c\u6cd5|\u8bb2\u8bc0/.test(threadText);
   const title = isVeryYoung
     ? visibleThreadTitle
     : isRealm
@@ -5578,7 +5591,9 @@ export function buildThreadContinuationEvent(state: CharacterState, thread: Pend
           ? `\u65e7\u7ea6\u56de\u54cd\u00b7${visibleThreadTitle}`
           : visibleThreadTitle;
 
-  const fallbackNarrative = isVeryYoung
+  const fallbackNarrative = isTeachingFollowUp
+    ? `${state.name}\u6309\u7740\u5148\u524d\u7684\u5631\u5490\uff0c\u5728\u7ea6\u5b9a\u7684\u65f6\u5019\u518d\u53bb\u542c\u8bb2\u3002\u8fd9\u4e00\u56de\u4e0d\u518d\u53ea\u662f\u8bb0\u4f4f\u51e0\u53e5\u8bdd\uff0c\u800c\u662f\u628a\u80fd\u542c\u61c2\u7684\u5173\u8282\u7559\u5728\u5fc3\u91cc\uff0c\u5f80\u540e\u4fee\u884c\u65f6\u4e5f\u591a\u4e86\u4e00\u5904\u53ef\u53cd\u590d\u56de\u60f3\u7684\u8bdd\u5934\u3002`
+    : isVeryYoung
     ? `${state.name}\u5e74\u7eaa\u5c1a\u5c0f\uff0c\u5bf9\u201c\u7ea6\u5b9a\u201d\u4e0e\u201c\u524d\u5f80\u201d\u8fd8\u53ea\u662f\u61f5\u61c2\u7684\u559c\u60a6\u3002\u5927\u4eba\u5728\u65c1\u7167\u770b\u65f6\uff0c\u4ed6\u4e0e\u5c0f\u4f19\u4f34\u53c8\u5728\u9662\u8fb9\u73a9\u4e86\u4e00\u9635\uff0c\u628a\u6cb3\u7554\u3001\u87ba\u86f3\u548c\u4ed9\u4eba\u4f20\u95fb\u90fd\u5f53\u4f5c\u660e\u65e5\u7684\u70ed\u95f9\u76fc\u5934\u3002`
     : isRealm
       ? `${state.name}\u4f9d\u7167\u624b\u4e2d\u4fe1\u7269\u4e0e\u5730\u52bf\u53d8\u5316\u91cd\u65b0\u8fa8\u8ba4\u95e8\u6237\u3002\u96fe\u6c14\u5f00\u5408\u4e4b\u95f4\uff0c\u65e7\u65e5\u6240\u89c1\u7ec8\u4e8e\u6709\u4e86\u53ef\u843d\u811a\u7684\u65b9\u4f4d\uff1b\u82e5\u8981\u518d\u8fdb\u4e00\u6b65\uff0c\u4ecd\u9700\u8c28\u614e\u8bd5\u63a2\u7981\u5236\u865a\u5b9e\u3002`
@@ -5599,7 +5614,7 @@ export function buildThreadContinuationEvent(state: CharacterState, thread: Pend
     memory: `${state.age}\u5c81\u7eed\u5199\u7ebf\u7d22\uff1a${thread.title}`,
     cultivationInsight: '',
     hasChoice: false, choice: null, triggeredBreakthrough: false, causedDeath: false, causedAscension: false,
-    timeAdvance: { amount: isVeryYoung ? 1 : 3, unit: isVeryYoung ? 'day' : 'month', label: isVeryYoung ? '\u7fcc\u65e5' : '\u6570\u6708\u540e', reason: '\u627f\u63a5\u540c\u5c81\u56e0\u7f18', ageDeltaYears: 0, elapsedDays: isVeryYoung ? 1 : 90 },
+    timeAdvance: shortThreadTimeAdvance(threadText, isVeryYoung),
     newThreads: [],
     advanceThreads: [],
     completeThreadIds: [thread.id],
