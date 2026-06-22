@@ -8,7 +8,8 @@ import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-log';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { getRealmInfo } from '@/lib/xianxia/types';
-import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, formatWorldTimeDisplay, hiddenEventMeta, sanitizeActionProjections, worldTimeStamp } from '@/lib/xianxia/world-time';
+import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections, worldTimeStamp } from '@/lib/xianxia/world-time';
+
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -343,9 +344,13 @@ ${narrative || ''}`);
     }];
 
     for (const extra of aiOutput.extraEvents || []) {
-      const extraTimeAdvance = extra.timeAdvance ? clampTimeAdvance(extra.timeAdvance, timeAdvance) : undefined;
+      const inferredExtraTime = inferInlineTimeAdvance(extra.title, extra.narrative);
+      const extraTimeAdvance = extra.timeAdvance
+        ? clampTimeAdvance(extra.timeAdvance, timeAdvance)
+        : inferredExtraTime ? clampTimeAdvance(inferredExtraTime, inferredExtraTime) : undefined;
       if (extraTimeAdvance) eventWorldCalendarCursor = advanceWorldCalendar(eventWorldCalendarCursor, extraTimeAdvance);
-      const extraWorldTime = extraTimeAdvance ? stampEventTime(worldTimeStamp(eventWorldCalendarCursor), extraTimeAdvance, false) : finalWorldTime;
+      const extraPhaseHint = phaseHintForTime(extraTimeAdvance?.label, `${extra.title || ''} ${extra.narrative || ''}`);
+      const extraWorldTime = extraTimeAdvance ? stampEventTime(worldTimeStamp(eventWorldCalendarCursor, extraPhaseHint), extraTimeAdvance, false) : finalWorldTime;
       finalWorldCalendar = eventWorldCalendarCursor;
       finalWorldTime = extraWorldTime;
       const extraActions = sanitizeActionProjections(extra.actionProjections);
@@ -361,7 +366,8 @@ ${narrative || ''}`);
     }
     for (const continuation of sameYearContinuationDrafts) {
       if (continuation.timeAdvance) eventWorldCalendarCursor = advanceWorldCalendar(eventWorldCalendarCursor, continuation.timeAdvance);
-      const continuationWorldTime = continuation.timeAdvance ? stampEventTime(worldTimeStamp(eventWorldCalendarCursor), continuation.timeAdvance, false) : finalWorldTime;
+      const continuationPhaseHint = phaseHintForTime(continuation.timeAdvance?.label, continuation.narrative);
+      const continuationWorldTime = continuation.timeAdvance ? stampEventTime(worldTimeStamp(eventWorldCalendarCursor, continuationPhaseHint), continuation.timeAdvance, false) : finalWorldTime;
       finalWorldCalendar = eventWorldCalendarCursor;
       finalWorldTime = continuationWorldTime;
       eventDrafts.push({

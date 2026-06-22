@@ -5,6 +5,7 @@ import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorld
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
+import { advanceWorldCalendar, formatWorldTimeDisplay, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -12,6 +13,20 @@ function assert(condition: unknown, message: string): void {
 
 function log(name: string, data: Record<string, unknown>): void {
   console.log(JSON.stringify({ smoke: name, ...data }));
+}
+
+function smokeInlineNightTimeStamp(): void {
+  const narrative = '\u5165\u591c\u540e\uff0c\u5362\u77e5\u79cb\u8eba\u5728\u571f\u576f\u7095\u4e0a\uff0c\u76ef\u7740\u7a97\u5916\u7684\u6208\u58c1\u661f\u5b50\uff0c\u5c06\u94dc\u54e8\u538b\u5728\u6795\u4e0b\u3002';
+  const advance = inferInlineTimeAdvance('\u6c99\u6751\u665a\u601d', narrative);
+  assert(advance?.label === '\u5165\u591c\u540e', 'night extra narrative should infer night label');
+  const phase = phaseHintForTime(advance?.label, narrative);
+  assert(phase === '\u5b50\u591c', 'night extra narrative should stamp midnight phase');
+  const calendar = advanceWorldCalendar({ eraName: '\u9752\u5c9a\u4ed9\u5386', calendarYear: 5005, elapsedDays: 450 }, advance!);
+  const stamp = worldTimeStamp(calendar, phase);
+  const label = formatWorldTimeDisplay({ timeAdvance: advance, worldTime: stamp, includeAge: false });
+  assert(label.includes('\u5165\u591c\u540e'), 'display label should include inferred segment label');
+  assert(label.includes('\u5b50\u591c'), 'display label should include inferred night phase');
+  log('inline-night-time-stamp', { passed: true, label });
 }
 
 
@@ -1317,6 +1332,7 @@ async function main(): Promise<void> {
   smokeEdibleRewardItemType();
   smokeDiscardStorageBagItem();
   smokeSameYearThreadTimeInference();
+  smokeInlineNightTimeStamp();
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
   smokeNarrativeContract();
