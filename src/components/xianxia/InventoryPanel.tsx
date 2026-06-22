@@ -112,6 +112,45 @@ function isStorageBag(item: any): boolean {
   return (item.effects || []).some((e: any) => e.target_attribute === 'storageCapacity' && e.operation === 'add' && e.value > 0);
 }
 
+type InventoryStack = { key: string; item: any; count: number; items: any[] };
+
+function stableEffectsKey(item: any): string {
+  const effects = Array.isArray(item?.effects) ? item.effects : [];
+  return JSON.stringify(effects.map((e: any) => ({
+    target_attribute: e?.target_attribute || '',
+    operation: e?.operation || '',
+    value: Number(e?.value) || 0,
+    description: e?.description || '',
+  })));
+}
+
+function inventoryStackKey(item: any): string {
+  return [
+    item?.item_type || 'material',
+    item?.name || '',
+    item?.rarity || 'common',
+    item?.description || '',
+    item?.source || '',
+    item?.equipNote || '',
+    stableEffectsKey(item),
+  ].join('::');
+}
+
+function stackInventoryItems(items: any[]): InventoryStack[] {
+  const map = new Map<string, InventoryStack>();
+  for (const item of items) {
+    const key = inventoryStackKey(item);
+    const stack = map.get(key);
+    if (stack) {
+      stack.count += 1;
+      stack.items.push(item);
+    } else {
+      map.set(key, { key, item, count: 1, items: [item] });
+    }
+  }
+  return [...map.values()];
+}
+
 export function InventoryPanel() {
   const { character, setCharacter } = useGameStore();
   const [busy, setBusy] = useState<string | null>(null);
@@ -171,11 +210,11 @@ export function InventoryPanel() {
   };
 
   // 储物袋按类型分组
-  const grouped: Record<string, any[]> = {};
-  for (const it of [...inventory].reverse()) {
-    const t = it.item_type || 'material';
+  const grouped: Record<string, InventoryStack[]> = {};
+  for (const stack of stackInventoryItems([...inventory].reverse())) {
+    const t = stack.item.item_type || 'material';
     if (!grouped[t]) grouped[t] = [];
-    grouped[t].push(it);
+    grouped[t].push(stack);
   }
   const groupOrder: ItemType[] = ['scripture', 'weapon', 'armor', 'accessory', 'artifact', 'consumable', 'tool', 'material'];
 
@@ -422,10 +461,12 @@ export function InventoryPanel() {
                       <div className="text-[10px] text-muted-foreground mb-1 px-0.5 flex items-center gap-1">
                         <span className="font-serif-cn">{ITEM_TYPE_LABEL[type] || type}</span>
                         <span className="opacity-50">·</span>
-                        <span>{items.length}</span>
+                        <span>{items.reduce((sum, stack) => sum + stack.count, 0)}{'\u4ef6'}</span>
+                        {items.length > 1 && <span className="opacity-60">{items.length}{'\u7c7b'}</span>}
                       </div>
                       <div className="space-y-1.5">
-                        {visibleItems.map((item, i) => {
+                        {visibleItems.map((stack, i) => {
+                          const item = stack.item;
                           const slot = itemToSlot(item.item_type);
                           const canEquip = !!slot && !isStorageBag(item);
                           const canUse = item.item_type === 'consumable';
@@ -434,7 +475,7 @@ export function InventoryPanel() {
                           const bag = isStorageBag(item);
                           return (
                             <div
-                              key={item.id || i}
+                              key={stack.key || item.id || i}
                               className="rounded-md border p-2 cursor-pointer transition-all hover:bg-muted/30"
                               style={{
                                 borderColor: `${color}40`,
@@ -448,6 +489,11 @@ export function InventoryPanel() {
                                   <span className="text-xs font-semibold font-serif-cn truncate" style={{ color }}>
                                     {item.name}
                                   </span>
+                                  {stack.count > 1 && (
+                                    <span className="text-[10px] px-1.5 py-0 rounded-full shrink-0 bg-primary/10 text-primary font-semibold">
+                                      {'\u00d7'}{stack.count}
+                                    </span>
+                                  )}
                                   {bag && (
                                     <span className="text-[9px] px-1 py-0 rounded shrink-0 bg-accent/20 text-accent">
                                       储物袋
