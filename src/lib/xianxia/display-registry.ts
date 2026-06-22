@@ -62,6 +62,14 @@ function groupFromStatus(status: any) {
   return '\u5f02\u8c61';
 }
 
+const CORE_DERIVED_ATTRIBUTE_IDS = new Set(['spiritualSense', 'soulStrength', 'physicalFoundation']);
+
+function isCoreDerivedAttribute(attr: any) {
+  const id = text(attr?.id || attr?.key || attr?.target_attribute || attr?.targetAttribute);
+  const label = text(attr?.displayLabel || attr?.name || attr?.label);
+  return CORE_DERIVED_ATTRIBUTE_IDS.has(id) || label === '\u795e\u8bc6' || label === '\u9b42\u9b44' || label === '\u4f53\u9b44';
+}
+
 function slotsFromStatus(status: any, group: string): DisplaySlot[] {
   const raw = Array.isArray(status?.displaySlots) ? status.displaySlots : [];
   const slots = raw.filter((slot: any): slot is DisplaySlot => SLOT_SET.has(slot));
@@ -105,6 +113,7 @@ export function attributeToDisplayEntry(attr: any, index = 0): DisplayEntry | nu
   const label = text(attr?.displayLabel || attr?.name || attr?.label);
   if (!label) return null;
   const group = text(attr?.displayGroup || attr?.categoryLabel || attr?.category, /\u4f53\u8d28|\u5251\u9aa8|\u9053\u80ce|\u8840\u8109/.test(label) ? '\u4f53\u8d28' : '\u5929\u8d4b').slice(0, 12);
+  const defaultSlots: DisplaySlot[] = isCoreDerivedAttribute(attr) ? ['topTags', 'characterDetail'] : ['topTags', 'characterDetail', 'statusPage'];
   return {
     id: text(attr?.id, `attribute-${index}-${label}`),
     kind: 'attribute',
@@ -116,7 +125,7 @@ export function attributeToDisplayEntry(attr: any, index = 0): DisplayEntry | nu
     detail: text(attr?.detail || attr?.description || attr?.effect),
     tone: /\u4f53\u8d28|\u5251\u9aa8|\u9053\u80ce|\u8840\u8109/.test(group + label) ? 'rare' : 'mystery',
     priority: Number.isFinite(Number(attr?.priority ?? attr?.displayPriority)) ? Number(attr?.priority ?? attr?.displayPriority) : 88 - index * 0.01,
-    displaySlots: Array.isArray(attr?.displaySlots) ? attr.displaySlots.filter((slot: any): slot is DisplaySlot => SLOT_SET.has(slot)) : ['topTags', 'characterDetail', 'statusPage'],
+    displaySlots: Array.isArray(attr?.displaySlots) ? attr.displaySlots.filter((slot: any): slot is DisplaySlot => SLOT_SET.has(slot)) : defaultSlots,
     renderHint: attr?.renderHint || 'card',
     source: text(attr?.source || attr?.sourceText),
     sourceEventId: text(attr?.sourceEventId),

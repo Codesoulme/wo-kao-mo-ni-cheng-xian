@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
 
 尚有灵宠因果相随：${inheritedPets.map((p: any) => p.name).join('、')}。` : ''}`,
         eventType: 'normal',
-        effects: JSON.stringify([]),
+        effects: JSON.stringify([hiddenEventMeta({ worldTime, actionProjections: [] })]),
       },
     });
 

@@ -1,11 +1,12 @@
 ﻿import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
-import { advanceWorldCalendar, formatWorldTimeDisplay, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
+import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
+import { characterDisplayEntries, entriesForSlot } from '../src/lib/xianxia/display-registry';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -13,6 +14,61 @@ function assert(condition: unknown, message: string): void {
 
 function log(name: string, data: Record<string, unknown>): void {
   console.log(JSON.stringify({ smoke: name, ...data }));
+}
+
+function smokeBirthCoreAttributesAndTimeProjection(): void {
+  const state: any = {
+    age: 0,
+    lifespan: 80,
+    realm: 'mortal',
+    realmLevel: 0,
+    spiritualRoot: 'none',
+    rootDetail: '\u65e0\u7075\u6839',
+    cultivationExp: 0,
+    expToBreak: 100,
+    hp: 100,
+    maxHp: 100,
+    mp: 50,
+    maxMp: 50,
+    attack: 10,
+    defense: 5,
+    speed: 10,
+    luck: 50,
+    comprehension: 50,
+    spiritStones: 0,
+    reputation: 0,
+    alive: true,
+    ascended: false,
+    causeOfDeath: '',
+    faction: '',
+    master: '',
+    location: '\u5c71\u6751',
+    fateNodes: [],
+    isAtChoice: false,
+    activeStatuses: [],
+    inventory: [],
+    equipped: [],
+    storageCapacity: 5,
+    elements: { metal: 20, wood: 20, water: 20, fire: 20, earth: 20 },
+    pendingThreads: [],
+    characterIntents: [],
+    heartDemon: 0,
+  };
+  const response: any = stateToResponse(state);
+  assert(response.spiritualSense > 0, 'birth state response should expose derived spiritual sense');
+  assert(response.soulStrength > 0, 'birth state response should expose derived soul strength');
+  assert(response.physicalFoundation > 0, 'birth state response should expose derived physical foundation');
+  const entries = characterDisplayEntries(response);
+  const statusIds = entriesForSlot(entries, 'statusPage').map(entry => entry.id);
+  assert(!statusIds.includes('spiritualSense'), 'core spiritual sense should not appear as status page entry');
+  assert(!statusIds.includes('soulStrength'), 'core soul strength should not appear as status page entry');
+  assert(!statusIds.includes('physicalFoundation'), 'core physical foundation should not appear as status page entry');
+  const stamp = worldTimeStamp({ eraName: '\u9752\u5c9a\u4ed9\u5386', calendarYear: 5000, elapsedDays: 0 }, '\u964d\u751f\u65f6');
+  const worldTime = { ...stamp, displayLabel: formatWorldTimeDisplay({ age: 0, worldTime: stamp, includeAge: true }) };
+  const meta = extractEventMeta([hiddenEventMeta({ worldTime, actionProjections: [] })]);
+  assert(meta.worldTime?.displayLabel?.includes('0\u5c81'), 'birth event hidden metadata should preserve age display label');
+  assert(meta.worldTime?.displayLabel?.includes('\u9752\u5c9a\u4ed9\u5386'), 'birth event hidden metadata should preserve world time label');
+  log('birth-core-attributes-time-projection', { passed: true, spiritualSense: response.spiritualSense, soulStrength: response.soulStrength, physicalFoundation: response.physicalFoundation, statusEntries: statusIds.length, label: meta.worldTime.displayLabel });
 }
 
 function smokeInlineNightTimeStamp(): void {
@@ -1329,6 +1385,7 @@ function smokeAiDrivenCombatActionPalette(): void {
 
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
+  smokeBirthCoreAttributesAndTimeProjection();
   smokeEdibleRewardItemType();
   smokeDiscardStorageBagItem();
   smokeSameYearThreadTimeInference();
