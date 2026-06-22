@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { CharacterState, useGameStore } from '@/lib/xianxia/store';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -28,6 +28,10 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
   const meaningfulStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
   const constitutionStatuses = meaningfulStatuses.filter(isConstitutionStatus);
   const dynamicAttributes = (current.cultivationAttributes || []).filter((attr: any) => attr && attr.visible !== false && attr.name);
+  const realmTraits = (current as any).realmTraits;
+  const traitCapabilities = Array.isArray(realmTraits?.capabilities) ? realmTraits.capabilities.slice(0, 3) : [];
+  const traitLimitations = Array.isArray(realmTraits?.limitations) ? realmTraits.limitations.slice(0, 3) : [];
+  const traitRisks = Array.isArray(realmTraits?.riskTags) ? realmTraits.riskTags.slice(0, 3) : [];
   const detailDisplayEntries = entriesForSlot(characterDisplayEntries(current), 'characterDetail')
     .filter((entry) => entry.kind !== 'status' || !constitutionStatuses.some((status: any) => status.id === entry.raw?.id || status.name === entry.raw?.name))
     .slice(0, 8);
@@ -101,7 +105,35 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             </div>
           </section>
 
-          {/* 灵根 */}
+          <section>
+            <SectionTitle icon={<Brain className="w-3.5 h-3.5" />} title={"\u795e\u8bc6\u00b7\u9b42\u9b44"} />
+            <div className="grid grid-cols-3 gap-2 mt-1.5">
+              <StatCard icon={<Brain className="w-3 h-3" />} label={"\u795e\u8bc6"} value={(current as any).spiritualSense ?? 0} color="#7c3aed" info={ATTRIBUTE_INFO.spiritualSense} onClick={setSelectedAttr} />
+              <StatCard icon={<Sparkles className="w-3 h-3" />} label={"\u9b42\u9b44"} value={(current as any).soulStrength ?? 0} color="#9333ea" info={ATTRIBUTE_INFO.soulStrength} onClick={setSelectedAttr} />
+              <StatCard icon={<Shield className="w-3 h-3" />} label={"\u4f53\u9b44"} value={(current as any).physicalFoundation ?? 0} color="#0f766e" info={ATTRIBUTE_INFO.physicalFoundation} onClick={setSelectedAttr} />
+            </div>
+            <div className="mt-2 rounded-lg border border-purple-300/30 bg-purple-500/10 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-serif-cn font-semibold text-purple-700 dark:text-purple-200">{(current as any).soulRealmName || '\u795e\u9b42\u672a\u663e'}</span>
+                <span className="text-[10px] rounded-full border border-purple-300/40 px-1.5 py-0.5 text-purple-700 dark:text-purple-200">{(current as any).soulRealmGap || '\u8eab\u795e\u672a\u5b9a'}</span>
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">{"\u795e\u8bc6\u3001\u9b42\u9b44\u4e0e\u4f53\u9b44\u53ef\u4e0e\u6cd5\u529b\u5883\u754c\u5206\u5316\u6210\u957f\uff1b\u5f15\u64ce\u4f1a\u5c06\u5176\u4f5c\u4e3a\u63a2\u67e5\u3001\u538b\u5236\u3001\u7a81\u7834\u3001\u593a\u820d\u548c\u79d8\u5883\u98ce\u9669\u7684\u4e8b\u5b9e\u8fb9\u754c\u3002"}</p>
+            </div>
+          </section>
+
+          {realmTraits && (
+            <section>
+              <SectionTitle icon={<Sparkles className="w-3.5 h-3.5" />} title={"\u5883\u754c\u7279\u6027"} />
+              <div className="mt-1.5 rounded-lg border border-border/60 bg-card/40 p-3 space-y-2">
+                {realmTraits.cultivationMode && <p className="text-[11px] leading-relaxed text-foreground/80">{realmTraits.cultivationMode}</p>}
+                <TraitLine label={"\u80fd\u505a"} values={traitCapabilities} />
+                <TraitLine label={"\u96be\u4e3a"} values={traitLimitations} />
+                <TraitLine label={"\u98ce\u9669"} values={traitRisks} />
+              </div>
+            </section>
+          )}
+
+          {/* 灵根·体质 */}
           <section>
             <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title="灵根·体质" />
             <button type="button" onClick={() => setSelectedAttr(ATTRIBUTE_INFO.spiritualRoot)} className="w-full text-left rounded-lg border border-border/60 p-3 mt-1.5 bg-card/40 transition hover:border-primary/40 hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-primary/30">
@@ -289,6 +321,9 @@ const ATTRIBUTE_INFO: Record<string, AttributeInfo> = {
   spiritStones: { title: '灵石', summary: '灵石是修仙界通用资源，既是交易筹码，也是修炼与行动的底气。', affects: ['购买丹药、法宝、材料和情报', '拍卖会出价与竞争上限', '传送、秘境准备、疗伤和打点人情', '贫富差距带来的机缘或劫修风险'] },
   reputation: { title: '声望', summary: '声望代表角色在周边修仙界的名气与可信度。', affects: ['宗门、坊市、散修圈的态度', '求助、结盟、交易、拜师成功率', '仇敌盯上或强者注意的概率', '称号、身份和势力关系推进'] },
   heartDemon: { title: '心魔', summary: '心魔越高，道心越不稳；它既能带来执念推进，也会引发修炼与战斗风险。', affects: ['修炼效率与走火入魔风险', '心魔试炼、幻境、执念相关事件', '杀伐、邪功、屈辱和仇恨的后果', '清心丹、顿悟、了却因果的收益'] },
+  spiritualSense: { title: '神识', summary: '神识是探查、预判、禁制感应和神念压制的核心维度，可与法力境界不同步。', affects: ['探查敌情、秘境和禁制', '战斗先机、破绽捕捉和神识压制', '高阶法宝、阵法、神识秘术的门槛', '被高阶修士锁定或反噬的风险'] },
+  soulStrength: { title: '魂魄', summary: '魂魄衡量神魂承载与元神根基，影响元婴、夺舍、心魔与高阶神通。', affects: ['突破时的神魂承压', '元婴出窍、夺舍或转修风险', '心魔、幻境、魂道秘术抗性', '神魂境界超前或落后的剧情分支'] },
+  physicalFoundation: { title: '体魄', summary: '体魄是肉身承载、重伤承受和大境界冲关稳定度的基础。', affects: ['重伤、中毒、炼体和天劫承受', '肉身毁坏后是否有转机', '长途探索、秘境压力和体修机缘', '法力境界过快时的肉身代价'] },
   faction: { title: '阵营/宗门', summary: '阵营决定角色背后的资源、人情、规矩和敌友关系。', affects: ['师承、任务、俸禄和宗门庇护', '宗门冲突、比试、追责和身份限制', 'NPC 态度与势力地图变化', '长期因果线索的承接方向'] },
   element_metal: { title: '金行', summary: '金行偏锋锐、杀伐、器物和决断。', affects: ['金系功法、剑诀、炼器适配', '攻击、破甲、肃杀类事件倾向', '对应秘境、法宝和敌人的亲和/克制'] },
   element_wood: { title: '木行', summary: '木行偏生机、疗愈、草木和绵长。', affects: ['木系功法、灵植、炼丹材料亲和', '疗伤、恢复、培育灵宠与灵田事件', '生机传承和毒草瘴林类秘境'] },
@@ -305,6 +340,19 @@ const RARITY_LABEL: Record<string, string> = {
   common: '凡品', uncommon: '良品', rare: '稀有',
   epic: '史诗', legendary: '传说', mythic: '神话',
 };
+
+
+function TraitLine({ label, values }: { label: string; values: string[] }) {
+  if (!values.length) return null;
+  return (
+    <div className="flex flex-wrap items-start gap-1.5 text-[10px]">
+      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-muted-foreground">{label}</span>
+      {values.map((value, index) => (
+        <span key={`${label}-${index}`} className="rounded border border-border/50 bg-background/60 px-1.5 py-0.5 text-foreground/75">{value}</span>
+      ))}
+    </div>
+  );
+}
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (

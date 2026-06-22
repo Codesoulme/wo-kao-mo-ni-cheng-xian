@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
@@ -625,7 +625,7 @@ function smokeAnnualNarrativePrompt(): void {
 function smokeTechniqueRequirements(): void {
   const baseState: any = {
     name: 'Root Tester', age: 20, lifespan: 100, realm: 'qi_refining', realmLevel: 1,
-    spiritualRoot: 'mixed', rootDetail: '???', rootMultiplier: 0.3,
+    spiritualRoot: 'mixed', rootDetail: '\u6742\u7075\u6839', rootMultiplier: 0.3,
     elements: { metal: 10, wood: 10, water: 10, fire: 10, earth: 10 },
     comprehension: 30, activeStatuses: [], longTermMemory: [], equipped: [], inventory: [], pets: [],
     hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 8, speed: 10,
@@ -796,7 +796,7 @@ function smokeCombatFleeNoSpoils(): void {
     gender: 'male',
     background: 'commoner',
     spiritualRoot: 'common',
-    rootDetail: '???',
+    rootDetail: '\u6742\u7075\u6839',
     rootMultiplier: 0.35,
     realm: 'qi_refining',
     realmLevel: 1,
@@ -851,7 +851,7 @@ function smokeIdentityNormalization(): void {
     gender: 'female',
     background: 'commoner',
     spiritualRoot: 'common',
-    rootDetail: '???',
+    rootDetail: '\u6742\u7075\u6839',
     rootMultiplier: 0.35,
     realm: 'qi_refining',
     realmLevel: 1,
@@ -911,6 +911,60 @@ function smokeDynamicCultivationAttributes(): void {
   const attrs = deriveCultivationAttributes(state);
   assert(attrs.some(attr => attr.name === '\u661f\u706b\u5251\u9aa8' && attr.source === '\u9668\u661f\u609f\u5251'), 'attribute statuses should project into cultivation attributes');
   log('dynamic-cultivation-attributes', { passed: true, count: attrs.length, first: attrs[0]?.name });
+}
+
+
+function smokeRealmTraitsAndSoulRealm(): void {
+  const state: any = {
+    id: 'realm-trait-smoke',
+    name: 'tester',
+    age: 80,
+    realm: 'foundation',
+    realmLevel: 3,
+    maxHp: 200,
+    maxMp: 120,
+    defense: 30,
+    comprehension: 60,
+    heartDemon: 5,
+    cultivationAttributes: [],
+    activeStatuses: [],
+  };
+  const soul = deriveSoulRealm(state);
+  const traits = deriveRealmTraits(state);
+  const ctx = buildStateContext({
+    ...state,
+    gender: 'unknown',
+    lifespan: 200,
+    spiritualRoot: 'common',
+    cultivationExp: 0,
+    expToBreak: 100,
+    elements: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
+    hp: 100,
+    mp: 100,
+    attack: 10,
+    speed: 10,
+    luck: 10,
+    spiritStones: 0,
+    reputation: 0,
+    faction: '',
+    master: '',
+    location: '',
+    alive: true,
+    ascended: false,
+    fateNodes: [],
+    pendingThreads: [],
+    inventory: [],
+    equipped: [],
+    cultivationFactors: [],
+    longTermMemory: [],
+    npcs: [],
+    worldFacts: [],
+    causalGraph: { nodes: [], edges: [] },
+  }, []);
+  assert(soul.name && soul.spiritualSense > 0 && soul.soulStrength > 0, 'soul realm should be derived from realm and attributes');
+  assert(traits.capabilities.length > 0 && traits.limitations.length > 0, 'realm traits should expose capability boundaries');
+  assert(ctx.character.spiritualSense > 0 && ctx.realmTraits?.combatStyle?.length, 'engine context should include body/spirit split and realm traits');
+  log('realm-traits-soul-realm', { passed: true, soul: soul.name, gap: soul.gap, limitation: traits.limitations[0] });
 }
 
 
@@ -1177,6 +1231,7 @@ async function main(): Promise<void> {
   smokeIdentityNormalization();
   smokeCombatSettlementSingleFlow();
   smokeDynamicCultivationAttributes();
+  smokeRealmTraitsAndSoulRealm();
   smokeCombatArtFallbackNames();
   smokeArtifactCultivationMisclassification();
   smokeCombatTacticalProjection();

@@ -395,6 +395,19 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean, qualit
   const mult = ctx.cultivationMultiplier || 0;
   const multDesc = mult > 0 ? `${mult.toFixed(2)}倍（已含灵根与功法加成）` : '0（无灵根，无法修炼）';
   const curInsight = ctx.cultivationInsight || '';
+  const realmTraits = ctx.realmTraits;
+  const realmTraitText = realmTraits ? [
+    `\u4fee\u884c\u65b9\u5f0f\uff1a${realmTraits.cultivationMode}`,
+    `\u5f53\u524d\u74f6\u9888\uff1a${realmTraits.bottleneck}`,
+    `\u7a81\u7834\u8003\u9a8c\uff1a${realmTraits.breakthroughTrial}`,
+    `\u80fd\u529b\u8fb9\u754c\uff1a${realmTraits.capabilities.join('\u3001')}`,
+    `\u4e0d\u53ef\u8f7b\u5199\uff1a${realmTraits.limitations.join('\u3001')}`,
+    `\u53ef\u89e6\u8fbe\u4e16\u754c\uff1a${realmTraits.worldAccess.join('\u3001')}`,
+    `\u4e16\u754c\u5f85\u9047\uff1a${realmTraits.socialWeight}`,
+    `\u6218\u6597\u503e\u5411\uff1a${realmTraits.combatStyle.join('\u3001')}`,
+    `\u8d44\u6e90\u9700\u6c42\uff1a${realmTraits.resourceNeeds.join('\u3001')}`,
+    `\u98ce\u9669\u6807\u7b7e\uff1a${realmTraits.riskTags.join('\u3001')}`,
+  ].join('\n') : '\u6682\u65e0\u5883\u754c\u7279\u6027\u753b\u50cf';
   // 引擎权威计算的来源条目（灵根 + 已装备功法 + 状态中的 cultivationExp 效果）
   // 这些数字是准确的，与顶部倍率一致；AI 必须在 cultivationInsight 文本中引用这些准确数字
   const engineFactors = (ctx.cultivationFactors && ctx.cultivationFactors.length)
@@ -418,6 +431,7 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean, qualit
 灵根：${sc.rootDetail || sc.spiritualRoot}
 境界：${sc.realmName}${sc.realmMaxLevel > 0 ? `（${sc.realmLevel + 1}层）` : ''}
 修为：${sc.cultivationExp}/${sc.expToBreak}（修炼速度：${multDesc}，你给出的 cultivationExp 正向增量会被该倍率放大）
+神识/魂魄/体魄：${sc.spiritualSense}/${sc.soulStrength}/${sc.physicalFoundation}（神魂境界：${sc.soulRealmName}，${sc.soulRealmGap}）
 五行倾向：${elements}
 生命：${sc.hp}/${sc.maxHp}  灵力：${sc.mp}/${sc.maxMp}
 攻击：${sc.attack}  防御：${sc.defense}  速度：${sc.speed}
@@ -430,6 +444,11 @@ ${statusList}
 ${invList}
 已装备（数组，无槽位上限，物品 id 已标注）：
 ${eqList}
+
+【境界特性与身神分化】（必须遵守：境界不是单纯数值层级；法力/肉身境界与神识/魂魄境界可不同步。你生成剧情、战斗、秘境、突破和 NPC 判断时要同时看这两套边界。）
+${realmTraitText}
+- 禁止让炼气或神魂未成者无因果长途御器、破高阶禁制或轻易承受高阶神识压制。
+- 若神魂超前，可写感知、梦兆、神识异动和心魔抗性；若神魂落后，突破、元婴、夺舍、高阶秘术都要有明显风险。
 
 【当前修炼心得】（玩家「宝」页修炼速度栏展示文本，由你上一轮生成，本轮可更新）
 ${curInsight || '（尚未生成，本轮请首次生成）'}

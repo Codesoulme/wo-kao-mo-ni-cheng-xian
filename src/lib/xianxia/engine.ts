@@ -16,6 +16,7 @@ import {
   Realm,
   RealmProfile,
   REALMS,
+  REALM_TRAITS,
   getRealmInfo,
   getNextRealm,
   SpiritualRoot,
@@ -233,7 +234,125 @@ export function deriveCultivationAttributes(state: CharacterState): CultivationA
       visible: true,
     });
   }
+  const core = deriveCoreCultivationAttributes(state);
+  const soul = deriveSoulRealm({ ...state, ...core });
+  byId.set('spiritualSense', {
+    id: 'spiritualSense',
+    name: '\u795e\u8bc6',
+    value: core.spiritualSense,
+    description: '\u611f\u77e5\u3001\u63a2\u67e5\u3001\u795e\u5ff5\u538b\u5236\u4e0e\u9ad8\u9636\u7981\u5236\u5224\u65ad\u7684\u57fa\u7840\u3002',
+    source: '\u5883\u754c\u4e0e\u795e\u9b42\u6d3e\u751f',
+    category: 'spirit',
+    visible: true,
+  });
+  byId.set('soulStrength', {
+    id: 'soulStrength',
+    name: '\u9b42\u9b44',
+    value: core.soulStrength,
+    description: `\u5f53\u524d\u795e\u9b42\u5883\u754c\uff1a${soul.name}\uff08${soul.gap}\uff09\uff0c\u5f71\u54cd\u5143\u5a74\u51fa\u7a8d\u3001\u593a\u820d\u98ce\u9669\u3001\u5fc3\u9b54\u627f\u53d7\u548c\u795e\u8bc6\u79d8\u672f\u3002`,
+    source: '\u5883\u754c\u4e0e\u5fc3\u6027\u6d3e\u751f',
+    category: 'spirit',
+    visible: true,
+  });
+  byId.set('physicalFoundation', {
+    id: 'physicalFoundation',
+    name: '\u4f53\u9b44',
+    value: core.physicalFoundation,
+    description: '\u8089\u8eab\u6839\u57fa\u4e0e\u627f\u8f7d\u529b\uff0c\u5f71\u54cd\u91cd\u4f24\u627f\u53d7\u3001\u70bc\u4f53\u673a\u7f18\u548c\u5927\u5883\u754c\u7a81\u7834\u7a33\u5b9a\u5ea6\u3002',
+    source: '\u8089\u8eab\u4e0e\u5883\u754c\u6d3e\u751f',
+    category: 'body',
+    visible: true,
+  });
   return [...byId.values()].slice(0, 24);
+}
+
+
+function firstNumber(...values: any[]) {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function attributeNumber(state: CharacterState, ids: string[]) {
+  const wanted = new Set(ids);
+  for (const attr of state.cultivationAttributes || []) {
+    if (!attr) continue;
+    if (!wanted.has(String(attr.id || '')) && !ids.some(id => String(attr.name || '').includes(id))) continue;
+    const n = Number(attr.value);
+    if (Number.isFinite(n)) return n;
+  }
+  for (const status of state.activeStatuses || []) {
+    const text = `${status.name || ''} ${status.description || ''}`;
+    if (!ids.some(id => text.includes(id))) continue;
+    const effect = (status.effects || []).find(e => Number.isFinite(Number(e.value)));
+    if (effect) return Number(effect.value);
+  }
+  return undefined;
+}
+
+export function deriveCoreCultivationAttributes(state: CharacterState) {
+  const realmIdx = Math.max(0, REALMS.findIndex(r => r.id === state.realm));
+  const levelRatio = Math.max(0, Number(state.realmLevel || 0)) / Math.max(1, Number(getRealmInfo(state.realm).levels || 1));
+  const profilePower = realmPowerMultiplier(state);
+  const spiritualSense = Math.round(firstNumber(
+    (state as any).spiritualSense,
+    attributeNumber(state, ['spiritualSense', '\u795e\u8bc6']),
+    5 + realmIdx * 24 + levelRatio * 18 + (state.comprehension || 0) * 0.45 + (state.maxMp || 0) * 0.04,
+  )! * profilePower);
+  const soulStrength = Math.round(firstNumber(
+    (state as any).soulStrength,
+    attributeNumber(state, ['soulStrength', '\u9b42\u9b44', '\u795e\u9b42', '\u5143\u795e']),
+    8 + realmIdx * 22 + levelRatio * 16 + (state.comprehension || 0) * 0.35 - (state.heartDemon || 0) * 0.15,
+  )! * profilePower);
+  const physicalFoundation = Math.round(firstNumber(
+    (state as any).physicalFoundation,
+    attributeNumber(state, ['physicalFoundation', '\u4f53\u9b44', '\u8089\u8eab', '\u6839\u9aa8']),
+    20 + realmIdx * 18 + levelRatio * 12 + (state.maxHp || 0) * 0.08 + (state.defense || 0) * 0.2,
+  )! * profilePower);
+  return {
+    spiritualSense: Math.max(0, Math.min(9999, spiritualSense)),
+    soulStrength: Math.max(0, Math.min(9999, soulStrength)),
+    physicalFoundation: Math.max(0, Math.min(9999, physicalFoundation)),
+  };
+}
+
+export function deriveSoulRealm(state: CharacterState) {
+  const core = deriveCoreCultivationAttributes(state);
+  const score = core.soulStrength + core.spiritualSense * 0.65;
+  const tiers = [
+    { name: '\u672a\u51dd\u795e', rank: 0, min: 0 },
+    { name: '\u7075\u611f\u521d\u840c', rank: 1, min: 45 },
+    { name: '\u795e\u8bc6\u521d\u6210', rank: 2, min: 85 },
+    { name: '\u795e\u9b42\u7a33\u56fa', rank: 3, min: 150 },
+    { name: '\u5143\u795e\u51fa\u7a8d', rank: 4, min: 260 },
+    { name: '\u5143\u795e\u663e\u5316', rank: 5, min: 420 },
+    { name: '\u795e\u610f\u901a\u7384', rank: 6, min: 680 },
+  ];
+  const tier = [...tiers].reverse().find(t => score >= t.min) || tiers[0];
+  const bodyRank = Math.max(0, REALMS.findIndex(r => r.id === state.realm));
+  const gap = tier.rank > bodyRank + 1
+    ? '\u795e\u9b42\u8d85\u524d'
+    : tier.rank + 1 < bodyRank
+      ? '\u795e\u9b42\u843d\u540e'
+      : '\u8eab\u795e\u76f8\u79f0';
+  return { ...tier, gap, score: Math.round(score), ...core };
+}
+
+export function deriveRealmTraits(state: CharacterState) {
+  const base = REALM_TRAITS[state.realm] || REALM_TRAITS.mortal;
+  const patch = getRealmProfile(state)?.traits || {};
+  return {
+    ...base,
+    ...patch,
+    capabilities: [...new Set([...(base.capabilities || []), ...(patch.capabilities || [])])].slice(0, 8),
+    limitations: [...new Set([...(base.limitations || []), ...(patch.limitations || [])])].slice(0, 8),
+    worldAccess: [...new Set([...(base.worldAccess || []), ...(patch.worldAccess || [])])].slice(0, 8),
+    combatStyle: [...new Set([...(base.combatStyle || []), ...(patch.combatStyle || [])])].slice(0, 8),
+    resourceNeeds: [...new Set([...(base.resourceNeeds || []), ...(patch.resourceNeeds || [])])].slice(0, 8),
+    riskTags: [...new Set([...(base.riskTags || []), ...(patch.riskTags || [])])].slice(0, 8),
+  };
 }
 
 function safeParse<T>(s: string, fallback: T): T {
@@ -259,6 +378,17 @@ function sanitizeRealmProfile(raw: any): RealmProfile | undefined {
   if (raw.powerMultiplier !== undefined) profile.powerMultiplier = clampProfileNumber(raw.powerMultiplier, 0.5, 9, 1);
   if (raw.expMultiplier !== undefined) profile.expMultiplier = clampProfileNumber(raw.expMultiplier, 0.2, 20, 1);
   if (raw.reason) profile.reason = String(raw.reason).slice(0, 120);
+  if (raw.traits && typeof raw.traits === 'object') {
+    const rawTraits = raw.traits as Record<string, any>;
+    profile.traits = {};
+    for (const key of ['cultivationMode', 'bottleneck', 'breakthroughTrial', 'socialWeight'] as const) {
+      if (rawTraits[key]) (profile.traits as any)[key] = String(rawTraits[key]).slice(0, 160);
+    }
+    for (const key of ['capabilities', 'limitations', 'worldAccess', 'combatStyle', 'resourceNeeds', 'riskTags'] as const) {
+      if (Array.isArray(rawTraits[key])) (profile.traits as any)[key] = rawTraits[key].map(String).filter(Boolean).slice(0, 6);
+    }
+    if (!Object.keys(profile.traits).length) delete profile.traits;
+  }
   return Object.keys(profile).length ? profile : undefined;
 }
 
@@ -319,6 +449,9 @@ export const ATTRIBUTE_BOUNDS: Record<string, { min: number; max: number }> = {
   speed:           { min: 0,    max: 99999 },
   luck:            { min: 0,    max: 100 },
   comprehension:   { min: 0,    max: 100 },
+  spiritualSense:  { min: 0,    max: 9999 },
+  soulStrength:    { min: 0,    max: 9999 },
+  physicalFoundation: { min: 0, max: 9999 },
   spiritStones:    { min: 0,    max: 99999999 },
   reputation:      { min: -9999,max: 99999 },
   elementMetal:    { min: 0,    max: 100 },
@@ -2264,6 +2397,9 @@ export function buildStateContext(
   // recentEventTypes / recentBlueprintCategories 来自 dbToState 的临时闭包变量
   const recentEventTypes = (state as any)._recentEventTypes || [];
   const recentBlueprintCategories = (state as any)._recentBlueprintCategories || [];
+  const coreAttrs = deriveCoreCultivationAttributes(state);
+  const soulRealm = deriveSoulRealm({ ...state, ...coreAttrs });
+  const realmTraits = deriveRealmTraits(state);
   return {
     character: {
       name: state.name,
@@ -2283,6 +2419,12 @@ export function buildStateContext(
       mp: state.mp, maxMp: state.maxMp,
       attack: state.attack, defense: state.defense, speed: state.speed,
       cultivationAttributes: deriveCultivationAttributes(state),
+      spiritualSense: coreAttrs.spiritualSense,
+      soulStrength: coreAttrs.soulStrength,
+      physicalFoundation: coreAttrs.physicalFoundation,
+      soulRealmName: soulRealm.name,
+      soulRealmRank: soulRealm.rank,
+      soulRealmGap: soulRealm.gap,
       luck: state.luck, comprehension: state.comprehension,
       spiritStones: state.spiritStones, reputation: state.reputation,
       faction: state.faction, master: state.master, location: state.location,
@@ -2312,6 +2454,7 @@ export function buildStateContext(
     completedFateNodes,
     availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
+    realmTraits,
     // Task 20 新字段
     pendingThreads: threads,
     questEntries,
@@ -4661,6 +4804,9 @@ export function stateToResponse(s: CharacterState) {
   const rootInfo = SPIRITUAL_ROOTS[s.spiritualRoot];
   const rate = computeEffectiveCultivationRate(s);
   const realmPower = realmPowerMultiplier(s);
+  const coreAttrs = deriveCoreCultivationAttributes(s);
+  const soulRealm = deriveSoulRealm({ ...s, ...coreAttrs });
+  const realmTraits = deriveRealmTraits(s);
   return {
     age: s.age,
     lifespan: s.lifespan,
@@ -4670,6 +4816,13 @@ export function stateToResponse(s: CharacterState) {
     realmLevel: s.realmLevel,
     realmMaxLevel: realmProfile?.maxLevel ?? realmInfo.levels,
     realmProfile,
+    realmTraits,
+    spiritualSense: coreAttrs.spiritualSense,
+    soulStrength: coreAttrs.soulStrength,
+    physicalFoundation: coreAttrs.physicalFoundation,
+    soulRealmName: soulRealm.name,
+    soulRealmRank: soulRealm.rank,
+    soulRealmGap: soulRealm.gap,
     realmPowerMultiplier: realmPower,
     cultivationExp: s.cultivationExp,
     expToBreak: s.expToBreak,
