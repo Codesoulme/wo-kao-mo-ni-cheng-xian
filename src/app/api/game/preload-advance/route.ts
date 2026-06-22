@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate, saveAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 
@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
     }
 
     const existing = await db.advancePreload.findUnique({ where: { characterId } });
-    if (existing && await isAdvancePreloadUsable(char, existing)) {
+    const preloadResult = existing ? await isAdvancePreloadUsable(char, existing) : { usable: false };
+    if (preloadResult.usable) {
       return NextResponse.json({ success: true });
     }
     if (existing) await clearAdvancePreload(characterId);

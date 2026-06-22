@@ -1,4 +1,4 @@
-﻿// 修仙模拟器 - 引擎核心
+// 修仙模拟器 - 引擎核心
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
@@ -1483,13 +1483,23 @@ export function equipItemsByIds(state: CharacterState, ids: string[]): ItemEffec
   };
   const toEquip: ItemEntry[] = [];
   const keptInv: ItemEntry[] = [];
+  const currentRealmIdx = REALMS.findIndex(r => r.id === state.realm);
   for (const it of state.inventory) {
     if (idSet.has(it.id)) {
+      const minRealm = it.technique?.requirements?.minRealm;
+      if (minRealm) {
+        const minRealmIdx = REALMS.findIndex(r => r.id === minRealm);
+        if (minRealmIdx >= 0 && currentRealmIdx < minRealmIdx) {
+          effectResolveWarnings.push(`\u5883\u754c\u4e0d\u8db3\uff1a\u9700${REALMS[minRealmIdx].name}`);
+          keptInv.push(it);
+          continue;
+        }
+      }
       const slot = itemToSlot(it.item_type);
       if (slot && !isStorageBag(it)) {
-        toEquip.push({ ...it, equipNote: it.equipNote || DEFAULT_EQUIP_NOTE[slot] || '装备' });
+        toEquip.push({ ...it, equipNote: it.equipNote || DEFAULT_EQUIP_NOTE[slot] || '\u88c5\u5907' });
       } else {
-        keptInv.push(it); // 不可装备的物品留在背包
+        keptInv.push(it); // Keep non-equippable item in inventory
       }
     } else {
       keptInv.push(it);
@@ -2395,7 +2405,8 @@ function questUrgency(thread: PendingThread, currentAge: number): number {
 
 export function buildQuestEntriesFromThreads(threads: PendingThread[] | null | undefined, currentAge: number): QuestEntry[] {
   const safeThreads = Array.isArray(threads) ? threads : [];
-  return safeThreads
+  const normalized = safeThreads.map(t => normalizeThreadCompletion(t));
+  return normalized
     .filter(t => t && t.id && t.title)
     .map(t => ({
       id: `quest_${t.id}`,
@@ -3244,6 +3255,10 @@ export function addThreads(state: CharacterState, threads: PendingThread[]): Cha
 }
 
 export function advanceThread(state: CharacterState, threadId: string, progressDelta: number, note?: string): CharacterState {
+  const existing = (state.pendingThreads || []).find(t => t.id === threadId);
+  if (!existing) return state;
+  // P0 规则：resolved/failed 线程不能再推进
+  if (existing.status === 'resolved' || existing.status === 'failed') return state;
   const threads = (state.pendingThreads || []).map(t => {
     if (t.id !== threadId) return normalizeThreadCompletion(t);
     const progress = Math.max(0, Math.min(100, (t.progress || 0) + progressDelta));
@@ -3253,6 +3268,9 @@ export function advanceThread(state: CharacterState, threadId: string, progressD
 }
 
 export function completeThread(state: CharacterState, threadId: string): CharacterState {
+  const existing = (state.pendingThreads || []).find(t => t.id === threadId);
+  if (!existing) return state;
+  if (existing.status === 'resolved' || existing.status === 'failed') return state;
   const threads = (state.pendingThreads || []).map(t =>
     t.id === threadId ? { ...t, status: 'resolved' as const, progress: 100 } : t
   );
@@ -3260,6 +3278,9 @@ export function completeThread(state: CharacterState, threadId: string): Charact
 }
 
 export function failThread(state: CharacterState, threadId: string): CharacterState {
+  const existing = (state.pendingThreads || []).find(t => t.id === threadId);
+  if (!existing) return state;
+  if (existing.status === 'resolved' || existing.status === 'failed') return state;
   const threads = (state.pendingThreads || []).map(t =>
     t.id === threadId ? { ...t, status: 'failed' as const } : t
   );
@@ -5497,7 +5518,7 @@ function buildStoryRealmFromText(name: string, text: string, state: CharacterSta
 
 export function getDiscoveredStoryRealms(state: CharacterState): SecretRealm[] {
   const realms = new Map<string, SecretRealm>();
-  const threads = (state.pendingThreads || []).filter(t => t.status !== 'failed' && t.status !== 'resolved');
+  const threads = normalizeThreadsCompletion(state.pendingThreads || []).filter(t => t.status !== 'failed' && t.status !== 'resolved');
   for (const t of threads) {
     const text = `${t.title} ${t.description} ${t.reward || ''} ${t.followUpHint || ''}`;
     const looksRealm = t.category === 'exploration' || /秘境|浮阁|洞府|遗迹|禁地|水府|古阁|江心|残图|禁制|破禁/.test(text);

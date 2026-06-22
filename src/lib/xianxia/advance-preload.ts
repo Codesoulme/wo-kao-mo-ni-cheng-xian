@@ -1,4 +1,4 @@
-﻿import { createHash } from 'crypto';
+import { createHash } from 'crypto';
 import { db } from '@/lib/db';
 import { dbToState, buildStateContext, tickStatusDurations, tickNaturalRecovery, checkFateNode, pickEventBlueprint, tickFormations, tickHeartDemon, tickPets, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
@@ -70,25 +70,30 @@ export async function clearAdvancePreload(characterId: string) {
   await db.advancePreload.deleteMany({ where: { characterId } });
 }
 
-export async function isAdvancePreloadUsable(char: NonNullable<CharacterRecord>, preload: any): Promise<boolean> {
-  if (!preload) return false;
-  if (preload.baseAge !== char.age) return false;
-  if (!char.alive || char.ascended || char.isAtChoice) return false;
-  if (char.pendingChoiceJson) return false;
+export type PreloadUsableResult = { usable: true } | { usable: false; reason: string };
+
+export async function isAdvancePreloadUsable(char: NonNullable<CharacterRecord>, preload: any): Promise<PreloadUsableResult> {
+  if (!preload) return { usable: false, reason: 'no_preload' };
+  if (preload.baseAge !== char.age) return { usable: false, reason: 'ageMismatch' };
+  if (!char.alive) return { usable: false, reason: 'characterDead' };
+  if (char.ascended) return { usable: false, reason: 'ascended' };
+  if (char.isAtChoice) return { usable: false, reason: 'isAtChoice' };
+  if (char.pendingChoiceJson) return { usable: false, reason: 'hasPendingChoice' };
   if (char.combatStateJson) {
     try {
       const cs = JSON.parse(char.combatStateJson);
-      if (cs && cs.status === 'ongoing') return false;
-    } catch { return false; }
+      if (cs && cs.status === 'ongoing') return { usable: false, reason: 'combatOngoing' };
+    } catch { return { usable: false, reason: 'combatStateParseFailed' }; }
   }
-  return preload.baseStateHash === buildAdvanceStateHash(char);
+  if (preload.baseStateHash !== buildAdvanceStateHash(char)) return { usable: false, reason: 'stateHashMismatch' };
+  return { usable: true };
 }
 
 async function getRecentEvents(characterId: string) {
   const recentEventsDb = await db.eventLog.findMany({
     where: { characterId },
     orderBy: { age: 'desc' },
-    take: 5,
+    take: 20,
   });
   return recentEventsDb.reverse().map(e => ({
     age: e.age,
@@ -125,6 +130,14 @@ function buildSameYearContinuationBlueprint(threadTitle: string): EventBlueprint
 export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>, options: { qualityMode?: 'full' | 'light'; worldCalendar?: any; previousWorldLegacies?: any[] } = {}) {
   const qualityMode = options.qualityMode || 'full';
   const recentEvents = await getRecentEvents(char.id);
+  // Dedup: detect repeated event titles at current age
+  const ageEventCounts: Record<string, number> = {};
+  for (const evt of recentEvents) {
+    if (evt.age === char.age) {
+      ageEventCounts[evt.title] = (ageEventCounts[evt.title] || 0) + 1;
+    }
+  }
+  const hasRepeatedEvents = Object.values(ageEventCounts).some(c => c >= 3);
   const narrativeContractFeedback = qualityMode === 'light' ? [] : await getNarrativeContractFeedback(char.id);
   let state = dbToState(char);
   const recentBlueprintCategories = (state as any)._recentBlueprintCategories || [];
@@ -134,12 +147,23 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     ? buildSameYearContinuationBlueprint(sameYearThread.title)
     : pickEventBlueprint(state, recentBlueprintCategories);
 
-  const suggestedTimeAdvance = suggestTimeAdvance({
+  const rawSuggestedTimeAdvance = suggestTimeAdvance({
     age: state.age,
     pendingThreads: state.pendingThreads || [],
     sameYearThread,
     blueprint,
   });
+  const suggestedTimeAdvance = hasRepeatedEvents && !sameYearThread
+    ? {
+      ...rawSuggestedTimeAdvance,
+      unit: 'year' as const,
+      amount: 1,
+      ageDeltaYears: Math.max(1, rawSuggestedTimeAdvance.ageDeltaYears || 1),
+      elapsedDays: Math.max(365, rawSuggestedTimeAdvance.elapsedDays || 365),
+      label: '\u4e00\u5e74\u540e',
+      reason: '\u56e0\u7f18\u81ea\u7136\u6d41\u8f6c\uff0c\u4e0d\u518d\u505c\u7559\u4e8e\u65e7\u4e8b',
+    }
+    : rawSuggestedTimeAdvance;
   const timeAdvance = clampTimeAdvance(suggestedTimeAdvance);
 
   if (!sameYearThread) {

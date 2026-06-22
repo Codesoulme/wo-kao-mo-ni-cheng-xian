@@ -1,4 +1,4 @@
-﻿// POST /api/game/choose
+// POST /api/game/choose
 // 玩家在重要事件中做出选择
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
     if (!char.isAtChoice) return NextResponse.json({ success: false, error: '当前无待选择' }, { status: 400 });
+    // P0: 幂等保护 - 记录选择前的状态
+    const lastEventAgeBefore = char.lastEventAge ?? char.age;
+    const isAtChoiceBefore = char.isAtChoice;
 
     const chosenOption = options[chosenIndex];
     if (!chosenOption) return NextResponse.json({ success: false, error: '选项无效' }, { status: 400 });
@@ -213,8 +216,10 @@ export async function POST(req: NextRequest) {
 
 
     // 持久化
-    await db.character.update({
-      where: { id: characterId },
+    // P0: 幂等保护 - update 加 isAtChoice + lastEventAge 条件，重复请求会触发 P2025
+    try {
+      await db.character.update({
+        where: { id: characterId, isAtChoice: isAtChoiceBefore, lastEventAge: lastEventAgeBefore },
       data: {
         age: state.age,
         lifespan: state.lifespan,
@@ -262,7 +267,14 @@ export async function POST(req: NextRequest) {
         // Task 24: 秘境探索记录
         exploredRealmsJson: JSON.stringify(state.exploredRealms || []),
       },
-    });
+      });
+    } catch (e: any) {
+      // P2025 = record to update not found → 选择条件不满足，说明已处理
+      if (e?.code === 'P2025') {
+        return NextResponse.json({ success: false, error: '选择已处理，请刷新页面', code: 'IDEMPOTENT_DUPLICATE' }, { status: 409 });
+      }
+      throw e;
+    }
 
     // 写入选择日志
     await db.choiceLog.create({

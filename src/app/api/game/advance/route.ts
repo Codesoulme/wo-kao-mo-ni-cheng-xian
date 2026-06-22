@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落，无法继续' }, { status: 400 });
     if (char.ascended) return NextResponse.json({ success: false, error: '角色已飞升，无需继续' }, { status: 400 });
     if (char.isAtChoice) return NextResponse.json({ success: false, error: '当前有待选择，请先完成选择' }, { status: 400 });
+    // P0: 幂等保护 - 记录推进前年龄，后续 update 加条件
+    const ageBefore = char.age;
+    const lastEventAgeBefore = char.lastEventAge ?? char.age;
     // Task 22: 战斗中不可推进年龄——必须先结束战斗
     if (char.combatStateJson) {
       try {
@@ -44,7 +47,8 @@ export async function POST(req: NextRequest) {
     const preload = skipPreload ? null : await db.advancePreload.findUnique({ where: { characterId } });
     let candidate;
     let usedPreload = false;
-    if (preload && await isAdvancePreloadUsable(char, preload)) {
+    const preloadResult = preload ? await isAdvancePreloadUsable(char, preload) : { usable: false };
+    if (preloadResult.usable) {
       candidate = {
         preparedState: JSON.parse(preload.preparedStateJson),
         blueprint: JSON.parse(preload.blueprintJson),
@@ -218,8 +222,10 @@ ${breakthroughText}`;
     const recentEventTypes = [...((state as any)._recentEventTypes || []), aiOutput.eventType || 'normal'].slice(-5);
     const newRecentBlueprintCategories = [...recentBlueprintCategories, blueprint.category].slice(-3);
 
-    await db.character.update({
-      where: { id: characterId },
+    // P0: 幂等保护 - update 加 age 条件，重复请求会触发 P2025
+    try {
+      await db.character.update({
+        where: { id: characterId, age: ageBefore },
       data: {
         age: finalState.age,
         lifespan: finalState.lifespan,
@@ -279,7 +285,14 @@ ${breakthroughText}`;
         // Task 24: 秘境探索记录
         exploredRealmsJson: JSON.stringify(finalState.exploredRealms || []),
       },
-    });
+      });
+    } catch (e: any) {
+      // P2025 = record to update not found → 年龄条件不满足，说明重复请求已被其他调用处理
+      if (e?.code === 'P2025') {
+        return NextResponse.json({ success: false, error: '请求已处理，请刷新页面', code: 'IDEMPOTENT_DUPLICATE' }, { status: 409 });
+      }
+      throw e;
+    }
 
     // 写入事件日志；同一岁允许多段史册记录，避免复杂年份只塞进一段文本。
     const displayEffects = appendNarrativeContractAuditEffect(

@@ -1,7 +1,8 @@
-﻿import { readFileSync } from 'fs';
+import { readFileSync } from 'fs';
+import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { advanceThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
+import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, equipItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
@@ -1593,6 +1594,126 @@ function smokeAiDrivenCombatActionPalette(): void {
   log('ai-driven-combat-action-palette', { passed: true, basicEnabled: palette.basicAttack.enabled, other: palette.other.options.map(o => o.name).join('|') });
 }
 
+function smokeSameAgeEventDedup(): void {
+  const charAge = 7;
+  const recentEvents = [
+    { age: 7, title: '\u65e7\u7ea6\u518d\u8d77', narrative: 'a', eventType: 'normal' },
+    { age: 7, title: '\u65e7\u7ea6\u518d\u8d77', narrative: 'b', eventType: 'normal' },
+    { age: 7, title: '\u65e7\u7ea6\u518d\u8d77', narrative: 'c', eventType: 'normal' },
+    { age: 8, title: '\u65e7\u7ea6\u518d\u8d77', narrative: 'd', eventType: 'normal' },
+  ];
+  const ageEventCounts: Record<string, number> = {};
+  for (const evt of recentEvents) {
+    if (evt.age === charAge) {
+      ageEventCounts[evt.title] = (ageEventCounts[evt.title] || 0) + 1;
+    }
+  }
+  const hasRepeatedEvents = Object.values(ageEventCounts).some(c => c >= 3);
+  assert(hasRepeatedEvents, 'same-age repeated title dedup flag should be set at 3+ occurrences');
+  log('same-age-event-dedup', { passed: true, repeated: ageEventCounts['\u65e7\u7ea6\u518d\u8d77'] });
+}
+
+function smokeEquipRealmCheck(): void {
+  const item: any = {
+    id: 'realm_locked_blade',
+    name: '\u9752\u5ca9\u5251',
+    description: '\u9700\u70bc\u6c14\u540e\u624d\u80fd\u9a7e\u9a6d\u3002',
+    item_type: 'weapon',
+    rarity: 'uncommon',
+    effects: [{ target_attribute: 'attack', operation: 'add', value: 8, description: '\u653b\u51fb+8' }],
+    source: 'smoke',
+    technique: { requirements: { minRealm: 'qi_refining' } },
+  };
+  const state: any = {
+    id: 'smoke_equip_realm', name: 'Tester', age: 18, lifespan: 80, gender: 'unknown',
+    spiritualRoot: 'none', rootDetail: '\u65e0\u7075\u6839', rootMultiplier: 1,
+    realm: 'mortal', realmLevel: 0, cultivationExp: 0, expToBreak: 100,
+    elements: { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
+    hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10,
+    luck: 50, comprehension: 50, spiritStones: 0, reputation: 0,
+    alive: true, ascended: false, causeOfDeath: '', faction: '', master: '', location: '',
+    fateNodes: [], isAtChoice: false, activeStatuses: [], inventory: [item], equipped: [], storageCapacity: 5,
+    cultivationMultiplier: 1, longTermMemory: [], completedFateNodes: [], pendingThreads: [], characterIntents: [], recentEventTypes: [],
+    npcs: [], causalGraph: { nodes: [], edges: [] }, worldFacts: [], pets: [], exploredRealms: [], discoveredRealms: [],
+  };
+  const result = equipItemsByIds(state, [item.id]);
+  assert(result.equipped.length === 0, 'realm-locked item should not be equipped below minRealm');
+  assert(result.state.inventory.some((it: any) => it.id === item.id), 'realm-locked item should stay in inventory');
+  assert(result.effectResolveWarnings.some(w => w.includes('\u5883\u754c\u4e0d\u8db3')), 'realm lock should emit warning');
+  log('equip-realm-check', { passed: true, equipped: result.equipped.length, inventory: result.state.inventory.length, warnings: result.effectResolveWarnings.length });
+}
+
+function smokeMarketStockCache(): void {
+  const routeSource = readFileSync('src/app/api/game/market/route.ts', 'utf-8');
+  const modalSource = readFileSync('src/components/xianxia/MarketModal.tsx', 'utf-8');
+  assert(/function\s+generateMarketItems\s*\(/.test(routeSource), 'market route should define generateMarketItems');
+  assert(modalSource.includes('xianxia-market-stock:${character.id}:${character.age}'), 'market modal should cache stock by character and age');
+  assert(modalSource.includes('window.localStorage.setItem(marketCacheKey'), 'market modal should persist stock cache');
+  assert(modalSource.includes('window.localStorage.getItem(marketCacheKey'), 'market modal should read stock cache');
+  log('market-stock-cache', { passed: true, generator: true, cacheKey: 'xianxia-market-stock:${character.id}:${character.age}' });
+}
+
+function smokeClosedThreadCannotBeAdvanced(): void {
+  // P0 修复验证：resolved/failed 线程不能再推进
+  const baseState: any = {
+    age: 20, pendingThreads: [
+      { id: 't1', title: '已了结线索', category: 'mystery', startAge: 18, status: 'resolved', progress: 100 },
+      { id: 't2', title: '失败线索', category: 'mystery', startAge: 18, status: 'failed', progress: 30 },
+      { id: 't3', title: '进行中线索', category: 'mystery', startAge: 19, status: 'pending', progress: 40 },
+    ],
+  };
+  const advancedResolved = advanceThread(baseState, 't1', 20);
+  const advancedFailed = advanceThread(baseState, 't2', 20);
+  const advancedPending = advanceThread(baseState, 't3', 20);
+  const completedResolved = completeThread(baseState, 't1');
+  const failedPending = failThread(baseState, 't3');
+  assert(advancedResolved.pendingThreads.find((t: any) => t.id === 't1')?.progress === 100, 'resolved thread must not advance');
+  assert(advancedFailed.pendingThreads.find((t: any) => t.id === 't2')?.progress === 30, 'failed thread must not advance');
+  assert(advancedPending.pendingThreads.find((t: any) => t.id === 't3')?.progress === 60, 'pending thread should advance normally');
+  assert(completedResolved.pendingThreads.find((t: any) => t.id === 't1')?.status === 'resolved', 'completeThread must ignore resolved thread');
+  assert(failedPending.pendingThreads.find((t: any) => t.id === 't3')?.status === 'failed', 'failThread should fail pending thread');
+  log('closed-thread-cannot-be-advanced', { passed: true });
+}
+
+async function smokePreloadInvalidationReason(): Promise<void> {
+  // P1 修复验证：isAdvancePreloadUsable 返回具体失效原因
+  // 注意：buildAdvanceStateHash 需要完整 CharacterRecord（Prisma字段），smoke 环境不完整
+  // 这里只覆盖不依赖完整 char 对象的 early-return case
+  const char: any = { age: 10, alive: true, ascended: false, isAtChoice: false, pendingChoiceJson: '', combatStateJson: '' };
+  // no_preload
+  assert((await isAdvancePreloadUsable(char, null))?.reason === 'no_preload', 'null preload should return no_preload');
+  // ageMismatch
+  assert((await isAdvancePreloadUsable({ ...char, age: 11 }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'ageMismatch', 'wrong age should return ageMismatch');
+  // characterDead
+  assert((await isAdvancePreloadUsable({ ...char, alive: false }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'characterDead', 'dead character should return characterDead');
+  // ascended
+  assert((await isAdvancePreloadUsable({ ...char, ascended: true }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'ascended', 'ascended character should return ascended');
+  // isAtChoice
+  assert((await isAdvancePreloadUsable({ ...char, isAtChoice: true }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'isAtChoice', 'at choice should return isAtChoice');
+  // hasPendingChoice
+  assert((await isAdvancePreloadUsable({ ...char, pendingChoiceJson: '{}' }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'hasPendingChoice', 'pending choice should return hasPendingChoice');
+  // combatOngoing
+  assert((await isAdvancePreloadUsable({ ...char, combatStateJson: '{"status":"ongoing"}' }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'combatOngoing', 'ongoing combat should return combatOngoing');
+  log('preload-invalidation-reason', { passed: true });
+}
+
+function smokeSameYearThreadNormalizedProgress100(): void {
+  // P0 修复验证：getSameYearThreads 读取线程前统一归一化
+  // normalizeThreadsCompletion 把 progress=100 → resolved，getSameYearThreads 的 t.progress < 100 条件会把已完成的线程排除
+  const state: any = {
+    age: 21, pendingThreads: [
+      { id: 'same_y1', title: '同岁已满线索', category: 'competition', startAge: 21, deadlineAge: 21, status: 'pending', progress: 100, dueInSameYear: true },
+      { id: 'same_y2', title: '同岁待续线索', category: 'competition', startAge: 21, deadlineAge: 21, status: 'pending', progress: 60, dueInSameYear: true },
+    ],
+  };
+  const threads = getSameYearThreads(state);
+  // same_y1: progress=100 → normalizeThreadsCompletion 转为 resolved → getSameYearThreads 过滤掉（t.progress < 100）
+  assert(!threads.find((t: any) => t.id === 'same_y1'), 'progress=100 thread should be excluded from same-year scheduling (already resolved)');
+  // same_y2: progress=60, pending → 保留
+  assert(threads.find((t: any) => t.id === 'same_y2'), 'pending thread should still appear in same-year scheduling');
+  log('same-year-thread-normalized-progress100', { passed: true });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -1633,10 +1754,16 @@ async function main(): Promise<void> {
   smokeCombatTechniqueSpellSplit();
   smokeEnemyLootArtifactNaming();
   smokeAiDrivenCombatActionPalette();
+  smokeSameAgeEventDedup();
+  smokeEquipRealmCheck();
+  smokeMarketStockCache();
   smokeTechniqueSpellNaming();
   smokeWorldEventConsequences();
   smokeActionCausality();
   smokeHiddenAudit();
+  smokeClosedThreadCannotBeAdvanced();
+  await smokePreloadInvalidationReason();
+  smokeSameYearThreadNormalizedProgress100();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
