@@ -386,7 +386,7 @@ export type EquipSlot = 'weapon' | 'armor' | 'accessory' | 'artifact' | 'scriptu
 
 export const ITEM_TYPE_LABEL: Record<ItemType, string> = {
   weapon: '兵器', armor: '防具', accessory: '饰物', artifact: '法宝',
-  consumable: '丹药', material: '材料', tool: '器具', scripture: '功法',
+  consumable: '\u4e39\u98df', material: '材料', tool: '器具', scripture: '功法',
 };
 
 export const SLOT_LABEL: Record<EquipSlot, string> = {

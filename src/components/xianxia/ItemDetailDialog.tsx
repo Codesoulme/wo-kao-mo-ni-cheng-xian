@@ -18,7 +18,7 @@ const RARITY_LABEL: Record<string, string> = {
 };
 const ITEM_TYPE_LABEL: Record<string, string> = {
   weapon: '兵器', armor: '防具', accessory: '饰物', artifact: '法宝',
-  consumable: '丹药', material: '材料', tool: '器具', scripture: '功法',
+  consumable: '\u4e39\u98df', material: '材料', tool: '器具', scripture: '功法',
 };
 const TYPE_ICON: Record<string, React.ReactNode> = {
   weapon: <Swords className="w-3.5 h-3.5" />,

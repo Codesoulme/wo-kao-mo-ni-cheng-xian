@@ -4,6 +4,7 @@ import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldF
 import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
+import { registerItem } from '../src/lib/xianxia/content-registry';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -13,6 +14,21 @@ function log(name: string, data: Record<string, unknown>): void {
   console.log(JSON.stringify({ smoke: name, ...data }));
 }
 
+
+function smokeEdibleRewardItemType(): void {
+  const result = registerItem({
+    id: 'food_half_wheat_cake',
+    name: '\u534a\u5757\u9ea6\u997c',
+    description: '\u7c97\u7cd9\u7684\u9ea6\u7c89\u997c\uff0c\u8fd8\u5e26\u7740\u4f59\u6e29',
+    item_type: 'material',
+    rarity: 'common',
+    effects: [{ target_attribute: 'hp', operation: 'add', value: 5, description: '\u6c14\u8840+5' }],
+    source: '\u90bb\u7ae5\u76f8\u8d60',
+  }, { source: '\u90bb\u7ae5\u76f8\u8d60' });
+  assert(result.ok, 'half wheat cake should register');
+  assert(result.content?.item_type === 'consumable', 'edible recovery item should be consumable, not material');
+  log('edible-reward-item-type', { passed: true, type: result.content?.item_type, name: result.content?.name });
+}
 
 function smokeDiscardStorageBagItem(): void {
   const bag: any = {
@@ -1262,6 +1278,7 @@ function smokeAiDrivenCombatActionPalette(): void {
 
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
+  smokeEdibleRewardItemType();
   smokeDiscardStorageBagItem();
   smokeSameYearThreadTimeInference();
   smokeSchedulerContinuity();

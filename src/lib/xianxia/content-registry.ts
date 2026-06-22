@@ -1,4 +1,4 @@
-﻿import {
+import {
   ItemEntry,
   ItemType,
   PendingThread,
@@ -152,6 +152,13 @@ function normalizeRarity(raw: unknown, trace: ValidationTrace[], fallback = 'com
   return fallback as ItemEntry['rarity'];
 }
 
+function isEdibleConsumable(raw: any, name: string, description: string, effects: StatusEffect[]): boolean {
+  const text = `${name}${description}${asText(raw?.source, '', 80)}`;
+  const hasFoodName = /\u997c|\u9ea6|\u996d|\u7ca5|\u9762|\u998d|\u7cd5|\u7cae|\u5e72\u7cae|\u7cd7|\u8089|\u70e4|\u679c|\u74dc|\u6843|\u68a8|\u9152|\u8336|\u6c64|\u6c34|\u871c|\u98df|\u5403|\u5145\u9965|\u88f9\u8179|\u53ef\u98df|\u4f59\u6e29/.test(text);
+  const hasImmediateRecovery = effects.some(e => e.operation === 'add' && /^(hp|maxHp|mp|maxMp|heartDemon|cultivationExp)$/i.test(e.target_attribute));
+  return hasFoodName && hasImmediateRecovery;
+}
+
 export function registerItem(raw: Partial<ItemEntry> | any, context: RegistryContext = {}): RegistrationResult<ItemEntry> {
   const trace: ValidationTrace[] = [];
   if (!raw || typeof raw !== 'object') return reject<ItemEntry>(trace, 'item is not an object');
@@ -159,17 +166,23 @@ export function registerItem(raw: Partial<ItemEntry> | any, context: RegistryCon
   const name = asText(raw.name, '', 40);
   if (!name) return reject<ItemEntry>(trace, 'item missing name');
   const rawType = asText(raw.item_type, 'material', 32) as ItemType;
-  const itemType = ITEM_TYPES.has(rawType) ? rawType : 'material';
+  let itemType = ITEM_TYPES.has(rawType) ? rawType : 'material';
   if (itemType !== rawType) {
     trace.push({ severity: 'warning', code: 'invalid_type', field: 'item_type', message: `invalid item_type ${rawType}, normalized to material` });
+  }
+  const description = asText(raw.description, name, 300);
+  const effects = normalizeEffects(raw.effects, trace);
+  if ((itemType === 'material' || rawType === 'material') && isEdibleConsumable(raw, name, description, effects)) {
+    itemType = 'consumable';
+    trace.push({ severity: 'warning', code: 'field_normalized', field: 'item_type', message: 'edible recovery item normalized to consumable' });
   }
   const item: ItemEntry = {
     id: ensureId(raw, 'item', existingIds, trace),
     name,
-    description: asText(raw.description, name, 300),
+    description,
     item_type: itemType,
     rarity: normalizeRarity(raw.rarity, trace),
-    effects: normalizeEffects(raw.effects, trace),
+    effects,
     source: asText(raw.source, context.source || 'content-registry', 80),
     equipNote: raw.equipNote ? asText(raw.equipNote, '', 80) : undefined,
   };
