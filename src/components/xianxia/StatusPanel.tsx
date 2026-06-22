@@ -71,8 +71,11 @@ export function StatusPanel({ character }: StatusPanelProps) {
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
     .sort((a: any, b: any) => b.__idx - a.__idx)
     .slice(0, 3);
+  const coreCultivationAttributeIds = new Set(['spiritualSense', 'soulStrength', 'physicalFoundation']);
+  const coreCultivationAttributeNames = new Set(['\u795e\u8bc6', '\u9b42\u9b44', '\u4f53\u9b44']);
   const dynamicAttributes = (character.cultivationAttributes || [])
     .filter((attr: any) => attr && attr.visible !== false && attr.name)
+    .filter((attr: any) => !coreCultivationAttributeIds.has(attr.id) && !coreCultivationAttributeNames.has(attr.name))
     .slice(0, 3);
 
   return (
