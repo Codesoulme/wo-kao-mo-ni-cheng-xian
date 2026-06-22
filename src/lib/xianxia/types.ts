@@ -475,7 +475,9 @@ export interface PendingThread {
   failureCost?: string;      // 失败代价描述
   dueInSameYear?: boolean;   // 同年内后续：如“三月后”“不久后”“今年比试”，advance 后应追加同岁续写
   followUpHint?: string;     // 后续应如何承接，例如“入仙门比试”“持潮湿玉片再探潮隙浮阁”
-  sourceEventTitle?: string; // 来源事件标题，帮助 AI/引擎保持因果
+  sourceEventTitle?: string; // 源事件标题，帮助 AI/引擎保持因果
+  summary?: string;            // 线索摘要，用于战斗去重匹配
+  resolution?: string;         // 解决方式记录
   realmId?: string;          // 若该线索指向秘境，填秘境 id
 }
 

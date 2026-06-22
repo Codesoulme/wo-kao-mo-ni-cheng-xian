@@ -96,7 +96,7 @@ function ArtSection({ title, emptyText, items, total, kindLabel, icon, openDetai
             </p>
             <div className="flex flex-wrap gap-1 mt-1">
               <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary">耗灵 {art.mpCost}</span>
-              <span className="text-[9px] px-1 py-0.5 rounded bg-accent/10 text-accent">威势 ?{art.power.toFixed(1)}</span>
+              <span className="text-[9px] px-1 py-0.5 rounded bg-accent/10 text-accent">威势 ${art.power.toFixed(1)}</span>
               {art.equipNote && <span className="text-[9px] px-1 py-0.5 rounded bg-muted text-muted-foreground">{art.equipNote}</span>}
             </div>
           </div>

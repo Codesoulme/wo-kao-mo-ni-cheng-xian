@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, endCombat, executeCombatRoundWithProposal } from '../src/lib/xianxia/engine';
+import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 
@@ -1047,6 +1047,34 @@ function smokeCombatStalemateBreakNode() {
   console.log(JSON.stringify({ smoke: 'combat-stalemate-break-node', passed: true, prompt: session.pendingImpulse.prompt.slice(0, 24) }));
 }
 
+function smokeCombatResolvedSceneDedupe(): void {
+  const state: any = normalizeCultivationState({
+    id: 'c-combat-dedupe',
+    age: 9,
+    hp: 80, maxHp: 80, mp: 40, maxMp: 40,
+    attack: 12, defense: 8, speed: 7,
+    realm: 'qi_refining', realmLevel: 2, spiritualRoot: 'heavenly', rootDetail: '土天灵根',
+    elements: { metal: 0, wood: 0, water: 0, fire: 0, earth: 100 },
+    inventory: [], equipped: [], activeStatuses: [], pendingThreads: [
+      { id: 'thread_old_scene', title: '晒谷场冲突后续', description: '平拓与虎子在晒谷场旧嫌未平。', category: 'enemy', startAge: 9, deadlineAge: 9, status: 'pending', progress: 60 },
+      { id: 'thread_revenge', title: '虎子逃脱报复', description: '虎子败走后可能寻人报复。', category: 'enemy', startAge: 9, deadlineAge: 10, status: 'pending', progress: 5 },
+    ],
+    questEntries: [], npcs: [], worldFacts: [],
+    causalGraph: { nodes: [{ id: 'event_combat_end_9_old', type: 'combat', label: '战斗得胜', age: 9, summary: '战斗得胜，平拓在晒谷场胜过虎子，狗蛋在旁惊魂未定。' }], edges: [] },
+  } as any);
+  const next = startCombat(state, {
+    contextTitle: '晒谷场遇故嫌',
+    contextNarrative: '未时的晒谷场，虎子带着同伴又围住狗蛋。',
+    enemies: [{ id: 'enemy_huzi', name: '虎子', hp: 50, attack: 8, defense: 5, speed: 5 }],
+  } as any);
+  assert(!next.combatSession, 'resolved same-age combat scene should not start again');
+  const oldScene = (next.pendingThreads || []).find((thread: any) => thread.id === 'thread_old_scene');
+  const revenge = (next.pendingThreads || []).find((thread: any) => thread.id === 'thread_revenge');
+  assert(oldScene?.status === 'resolved', 'consumed combat scene thread should be resolved');
+  assert(revenge?.status === 'pending', 'aftermath/revenge thread should remain pending');
+  console.log(JSON.stringify({ smoke: 'combat-resolved-scene-dedupe', passed: true, oldScene: oldScene?.status, revenge: revenge?.status }));
+}
+
 function smokeCombatTechniqueSpellSplit(): void {
   const rawState: any = {
     spiritualRoot: 'common', realm: 'qi_refining', realmLevel: 2, comprehension: 60,
@@ -1153,6 +1181,7 @@ async function main(): Promise<void> {
   smokeArtifactCultivationMisclassification();
   smokeCombatTacticalProjection();
   smokeCombatStalemateBreakNode();
+  smokeCombatResolvedSceneDedupe();
   smokeCombatTechniqueSpellSplit();
   smokeEnemyLootArtifactNaming();
   smokeAiDrivenCombatActionPalette();

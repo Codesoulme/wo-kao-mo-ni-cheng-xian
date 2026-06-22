@@ -1,4 +1,4 @@
-﻿// 修仙模拟器 - 引擎核心
+// 修仙模拟器 - 引擎核心
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
@@ -3129,8 +3129,70 @@ export function checkThreadDeadlines(state: CharacterState): { state: CharacterS
 
 // ==================== Task 20: 战斗系统 ====================
 
+
+function normalizeCombatDedupeText(value: unknown): string {
+  return String(value || '').replace(/\s+/g, '');
+}
+
+function combatTriggerEnemyNames(trigger: NonNullable<AIEventOutput['triggerCombat']>): string[] {
+  return Array.from(new Set((trigger.enemies || [])
+    .map((enemy) => normalizeCombatDedupeText(enemy?.name))
+    .filter((name) => name.length >= 2)));
+}
+
+function combatTriggerSceneTokens(trigger: NonNullable<AIEventOutput['triggerCombat']>): string[] {
+  const text = normalizeCombatDedupeText(`${trigger.contextTitle || ''}${trigger.contextNarrative || ''}`);
+  const tokens = ['晒谷场', '旧嫌', '冲突', '约', '狗蛋', '虎子', '秘境', '洞府', '坊市', '山林', '江边', '村头', '宗门'];
+  return tokens.filter((token) => text.includes(token));
+}
+
+function hasSameAgeResolvedCombat(state: CharacterState, trigger: NonNullable<AIEventOutput['triggerCombat']>): boolean {
+  const enemyNames = combatTriggerEnemyNames(trigger);
+  if (!enemyNames.length) return false;
+  const sceneTokens = combatTriggerSceneTokens(trigger);
+  const nodes = state.causalGraph?.nodes || [];
+  return nodes.some((node: any) => {
+    if (node?.age !== state.age) return false;
+    const id = normalizeCombatDedupeText(node?.id);
+    const text = normalizeCombatDedupeText(`${node?.label || ''}${node?.title || ''}${node?.summary || ''}`);
+    const looksEnded = id.includes('combat_end') || text.includes('战斗得胜') || text.includes('战罢') || text.includes('胜过');
+    if (!looksEnded) return false;
+    const sameEnemy = enemyNames.some((name) => text.includes(name));
+    if (!sameEnemy) return false;
+    if (!sceneTokens.length) return true;
+    return sceneTokens.some((token) => text.includes(token));
+  });
+}
+
+function resolveConsumedCombatSceneThreads(state: CharacterState, trigger: NonNullable<AIEventOutput['triggerCombat']>, note: string): CharacterState {
+  const enemyNames = combatTriggerEnemyNames(trigger);
+  const sceneTokens = combatTriggerSceneTokens(trigger);
+  if (!enemyNames.length && !sceneTokens.length) return state;
+  let changed = false;
+  const pendingThreads = (state.pendingThreads || []).map((thread) => {
+    if (thread.status !== 'pending' && thread.status !== 'urgent') return thread;
+    const text = normalizeCombatDedupeText(`${thread.title || ''}${thread.description || ''}${thread.summary || ''}${thread.sourceEventTitle || ''}${thread.followUpHint || ''}`);
+    if (text.includes('报复') || text.includes('追杀') || text.includes('余波')) return thread;
+    const sameEnemy = enemyNames.some((name) => text.includes(name));
+    const sameScene = sceneTokens.some((token) => text.includes(token));
+    if (!sameEnemy && !sameScene) return thread;
+    changed = true;
+    return {
+      ...thread,
+      status: 'resolved' as const,
+      progress: Math.max(thread.progress || 0, 100),
+      resolution: thread.resolution || note,
+    };
+  });
+  return changed ? { ...state, pendingThreads, questEntries: buildQuestEntriesFromThreads(pendingThreads, state.age) } : state;
+}
+
 // 启动战斗：从 AI 触发的 triggerCombat 创建 CombatSession
 export function startCombat(state: CharacterState, trigger: NonNullable<AIEventOutput['triggerCombat']>): CharacterState {
+  if (hasSameAgeResolvedCombat(state, trigger)) {
+    return resolveConsumedCombatSceneThreads(state, trigger, '同一场冲突已经了结，引擎拦截重复开战');
+  }
+
   const realmPower = realmPowerMultiplier(state);
   const session: CombatSession = {
     id: `combat_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
