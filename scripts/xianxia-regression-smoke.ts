@@ -173,9 +173,35 @@ function smokeThreadPromiseNoAdultTravelTemplate(): void {
   };
   const event = buildThreadContinuationEvent(state, thread);
   const text = `${event.title} ${event.narrative}`;
-  assert(!/\u6574\u7406\u884c\u88c5|\u524d\u53bb\u8d74\u7ea6|\u4eb2\u81ea\u7ed9\u51fa\u7684\u4ea4\u4ee3/.test(text), 'promise continuation should not use adult travel template');
+  assert(!/\u6574\u7406\u884c\u88c5|\u524d\u53bb\u8d74\u7ea6|\u4eb2\u81ea\u7ed9\u51fa\u7684\u4ea4\u4ee3|\u5c71\u98ce\u8fc7\u5904|\u4e00\u91cd\u56e0\u679c|\u5fc5\u987b.*\u91cf/.test(text), 'promise continuation should not use adult or abstract causality template');
   assert(!event.title.includes('\u8d74\u7ea6'), 'promise title should avoid direct go-to-appointment framing');
   log('thread-promise-no-adult-travel-template', { passed: true, title: event.title });
+}
+
+function smokeThreadGenericNoAbstractCausalityTemplate(): void {
+  const state: any = {
+    name: '\u6731\u73a9',
+    age: 8,
+    realm: 'mortal',
+    realmLevel: 0,
+    pendingThreads: [],
+    activeStatuses: [],
+    inventory: [],
+    equipped: [],
+  };
+  const thread: any = {
+    id: 'generic_inquiry',
+    title: '\u5bfb\u518c\u95ee\u4ed9\u9014',
+    description: '\u4ece\u65e7\u518c\u91cc\u542c\u95fb\u4ed9\u9014\u7ebf\u7d22',
+    followUpHint: '\u53ef\u4ee5\u5411\u8eab\u8fb9\u4eba\u6253\u542c',
+    category: 'custom',
+    status: 'pending',
+    progress: 0,
+    deadlineAge: 8,
+  };
+  const event = buildThreadContinuationEvent(state, thread);
+  assert(!/\u5c71\u98ce\u8fc7\u5904|\u65e7\u4e8b\u4e0d\u518d\u53ea\u662f\u5ff5\u5934|\u4e00\u91cd\u56e0\u679c|\u5fc5\u987b.*\u91cf/.test(event.narrative), 'generic continuation should not use abstract causality template');
+  log('thread-generic-no-abstract-causality-template', { passed: true, title: event.title });
 }
 
 function smokeSchedulerContinuity(): void {
@@ -1418,6 +1444,7 @@ async function main(): Promise<void> {
   smokeDiscardStorageBagItem();
   smokeSameYearThreadTimeInference();
   smokeThreadPromiseNoAdultTravelTemplate();
+  smokeThreadGenericNoAbstractCausalityTemplate();
   smokeInlineNightTimeStamp();
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
