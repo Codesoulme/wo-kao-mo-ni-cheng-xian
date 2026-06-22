@@ -46,12 +46,13 @@ export function StatusPanel({ character }: StatusPanelProps) {
     : 0;
   const genderLabel = character.gender === 'male' ? '男' : character.gender === 'female' ? '女' : character.gender || '未知';
   const rootLabel = character.rootDetail || character.spiritualRoot || '无灵根';
+  const combatProjection = (character as any).combatProjection || {};
   const quickStats = [
-    { label: '攻', value: character.attack, icon: <Sword className="w-2.5 h-2.5" />, color: '#c8453c' },
-    { label: '防', value: character.defense, icon: <Shield className="w-2.5 h-2.5" />, color: '#2e5c8a' },
-    { label: '速', value: character.speed, icon: <Zap className="w-2.5 h-2.5" />, color: '#d4af37' },
-    { label: '运', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
-    { label: '悟', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
+    { label: '\u7834\u52bf', value: combatProjection.force ?? character.attack, icon: <Sword className="w-2.5 h-2.5" />, color: '#c8453c' },
+    { label: '\u62a4\u6301', value: combatProjection.guard ?? character.defense, icon: <Shield className="w-2.5 h-2.5" />, color: '#2e5c8a' },
+    { label: '\u673a\u53d8', value: combatProjection.agility ?? character.speed, icon: <Zap className="w-2.5 h-2.5" />, color: '#d4af37' },
+    { label: '\u8fd0', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
+    { label: '\u609f', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
   ];
   const meaningfulStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
   const constitutionStatuses = meaningfulStatuses
