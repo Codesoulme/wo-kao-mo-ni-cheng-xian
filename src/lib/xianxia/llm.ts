@@ -545,7 +545,8 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
   "breakthroughTargetLevel": null,
   "realmProfilePatch": null,
   "extraEvents": [{"title":"\u540c\u5c81\u7eed\u7f18","narrative":"\u4e09\u6708\u4e4b\u540e\uff0c\u524d\u4e8b\u81ea\u7136\u56de\u54cd\u3002","eventType":"normal","timeAdvance":{"amount":3,"unit":"month","label":"\u4e09\u6708\u540e","reason":"\u627f\u63a5\u540c\u5e74\u56e0\u7f18","ageDeltaYears":0,"elapsedDays":90},"actionProjections":[]}],
-æ¶é´é¢ç­¾è§åï¼timeAdvance.label æ¯ç©å®¶å¯è§çæ¬æ®µæ¶é´é¢ç­¾ï¼åªåâä¸å¹´åââä¸æåââç¿æ¥ââåæ¥åââé­å³æ°è½½åâè¿ç±»æ¶é´è¡¨è¾¾ï¼ä¸å¾åâåå¾æå°ââæ§è¡çº¦å®ââè¿½æ¥å ç¼âç­è¡å¨å¥ãå¼æä¼æè¯¥é¢ç­¾ä¸çå®ä»åç»æ worldTime.displayLabelï¼åç«¯åªå±ç¤º displayLabelã
+\u65f6\u95f4\u9898\u7b7e\u89c4\u5219\uff1atimeAdvance.label \u662f\u73a9\u5bb6\u53ef\u89c1\u7684\u672c\u6bb5\u65f6\u95f4\u9898\u7b7e\uff0c\u53ea\u5199\u201c\u4e00\u5e74\u540e\u201d\u201c\u4e09\u6708\u540e\u201d\u201c\u7fcc\u65e5\u201d\u201c\u534a\u65e5\u540e\u201d\u201c\u95ed\u5173\u6570\u8f7d\u540e\u201d\u8fd9\u7c7b\u65f6\u95f4\u8868\u8fbe\uff1b\u4e0d\u5f97\u5199\u201c\u524d\u5f80\u67d0\u5730\u201d\u201c\u6267\u884c\u7ea6\u5b9a\u201d\u201c\u8ffd\u67e5\u56e0\u7f18\u201d\u7b49\u884c\u52a8\u53e5\u3002
+\u5f15\u64ce\u4f1a\u628a timeAdvance.label \u4e0e\u771f\u5b9e\u4ed9\u5386\u7ec4\u6210 worldTime.displayLabel\uff0c\u524d\u7aef\u53ea\u5c55\u793a displayLabel\u3002\u540c\u5e74/\u540c\u5c81\u8ffd\u52a0\u4e8b\u4ef6\u7684 narrative \u4e0d\u8981\u53cd\u590d\u5199\u5e74\u9f84\uff0c\u4e0d\u8981\u7528\u201cX\u5c81\u7684\u67d0\u67d0\u201d\u5f00\u5934\u3002
   "causedDeath": false,
   "causedAscension": false,
   "newNpcs": [],
@@ -591,23 +592,15 @@ narrativeContract 必须声明本轮主要承接对象：
 - 不要滥发状态；每轮 0-2 个即可，必须与叙事因果一致。
 - 如果生命或灵力明显不满，应在事件中考虑角色伤势/灵力枯竭；可生成调息修养、寻药疗伤、闭关恢复等叙事与 hp/mp 变化，但不要每次都强行恢复满。
 
-ãè§è²è¡å¨ä¸è´æ§è§åââå¼ºå¶ã
-ææ narrativeãextraEventsãnewThreadsãactionProjections é½å¿
-é¡»ç¬¦åè§è²å½åå¹´é¾ãèº«ä»½ãå¢çãèº«ä½ç¶æãå¿å¢ãè¿æç»åãæå¨å°ç¹ä¸éèº«èµæºã
-- 0-6 å²è§è²åªè½åæµææåãç©èãè¢«ç¶æ¯/é¿è¾å¸¦çè¡å¨ãå¬é»ä¼ è¯´ãåç¯å¢å½±åï¼ä¸å¾åæç¬ç«èµ´çº¦ãæ´çè¡è£
-ãæ§è¡çº¦å®ãè¿½æ¥å ç¼ãä¸»å¨æ¢ç§ãäº¤ææææ³ã
-- 7-12 å²è§è²å¯ä»¥æå¥½å¥ãæ¨¡ä»¿ãè·éå¤§äººãç«¥ä¼´çº¦å®åç®åå°è¯ï¼ä½ä»ä¸è½æ¿æ
-æäººå¼ä»»å¡ãç¬èªè¿è¡æå¤æä¿®ä»å³ç­ï¼é¤é narrative ç»åºå¯é çæ¤æç¹æ®ä¼ æ¿å æã
-- å¡äººãå¹¼ç«¥ãéä¼¤ãåå°ãè´«å¼±ãä½å¢çãå¿é­ç½çç­ç¶æé½åºéå¶è¡å¨è½åï¼ä¸è¦åªæâçº¿ç´¢éè¦æ¨è¿âè®©è§è²åè¶
-åºå½ä¸è½åçäºã
-- çº¿ç´¢æè¦å¯ä»¥åç» AI/å¼æè¿½è¸ªï¼ä½ç©å®¶å¯è§æ­£æå¿
-é¡»æ¹åæè§è²å½ä¸çå®è½åãè½æåå°ãè½è¢«å·å
-¥çå
-·ä½ä¸çå
-äºä»¶ã
-- è¥å½åç¶æä¸è¶³ä»¥æ§è¡æä¸ªæ¿è¯ºæçº¿ç´¢ï¼åºåâæç¼ãè¢«å¸¦å»ãå¬é»ãéè¿ãç­å¾
-æ¶æºãç±ä»äººä»£è¡ãçä¸çµæâç­åçæ¿æ¥ï¼èä¸æ¯ç¡¬è®©è§è²å®æã
-严禁修改 age（年龄由天道推进，每岁固定 +1，AI 不得在 changes 中包含 age）。
+\u3010\u89d2\u8272\u884c\u52a8\u4e00\u81f4\u6027\u89c4\u5219\u2014\u2014\u5f3a\u5236\u3011
+\u6240\u6709 narrative\u3001extraEvents\u3001newThreads\u3001actionProjections \u90fd\u5fc5\u987b\u7b26\u5408\u89d2\u8272\u5f53\u524d\u5e74\u9f84\u3001\u8eab\u4efd\u3001\u5883\u754c\u3001\u8eab\u4f53\u72b6\u6001\u3001\u5fc3\u5883\u3001\u8fd1\u671f\u7ecf\u5386\u3001\u6240\u5728\u5730\u70b9\u4e0e\u968f\u8eab\u8d44\u6e90\u3002
+- 0-6 \u5c81\u89d2\u8272\u53ea\u80fd\u5199\u61f5\u61c2\u611f\u53d7\u3001\u73a9\u800d\u3001\u88ab\u7236\u6bcd/\u957f\u8f88\u5e26\u7740\u884c\u52a8\u3001\u542c\u95fb\u4f20\u8bf4\u3001\u53d7\u73af\u5883\u5f71\u54cd\uff1b\u4e0d\u5f97\u5199\u6210\u72ec\u7acb\u8d74\u7ea6\u3001\u6574\u7406\u884c\u88c5\u3001\u6267\u884c\u7ea6\u5b9a\u3001\u8ffd\u67e5\u56e0\u7f18\u3001\u4e3b\u52a8\u63a2\u79d8\u3001\u4ea4\u6613\u6216\u6597\u6cd5\u3002
+- 7-12 \u5c81\u89d2\u8272\u53ef\u4ee5\u6709\u597d\u5947\u3001\u6a21\u4eff\u3001\u8ddf\u968f\u5927\u4eba\u3001\u7ae5\u4f34\u7ea6\u5b9a\u548c\u7b80\u5355\u5c1d\u8bd5\uff0c\u4f46\u4ecd\u4e0d\u80fd\u627f\u62c5\u6210\u4eba\u5f0f\u4efb\u52a1\u3001\u72ec\u81ea\u8fdc\u884c\u6216\u590d\u6742\u4fee\u4ed9\u51b3\u7b56\uff0c\u9664\u975e narrative \u7ed9\u51fa\u53ef\u9760\u770b\u62a4\u6216\u7279\u6b8a\u4f20\u627f\u56e0\u679c\u3002
+- \u51e1\u4eba\u3001\u5e7c\u7ae5\u3001\u91cd\u4f24\u3001\u53d7\u56f0\u3001\u8d2b\u5f31\u3001\u4f4e\u5883\u754c\u3001\u5fc3\u9b54\u70bd\u76db\u7b49\u72b6\u6001\u90fd\u5e94\u9650\u5236\u884c\u52a8\u80fd\u529b\uff1b\u4e0d\u8981\u53ea\u6309\u201c\u7ebf\u7d22\u9700\u8981\u63a8\u8fdb\u201d\u8ba9\u89d2\u8272\u505a\u8d85\u51fa\u5f53\u4e0b\u80fd\u529b\u7684\u4e8b\u3002
+- \u7ebf\u7d22\u6458\u8981\u53ef\u4ee5\u5199\u7ed9 AI/\u5f15\u64ce\u8ffd\u8e2a\uff0c\u4f46\u73a9\u5bb6\u53ef\u89c1\u6b63\u6587\u5fc5\u987b\u6539\u5199\u6210\u89d2\u8272\u5f53\u4e0b\u771f\u5b9e\u80fd\u505a\u3001\u80fd\u611f\u53d7\u5230\u3001\u80fd\u88ab\u5377\u5165\u7684\u5177\u4f53\u4e16\u754c\u5185\u4e8b\u4ef6\u3002
+- \u82e5\u5f53\u524d\u72b6\u6001\u4e0d\u8db3\u4ee5\u6267\u884c\u67d0\u4e2a\u627f\u8bfa\u6216\u7ebf\u7d22\uff0c\u5e94\u5199\u201c\u6682\u7f13\u3001\u88ab\u5e26\u53bb\u3001\u542c\u95fb\u3001\u9519\u8fc7\u3001\u7b49\u5f85\u65f6\u673a\u3001\u7531\u4ed6\u4eba\u4ee3\u884c\u3001\u7559\u4e0b\u7275\u6302\u201d\u7b49\u5408\u7406\u627f\u63a5\uff0c\u800c\u4e0d\u662f\u786c\u8ba9\u89d2\u8272\u5b8c\u6210\u3002
+- \u540c\u5e74/\u540c\u5c81\u8ffd\u52a0\u4e8b\u4ef6\u7684 narrative \u4e0d\u8981\u53cd\u590d\u5199\u201c\u51e0\u5c81\u7684\u67d0\u67d0\u201d\u3001\u201cX\u5c81\u65f6\u201d\u3001\u201cX\u5c81\u90a3\u5e74\u201d\u7b49\u5e74\u9f84\u53e5\u5f0f\uff1b\u5e74\u9f84\u5df2\u7531\u4e8b\u4ef6\u65f6\u95f4\u6807\u7b7e\u627f\u62c5\uff0c\u6b63\u6587\u5e94\u76f4\u63a5\u5199\u5f53\u4e0b\u52a8\u4f5c\u3001\u611f\u53d7\u3001\u73af\u5883\u548c\u56e0\u679c\u3002
+\u4e25\u7981\u4fee\u6539 age\uff08\u5e74\u9f84\u7531\u5929\u9053\u63a8\u8fdb\uff0cAI \u4e0d\u5f97\u5728 changes \u4e2d\u5305\u542b age\uff09\u3002
 
 【Task 22 心魔值机制——参考《凡人修仙传》走火入魔设定】
 当前心魔值：${ctx.character.heartDemon}/100
@@ -1279,6 +1272,28 @@ function fixNarrativeAge(narrative: string, correctAge: number, charName?: strin
   return out;
 }
 
+function reduceNarrativeAgeMentions(narrative: string, correctAge: number, charName?: string): string {
+  if (!narrative) return narrative;
+  const safeCharName = String(charName || '').trim();
+  const ageWords = Array.from(new Set([String(correctAge), numToZhAge(correctAge)].filter(Boolean))).map(escapeRegExp).join('|');
+  if (!ageWords) return narrative;
+  let out = narrative;
+  const sentenceBoundary = '\\u3002\\uff01\\uff1f\\uff1b\\n';
+  if (safeCharName) {
+    const name = escapeRegExp(safeCharName);
+    out = out.replace(new RegExp(`(^|[${sentenceBoundary}])\\s*(?:${ageWords})\\u5c81(?:\\u7684)?${name}`, 'g'), `$1${safeCharName}`);
+    out = out.replace(new RegExp(`(?:${ageWords})\\u5c81(?:\\u7684)?${name}`, 'g'), safeCharName);
+  }
+  out = out.replace(new RegExp(`(^|[${sentenceBoundary}])\\s*(?:${ageWords})\\u5c81(?:\\u65f6|\\u90a3\\u5e74|\\u7684)?[\\uff0c,\\u3001]?\\s*`, 'g'), '$1');
+  out = out.replace(new RegExp(`(?:${ageWords})\\u5c81\\u7684(\\u4ed6|\\u5979|\\u5b69\\u5b50|\\u5c11\\u5e74|\\u5c11\\u5973|\\u89d2\\u8272|\\u5e7c\\u7ae5|\\u5b69\\u7ae5|\\u5a74\\u5b69|\\u5a03\\u513f)`, 'g'), '$1');
+  out = out.replace(new RegExp(`(?:${ageWords})\\u5c81(?:\\u65f6|\\u90a3\\u5e74)[\\uff0c,\\u3001]?\\s*`, 'g'), '');
+  return out.replace(/^[\uff0c,\u3001\s]+/, '').replace(/[\u3002\uff01\uff1f\uff1b]\s+[\u3002\uff01\uff1f\uff1b]/g, (m) => m[0]);
+}
+
+function cleanNarrativeAge(narrative: string, correctAge: number, charName?: string): string {
+  return reduceNarrativeAgeMentions(fixNarrativeAge(narrative, correctAge, charName), correctAge, charName);
+}
+
 function escapeRegExp(s: string): string {
   return String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -1288,9 +1303,15 @@ export async function generateAgeEvent(ctx: EngineStateContext, isFateNode: bool
   const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.advance);
   const sanitized = sanitizeEventOutput(raw, ctx.character.age);
   // 后处理：修正 narrative 中主角年龄数字
-  sanitized.narrative = fixNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
+  sanitized.narrative = cleanNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
+  if (Array.isArray(sanitized.extraEvents)) {
+    sanitized.extraEvents = sanitized.extraEvents.map((event: any) => ({
+      ...event,
+      narrative: cleanNarrativeAge(String(event?.narrative || ''), ctx.character.age, ctx.character.name),
+    }));
+  }
   if (sanitized.choice?.prompt) {
-    sanitized.choice.prompt = fixNarrativeAge(sanitized.choice.prompt, ctx.character.age, ctx.character.name);
+    sanitized.choice.prompt = cleanNarrativeAge(sanitized.choice.prompt, ctx.character.age, ctx.character.name);
   }
   return sanitized;
 }
@@ -1304,7 +1325,7 @@ export async function generateChoiceResult(
   try {
     const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.choose);
     const sanitized = sanitizeChoiceOutput(raw);
-    sanitized.narrative = fixNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
+    sanitized.narrative = cleanNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
     return sanitized;
   } catch (err: any) {
     console.error('Choice generation failed, using fallback:', err?.message || err);
@@ -1334,7 +1355,7 @@ export async function generateInterfereResponse(
   try {
     const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.interfere);
     const sanitized = sanitizeInterfereOutput(raw, ctx.character.age);
-    sanitized.narrative = fixNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
+    sanitized.narrative = cleanNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
     return sanitized;
   } catch (err: any) {
     console.error('Interfere generation failed, using fallback:', err?.message || err);
