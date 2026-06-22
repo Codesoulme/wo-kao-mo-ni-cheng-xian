@@ -117,7 +117,6 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
                 <span className="text-xs font-serif-cn font-semibold text-purple-700 dark:text-purple-200">{(current as any).soulRealmName || '\u795e\u9b42\u672a\u663e'}</span>
                 <span className="text-[10px] rounded-full border border-purple-300/40 px-1.5 py-0.5 text-purple-700 dark:text-purple-200">{(current as any).soulRealmGap || '\u8eab\u795e\u672a\u5b9a'}</span>
               </div>
-              <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">{"\u795e\u8bc6\u3001\u9b42\u9b44\u4e0e\u4f53\u9b44\u53ef\u4e0e\u6cd5\u529b\u5883\u754c\u5206\u5316\u6210\u957f\uff1b\u5f15\u64ce\u4f1a\u5c06\u5176\u4f5c\u4e3a\u63a2\u67e5\u3001\u538b\u5236\u3001\u7a81\u7834\u3001\u593a\u820d\u548c\u79d8\u5883\u98ce\u9669\u7684\u4e8b\u5b9e\u8fb9\u754c\u3002"}</p>
             </div>
           </section>
 

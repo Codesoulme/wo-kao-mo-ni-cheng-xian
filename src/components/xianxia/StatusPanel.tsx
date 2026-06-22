@@ -47,6 +47,11 @@ export function StatusPanel({ character }: StatusPanelProps) {
   const genderLabel = character.gender === 'male' ? '男' : character.gender === 'female' ? '女' : character.gender || '未知';
   const rootLabel = character.rootDetail || character.spiritualRoot || '无灵根';
   const combatProjection = (character as any).combatProjection || {};
+  const coreCultivationStats = [
+    { label: '\u795e\u8bc6', value: (character as any).spiritualSense ?? 0, icon: <Brain className="w-2.5 h-2.5" />, color: '#7c3aed' },
+    { label: '\u9b42\u9b44', value: (character as any).soulStrength ?? 0, icon: <Sparkles className="w-2.5 h-2.5" />, color: '#9333ea' },
+    { label: '\u4f53\u9b44', value: (character as any).physicalFoundation ?? 0, icon: <Shield className="w-2.5 h-2.5" />, color: '#0f766e' },
+  ];
   const quickStats = [
     { label: '\u7834\u52bf', value: combatProjection.force ?? character.attack, icon: <Sword className="w-2.5 h-2.5" />, color: '#c8453c' },
     { label: '\u62a4\u6301', value: combatProjection.guard ?? character.defense, icon: <Shield className="w-2.5 h-2.5" />, color: '#2e5c8a' },
@@ -277,12 +282,30 @@ export function StatusPanel({ character }: StatusPanelProps) {
 
               {expandedVitals && (
                 <div className="mt-2 space-y-1.5 border-t border-border/40 pt-2 animate-in fade-in duration-150">
+                  <div className="grid grid-cols-3 gap-1">
+                    {coreCultivationStats.map(stat => (
+                      <div
+                        key={stat.label}
+                        className="rounded-md border border-primary/20 bg-primary/5 px-1.5 py-1 text-center shadow-sm"
+                        title={`${stat.label}?${stat.value}`}
+                      >
+                        <div className="flex items-center justify-center gap-0.5 text-[9px] text-muted-foreground">
+                          <span style={{ color: stat.color }}>{stat.icon}</span>
+                          {stat.label}
+                        </div>
+                        <div className="text-[11px] leading-none mt-0.5 font-semibold tabular-nums" style={{ color: stat.color }}>
+                          {stat.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
                   <div className="grid grid-cols-5 gap-1">
                     {quickStats.map(stat => (
                       <div
                         key={stat.label}
                         className="rounded-md border border-border/50 bg-background/45 px-1.5 py-1 text-center shadow-sm"
-                        title={`${stat.label}：${stat.value}`}
+                        title={`${stat.label}?${stat.value}`}
                       >
                         <div className="flex items-center justify-center gap-0.5 text-[9px] text-muted-foreground">
                           <span style={{ color: stat.color }}>{stat.icon}</span>
