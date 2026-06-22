@@ -150,6 +150,34 @@ function smokeSameYearThreadTimeInference(): void {
   log('same-year-thread-time-inference', { passed: true, title: threads[0].title, ageDeltaYears: continuation.timeAdvance?.ageDeltaYears });
 }
 
+function smokeThreadPromiseNoAdultTravelTemplate(): void {
+  const state: any = {
+    name: '\u6731\u73a9',
+    age: 8,
+    realm: 'mortal',
+    realmLevel: 0,
+    pendingThreads: [],
+    activeStatuses: [],
+    inventory: [],
+    equipped: [],
+  };
+  const thread: any = {
+    id: 'promise_childhood',
+    title: '\u69d0\u6811\u4e0b\u7684\u65e7\u7ea6',
+    description: '\u65e9\u5148\u4e0e\u6751\u7ae5\u8bb8\u4e0b\u7ea6\u5b9a',
+    followUpHint: '\u5f85\u65f6\u673a\u6210\u719f\u518d\u56de\u5e94',
+    category: 'promise',
+    status: 'pending',
+    progress: 0,
+    deadlineAge: 8,
+  };
+  const event = buildThreadContinuationEvent(state, thread);
+  const text = `${event.title} ${event.narrative}`;
+  assert(!/\u6574\u7406\u884c\u88c5|\u524d\u53bb\u8d74\u7ea6|\u4eb2\u81ea\u7ed9\u51fa\u7684\u4ea4\u4ee3/.test(text), 'promise continuation should not use adult travel template');
+  assert(!event.title.includes('\u8d74\u7ea6'), 'promise title should avoid direct go-to-appointment framing');
+  log('thread-promise-no-adult-travel-template', { passed: true, title: event.title });
+}
+
 function smokeSchedulerContinuity(): void {
   const state: any = {
     age: 20,
@@ -1389,6 +1417,7 @@ async function main(): Promise<void> {
   smokeEdibleRewardItemType();
   smokeDiscardStorageBagItem();
   smokeSameYearThreadTimeInference();
+  smokeThreadPromiseNoAdultTravelTemplate();
   smokeInlineNightTimeStamp();
   smokeSchedulerContinuity();
   smokeBoundaryFactChecks();
