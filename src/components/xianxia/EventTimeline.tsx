@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { GameEvent } from '@/lib/xianxia/store';
 import { cn } from '@/lib/utils';
@@ -28,7 +28,7 @@ const EVENT_ICONS: Record<string, React.ReactNode> = {
 
 const EVENT_LABELS: Record<string, string> = {
   normal: '流年',
-  fate_node: '命节点',
+  fate_node: '因缘转折',
   choice: '抉择',
   combat: '争斗',
   breakthrough: '突破',
