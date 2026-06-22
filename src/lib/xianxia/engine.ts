@@ -2070,6 +2070,59 @@ function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
   return base;
 }
 
+
+function factNameKey(value?: string) {
+  return String(value || '')
+    .replace(/[\s\u3000]/g, '')
+    .replace(/^(?:[^\u4e00-\u9fa5]{0,4})/, '')
+    .slice(0, 24);
+}
+
+function knownItemNameSet(state: CharacterState) {
+  return new Set([...(state.inventory || []), ...(state.equipped || [])].map(it => factNameKey(it.name)).filter(Boolean));
+}
+
+function filterAlreadyKnownItems(state: CharacterState, items: ItemEntry[]) {
+  const known = knownItemNameSet(state);
+  const accepted: ItemEntry[] = [];
+  const rejectedNames: string[] = [];
+  for (const item of items || []) {
+    const key = factNameKey(item.name);
+    if (key && known.has(key)) {
+      rejectedNames.push(item.name);
+      continue;
+    }
+    if (key) known.add(key);
+    accepted.push(item);
+  }
+  return { accepted, rejectedNames };
+}
+
+function escapeStoryRegExp(value: string) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function sanitizeNarrativeKnownFactRepetition(text: string, state: CharacterState, duplicateItemNames: string[] = []) {
+  let out = String(text || '');
+  const names = Array.from(new Set([
+    ...duplicateItemNames,
+    ...(state.inventory || []).map(it => it.name),
+    ...(state.equipped || []).map(it => it.name),
+  ].filter(Boolean))).slice(0, 40);
+  for (const name of names) {
+    const safe = escapeStoryRegExp(name);
+    const inquire = new RegExp(`[^\u3002\uff01\uff1f\uff1b]{0,40}${safe}[^\u3002\uff01\uff1f\uff1b]{0,40}(?:\u54ea\u91cc\u53ef\u4ee5\u83b7\u5f97|\u4f55\u5904\u53ef\u5f97|\u4ece\u4f55\u5f97\u6765|\u5982\u4f55\u83b7\u5f97|\u4ece\u4f55\u800c\u6765)[^\u3002\uff01\uff1f\uff1b]*[\u3002\uff01\uff1f\uff1b]?`, 'g');
+    out = out.replace(inquire, `${state.name}\u4e0d\u518d\u8ffd\u95ee${name}\u4ece\u4f55\u800c\u6765\uff0c\u8f6c\u800c\u6838\u5bf9\u5176\u4fee\u4e60\u95e8\u69db\u4e0e\u540e\u7eed\u7528\u6cd5\u3002`);
+    const obtain = new RegExp(`[^\u3002\uff01\uff1f\uff1b]{0,30}(?:\u5076\u7136\u6240\u5f97|\u5076\u7136\u83b7\u5f97|\u62fe\u5f97|\u6361\u5230|\u53c8\u5f97|\u518d\u6b21\u83b7\u5f97|\u83b7\u5f97\u4e86|\u5f97\u5230)${safe}[^\u3002\uff01\uff1f\uff1b]*[\u3002\uff01\uff1f\uff1b]?`, 'g');
+    out = out.replace(obtain, `${state.name}\u91cd\u65b0\u53d6\u51fa\u5df2\u5728\u8eab\u8fb9\u7684${name}\uff0c\u628a\u5fc3\u601d\u653e\u5728\u5982\u4f55\u627f\u63a5\u5176\u56e0\u679c\u3002`);
+  }
+  return out.replace(/\s{2,}/g, ' ').trim();
+}
+
+function itemAcquisitionMemories(age: number, items: ItemEntry[]) {
+  return (items || []).slice(0, 6).map(item => `${age}\u5c81\u5df2\u83b7\u5f97${item.name}${item.source ? `\uff0c\u6765\u6e90\uff1a${item.source}` : ''}`);
+}
+
 // 添加物品到 inventory。若物品是储物袋（含 storageCapacity 效果的 tool），自动增加 storageCapacity。
 // 兜底：若 AI 给了无效 item_type（如 'storage'），但物品含 storageCapacity 效果，则强转 item_type='tool'。
 // 兜底：若物品名含功法关键词（诀/经/典/录/篇/功法）但 item_type 不是 scripture，强转 scripture 并补默认效果
@@ -4235,6 +4288,13 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   const effectResolveWarnings: string[] = [];
   const appliedChanges: AttributeChange[] = [];
   const boundaryValidation = validateAIBoundary(state, aiOutput);
+  const preExistingItemNames = knownItemNameSet(state);
+  const duplicateNarrativeItems = [...(aiOutput.newItems || []), ...(aiOutput.newEquippedItems || [])]
+    .map(item => item?.name)
+    .filter((name): name is string => !!name && preExistingItemNames.has(factNameKey(name)));
+  if (duplicateNarrativeItems.length) {
+    aiOutput.narrative = sanitizeNarrativeKnownFactRepetition(aiOutput.narrative, state, duplicateNarrativeItems);
+  }
   const collectItemResolve = (resolved: ItemEffectResolveResult) => {
     appliedChanges.push(...resolved.appliedChanges);
     rejected.push(...resolved.rejectedChanges);
@@ -4290,7 +4350,13 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
       });
       contentRegistryTrace.push(...registered.trace);
       contentRegistryWarnings.push(...registered.warnings);
-      next = addItems(next, registered.accepted);
+      const deduped = filterAlreadyKnownItems(next, registered.accepted);
+      if (deduped.rejectedNames.length) {
+        contentRegistryWarnings.push(`\u5df2\u62e5\u6709\u7269\u54c1\u4e0d\u91cd\u590d\u53d1\u653e\uff1a${deduped.rejectedNames.join('\u3001')}`);
+        aiOutput.narrative = sanitizeNarrativeKnownFactRepetition(aiOutput.narrative, next, deduped.rejectedNames);
+      }
+      next = addItems(next, deduped.accepted);
+      for (const memo of itemAcquisitionMemories(next.age, deduped.accepted)) next = addMemory(next, memo);
     }
   }
 
@@ -4303,11 +4369,17 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     });
     contentRegistryTrace.push(...registered.trace);
     contentRegistryWarnings.push(...registered.warnings);
-    const newEqItems = registered.accepted;
+    const deduped = filterAlreadyKnownItems(next, registered.accepted);
+    if (deduped.rejectedNames.length) {
+      contentRegistryWarnings.push(`\u5df2\u62e5\u6709\u7269\u54c1\u4e0d\u91cd\u590d\u88c5\u5907\uff1a${deduped.rejectedNames.join('\u3001')}`);
+      aiOutput.narrative = sanitizeNarrativeKnownFactRepetition(aiOutput.narrative, next, deduped.rejectedNames);
+    }
+    const newEqItems = deduped.accepted;
     next = {
       ...next,
       equipped: [...(next.equipped || []), ...newEqItems],
     };
+    for (const memo of itemAcquisitionMemories(next.age, newEqItems)) next = addMemory(next, memo);
     for (const it of newEqItems) {
       const resolved = resolveItemEffects(next, it, 1, `生成并装备 ${it.name}`);
       next = resolved.state;

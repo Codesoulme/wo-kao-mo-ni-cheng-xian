@@ -405,6 +405,12 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean, qualit
   const invCount = ctx.inventory.length;
   const hasBag = invCount > 0 && ctx.inventory.some(i => i.item_type === 'tool' && (i.effects || []).some(e => e.target_attribute === 'storageCapacity'));
   const storageDesc = `${invCount}/${storageCap}件${hasBag ? '（已有储物袋）' : '（无储物袋，上限仅 5 件）'}`;
+  const acquiredFactLedger = [
+    ...ctx.inventory.map(i => `- 已持有物品：${i.name}${i.source ? `；来源：${i.source}` : ''}${i.item_type ? `；类型：${i.item_type}` : ''}`),
+    ...eqArr.map((i: any) => `- 已装备物品：${i.name}${i.source ? `；来源：${i.source}` : ''}${i.item_type ? `；类型：${i.item_type}` : ''}`),
+    ...ctx.activeStatuses.filter(s => s.duration === -1 || s.category === 'identity' || s.category === 'special' || s.category === 'quest' || s.category === 'constitution').map(s => `- 已落定状态：${s.name}${s.source ? `；来源：${s.source}` : ''}；${s.description.slice(0, 80)}`),
+    ...ctx.longTermMemory.filter(m => /已获得|获得|相赠|赠予|传授|拜师|已入|已结/.test(m)).slice(-8).map(m => `- 已记录经历：${m}`),
+  ].slice(-24).join('\n') || '（暂无已得之物或已定来源）';
 
   return `【状态快照区】
 角色：${sc.name}（${sc.gender === 'male' ? '男' : '女'}），${sc.age}岁
@@ -512,9 +518,15 @@ ${ctx.pendingThreads && ctx.pendingThreads.some(t => t.status === 'urgent')
 - 若本轮蓝图主题与上轮相同，你必须从不同角度切入（如上轮"坊市寻兵"，本轮可"坊市拍卖"或"黑市淘宝"）
 - 严禁生成与最近标题仅修改数字的标题（如"家道中落"→"家道再陷"→"家道又变"，这种重复视为违规）
 - 若发现自己想用的标题与最近标题相似，换个完全不同的视角命名
+- 禁止把已发生的获得/赠予/拜师/发现改写成另一次新发生的事；已得之物不能再“偶然所得”，只能被使用、研习、损坏、交易、追溯或引出新因果。
 
 【记忆检索区】长期记忆：
 ${memory}
+
+【既得事实核对区】（这些已发生/已获得/已明确来源，本轮必须承接，不得重演或改写成另一种获得方式）：
+${acquiredFactLedger}
+- 若功法/法宝/物品已在上列清单或长期记忆中，禁止再写成“偶然所得”“又获赠”“再次拾得”。正确写法是回到修习、门槛、代价、来源追溯的新线索或与赠予者的后续因果。
+- 若某人已明确赠予/传授功法，禁止让角色再去问他“这本功法哪里可以获得”；应改为请教修习要诀、询问来历秘辛、承接人情或引出新因缘。
 
 【短期对话区】最近事件：
 ${recentEvts}
