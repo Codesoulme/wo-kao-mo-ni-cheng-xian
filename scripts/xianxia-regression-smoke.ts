@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+﻿import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat } from '../src/lib/xianxia/engine';
@@ -675,11 +675,47 @@ function smokeSameYearContinuation(): void {
   assert(threads.length === 1, 'same-year thread should be selected before cross-year advance');
   const output = buildThreadContinuationEvent(state, threads[0]);
   assert(output.title.includes('约期已至'), 'same-year competition continuation should use appointment title');
-  assert(output.advanceThreads?.[0]?.id === 'sect_trial_same_year', 'same-year continuation should advance the selected thread');
-  assert(output.completeThreadIds?.includes('sect_trial_same_year'), 'same-year competition should complete the selected thread');
+  assert(output.advanceThreads?.length === 0, 'same-year continuation should no longer use partial advance');
+  assert(output.completeThreadIds?.includes('sect_trial_same_year'), 'same-year continuation should complete the selected thread');
   log('same-year-continuation', { passed: true, age: state.age, title: output.title });
 }
 
+
+function smokeSameYearContinuationDedup(): void {
+  // Verify that after a same-year continuation completes a thread,
+  // getSameYearThreads no longer returns it (preventing duplicate events)
+  const state: any = {
+    name: '测试弟子',
+    age: 21,
+    pendingThreads: [{
+      id: 'sect_trial_same_year',
+      title: '月后入门比试',
+      description: '按约前往石坪参加入门比试',
+      category: 'competition',
+      startAge: 21,
+      deadlineAge: 21,
+      status: 'pending',
+      progress: 20,
+      dueInSameYear: true,
+      followUpHint: '同岁月后前往石坪参加入门比试',
+    }],
+  };
+  const threadsBefore = getSameYearThreads(state);
+  assert(threadsBefore.length === 1, 'pending thread should be selected before continuation');
+  const output = buildThreadContinuationEvent(state, threadsBefore[0]);
+  assert(output.completeThreadIds?.includes('sect_trial_same_year'), 'continuation should mark thread as completed');
+  assert((output.advanceThreads?.length ?? 0) === 0, 'continuation should not use partial advance');
+  // Simulate the effect of executing the output
+  const completedState: any = {
+    ...state,
+    pendingThreads: state.pendingThreads.map((t: any) =>
+      t.id === 'sect_trial_same_year' ? { ...t, status: 'resolved', progress: 100 } : t
+    ),
+  };
+  const threadsAfter = getSameYearThreads(completedState);
+  assert(threadsAfter.length === 0, 'completed thread should not be selected again (preventing duplicate loop)');
+  log('same-year-continuation-dedup', { passed: true });
+}
 function smokeAnnualNarrativePrompt(): void {
   const source = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
   assert(source.includes('年龄推进不是“一年只发生一件事”'), 'advance prompt should require annual multi-part narration');
@@ -1292,6 +1328,7 @@ async function main(): Promise<void> {
   smokeWorldMemoryOutcomeFeedback();
   smokeThreadOutcomeSync();
   smokeSameYearContinuation();
+  smokeSameYearContinuationDedup();
   smokeAnnualNarrativePrompt();
   smokeTechniqueRequirements();
   smokeNoProtagonistShieldPrompt();
@@ -1321,3 +1358,6 @@ main().catch(error => {
   console.error(JSON.stringify({ passed: false, suite: 'xianxia-regression-smoke', error: error?.message || String(error) }));
   process.exit(1);
 });
+
+
+

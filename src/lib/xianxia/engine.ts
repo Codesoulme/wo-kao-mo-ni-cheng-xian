@@ -1,4 +1,4 @@
-// 修仙模拟器 - 引擎核心
+﻿// 修仙模拟器 - 引擎核心
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
@@ -5604,8 +5604,8 @@ export function buildThreadContinuationEvent(state: CharacterState, thread: Pend
     hasChoice: false, choice: null, triggeredBreakthrough: false, causedDeath: false, causedAscension: false,
     timeAdvance: { amount: isVeryYoung ? 1 : 3, unit: isVeryYoung ? 'day' : 'month', label: isVeryYoung ? '\u7fcc\u65e5' : '\u6570\u6708\u540e', reason: '\u627f\u63a5\u540c\u5c81\u56e0\u7f18', ageDeltaYears: 0, elapsedDays: isVeryYoung ? 1 : 90 },
     newThreads: [],
-    advanceThreads: [{ id: thread.id, progressDelta: isRealm ? 35 : 50, note: '\u540c\u5c81\u540e\u7eed\u5df2\u5c55\u5f00' }],
-    completeThreadIds: isCompetition ? [thread.id] : [],
+    advanceThreads: [],
+    completeThreadIds: [thread.id],
     failThreadIds: [],
     triggerCombat: null,
     newPets: [],
@@ -5723,3 +5723,6 @@ export function recordExploration(
   delete (newState as any)._currentExploration;
   return newState;
 }
+
+
+
