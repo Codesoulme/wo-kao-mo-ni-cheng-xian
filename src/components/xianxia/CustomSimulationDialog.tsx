@@ -131,16 +131,29 @@ export function CustomSimulationDialog() {
               ) : visibleItems.map((item) => {
                 const checked = selectedIds.has(item.id);
                 return (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={checked}
                     onClick={() => toggleSelectedHeritage(item)}
-                    className={`w-full rounded-lg border p-3 text-left transition hover:bg-muted/40 ${
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggleSelectedHeritage(item);
+                      }
+                    }}
+                    className={`w-full rounded-lg border p-3 text-left transition hover:bg-muted/40 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 ${
                       checked ? 'border-primary/50 bg-primary/5' : 'bg-card/70'
                     }`}
                   >
                     <div className="flex gap-3">
-                      <Checkbox checked={checked} className="mt-1" />
+                      <Checkbox
+                        checked={checked}
+                        className="mt-1"
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      />
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-serif-cn text-sm font-semibold truncate">{item.name}</span>
@@ -151,7 +164,7 @@ export function CustomSimulationDialog() {
                         <p className="text-[10px] text-muted-foreground/80">{'\u6765\u6e90\uff1a'}{item.source}</p>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
