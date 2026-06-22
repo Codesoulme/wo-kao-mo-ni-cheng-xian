@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
 
     const preload = skipPreload ? null : await db.advancePreload.findUnique({ where: { characterId } });
     let candidate;
+    let usedPreload = false;
     if (preload && await isAdvancePreloadUsable(char, preload)) {
       candidate = {
         preparedState: JSON.parse(preload.preparedStateJson),
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
         fateNode: null,
         recentBlueprintCategories: JSON.parse(char.recentBlueprintCategoriesJson || '[]'),
       };
+      usedPreload = true;
       await clearAdvancePreload(characterId);
     } else {
       if (preload) await clearAdvancePreload(characterId);
@@ -453,6 +455,7 @@ ${narrative || ''}`);
       timeAdvance,
       worldCalendar: finalWorldCalendar,
       worldTime: finalWorldTime,
+      usedPreload,
       actionProjections: baseActionProjections,
       hasChoice: aiOutput.hasChoice,
       choice: aiOutput.choice,

@@ -151,7 +151,7 @@ export function dbToState(c: DBCharacter): CharacterState {
   const storageCapacity = c.storageCapacity ?? 5;
   // Task 20: 解析新字段
   const parsedPendingThreads = safeParse<PendingThread[]>(c.pendingThreadsJson || '[]', []);
-  const pendingThreads = Array.isArray(parsedPendingThreads) ? parsedPendingThreads : [];
+  const pendingThreads = normalizeThreadsCompletion(Array.isArray(parsedPendingThreads) ? parsedPendingThreads : []);
   const parsedCharacterIntents = safeParse<CharacterIntent[]>(c.characterIntentsJson || '[]', []);
   const characterIntents = Array.isArray(parsedCharacterIntents) ? parsedCharacterIntents : [];
   const combatSession = c.combatStateJson ? safeParse<CombatSession | null>(c.combatStateJson, null) : null;
@@ -2367,6 +2367,20 @@ function threadStatusToQuestStage(status: PendingThread['status']): QuestEntrySt
   return 'open';
 }
 
+function normalizeThreadCompletion(thread: PendingThread): PendingThread {
+  if (!thread) return thread;
+  if (thread.status === 'resolved' || thread.status === 'failed') return thread;
+  const progress = Math.max(0, Math.min(100, Number(thread.progress || 0)));
+  if (progress >= 100) {
+    return { ...thread, progress: 100, status: 'resolved' as const, dueInSameYear: false };
+  }
+  return progress === thread.progress ? thread : { ...thread, progress };
+}
+
+function normalizeThreadsCompletion(threads: PendingThread[] = []): PendingThread[] {
+  return threads.map(normalizeThreadCompletion);
+}
+
 function questUrgency(thread: PendingThread, currentAge: number): number {
   if (thread.status === 'resolved' || thread.status === 'failed') return 0;
   const remaining = Number(thread.deadlineAge ?? currentAge) - currentAge;
@@ -3231,9 +3245,9 @@ export function addThreads(state: CharacterState, threads: PendingThread[]): Cha
 
 export function advanceThread(state: CharacterState, threadId: string, progressDelta: number, note?: string): CharacterState {
   const threads = (state.pendingThreads || []).map(t => {
-    if (t.id !== threadId) return t;
+    if (t.id !== threadId) return normalizeThreadCompletion(t);
     const progress = Math.max(0, Math.min(100, (t.progress || 0) + progressDelta));
-    return { ...t, progress };
+    return normalizeThreadCompletion({ ...t, progress });
   });
   return { ...state, pendingThreads: threads, questEntries: buildQuestEntriesFromThreads(threads, state.age) };
 }
@@ -3305,7 +3319,9 @@ function syncThreadsFromNarrativeOutcome(state: CharacterState, aiOutput: AIEven
 export function checkThreadDeadlines(state: CharacterState): { state: CharacterState; failed: PendingThread[] } {
   const failed: PendingThread[] = [];
   let changed = false;
-  const threads = (state.pendingThreads || []).map(t => {
+  const threads = (state.pendingThreads || []).map(raw => {
+    const t = normalizeThreadCompletion(raw);
+    if (t !== raw) changed = true;
     if (t.status === 'pending' && state.age > t.deadlineAge) {
       changed = true;
       failed.push(t);
@@ -4803,6 +4819,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   }
 
   // 8. 角色主动意图重新生成（每岁重算）
+  next.pendingThreads = normalizeThreadsCompletion(next.pendingThreads || []);
   next.questEntries = buildQuestEntriesFromThreads(next.pendingThreads, next.age);
   next.characterIntents = generateCharacterIntents(next, next.pendingThreads);
   next = refreshWorldFacts(next, aiOutput.title || 'ai-event');
@@ -5511,7 +5528,7 @@ function isLocalSameYearThread(thread: PendingThread, age: number): boolean {
 
 export function getSameYearThreads(state: CharacterState): PendingThread[] {
   const age = state.age;
-  return (state.pendingThreads || []).filter(t =>
+  return normalizeThreadsCompletion(state.pendingThreads || []).filter(t =>
     (t.status === 'pending' || t.status === 'urgent') &&
     isLocalSameYearThread(t, age) &&
     t.progress < 100

@@ -1,7 +1,7 @@
 ﻿import { readFileSync } from 'fs';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
+import { advanceThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
@@ -751,6 +751,87 @@ function smokeThreadOutcomeSync(): void {
   const echoedThread = echoed.state.pendingThreads.find((t: any) => t.id === 'auction_aftermath_x');
   assert(echoedThread?.status === 'pending' && echoedThread?.progress === 20, 'echoed outcome should not mutate thread state');
   log('thread-outcome-sync', { passed: true, resolved: thread?.status, advanced: advancedThread?.progress, echoed: echoedThread?.progress });
+}
+
+
+function smokeThreadProgressAutoResolve(): void {
+  const baseState: any = {
+    age: 11,
+    lifespan: 80,
+    realm: 'mortal',
+    realmLevel: 0,
+    cultivationExp: 0,
+    expToBreak: 100,
+    hp: 100,
+    maxHp: 100,
+    mp: 50,
+    maxMp: 50,
+    attack: 10,
+    defense: 8,
+    speed: 10,
+    luck: 10,
+    comprehension: 10,
+    spiritStones: 0,
+    reputation: 0,
+    alive: true,
+    ascended: false,
+    activeStatuses: [],
+    inventory: [],
+    equipped: [],
+    memory: [],
+    longTermMemory: [],
+    fateNodes: [],
+    pendingThreads: [{
+      id: 'thread_lingji_repeat',
+      title: 'Thread repeat',
+      description: 'The same instruction thread has already been substantially advanced.',
+      category: 'mystery',
+      startAge: 10,
+      deadlineAge: 12,
+      status: 'pending',
+      progress: 95,
+      followUpHint: 'Ask for the introductory method',
+    }],
+    questEntries: [],
+    npcs: [],
+    worldFacts: [],
+    causalGraph: { nodes: [], edges: [] },
+    pets: [],
+    exploredRealms: [],
+  };
+  const advanced = advanceThread(baseState, 'thread_lingji_repeat', 10, 'instruction already clarified');
+  const thread = advanced.pendingThreads.find((t: any) => t.id === 'thread_lingji_repeat');
+  assert(thread?.status === 'resolved', 'thread reaching 100 progress should auto resolve');
+  assert(thread?.progress === 100, 'auto resolved thread should keep progress 100');
+  assert(getSameYearThreads(advanced).length === 0, 'resolved progress-100 thread should not be scheduled again');
+  const executed = executeAIEvent(advanced, {
+    title: 'Other event',
+    narrative: 'The character turns to another matter.',
+    eventType: 'normal',
+    changes: [],
+    newStatuses: [],
+    newItems: [],
+    removedItemIds: [],
+    newEquippedItems: [],
+    equipItemIds: [],
+    unequipItemIds: [],
+    memory: '',
+    cultivationInsight: '',
+    hasChoice: false,
+    choice: null,
+    triggeredBreakthrough: false,
+    causedDeath: false,
+    causedAscension: false,
+    newThreads: [],
+    advanceThreads: [],
+    completeThreadIds: [],
+    failThreadIds: [],
+    triggerCombat: null,
+    newPets: [],
+  } as any);
+  const afterThread = executed.state.pendingThreads.find((t: any) => t.id === 'thread_lingji_repeat');
+  assert(afterThread?.status === 'resolved', 'executeAIEvent should preserve progress-100 resolution');
+  log('thread-progress-auto-resolve', { passed: true, status: afterThread?.status, progress: afterThread?.progress });
 }
 
 function smokeWorldEventConsequences(): void {
@@ -1532,6 +1613,7 @@ async function main(): Promise<void> {
   smokeWorldMemoryResolution();
   smokeWorldMemoryOutcomeFeedback();
   smokeThreadOutcomeSync();
+  smokeThreadProgressAutoResolve();
   smokeSameYearContinuation();
   smokeSameYearContinuationDedup();
   smokeAnnualNarrativePrompt();

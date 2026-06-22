@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -48,6 +48,7 @@ export function ActionButtons() {
   const [autoTotal, setAutoTotal] = useState(0);
   const [restartOpen, setRestartOpen] = useState(false);
   const autoCancelRef = useRef(false);
+  const preloadRef = useRef<{ key: string | null; inFlight: boolean }>({ key: null, inFlight: false });
 
   const syncLatestState = async (characterId: string) => {
     const res = await fetch(`/api/game/state?characterId=${characterId}`);
@@ -65,13 +66,46 @@ export function ActionButtons() {
     return data.character;
   };
 
-  const prepareNextTurn = (characterId: string) => {
+  const prepareNextTurn = (characterId: string, preloadKey?: string) => {
+    const key = preloadKey || characterId;
+    if (preloadRef.current.inFlight && preloadRef.current.key === key) return;
+    if (preloadRef.current.key === key) return;
+    preloadRef.current = { key, inFlight: true };
     fetch('/api/game/preload-advance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ characterId }),
-    }).catch(() => undefined);
+    })
+      .then((res) => res.json().catch(() => null))
+      .then((data) => {
+        if (!data?.success) preloadRef.current.key = null;
+      })
+      .catch(() => {
+        preloadRef.current.key = null;
+      })
+      .finally(() => {
+        preloadRef.current.inFlight = false;
+      });
   };
+
+  useEffect(() => {
+    if (!character?.id) return;
+    const blocked = loading || pendingChoice || !character.alive || character.ascended || character.isAtChoice || (character as any).pendingChoice || (character.combatSession?.status === 'ongoing');
+    if (blocked) return;
+    const key = [
+      character.id,
+      character.age,
+      character.realm,
+      character.realmLevel,
+      character.cultivationExp,
+      character.hp,
+      character.mp,
+      character.spiritStones,
+      events.length,
+    ].join(':');
+    const timer = window.setTimeout(() => prepareNextTurn(character.id, key), 900);
+    return () => window.clearTimeout(timer);
+  }, [character?.id, character?.age, character?.realm, character?.realmLevel, character?.cultivationExp, character?.hp, character?.mp, character?.spiritStones, character?.alive, character?.ascended, character?.isAtChoice, (character as any)?.pendingChoice, character?.combatSession?.status, pendingChoice, loading, events.length]);
 
   if (!character) return null;
 
@@ -196,6 +230,7 @@ export function ActionButtons() {
         autoCancelRef.current = true;
       }
       if (!data.hasChoice && !data.triggeredCombat && !data.died && !data.ascended) {
+        preloadRef.current.key = null;
         prepareNextTurn(character.id);
       }
     } catch (err: any) {
@@ -285,6 +320,7 @@ export function ActionButtons() {
         autoCancelRef.current = true;
       }
       if (!data.hasChoice && !data.triggeredCombat && !data.died && !data.ascended && character.id) {
+        preloadRef.current.key = null;
         prepareNextTurn(character.id);
       }
     } catch (err: any) {

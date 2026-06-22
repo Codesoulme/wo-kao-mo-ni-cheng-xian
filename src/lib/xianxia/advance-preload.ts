@@ -20,6 +20,12 @@ function stable(value: any): any {
 }
 
 export function buildAdvanceStateHash(char: NonNullable<CharacterRecord>): string {
+  let normalizedPendingThreadsJson = char.pendingThreadsJson;
+  try {
+    normalizedPendingThreadsJson = JSON.stringify(dbToState(char as any).pendingThreads || []);
+  } catch {
+    normalizedPendingThreadsJson = char.pendingThreadsJson;
+  }
   const payload = {
     age: char.age,
     lifespan: char.lifespan,
@@ -48,7 +54,7 @@ export function buildAdvanceStateHash(char: NonNullable<CharacterRecord>): strin
     cultivationFactorsJson: char.cultivationFactorsJson,
     pendingChoiceJson: char.pendingChoiceJson,
     memoryJson: char.memoryJson,
-    pendingThreadsJson: char.pendingThreadsJson,
+    pendingThreadsJson: normalizedPendingThreadsJson,
     characterIntentsJson: char.characterIntentsJson,
     combatStateJson: char.combatStateJson,
     recentEventTypesJson: char.recentEventTypesJson,
