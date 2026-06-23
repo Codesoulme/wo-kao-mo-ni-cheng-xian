@@ -37,9 +37,44 @@ type RuntimeAIConfig = {
   chatId?: string;
   userId?: string;
   model: string;
+  liteModel?: string;
 };
 
 let cachedAIConfig: RuntimeAIConfig | null = null;
+
+// 同 prompt 短时缓存：避免误操作/双击导致重复 LLM 调用
+type CacheEntry = { value: string; expiresAt: number };
+const llmCache: Map<string, CacheEntry> = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 分钟
+
+export function hashCacheKey(s: string): string {
+  // 简单 hash，O(n) 不依赖 node:crypto
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) - h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return `llm_${h}`;
+}
+
+function getCachedLLM(key: string): string | null {
+  const entry = llmCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    llmCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function setCachedLLM(key: string, value: string): void {
+  llmCache.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+  // 简单 LRU：超过 50 条清理最旧
+  if (llmCache.size > 50) {
+    const firstKey = llmCache.keys().next().value;
+    if (firstKey) llmCache.delete(firstKey);
+  }
+}
 
 export function resetGameAI() {
   cachedAIConfig = null;
@@ -59,6 +94,7 @@ async function loadAIConfig(): Promise<RuntimeAIConfig> {
     baseUrl,
     apiKey,
     model,
+    liteModel: cfg?.liteModel ? String(cfg.liteModel).trim() : undefined,
     chatId: cfg?.chatId ? String(cfg.chatId) : undefined,
     userId: cfg?.userId ? String(cfg.userId) : undefined,
   };
@@ -1027,18 +1063,28 @@ removedItemIds：若玩家行动导致物品消耗/损坏（如服用丹药、�
 
 // ==================== LLM 调用 ====================
 
-async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: string): Promise<any> {
+async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: string, options: { qualityMode?: 'full' | 'light' } = {}): Promise<any> {
   const fullSystem = `${systemPrompt}
 
 ${scenePrompt}`;
-  const content = await callLLMText(fullSystem, userPrompt);
+  const content = await callLLMText(fullSystem, userPrompt, options);
   return parseJSON(content);
 }
 
-async function callLLMText(systemPrompt: string, userPrompt: string): Promise<string> {
+async function callLLMText(systemPrompt: string, userPrompt: string, options: { qualityMode?: 'full' | 'light' } = {}): Promise<string> {
+  // 缓存命中：避免重复请求
+  const cacheKey = hashCacheKey(`${options.qualityMode || 'full'}|${systemPrompt.slice(0, 200)}|${userPrompt}`);
+  const cached = getCachedLLM(cacheKey);
+  if (cached) {
+    console.log('[LLM] cache hit, skip request');
+    return cached;
+  }
   try {
     const cfg = await loadAIConfig();
-    const isAnthropic = /anthropic/i.test(cfg.baseUrl) || cfg.model?.toLowerCase().includes('claude');
+    // 轻量模式：非命节点用小模型，推理快 2-3x
+    const isLite = options.qualityMode === 'light';
+    const model = isLite && cfg.liteModel ? cfg.liteModel : cfg.model;
+    const isAnthropic = /anthropic/i.test(cfg.baseUrl) || model?.toLowerCase().includes('claude');
     let res: Response;
     if (isAnthropic) {
       // Anthropic 协议：/v1/messages，x-api-key + anthropic-version
@@ -1052,7 +1098,7 @@ async function callLLMText(systemPrompt: string, userPrompt: string): Promise<st
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model: cfg.model,
+          model,
           max_tokens: 16384,
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
@@ -1070,7 +1116,7 @@ async function callLLMText(systemPrompt: string, userPrompt: string): Promise<st
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model: cfg.model,
+          model,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
@@ -1101,6 +1147,7 @@ async function callLLMText(systemPrompt: string, userPrompt: string): Promise<st
       stopReason = data?.choices?.[0]?.finish_reason || '';
     }
     if (!content) throw new Error('AI 接口返回为空');
+    setCachedLLM(cacheKey, content);
     return content;
   } catch (err: any) {
     console.error('LLM call failed:', err?.message || err);
@@ -1399,7 +1446,7 @@ function escapeRegExp(s: string): string {
 
 export async function generateAgeEvent(ctx: EngineStateContext, isFateNode: boolean, qualityMode: 'full' | 'light' = 'full'): Promise<AIEventOutput> {
   const userPrompt = buildAdvancePrompt(ctx, isFateNode, qualityMode);
-  const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.advance);
+  const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.advance, { qualityMode });
   const sanitized = sanitizeEventOutput(raw, ctx.character.age);
   // 后处理：修正 narrative 中主角年龄数字
   sanitized.narrative = cleanNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);

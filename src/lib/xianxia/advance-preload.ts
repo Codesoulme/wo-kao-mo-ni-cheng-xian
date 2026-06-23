@@ -185,15 +185,19 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   const fateNodeIdx = sameYearThread || timeAdvance.ageDeltaYears <= 0 ? null : checkFateNode(state);
   const referenceFateNode = fateNodeIdx !== null ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
   const isFateNode = false;
-  const ctx = buildStateContext(state, qualityMode === 'light' ? recentEvents.slice(-3) : recentEvents, narrativeContractFeedback);
+  const ctx = buildStateContext(state, recentEvents.slice(qualityMode === 'light' ? -3 : -5), narrativeContractFeedback.slice(-3));
   ctx.blueprint = blueprint;
   ctx.suggestedTimeAdvance = timeAdvance;
   if (options.worldCalendar) ctx.worldCalendar = options.worldCalendar;
   if (Array.isArray(options.previousWorldLegacies)) ctx.previousWorldLegacies = options.previousWorldLegacies;
 
-  // ===== 风格锚定 + 实体库：把历史 AI 风格与已用实体喂给 AI 续写 =====
-  const { formatStyleAnchorsForPrompt, extractStyleAnchor, mergeStyleAnchor } = await import('./style-anchor');
-  const { getEntityEntries, formatEntitiesForPrompt, extractEntitiesFromNarrative, mergeEntities } = await import('./entity-store');
+  // ===== 风格锚定 + 实体库：把历史 AI 风格与已用实体喂给 AI 续写（并行加载） =====
+  const [styleAnchorMod, entityStoreMod] = await Promise.all([
+    import('./style-anchor'),
+    import('./entity-store'),
+  ]);
+  const { formatStyleAnchorsForPrompt, extractStyleAnchor, mergeStyleAnchor } = styleAnchorMod;
+  const { getEntityEntries, formatEntitiesForPrompt, extractEntitiesFromNarrative, mergeEntities } = entityStoreMod;
   // 重新导出别名供下方使用
   const extractStyleAnchorForAge = extractStyleAnchor;
   const styleAnchors: any[] = (() => {

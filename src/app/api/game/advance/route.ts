@@ -459,6 +459,15 @@ ${narrative || ''}`);
       });
     }
 
+    // ===== 后台预热下一岁：玩家点第二次推进时 0 等待 =====
+    if (finalState.alive && !finalState.ascended && !aiOutput.causedDeath && !aiOutput.hasChoice && !aiOutput.triggerCombat) {
+      setImmediate(() => {
+        prepareAdvanceCandidate(char).catch(err => {
+          console.warn('[prefetch-next-age] failed:', err?.message);
+        });
+      });
+    }
+
     return NextResponse.json({
       success: true,
       event: createdEvents[0],
