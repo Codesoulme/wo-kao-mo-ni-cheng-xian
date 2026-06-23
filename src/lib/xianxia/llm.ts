@@ -1315,7 +1315,7 @@ function parseJSON(content: string): any {
 // 适用场景：LLM 输出的 JSON 严重畸形但关键文本字段（narrative/title/memory 等）仍可识别
 function extractFields(s: string): any {
   const result: any = {
-    title: '岁月流转',
+    title: '岁月更迭',
     narrative: '',
     eventType: 'normal',
     changes: [],
@@ -1387,7 +1387,7 @@ function extractFields(s: string): any {
   if (!found) return null;
   // 若 narrative 仍为空，给个占位避免空白事件
   if (!result.narrative) {
-    result.narrative = '这一年虽未见惊天变故，角色仍按自身处境修炼、谋生或寻访机缘，日常积累也在悄然改变道途。';
+    result.narrative = '这一年角色依旧在世间行走，日复一日，修行也好，谋生也罢，皆在道途之上。';
   }
   return result;
 }
@@ -2439,8 +2439,8 @@ function sanitizeEventOutput(raw: any, currentAge = 0): AIEventOutput {
   } : undefined;
 
   return {
-    title: String(raw?.title || '岁月流转').slice(0, 32),
-    narrative: String(raw?.narrative || '这一年未见惊天变故，但角色仍在修炼、谋生、游历或交际中推进自己的道途。'),
+    title: String(raw?.title || '岁月更迭').slice(0, 32),
+    narrative: String(raw?.narrative || '这一年角色依旧在世间行走，日复一日，修行也好，谋生也罢，皆在道途之上。'),
     eventType: ['normal','fate_node','choice','combat','breakthrough','death','ascension'].includes(raw?.eventType) ? raw.eventType : 'normal',
     changes,
     newStatuses: filterMeaningfulStatuses(statuses as any),

@@ -233,6 +233,9 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
       const fallbackAnchor = styleAnchorsRaw.length ? styleAnchorsRaw[styleAnchorsRaw.length - 1] : null;
       const fallbackEntities = entityEntries;
       aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode, { recentEvents, styleAnchor: fallbackAnchor, entityEntries: fallbackEntities });
+      // fallback 路径：清掉 blueprint 标签，避免 "因缘：线索推进" 这类与 narrative 不匹配的标签
+      // BlueprintChip 看到 null 时不渲染
+      blueprint = null;
     }
   }
 
