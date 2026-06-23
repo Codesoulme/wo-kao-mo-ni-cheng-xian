@@ -40,6 +40,9 @@ export function ActionButtons() {
     setExplorationOpen,
     setWorldCalendar,
     setNewEventRange,
+    appendStreamingNarrative,
+    finishStreamingNarrative,
+    clearStreamingNarrative,
     reset,
   } = useGameStore();
 
@@ -149,46 +152,67 @@ export function ActionButtons() {
     setLastBreakthrough(null);
     try {
       await ensureAIConfigured();
-      const res = await fetch('/api/game/advance', {
+      // 流式接口：边读 narrative 边触发气泡
+      const previousEventCount = events.length;
+      setNewEventRange({ start: previousEventCount, end: previousEventCount + 5 }); // 占位：最多 5 段
+      const res = await fetch('/api/game/advance/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
       });
-      const data = await res.json();
-      if (!data.success) {
-        const message = data.error || '推进失败';
-        if (message.includes('战斗进行中')) {
-          const latest = await syncLatestState(character.id);
-          autoCancelRef.current = true;
-          if (latest?.combatSession?.status === 'ongoing') {
-            setError(null);
-            toast('战斗已接续', { description: '请先了结此战，再让岁月继续流转' });
-            return;
+      if (!res.ok || !res.body) {
+        const errText = await res.text().catch(() => '');
+        throw new Error(`HTTP ${res.status} ${errText.slice(0, 200)}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let doneData: any = null;
+      let startedEvent = false;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          let obj: any;
+          try { obj = JSON.parse(trimmed); } catch { continue; }
+          if (obj.type === 'start') {
+            startedEvent = true;
+            // 标记该事件开始 stream（eventIndex = previousEventCount）
+          } else if (obj.type === 'narrative_delta') {
+            if (!startedEvent) startedEvent = true;
+            appendStreamingNarrative(previousEventCount, obj.delta);
+          } else if (obj.type === 'done') {
+            doneData = obj;
+          } else if (obj.type === 'error') {
+            throw new Error(obj.error || 'stream error');
           }
         }
-        throw new Error(message);
       }
+      if (!doneData) throw new Error('流式响应未完成');
+
+      // 流结束：清掉 streamingNarrative 标记，让 EventTimeline 走完整 narrative
+      finishStreamingNarrative();
 
       // 更新角色
-      setCharacter({ ...character, ...data.state, worldCalendar: data.worldTime || data.worldCalendar });
-      if (data.worldCalendar) setWorldCalendar(data.worldCalendar);
-      setLastChange(data.changes || null);
-      if (data.breakthrough) setLastBreakthrough(data.breakthrough);
+      setCharacter({ ...character, ...doneData.state, worldCalendar: doneData.worldTime || doneData.worldCalendar });
+      if (doneData.worldCalendar) setWorldCalendar(doneData.worldCalendar);
+      setLastChange(doneData.changes || null);
+      if (doneData.breakthrough) setLastBreakthrough(doneData.breakthrough);
 
-      // 添加事件；后端可能返回同一岁多段史册记录
-      const returnedEvents = Array.isArray(data.events) && data.events.length ? data.events : [data.event];
-      // 记录新事件索引范围，前端会触发气泡级流式显示
-      const previousEventCount = events.length;
-      setNewEventRange({ start: previousEventCount, end: previousEventCount + returnedEvents.length });
-      // 10 秒后自动清除动画标记（避免翻页后旧事件还触发动画）
-      setTimeout(() => setNewEventRange(null), 10000);
+      // 添加事件
+      const returnedEvents = Array.isArray(doneData.events) && doneData.events.length ? doneData.events : [];
       returnedEvents.forEach((evt: any, idx: number) => addEvent({
         id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
         age: evt.age,
         title: evt.title,
         narrative: evt.narrative,
         eventType: evt.eventType,
-        effects: evt.effects || (idx === 0 ? (data.changes || []) : []),
+        effects: evt.effects || (idx === 0 ? (doneData.changes || []) : []),
         isFateNode: evt.isFateNode,
         fateNodeName: evt.fateNodeName,
         blueprint: evt.blueprint,
@@ -198,14 +222,18 @@ export function ActionButtons() {
         createdAt: evt.createdAt || new Date().toISOString(),
       }));
 
-      // 设置待选择（带上因缘前情提要，供弹窗展示完整情境）
-      if (data.hasChoice && data.choice) {
+      // 标记新事件气泡（流式已经显示，这里给旧 fallback 流程留入口）
+      setNewEventRange({ start: previousEventCount, end: previousEventCount + returnedEvents.length });
+      setTimeout(() => setNewEventRange(null), 10000);
+
+      // 待选择
+      if (doneData.hasChoice && doneData.choice) {
         setPendingChoice({
-          ...data.choice,
-          contextTitle: data.event.title,
-          contextNarrative: data.event.narrative,
-          contextAge: data.event.age,
-          contextFateNodeName: data.fateNodeName,
+          ...doneData.choice,
+          contextTitle: doneData.events?.[0]?.title,
+          contextNarrative: doneData.events?.[0]?.narrative,
+          contextAge: doneData.events?.[0]?.age,
+          contextFateNodeName: doneData.events?.[0]?.fateNodeName,
         });
         toast('因缘转折', { description: '请做出你的抉择' });
         // 因缘抉择中断自动推进
@@ -213,32 +241,35 @@ export function ActionButtons() {
       }
 
       // Task 20: 触发战斗 → 中断自动推进，提示玩家
-      if (data.triggeredCombat) {
-        toast('战斗触发', { description: '请进入战斗界面应战' });
+      if (doneData.triggeredCombat || doneData.hasChoice || doneData.events?.[0]?.isFateNode) {
+        // 战斗或选择触发：中断自动推进
+        if (doneData.triggeredCombat) {
+          toast('战斗触发', { description: '请进入战斗界面应战' });
+        }
         autoCancelRef.current = true;
       }
 
-      if (data.breakthrough) {
-        if (data.breakthrough.major) {
+      if (doneData.breakthrough) {
+        if (doneData.breakthrough.major) {
           toast.success('大境界突破！', { description: `踏入新境界` });
           // 触发突破仪式
-          triggerBreakthroughCeremony(data.state, character);
+          triggerBreakthroughCeremony(doneData.state, character);
         } else {
-          toast.success('小境界突破！', { description: `晋至${data.state.realmLevel + 1}层` });
+          toast.success('小境界突破！', { description: `晋至${doneData.state.realmLevel + 1}层` });
         }
       }
-      if (data.died) {
-        toast.error('角色陨落', { description: data.deathReason });
+      if (doneData.state && !doneData.state.alive) {
+        toast.error('角色陨落', { description: (doneData.state as any).deathReason });
         autoCancelRef.current = true;
       }
-      if (data.ascended) {
+      if (doneData.state && doneData.state.ascended) {
         toast.success('飞升仙界！', { description: '超脱凡俗，与天地同寿' });
         autoCancelRef.current = true;
       }
-      if (data.fallbackGenerated) {
+      if (doneData.fallbackGenerated) {
         toast.warning('AI 响应异常', { description: 'AI 生成失败，已使用模板叙事。请检查 AI 配置或额度。' });
       }
-      if (!data.hasChoice && !data.triggeredCombat && !data.died && !data.ascended) {
+      if (!doneData.hasChoice && !(doneData.state && !doneData.state.alive)) {
         preloadRef.current.key = null;
         prepareNextTurn(character.id);
       }

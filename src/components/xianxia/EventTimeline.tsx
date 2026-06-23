@@ -14,6 +14,8 @@ interface EventTimelineProps {
   showToolbar?: boolean;
   /** 新事件索引范围 [start, end)：这些事件会触发气泡级流式显示 */
   newEventRange?: { start: number; end: number };
+  /** 真正流式：当前正在流式写入的 event */
+  streamingEvent?: { eventIndex: number; text: string } | null;
 }
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -143,7 +145,27 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
  * - 旧事件/已展开：直接全部显示（无动画）
  * - 新事件：逐句出现，间隔 180ms；玩家感觉"AI 在写"
  */
-function StreamingNarrative({ text, isNew }: { text?: string; isNew?: boolean }) {
+function StreamingNarrative({ text, isNew, streamingText }: { text?: string; isNew?: boolean; streamingText?: string }) {
+  // 真正流式：直接显示 streamingText（已包含 LLM 当前已生成的 narrative）
+  if (streamingText !== undefined) {
+    if (!streamingText) {
+      // 还没收到 delta：显示 typing 指示
+      return <p className="text-muted-foreground/50 text-[10px] animate-pulse">…</p>;
+    }
+    const paragraphs = splitNarrativeParagraphs(streamingText);
+    return (
+      <>
+        {paragraphs.map((p, idx) => (
+          <p key={idx} className="first-letter:pl-0 transition-opacity duration-200">
+            {p}
+            {idx === paragraphs.length - 1 && (
+              <span className="inline-block w-1.5 h-3 ml-0.5 bg-foreground/70 animate-pulse align-middle" />
+            )}
+          </p>
+        ))}
+      </>
+    );
+  }
   const paragraphs = useMemo(() => splitNarrativeParagraphs(text), [text]);
   const [visibleCount, setVisibleCount] = useState(isNew ? 0 : paragraphs.length);
 
@@ -239,7 +261,7 @@ function eventTypeLabel(event: GameEvent, prevEvent?: GameEvent) {
   return EVENT_LABELS[event.eventType] || '流年';
 }
 
-export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true, newEventRange }: EventTimelineProps) {
+export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true, newEventRange, streamingEvent }: EventTimelineProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // 用 Set 记录展开的事件 index（按 events 数组顺序）
@@ -490,7 +512,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {isExpanded && (
                   <div className="px-3 pb-2">
                     <div className="space-y-2 text-xs leading-relaxed text-foreground/90 xianxia-prose">
-                      <StreamingNarrative text={event.narrative} isNew={isNewEvent} />
+                      <StreamingNarrative text={event.narrative} isNew={isNewEvent} streamingText={streamingEvent && isNewEvent ? streamingEvent.text : undefined} />
                     </div>
                     {/* 效果 */}
                     {visibleEffects.length > 0 && (

@@ -1156,6 +1156,105 @@ async function callLLMText(systemPrompt: string, userPrompt: string, options: { 
   }
 }
 
+/**
+ * 流式 LLM 调用：边读边触发 onDelta 回调
+ * 协议：OpenAI stream 格式（chunked SSE），Anthropic stream 格式
+ * 返回最终的完整 content 字符串
+ */
+async function callLLMStream(
+  systemPrompt: string,
+  userPrompt: string,
+  onDelta: (delta: string) => void,
+  options: { qualityMode?: 'full' | 'light' } = {},
+): Promise<string> {
+  const cfg = await loadAIConfig();
+  const isLite = options.qualityMode === 'light';
+  const model = isLite && cfg.liteModel ? cfg.liteModel : cfg.model;
+  const isAnthropic = /anthropic/i.test(cfg.baseUrl) || model?.toLowerCase().includes('claude');
+  const headers: Record<string, string> = isAnthropic
+    ? {
+        'Content-Type': 'application/json',
+        'x-api-key': cfg.apiKey,
+        'anthropic-version': '2023-06-01',
+      }
+    : {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cfg.apiKey}`,
+        ...(cfg.chatId ? { 'X-Chat-Id': cfg.chatId } : {}),
+        ...(cfg.userId ? { 'X-User-Id': cfg.userId } : {}),
+      };
+  const body = isAnthropic
+    ? JSON.stringify({
+        model,
+        max_tokens: 16384,
+        stream: true,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+    : JSON.stringify({
+        model,
+        stream: true,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        thinking: { type: 'disabled' },
+      });
+  const endpoint = isAnthropic
+    ? `${cfg.baseUrl.replace(/\/+$/, '')}/v1/messages`
+    : `${cfg.baseUrl}/chat/completions`;
+  const res = await fetch(endpoint, { method: 'POST', headers, body });
+  if (!res.ok || !res.body) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`AI stream failed: HTTP ${res.status} ${errText.slice(0, 200)}`);
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let total = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // OpenAI 用 \n\n 分隔；Anthropic 也类似
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || ''; // 保留未完整行
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      let data = '';
+      if (isAnthropic) {
+        // Anthropic: "event: content_block_delta\ndata: {...}"
+        if (trimmed.startsWith('event:')) continue;
+        if (!trimmed.startsWith('data:')) continue;
+        data = trimmed.slice(5).trim();
+      } else {
+        if (!trimmed.startsWith('data:')) continue;
+        data = trimmed.slice(5).trim();
+      }
+      if (!data || data === '[DONE]') continue;
+      try {
+        const json = JSON.parse(data);
+        let delta = '';
+        if (isAnthropic) {
+          if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
+            delta = json.delta.text || '';
+          }
+        } else {
+          delta = json.choices?.[0]?.delta?.content || '';
+        }
+        if (delta) {
+          total += delta;
+          onDelta(delta);
+        }
+      } catch {
+        // 忽略单行解析错误
+      }
+    }
+  }
+  return total;
+}
+
 // 从 LLM 输出中提取 JSON（兼容 ```json ``` 包装、未转义字符、尾随逗号、中文标点等常见问题）
 // 多层兜底：直接解析 → repairJSON → 字段抽取 → 最小可用 fallback
 function parseJSON(content: string): any {
@@ -1450,6 +1549,34 @@ export async function generateAgeEvent(ctx: EngineStateContext, isFateNode: bool
   const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.advance, { qualityMode });
   const sanitized = sanitizeEventOutput(raw, ctx.character.age);
   // 后处理：修正 narrative 中主角年龄数字
+  sanitized.narrative = cleanNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
+  if (Array.isArray(sanitized.extraEvents)) {
+    sanitized.extraEvents = sanitized.extraEvents.map((event: any) => ({
+      ...event,
+      narrative: cleanNarrativeAge(String(event?.narrative || ''), ctx.character.age, ctx.character.name),
+    }));
+  }
+  if (sanitized.choice?.prompt) {
+    sanitized.choice.prompt = cleanNarrativeAge(sanitized.choice.prompt, ctx.character.age, ctx.character.name);
+  }
+  return sanitized;
+}
+
+/**
+ * 流式生成 age event：LLM 用 stream=true 边读边回调 onNarrativeDelta
+ * onNarrativeDelta: 增量 narrative 字符串（拼到已收到的 narrative 末尾）
+ * 完整输出用 sanitizeEventOutput + cleanNarrativeAge 后处理
+ */
+export async function generateAgeEventStream(
+  ctx: EngineStateContext,
+  isFateNode: boolean,
+  qualityMode: 'full' | 'light',
+  onNarrativeDelta: (delta: string) => void,
+): Promise<AIEventOutput> {
+  const userPrompt = buildAdvancePrompt(ctx, isFateNode, qualityMode);
+  const fullSystem = `${IDENTITY_PROMPT}\n\n${SCENE_PROMPTS.advance}`;
+  const raw = await callLLMStream(fullSystem, userPrompt, onNarrativeDelta, { qualityMode });
+  const sanitized = sanitizeEventOutput(raw, ctx.character.age);
   sanitized.narrative = cleanNarrativeAge(sanitized.narrative, ctx.character.age, ctx.character.name);
   if (Array.isArray(sanitized.extraEvents)) {
     sanitized.extraEvents = sanitized.extraEvents.map((event: any) => ({

@@ -38,7 +38,7 @@ export default function Home() {
   const {
     character, events, pendingChoice, settlementResult, hallOfSimulations,
     setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice, setSettlementResult,
-    newEventRange,
+    newEventRange, streamingNarrative,
   } = useGameStore();
   // 当有 pendingChoice 时自动聚焦到故事 Tab
   const [tab, setTab] = useState('story');
@@ -210,7 +210,7 @@ export default function Home() {
                       onScroll={(e) => { storyScrollTopRef.current = e.currentTarget.scrollTop; }}
                       className="flex-1 overflow-y-auto xianxia-scroll px-3 pb-2"
                     >
-                      <EventTimeline events={events} newEventRange={newEventRange ?? undefined} />
+                      <EventTimeline events={events} newEventRange={newEventRange ?? undefined} streamingEvent={streamingNarrative ?? undefined} />
                     </div>
                     {/* 推进按钮 */}
                     <div className="shrink-0 px-3 py-2 border-t border-border/40 bg-card/40">

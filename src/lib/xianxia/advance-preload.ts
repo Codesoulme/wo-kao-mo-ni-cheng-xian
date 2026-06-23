@@ -127,7 +127,7 @@ function buildSameYearContinuationBlueprint(threadTitle: string): EventBlueprint
   };
 }
 
-export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>, options: { qualityMode?: 'full' | 'light'; worldCalendar?: any; previousWorldLegacies?: any[] } = {}) {
+export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>, options: { qualityMode?: 'full' | 'light'; worldCalendar?: any; previousWorldLegacies?: any[]; skipLlm?: boolean } = {}) {
   const qualityMode = options.qualityMode || 'full';
   const recentEvents = await getRecentEvents(char.id);
   // Dedup: detect repeated event titles at current age
@@ -218,6 +218,9 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
       narrativeOutcome: sameYearThread.category === 'competition' ? 'resolved' : 'advanced',
       contractNote: `同年续写：${sameYearThread.title}`,
     };
+  } else if (options.skipLlm) {
+    // 流式路由调用：跳过 LLM，留着空 aiOutput 让上层手动生成
+    aiOutput = null;
   } else {
     try {
       aiOutput = await generateAgeEvent(ctx, isFateNode, qualityMode);

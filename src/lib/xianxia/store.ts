@@ -277,12 +277,17 @@ interface GameState {
   clearSelectedHeritage: () => void;
   // 气泡级流式显示：新事件索引范围 [start, end)；null 表示无新事件（关闭动画）
   newEventRange: { start: number; end: number } | null;
+  // 真正流式：当前正在写入的 narrative（含主叙事 + 增量和）；为空则走原气泡逻辑
+  streamingNarrative: { eventIndex: number; text: string } | null;
   setNewEventRange: (range: { start: number; end: number } | null) => void;
   setSettlementResult: (result: SettlementResult | null) => void;
   addHallRecord: (record: SimulationHallRecord) => void;
   setWorldCalendar: (world: WorldCalendarState) => void;
   advanceWorldCalendar: (time?: TimeAdvance | null) => WorldCalendarState;
   addWorldLegacy: (record: WorldLegacyRecord) => void;
+  appendStreamingNarrative: (eventIndex: number, delta: string) => void;
+  finishStreamingNarrative: () => void;
+  clearStreamingNarrative: () => void;
   resetWorldLocal: () => void;
   reset: () => void;
 }
@@ -313,6 +318,7 @@ export const useGameStore = create<GameState>()(
       worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
       worldLegacies: [],
       newEventRange: null,
+      streamingNarrative: null,
 
       setCharacter: (c) => set({ character: c }),
       setEvents: (e) => set({ events: e }),
@@ -340,6 +346,16 @@ export const useGameStore = create<GameState>()(
       }),
       setSelectedHeritage: (selected) => set({ selectedHeritage: selected }),
       setNewEventRange: (range) => set({ newEventRange: range }),
+      appendStreamingNarrative: (eventIndex, delta) => set((s) => {
+        const cur = s.streamingNarrative;
+        if (cur && cur.eventIndex === eventIndex) {
+          return { streamingNarrative: { eventIndex, text: cur.text + delta } };
+        }
+        // 新事件：重置
+        return { streamingNarrative: { eventIndex, text: delta } };
+      }),
+      finishStreamingNarrative: () => set({ streamingNarrative: null }),
+      clearStreamingNarrative: () => set({ streamingNarrative: null }),
       toggleSelectedHeritage: (item) => set((s) => {
         const current = s.selectedHeritage[item.category] || [];
         const exists = current.some((it) => it.id === item.id);
