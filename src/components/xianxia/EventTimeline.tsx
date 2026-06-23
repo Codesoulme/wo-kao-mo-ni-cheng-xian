@@ -218,12 +218,12 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
       const style = getComputedStyle(node);
       const overflowY = style.overflowY;
       if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
-        // target.offsetTop 是相对最近 positioned 祖先；最稳妥是用 getBoundingClientRect 算
+        // 用 getBoundingClientRect 算目标相对容器的位置，再预留足够顶部空间避免被 fixed/sticky header 遮挡
         const containerRect = node.getBoundingClientRect();
         const targetRect = target.getBoundingClientRect();
         const offset = targetRect.top - containerRect.top + node.scrollTop;
-        // 把新事件第一条卡片滚到容器顶部偏上一点的位置（避免贴边）
-        node.scrollTo({ top: Math.max(0, offset - 16), behavior: 'smooth' });
+        // 滚动后让卡片顶部在容器内 80px 处，给顶部状态栏/标签栏留出视觉空间
+        node.scrollTo({ top: Math.max(0, offset - 80), behavior: 'smooth' });
         setPendingScrollIndex(null);
         return;
       }
