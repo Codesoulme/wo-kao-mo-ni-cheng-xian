@@ -126,18 +126,19 @@ export function ResetWorldButton() {
             <AlertDialogDescription className="leading-6">
               这会清空所有角色存档、事件史册、选择记录、传承池、仙路殿堂、全局仙历与历代遗响。
               适合大版本改动后重新测试，但此操作不可撤销。
-              <div className="mt-3 text-foreground">
-                请输入 <span className="font-bold text-destructive">「{CONFIRM_WORD}」</span> 以确认：
-                <Input
-                  className="mt-2"
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder={CONFIRM_WORD}
-                  disabled={busy}
-                />
-              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {/* 不能放进 AlertDialogDescription（渲染成 <p>），独立放在 header 外的 div 里避免 p > div 嵌套错误 */}
+          <div className="mt-3 px-1 text-foreground">
+            请输入 <span className="font-bold text-destructive">「{CONFIRM_WORD}」</span> 以确认：
+            <Input
+              className="mt-2"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder={CONFIRM_WORD}
+              disabled={busy}
+            />
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={busy}>取消</AlertDialogCancel>
             <AlertDialogAction
