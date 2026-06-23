@@ -258,9 +258,12 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     aiOutput: { ...aiOutput, timeAdvance: clampTimeAdvance(aiOutput?.timeAdvance, timeAdvance) },
     isFateNode,
     fateNode: referenceFateNode,
+    recentEvents,
+    narrativeContractFeedback,
     recentBlueprintCategories,
     baseAge: char.age,
     baseStateHash: buildAdvanceStateHash(char),
+    timeAdvance,
   };
 }
 

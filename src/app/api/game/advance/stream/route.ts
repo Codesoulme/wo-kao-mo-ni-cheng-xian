@@ -50,7 +50,9 @@ export async function POST(req: NextRequest) {
       try {
         await runAdvance(req, write, close);
       } catch (err: any) {
-        write({ type: 'error', error: err?.message || 'stream failed' });
+        const msg = err?.message || 'stream failed';
+        const stack = err?.stack?.split('\n').slice(0, 3).join(' | ');
+        write({ type: 'error', error: msg, stack });
       } finally {
         close();
       }
@@ -102,8 +104,8 @@ async function runAdvance(req: NextRequest, write: (obj: any) => void, _close: (
   const blueprint = candidate.blueprint;
   const isFateNode = candidate.isFateNode;
   const fateNode = candidate.fateNode;
-  const recentEvents = candidate.recentEvents;
-  const narrativeContractFeedback = candidate.narrativeContractFeedback;
+  const recentEvents = candidate.recentEvents || [];
+  const narrativeContractFeedback = candidate.narrativeContractFeedback || [];
   const timeAdvance = clampTimeAdvance(candidate.timeAdvance);
 
   // 2) 流式生成 aiOutput
@@ -146,6 +148,7 @@ async function runAdvance(req: NextRequest, write: (obj: any) => void, _close: (
   }
 
   // 4) 引擎执行 AI 输出
+  const stateBeforeEvent = state as any;
   const result = executeAIEvent(state as any, aiOutput);
   let finalState = result.state;
 
@@ -211,7 +214,16 @@ async function runAdvance(req: NextRequest, write: (obj: any) => void, _close: (
 
   // 11) 构造事件
   const finalNarrative = truncateNarrativeAtSentence(completeNarrative(aiOutput.narrative || ''), 420);
-  const displayEffects = buildEventDisplayEffects(aiOutput);
+  const displayEffects = buildEventDisplayEffects({
+    before: stateBeforeEvent,
+    after: finalState,
+    changes: result.appliedChanges,
+    newStatuses: aiOutput.newStatuses,
+    newItems: aiOutput.newItems,
+    newEquippedItems: aiOutput.newEquippedItems,
+    newPets: aiOutput.newPets,
+    removedItemIds: aiOutput.removedItemIds,
+  });
   const eventDraft = sanitizeEventDraft({ title: aiOutput.title, narrative: finalNarrative }, finalState.age);
   const eventDrafts: any[] = [{
     age: finalState.age,
