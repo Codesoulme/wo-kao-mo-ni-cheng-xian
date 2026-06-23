@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { GameEvent } from '@/lib/xianxia/store';
 import { cn } from '@/lib/utils';
@@ -165,6 +165,9 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
   // 跟踪上次 events 长度，用于在事件数量变化时重置展开状态
   const [prevEventsLen, setPrevEventsLen] = useState(events.length);
   const lastAutoScrollLenRef = useRef(events.length);
+  // 本次新增事件的第一条 index；用来滚到它而不是最底
+  const [pendingScrollIndex, setPendingScrollIndex] = useState<number | null>(null);
+  const newEventCardRef = useRef<HTMLDivElement | null>(null);
 
   const sameAgeMeta = useMemo(() => {
     const ageCounts = new Map<number, number>();
@@ -181,6 +184,8 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
   // 当事件数量变化时，重置展开状态：默认展开最后 N 条
   // 使用"渲染期间调整状态"模式（React 推荐）避免 useEffect 内 setState
   if (events.length !== prevEventsLen) {
+    const newFirstIndex = Math.min(prevEventsLen, events.length);
+    if (newFirstIndex < events.length) setPendingScrollIndex(newFirstIndex);
     setPrevEventsLen(events.length);
     setExpandedSet(prev => {
       if (events.length === 0) return new Set();
@@ -198,22 +203,28 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
     });
   }
 
-  // 只在新增史册事件时滚到最新；切换标签页或展开/折叠不改变玩家离开时的位置。
+  // 只在新增史册事件时滚到本次新增事件的第一条；切换标签页或展开/折叠不改变玩家离开时的位置。
   useEffect(() => {
     if (events.length <= lastAutoScrollLenRef.current) {
       lastAutoScrollLenRef.current = events.length;
       return;
     }
     lastAutoScrollLenRef.current = events.length;
-    const el = endRef.current;
-    if (!el) return;
-    // 向上查找最近的可滚动祖先
-    let node: HTMLElement | null = el.parentElement;
+    // 优先滚到本次新增事件的第一条卡片；拿不到就兜底滚到底
+    const target = newEventCardRef.current || endRef.current;
+    if (!target) return;
+    let node: HTMLElement | null = target.parentElement;
     while (node) {
       const style = getComputedStyle(node);
       const overflowY = style.overflowY;
       if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
-        node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+        // target.offsetTop 是相对最近 positioned 祖先；最稳妥是用 getBoundingClientRect 算
+        const containerRect = node.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const offset = targetRect.top - containerRect.top + node.scrollTop;
+        // 把新事件第一条卡片滚到容器顶部偏上一点的位置（避免贴边）
+        node.scrollTo({ top: Math.max(0, offset - 16), behavior: 'smooth' });
+        setPendingScrollIndex(null);
         return;
       }
       node = node.parentElement;
@@ -320,6 +331,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
 
               {/* 卡片 - 可点击折叠 */}
               <div
+                ref={idx === pendingScrollIndex ? newEventCardRef : undefined}
                 className={cn(
                   "rounded-lg border shadow-sm cursor-pointer transition-all",
                   isFate ? "border-primary/40 bg-primary/5" :
