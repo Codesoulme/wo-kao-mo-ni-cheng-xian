@@ -4593,16 +4593,16 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     effectResolveWarnings.push(...resolved.effectResolveWarnings);
   };
 
-  // 0. 年龄驱动的身体成长：凡人/低境界角色 attack/defense/speed/maxHp 随年龄自然增长
-  // 修真后属性保留（身体不再退化），但凡人/低境界会逐渐接近 baseline
-  const bodyGrowth = applyAgeBasedBodyGrowth(next, next.age);
+  // 0. 年龄驱动的身体成长 + 叙事修正：凡人/低境界角色 attack/defense/speed/maxHp 随年龄自然增长
+  // 但 narrative 里"久病/缠绵病榻"等关键词会压低 baseline（修真者属性保留）
+  const bodyGrowth = applyAgeBasedBodyGrowth(next, next.age, aiOutput.narrative);
   if (bodyGrowth.growth.attack || bodyGrowth.growth.defense || bodyGrowth.growth.speed || bodyGrowth.growth.maxHp) {
     next = bodyGrowth.state;
     effectResolveTrace.push({
       severity: 'info',
       code: 'age_body_growth',
       attribute: '*',
-      message: `Age ${next.age} body growth: factor=${bodyGrowth.factor.toFixed(2)}, realmMult=${bodyGrowth.realmMultiplier.toFixed(2)}, deltas=atk:${bodyGrowth.growth.attack} def:${bodyGrowth.growth.defense} spd:${bodyGrowth.growth.speed} hp:${bodyGrowth.growth.maxHp}`,
+      message: `Age ${next.age} body growth: factor=${bodyGrowth.factor.toFixed(2)}, realmMult=${bodyGrowth.realmMultiplier.toFixed(2)}, bodyMod=${bodyGrowth.bodyModifier.mode}(${bodyGrowth.bodyModifier.multiplier}x, ${bodyGrowth.bodyModifier.reason}), deltas=atk:${bodyGrowth.growth.attack} def:${bodyGrowth.growth.defense} spd:${bodyGrowth.growth.speed} hp:${bodyGrowth.growth.maxHp}`,
       source: aiOutput.title || 'age-body-growth',
     });
   }

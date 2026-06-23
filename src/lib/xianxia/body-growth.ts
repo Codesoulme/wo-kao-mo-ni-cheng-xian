@@ -5,9 +5,16 @@
  * 修真后由功法/境界倍率再放大
  *
  * 这是纯引擎行为：不依赖 AI 输出、不依赖 narrative 关键词
- * 在 executeAIEvent 流程最早期调用一次，确保属性随年龄长
+ * 在 executeAIEvent 流程最早期调用，确保属性随年龄长
+ *
+ * 第二阶段：叙事身体修正
+ * - 叙事写"久病/缠绵病榻" → body 压到 baseline 30%
+ * - 叙事写"病弱/旧疾" → body 压到 baseline 50%
+ * - 叙事写"病愈/初愈" → body 恢复 baseline
+ * - 修真后属性保留：current > 修正后 baseline 时保留 current
  */
 import type { CharacterState } from './types';
+import { detectBodyModifier } from './narrative-body-modifier';
 
 // 各境界的"凡人成年体"基线（attack/defense/speed/maxHp）
 // 凡人=1x，炼气=1.5x，筑基=2x，金丹=3x，元婴=4x...
@@ -65,26 +72,40 @@ export interface BodyGrowthResult {
   };
   factor: number;
   realmMultiplier: number;
+  bodyModifier: {
+    mode: 'healthy' | 'weak' | 'critically_ill' | 'recovered';
+    multiplier: number;
+    reason: string;
+  };
 }
 
 /**
- * 应用年龄驱动的身体成长
- * - 计算新 baseline = MORTAL_PEAK * ageFactor * realmMultiplier
- * - 如果当前属性 < 新 baseline，提升到新 baseline（身体在成长）
- * - 如果当前属性 > 新 baseline（如修真后属性远超凡人），不降低（修真成果不被衰老抹除）
- * - 修真后 attack 30、defense 30 → 80 岁后不再涨到 baseline，但也不会"老到掉回 5"
+ * 应用年龄驱动的身体成长（+ 叙事修正）
  *
- * 这意味着：修真者继续成长修真属性，body 永远是其修真巅峰的下限
+ * @param state 当前状态
+ * @param newAge 推进后的年龄
+ * @param narrative 当岁 narrative（用于检测病弱/垂危等）
+ *
+ * 计算：
+ * 1. ageFactor（新年龄）
+ * 2. realmMultiplier（境界）
+ * 3. narrativeBodyMultiplier（叙事修正：1.0 / 0.5 / 0.3）
+ * 4. baseline = MORTAL_PEAK * ageFactor * realmMultiplier * narrativeBodyMultiplier
+ * 5. current > baseline → 保留 current（修真成果不被抹除）
+ * 6. current < baseline → 拉到 baseline（身体在成长 / 病愈）
+ * 7. current >> baseline（如修真者）→ 修真巅峰保留
  */
-export function applyAgeBasedBodyGrowth(state: CharacterState, newAge: number): BodyGrowthResult {
+export function applyAgeBasedBodyGrowth(state: CharacterState, newAge: number, narrative?: string): BodyGrowthResult {
   const factor = ageGrowthFactor(newAge);
   const realmMult = REALM_BODY_MULTIPLIER[state.realm] ?? 1.0;
-  const baselineAttack = Math.round(MORTAL_PEAK.attack * factor * realmMult);
-  const baselineDefense = Math.round(MORTAL_PEAK.defense * factor * realmMult);
-  const baselineSpeed = Math.round(MORTAL_PEAK.speed * factor * realmMult);
-  const baselineMaxHp = Math.round(MORTAL_PEAK.maxHp * factor * realmMult);
+  const bodyMod = detectBodyModifier(narrative || '');
+  const effectiveMult = realmMult * bodyMod.multiplier;
+  const baselineAttack = Math.round(MORTAL_PEAK.attack * factor * effectiveMult);
+  const baselineDefense = Math.round(MORTAL_PEAK.defense * factor * effectiveMult);
+  const baselineSpeed = Math.round(MORTAL_PEAK.speed * factor * effectiveMult);
+  const baselineMaxHp = Math.round(MORTAL_PEAK.maxHp * factor * effectiveMult);
 
-  // 修真后属性保留：若当前 attack > baselineAttack，取当前值
+  // 修真者属性保留：若 current > baseline，取 current（修真巅峰不被病弱压低）
   const newAttack = Math.max(state.attack, baselineAttack);
   const newDefense = Math.max(state.defense, baselineDefense);
   const newSpeed = Math.max(state.speed, baselineSpeed);
@@ -106,5 +127,10 @@ export function applyAgeBasedBodyGrowth(state: CharacterState, newAge: number): 
     },
     factor,
     realmMultiplier: realmMult,
+    bodyModifier: {
+      mode: bodyMod.mode,
+      multiplier: bodyMod.multiplier,
+      reason: bodyMod.reason,
+    },
   };
 }

@@ -2140,6 +2140,100 @@ function smokeBodyGrowth(): void {
   });
 }
 
+function smokeBodyModifier(): void {
+  // 叙事身体修正：从 narrative 关键词检测身体状态
+  const { detectBodyModifier } = require('../src/lib/xianxia/narrative-body-modifier');
+  // 测试 1: 缠绵病榻
+  const t1 = '那年寒冬，他缠绵病榻三月有余，瘦得只剩一把骨头。';
+  const r1 = detectBodyModifier(t1);
+  assert(r1.mode === 'critically_ill' && r1.multiplier === 0.30, `缠绵病榻 → critically_ill 0.3x: ${JSON.stringify(r1)}`);
+
+  // 测试 2: 久病
+  const t2 = '他自幼体弱，瘦弱不堪。';
+  const r2 = detectBodyModifier(t2);
+  assert(r2.mode === 'weak' && r2.multiplier === 0.50, `体弱瘦弱 → weak 0.5x: ${JSON.stringify(r2)}`);
+
+  // 测试 3: 病愈（"初愈"必须先匹配，不能被"久病"抢先）
+  const t3 = '他久病初愈，下了床慢慢走了一圈。';
+  const r3 = detectBodyModifier(t3);
+  assert(r3.mode === 'recovered' && r3.multiplier === 1.0, `久病初愈 → recovered 1.0x: ${JSON.stringify(r3)}`);
+
+  // 测试 4: 健康
+  const t4 = '他在山间采药，每日劳作，身体愈发健壮。';
+  const r4 = detectBodyModifier(t4);
+  assert(r4.mode === 'healthy' && r4.multiplier === 1.0, `健康 → healthy 1.0x: ${JSON.stringify(r4)}`);
+
+  // 测试 5: 重病
+  const t5 = '那日他忽染重病，一病不起，气息奄奄。';
+  const r5 = detectBodyModifier(t5);
+  assert(r5.mode === 'critically_ill', `气息奄奄 → critically_ill: ${JSON.stringify(r5)}`);
+
+  // 测试 6: 先天不足
+  const t6 = '他生来先天不足，体弱多病。';
+  const r6 = detectBodyModifier(t6);
+  assert(r6.mode === 'weak', `先天不足 → weak: ${JSON.stringify(r6)}`);
+
+  // 测试 7: 空 narrative
+  const r7 = detectBodyModifier('');
+  assert(r7.mode === 'healthy' && r7.multiplier === 1.0, `空 → healthy: ${JSON.stringify(r7)}`);
+
+  log('body-modifier', {
+    passed: true,
+    t1: r1.mode, t2: r2.mode, t3: r3.mode, t4: r4.mode, t5: r5.mode, t6: r6.mode,
+  });
+}
+
+function smokeBodyGrowthWithNarrative(): void {
+  // 集成测试：年龄 + 叙事修正 协同工作
+  const { applyAgeBasedBodyGrowth } = require('../src/lib/xianxia/body-growth');
+  const baseMortal = {
+    age: 0, realm: 'mortal', spiritualRoot: 'common',
+    cultivationMultiplier: 1, cultivationExp: 0, expToBreak: 100,
+    hp: 50, maxHp: 50, mp: 50, maxMp: 50,
+    attack: 0, defense: 0, speed: 0, luck: 5, comprehension: 5,
+    heartDemon: 0, lifespan: 80,
+  } as any;
+
+  // 测试 1: 25 岁健康凡人 → attack 5
+  let s = applyAgeBasedBodyGrowth(baseMortal, 25, '他打猎归来，酒足饭饱，身体健壮。').state;
+  assert(s.attack === 5, `25岁健康凡人 attack=5: ${s.attack}`);
+
+  // 测试 2: 25 岁体弱凡人 → attack 应该是 round(5*1*0.5)=round(2.5)=3 但 current 0 → max(0, 3) = 3
+  s = applyAgeBasedBodyGrowth(baseMortal, 25, '他自幼体弱，瘦弱不堪，连锄头都举不起。').state;
+  assert(s.attack === 3, `25岁体弱凡人 attack=3: ${s.attack}`);
+
+  // 测试 3: 25 岁缠绵病榻 → attack 应该是 round(5*0.3)=round(1.5)=2
+  s = applyAgeBasedBodyGrowth(baseMortal, 25, '他缠绵病榻，气息奄奄，濒临死亡。').state;
+  assert(s.attack === 2, `25岁重病凡人 attack=2: ${s.attack}`);
+
+  // 测试 4: 修真后 25 岁 + 重病叙事 → attack 保留修真巅峰
+  const advanced = { ...baseMortal, attack: 30, defense: 30, speed: 30, maxHp: 200, realm: 'golden_core' };
+  s = applyAgeBasedBodyGrowth(advanced, 25, '他缠绵病榻，卧床不起。').state;
+  assert(s.attack === 30, `修真者重病 attack 保留: ${s.attack}`);
+
+  // 测试 5: 病愈后 → 拉回 baseline
+  const sick = { ...baseMortal, attack: 2, defense: 2, speed: 2, maxHp: 20 };
+  s = applyAgeBasedBodyGrowth(sick, 25, '他久病初愈，下床活动，身体正在恢复。').state;
+  assert(s.attack === 5, `病愈后 attack 拉回 5: ${s.attack}`);
+  assert(s.maxHp === 50, `病愈后 maxHp 拉回 50: ${s.maxHp}`);
+
+  // 测试 6: 体弱修真者 → body 仍受 modifier 影响
+  // 修真后 maxHp 200，body 成长 baseline * 0.5 = 25 → max(200, 25) = 200 保留
+  const adv2 = { ...baseMortal, attack: 30, maxHp: 200, realm: 'qi_refining' };
+  s = applyAgeBasedBodyGrowth(adv2, 25, '他自幼体弱，虽已炼气仍气血两亏。').state;
+  assert(s.attack === 30, `修真体弱者 attack 仍保留: ${s.attack}`);
+  assert(s.maxHp === 200, `修真体弱者 maxHp 仍保留: ${s.maxHp}`);
+
+  log('body-growth-narrative', {
+    passed: true,
+    healthy25: applyAgeBasedBodyGrowth(baseMortal, 25, '健康').state.attack,
+    weak25: applyAgeBasedBodyGrowth(baseMortal, 25, '体弱').state.attack,
+    sick25: applyAgeBasedBodyGrowth(baseMortal, 25, '缠绵病榻').state.attack,
+    advSick25: applyAgeBasedBodyGrowth(advanced, 25, '缠绵病榻').state.attack,
+    recovered: applyAgeBasedBodyGrowth(sick, 25, '久病初愈').state.attack,
+  });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -2206,6 +2300,8 @@ async function main(): Promise<void> {
   smokeNarrativeCompletion();
   smokeNarrativeInference();
   smokeBodyGrowth();
+  smokeBodyModifier();
+  smokeBodyGrowthWithNarrative();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
