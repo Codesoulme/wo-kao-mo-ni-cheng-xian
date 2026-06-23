@@ -92,7 +92,7 @@ const MECHANISM_PATTERNS: Array<[RegExp, string | ((m: string) => string)]> = [
   [/[（\(【\[][+\-]?\d+[】\)\]\)】]/g, ''],
 ];
 
-export function sanitizeNarrativeText(text: string): string {
+export function sanitizeNarrativeText(text: string, currentAge?: number): string {
   if (!text || typeof text !== 'string') return text ?? '';
   let result = '';
   let lastIndex = 0;
@@ -149,14 +149,41 @@ export function sanitizeNarrativeText(text: string): string {
   // 清理多余空格
   result = result.replace(/ {2,}/g, ' ').trim();
   result = result.replace(/[，,。\.、;：:]{2,}/g, '，').trim();
+
+  // 校准叙事里的"X岁"与当前年龄一致
+  // 例：玩家5岁，AI 写了"六岁生辰"或"七岁时他上山"——前者是"生辰"= N+1（合理），后者是事实错位（必须改）
+  if (typeof currentAge === 'number' && Number.isFinite(currentAge) && currentAge >= 0) {
+    // 收集"X岁"所有出现位置，对每处检查"前/后语境"决定是否替换
+    const ageRe = /(\d+)\s*岁(?![\d])/g;
+    const targets: { start: number; end: number; num: number; before: string; after: string }[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = ageRe.exec(result)) !== null) {
+      const start = m.index;
+      const end = start + m[0].length;
+      const num = parseInt(m[1], 10);
+      const before = result.slice(Math.max(0, start - 8), start);
+      const after = result.slice(end, Math.min(result.length, end + 8));
+      targets.push({ start, end, num, before, after });
+    }
+    // 倒序替换，避免位移
+    for (let i = targets.length - 1; i >= 0; i--) {
+      const t = targets[i];
+      if (t.num === currentAge) continue;
+      // 白名单：后跟"生辰/生日/周岁/满"，表示"将/已到达 N 岁"
+      if (/(生辰|生日|周岁|满)[\u00b7\.\s\u3000]?$/.test(t.after)) continue;
+      // 白名单：年长者称呼，如"百岁老翁" "千岁老祖"等不影响主角
+      // 替换成 currentAge
+      result = result.slice(0, t.start) + `${currentAge}岁` + result.slice(t.end);
+    }
+  }
   return result;
 }
 
-export function sanitizeEventDraft<T extends { title?: string; narrative?: string }>(draft: T): T {
+export function sanitizeEventDraft<T extends { title?: string; narrative?: string }>(draft: T, currentAge?: number): T {
   return {
     ...draft,
-    title: draft.title ? sanitizeNarrativeText(draft.title) : draft.title,
-    narrative: draft.narrative ? sanitizeNarrativeText(draft.narrative) : draft.narrative,
+    title: draft.title ? sanitizeNarrativeText(draft.title, currentAge) : draft.title,
+    narrative: draft.narrative ? sanitizeNarrativeText(draft.narrative, currentAge) : draft.narrative,
   };
 }
 

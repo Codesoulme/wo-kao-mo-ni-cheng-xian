@@ -346,8 +346,8 @@ ${narrative || ''}`);
 
     const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[]; timeAdvance?: any; worldTime?: any; actionProjections?: any[] }[] = [{
       // 主事件只记录这一段时日发生的因果；不要因为最终数值成功突破，就把“冲关前夜/开始冲关”提前包装成已破境。
-      title: sanitizeEventDraft({ title: aiOutput.title, narrative: '' }).title,
-      narrative: sanitizeEventDraft({ title: '', narrative: aiOutput.narrative }).narrative,
+      title: sanitizeEventDraft({ title: aiOutput.title, narrative: '' }, finalState.age).title,
+      narrative: sanitizeEventDraft({ title: '', narrative: aiOutput.narrative }, finalState.age).narrative,
       eventType: isFateNode ? 'fate_node' : visibleEventType(aiOutput.eventType, aiOutput.title, aiOutput.narrative),
       effects: [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime: stampedWorldTime, actionProjections: baseActionProjections })],
       timeAdvance,
@@ -374,7 +374,7 @@ ${narrative || ''}`);
         timeAdvance: extraTimeAdvance,
         worldTime: extraWorldTime,
         actionProjections: extraActions,
-      }));
+      }, finalState.age));
     }
     for (const continuation of sameYearContinuationDrafts) {
       if (continuation.timeAdvance) eventWorldCalendarCursor = advanceWorldCalendar(eventWorldCalendarCursor, continuation.timeAdvance);
@@ -386,7 +386,7 @@ ${narrative || ''}`);
         ...continuation,
         worldTime: continuationWorldTime,
         effects: [...continuation.effects, hiddenEventMeta({ timeAdvance: continuation.timeAdvance, worldTime: continuationWorldTime, actionProjections: continuation.actionProjections })],
-      }));
+      }, finalState.age));
     }
 
     // 若引擎最终确认已经突破，单独追加一条破境成功记载。
