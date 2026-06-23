@@ -229,6 +229,9 @@ export function ActionButtons() {
         toast.success('飞升仙界！', { description: '超脱凡俗，与天地同寿' });
         autoCancelRef.current = true;
       }
+      if (data.fallbackGenerated) {
+        toast.warning('AI 响应异常', { description: 'AI 生成失败，已使用模板叙事。请检查 AI 配置或额度。' });
+      }
       if (!data.hasChoice && !data.triggeredCombat && !data.died && !data.ascended) {
         preloadRef.current.key = null;
         prepareNextTurn(character.id);

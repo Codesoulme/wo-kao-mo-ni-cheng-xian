@@ -8,6 +8,7 @@ import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extra
 import { registerItem } from '../src/lib/xianxia/content-registry';
 import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
 import { characterDisplayEntries, entriesForSlot } from '../src/lib/xianxia/display-registry';
+import { sanitizeNarrativeText, sanitizeEventDraft } from '../src/lib/xianxia/display';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -1714,6 +1715,68 @@ function smokeSameYearThreadNormalizedProgress100(): void {
   log('same-year-thread-normalized-progress100', { passed: true });
 }
 
+function smokeNoMechanismWordsInNarrative(): void {
+  // 文案过滤层验证：sanitizeNarrativeText 应移除内部机制词
+  // 验证策略：检查结果中不包含字段名、调试元词等机制词；不检查数值残留（来自原始文本，预期会部分残留）
+  const inputOutputs: Array<[string, RegExp[]]> = [
+    ['你获得了 cultivationExp 50点修为', [/\bcultivationExp\b/i]],                          // cultivationExp 字段必须清除
+    ['心魔heartDemon增加了2层', [/\bheartDemon\b/i]],                                       // heartDemon 字段必须清除
+    ['剩余灵石 spiritStones 100颗', [/\bspiritStones?\b/i]],                               // spiritStones 字段必须清除
+    ['你的 pendingThreads 中有一条新线索', [/\bpendingThreads?\b/i]],                       // pendingThreads 字段必须清除
+    ['触发 progress 50 的进度判定', [/\bprogress\b/i]],                                      // progress 字段必须清除
+    ['debug error cache api', [/\b(?:debug|log|error|test|cache)\b/i]],                  // 调试元词必须清除
+    ['P0 P1 preload stateHash', [/\b(?:P0|P1|preload|stateHash)\b/]],                   // 内部标记词必须清除
+    ['气血上限 maxHp 已满', [/\bmaxHp\b/i]],                                                // maxHp 字段必须清除
+    ['攻击 attack 提升', [/\battack\b/i]],                                                  // attack 字段必须清除
+    ['普通叙事文字无变化', []],                                                               // 无机制词保持不变
+  ];
+  let allPassed = true;
+  for (const [input, forbidden] of inputOutputs) {
+    const result = sanitizeNarrativeText(input);
+    const remaining = forbidden.filter(r => r.test(result));
+    if (remaining.length > 0) {
+      allPassed = false;
+      log('mechanism-word-filter-failed', { input, forbidden: remaining.map(r => r.source), got: result });
+    }
+  }
+  // 关键字段替换映射正确性
+  assert(sanitizeNarrativeText('spiritStones') === '灵石', 'spiritStones should map to 灵石');
+  assert(sanitizeNarrativeText('cultivationExp') === '修为', 'cultivationExp should map to 修为');
+  assert(sanitizeNarrativeText('heartDemon') === '心魔', 'heartDemon should map to 心魔');
+  assert(sanitizeNarrativeText('pendingThreads') === '因缘线索', 'pendingThreads should map to 因缘线索');
+  assert(sanitizeNarrativeText('debug cache error') === '', 'debug words should be removed');
+  assert(allPassed, 'sanitizeNarrativeText should clean all mechanism words correctly');
+  // sanitizeEventDraft 验证
+  const draft = sanitizeEventDraft({ title: '标题含 cultivationExp', narrative: '修为+30点 spiritStones 消耗' });
+  assert(!draft.title.includes('cultivationExp'), 'draft title should be sanitized');
+  assert(!draft.narrative.includes('cultivationExp'), 'draft narrative should be sanitized');
+  assert(!draft.narrative.includes('spiritStones'), 'draft narrative should have spiritStones replaced');
+  log('smoke-no-mechanism-words', { passed: true });
+}
+
+function smokeYoungCharacterNoAdultAction(): void {
+  // 幼龄角色（age < 12）不应触发成人化事件调度
+  // 验证 buildWorldPressureOpportunityMap 对幼龄角色不推荐成人化活动
+  const youngState: any = {
+    name: '小童',
+    age: 7,
+    lifespan: 80,
+    realm: 'mortal',
+    realmLevel: 0,
+    pendingThreads: [],
+    activeStatuses: [],
+    inventory: [],
+    equipped: [],
+    location: '村庄',
+  };
+  const pressureMap = buildWorldPressureOpportunityMap(youngState, []);
+  // 幼龄角色 summary 中不应出现成人化关键词
+  const summaryText = pressureMap.summary || '';
+  const adultKeywords = /交易|拍卖|秘境|洞府|遗迹|传承|宗门|历练|闯荡|修行|闭关/;
+  assert(!adultKeywords.test(summaryText), `young child (age 7) world pressure summary should not contain adult activities: ${summaryText}`);
+  log('smoke-young-character-no-adult-action', { passed: true, summary: summaryText });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -1764,6 +1827,8 @@ async function main(): Promise<void> {
   smokeClosedThreadCannotBeAdvanced();
   await smokePreloadInvalidationReason();
   smokeSameYearThreadNormalizedProgress100();
+  smokeNoMechanismWordsInNarrative();
+  smokeYoungCharacterNoAdultAction();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }

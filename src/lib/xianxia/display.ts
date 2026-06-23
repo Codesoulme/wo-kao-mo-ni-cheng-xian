@@ -54,9 +54,110 @@ export function isVisibleNumericEventEffect(eff: any): boolean {
   if (!attr || HIDDEN_EFFECT_ATTRIBUTES.has(attr)) return false;
   const delta = Number(eff.delta || 0);
   if (delta === 0) return false;
-  // 背包数量是内部计数，不用 +1/-1 打断沉浸；保留 reason，如“得 回春符”“售 木剑”
+  // 背包数量是内部计数，不用 +1/-1 打断沉浸；保留 reason，如"得 回春符""售 木剑"
   if (attr === 'inventory' && !String(eff.reason || '').trim()) return false;
   return true;
+}
+
+// ─── 文案过滤层：移除玩家可见叙事中的机制词 ────────────────────────────────────
+// 策略：单次扫描文本，每段匹配到则替换/删除，跳过已处理区域，避免重复替换
+// 何时调用：所有 API 返回 narrative/title 前
+
+const MECHANISM_PATTERNS: Array<[RegExp, string | ((m: string) => string)]> = [
+  // 内部字段名（全大写驼峰/蛇底，替换为玩家能理解的词）
+  [/\bcultivationExp\b/gi, '修为'],
+  [/\bheartDemon\b/gi, '心魔'],
+  [/\bspiritStones?\b/gi, '灵石'],
+  [/\bpendingThreads?\b/gi, '因缘线索'],
+  [/\bquestEntries?\b/gi, '任务'],
+  [/\bhp\b/gi, '气血'],
+  [/\bmaxHp\b/gi, '气血上限'],
+  [/\bmp\b/gi, '灵力'],
+  [/\bmaxMp\b/gi, '灵力上限'],
+  [/\battack\b/gi, '攻'],
+  [/\bdefense\b/gi, '守'],
+  [/\bspeed\b/gi, '敏'],
+  [/\breputation\b/gi, '声望'],
+  [/\blifespan\b/gi, '寿元'],
+  // 数值变化词（AI叙事中最常见的泄露形式）
+  [/[+\-×*]?\d{1,8}(?:点|层|颗|枚)/g, ''],
+  [/(\+|\-|±)\d{1,8}(?!\w)/g, ''],
+  [/[+\-]?\d{1,8}(?:%|％)/g, ''],
+  // progress 裸值
+  [/\bprogress\s*\d+/gi, ''],
+  // 内部/调试元词
+  [/\b(?:debug|log|error|test|cache|config|api|route)\b/gi, ''],
+  [/\b(?:P0|P1|P2|P3|IDEMPOTENT|preload|pre_load|stateHash)\b/g, ''],
+  // 括号内的数值摘要
+  [/[（\(【\[][+\-]?\d+[】\)\]\)】]/g, ''],
+];
+
+export function sanitizeNarrativeText(text: string): string {
+  if (!text || typeof text !== 'string') return text ?? '';
+  let result = '';
+  let lastIndex = 0;
+
+  // 全局查找所有匹配片段并去重（处理重叠/嵌套匹配）
+  type Segment = { start: number; end: number; replacement: string };
+  const segments: Segment[] = [];
+
+  for (const [pattern, replacement] of MECHANISM_PATTERNS) {
+    pattern.lastIndex = 0; // reset per pattern
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      const rep = typeof replacement === 'function' ? replacement(match[0]) : replacement;
+      // 保留最长 replacement（去重）
+      const existing = segments.findIndex(s => s.start === start && s.end === end);
+      if (existing === -1 || rep.length > segments[existing].replacement.length) {
+        if (existing !== -1) segments.splice(existing, 1);
+        segments.push({ start, end, replacement: rep });
+      }
+      // 防止死循环：单字符匹配无进展时跳到下一位置
+      if (end === start) pattern.lastIndex = start + 1;
+    }
+  }
+
+  // 无匹配直接返回原文本
+  if (!segments.length) return text;
+
+  // 按位置顺序合并重叠片段
+  segments.sort((a, b) => a.start - b.start || b.replacement.length - a.replacement.length);
+  const merged: Segment[] = [];
+  for (const seg of segments) {
+    const last = merged[merged.length - 1];
+    if (last && seg.start <= last.end) {
+      // 重叠：保留较长 replacement 的那个
+      if (seg.replacement.length > last.replacement.length) {
+        merged[merged.length - 1] = seg;
+      }
+    } else {
+      merged.push(seg);
+    }
+  }
+
+  // 重建文本
+  let pos = 0;
+  for (const seg of merged) {
+    result += text.slice(pos, seg.start);
+    result += seg.replacement;
+    pos = seg.end;
+  }
+  result += text.slice(pos);
+
+  // 清理多余空格
+  result = result.replace(/ {2,}/g, ' ').trim();
+  result = result.replace(/[，,。\.、;：:]{2,}/g, '，').trim();
+  return result;
+}
+
+export function sanitizeEventDraft<T extends { title?: string; narrative?: string }>(draft: T): T {
+  return {
+    ...draft,
+    title: draft.title ? sanitizeNarrativeText(draft.title) : draft.title,
+    narrative: draft.narrative ? sanitizeNarrativeText(draft.narrative) : draft.narrative,
+  };
 }
 
 export function formatEventEffectLabel(eff: any): string {

@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { POST as advanceOne } from '../advance/route';
 
 export const runtime = 'nodejs';
@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
       deathReason: finalStep?.deathReason,
       ascended: Boolean(finalStep?.ascended),
       triggeredCombat: Boolean(finalStep?.triggeredCombat),
+      fallbackGenerated: Boolean(finalStep?.fallbackGenerated),
       state: finalStep?.state,
     });
   } catch (err: any) {

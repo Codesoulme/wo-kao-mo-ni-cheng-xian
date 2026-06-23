@@ -71,6 +71,72 @@ export function buildFallbackAgeEvent(state: any, blueprint: any, ctx: any, isFa
         }],
         defeatCost: isArena ? '擂台失利，声望受损' : '遭敌重创，可能遗失财物或留下伤势',
       },
+      isFallbackGenerated: true,
+    };
+  }
+
+  // 6岁以下幼童：只写被动感知、基本生理反应、在成人协助下的简单互动
+  if (age < 6) {
+    const infantTemplates = age < 1
+      ? [
+          {
+            title: '襁褓之中',
+            narrative: `${state.name}尚在襁褓之中，整日或是酣睡，或是因饥饿与不适而啼哭。窗外有鸟雀声、屋内有亲人低语，懵懂之间似在感受这世间的温度。`,
+            changes: [{ attribute: 'hp', delta: 2, reason: '健康成长' }],
+            insight: '襁褓之中，以养育为主。',
+          },
+          {
+            title: '周岁将至',
+            narrative: `${state.name}满周岁不久，肌肤娇嫩，所见不过母亲怀抱与屋顶光影。偶尔发热或夜惊，亲人彻夜照看。这一年里，她学会了在人怀中安睡。`,
+            changes: [{ attribute: 'hp', delta: 3, reason: '周岁平安' }],
+            insight: '周岁幼子，需细心呵护。',
+          },
+        ]
+      : [
+          {
+            title: '蹒跚学步',
+            narrative: `${age}岁，${state.name}在${place}蹒跚学步，偶有跌倒，但亲人及时扶起。一年里她学会了叫爸妈，见生人会害羞躲进大人身后，对家中圈养的小鸡格外好奇。`,
+            changes: [{ attribute: 'hp', delta: 2, reason: '孩童发育' }],
+            insight: '幼童成长，以养代修。',
+          },
+          {
+            title: '童蒙初开',
+            narrative: `${age}岁，${state.name}常被祖父抱在膝上讲故事，似懂非懂地听人提起"仙缘"二字。午后她在院中玩泥巴、追蝴蝶，偶尔被父亲抱到田间看人劳作。`,
+            changes: [{ attribute: 'hp', delta: 2, reason: '童蒙发育' }],
+            insight: '童蒙初开，心性纯然。',
+          },
+          {
+            title: '山间童趣',
+            narrative: `${age}岁，${state.name}在${place}附近的山坡上追兔子、摘野果，衣服总是弄得很脏，但少有危险。傍晚她蹲在溪边看小鱼，被爷爷肩头扛着回了家。`,
+            changes: [{ attribute: 'hp', delta: 3, reason: '孩童发育' }],
+            insight: '山野之间，童趣天成。',
+          },
+        ];
+    const picked = infantTemplates[seed % infantTemplates.length];
+    return {
+      title: picked.title,
+      narrative: picked.narrative,
+      eventType: 'normal',
+      changes: picked.changes,
+      newStatuses: [],
+      newItems: [],
+      removedItemIds: [],
+      newEquippedItems: [],
+      equipItemIds: [],
+      unequipItemIds: [],
+      memory: `${age}岁，${picked.title}。`,
+      cultivationInsight: picked.insight,
+      hasChoice: false,
+      choice: null,
+      triggeredBreakthrough: false,
+      causedDeath: false,
+      causedAscension: false,
+      newThreads: [],
+      advanceThreads: [],
+      completeThreadIds: [],
+      failThreadIds: [],
+      triggerCombat: null,
+      isFallbackGenerated: true,
     };
   }
 
@@ -154,5 +220,6 @@ export function buildFallbackAgeEvent(state: any, blueprint: any, ctx: any, isFa
     completeThreadIds: [],
     failThreadIds: [],
     triggerCombat: null,
+    isFallbackGenerated: true,
   };
 }

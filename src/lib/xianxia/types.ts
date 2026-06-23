@@ -86,7 +86,7 @@ export const REALMS: RealmInfo[] = [
     baseLifespan: 120,
     expPerLevel: 200,
     color: '#84cc16',
-    description: '感应天地灵气，引气入体，洗筋伐髓。',
+    description: '感应天地灵气，引气入体，迈入修仙门槛。寿元一百二十载，可习低阶功法和简单术式。',
   },
   {
     id: 'foundation',
@@ -96,7 +96,7 @@ export const REALMS: RealmInfo[] = [
     baseLifespan: 200,
     expPerLevel: 600,
     color: '#22c55e',
-    description: '凝聚灵根，奠定道基，可御器飞行。',
+    description: '凝聚道基，可御器飞行，可用古宝、丹药、阵法辅助修行。寿元二百载，筑基修士在修仙界已算一方势力。',
   },
   {
     id: 'golden_core',
@@ -106,7 +106,7 @@ export const REALMS: RealmInfo[] = [
     baseLifespan: 500,
     expPerLevel: 1800,
     color: '#eab308',
-    description: '金丹大成，寿元大增，神通初显。',
+    description: '金丹大成，寿元五百载，神通初显，可开辟洞府、收徒立派。金丹修士是各大势力的骨干。',
   },
   {
     id: 'nascent_soul',
@@ -116,7 +116,7 @@ export const REALMS: RealmInfo[] = [
     baseLifespan: 1000,
     expPerLevel: 5400,
     color: '#f97316',
-    description: '元婴出窍，神通大成，移山填海。',
+    description: '元婴出窍，神通大成，寿元千载，可移山填海、炼制傀儡、布置大阵。元婴修士已是世人眼中的神仙人物。',
   },
   {
     id: 'spirit_severing',
@@ -126,7 +126,7 @@ export const REALMS: RealmInfo[] = [
     baseLifespan: 2000,
     expPerLevel: 16200,
     color: '#ef4444',
-    description: '化神入道，可局部修改法则，寿元绵长。',
+    description: '化神入道，寿元两千载，可局部操控天地法则，举手投足可灭一方修士。化神修士已是传说。',
   },
   {
     id: 'great_vehicle',
@@ -136,7 +136,7 @@ export const REALMS: RealmInfo[] = [
     baseLifespan: 5000,
     expPerLevel: 48600,
     color: '#a855f7',
-    description: '大乘圆满，可修改时间速率，俯瞰众生。',
+    description: '大乘圆满，寿元五千载，可操控时间流速，一念可定凡间兴亡。此境距渡劫仅一步之遥。',
   },
   {
     id: 'tribulation',
@@ -146,7 +146,7 @@ export const REALMS: RealmInfo[] = [
     baseLifespan: 10000,
     expPerLevel: 100000,
     color: '#ec4899',
-    description: '天劫降临，生死考验，过则飞升。',
+    description: '天劫降临，生死考验，过则飞升成仙，败则形神俱灭。渡劫是修仙路上最凶险的一关，十不存一。',
   },
   {
     id: 'ascension',
@@ -156,7 +156,7 @@ export const REALMS: RealmInfo[] = [
     baseLifespan: 99999,
     expPerLevel: 999999,
     color: '#fbbf24',
-    description: '超脱凡俗，飞升仙界，与天地同寿。',
+    description: '超脱凡俗，飞升仙界，与天地同寿，与日月同辉。仙界之事，非下界修士所能揣测。',
   },
 ];
 

@@ -1,4 +1,4 @@
-﻿// POST /api/game/alchemy
+// POST /api/game/alchemy
 // 炼丹：投入 2-3 味材料 + 灵石，产出丹药或焦丹。
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -8,6 +8,7 @@ import { dbToState, alchemy, computeAlchemyHints, buildStateContext, recordActio
 import { generateAlchemyOutcome } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
+import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
     }
 
     const result = alchemy(state, materialIds, cost, aiOutcome || undefined);
+    const safeNarrative = sanitizeNarrativeText(result.narrative);
 
     if (!result.ok) {
       return NextResponse.json({ success: false, error: result.error }, { status: 400 });
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest) {
       actionId: `alchemy_${state.age}_${materialIds.join('_')}`,
       actionType: 'alchemy',
       title: result.success ? `炼成${result.product?.name || '丹药'}` : '炼丹焦炉',
-      summary: result.narrative,
+      summary: safeNarrative,
       tags: ['alchemy', result.success ? 'success' : 'failed'],
       newItems: result.product ? [result.product] : [],
       consumedItems: result.consumedMaterials,
@@ -149,7 +151,7 @@ export async function POST(req: NextRequest) {
         characterId,
         age: finalState.age,
         title: result.success ? `开炉炼成${result.product?.name || '丹药'}` : '炼丹失手成焦丹',
-        narrative: result.narrative,
+        narrative: safeNarrative,
         eventType: 'alchemy',
         effects: JSON.stringify(effectsWithAudit),
       },
@@ -158,7 +160,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       alchemySuccess: result.success,
-      narrative: result.narrative,
+      narrative: safeNarrative,
       product: result.product,
       consumedMaterials: result.consumedMaterials.map(material => ({ id: material.id, name: material.name })),
       spiritStoneCost: result.spiritStoneCost,

@@ -8,6 +8,7 @@ import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addM
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
+import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
     } catch { /* ignore parse errors */ }
 
     const result = await generateChoiceResult(ctx, choicePrompt, chosenOption.text);
+    const safeNarrative = sanitizeNarrativeText(result.narrative);
 
     // 应用变更
     state = applyChanges(state, result.changes || []);
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
       state = startCombat(state, {
         ...result.triggerCombat,
         contextTitle: `抉择：${chosenOption.text.slice(0, 12)}`,
-        contextNarrative: result.narrative || result.triggerCombat.contextNarrative,
+        contextNarrative: safeNarrative || result.triggerCombat.contextNarrative,
       });
     } else if (deferredCombat) {
       state = startCombat(state, deferredCombat);
@@ -174,7 +176,7 @@ export async function POST(req: NextRequest) {
           prompt: nextChoice.prompt,
           options: nextChoice.options,
           contextTitle: `抉择：${chosenOption.text.slice(0, 12)}`,
-          contextNarrative: result.narrative,
+          contextNarrative: safeNarrative,
           contextAge: state.age,
         })
       : '';
@@ -194,7 +196,7 @@ export async function POST(req: NextRequest) {
       actionId: `choice_${state.age}_${chosenIndex}_${chosenOption.text.slice(0, 16)}`,
       actionType: 'choice',
       title: `抉择：${chosenOption.text.slice(0, 18)}`,
-      summary: result.narrative,
+      summary: safeNarrative,
       tags: ['choice'],
       newItems: result.newItems || [],
       removedItems,
@@ -285,7 +287,7 @@ export async function POST(req: NextRequest) {
         options: JSON.stringify(options),
         chosenIndex,
         chosenText: chosenOption.text,
-        result: result.narrative,
+        result: safeNarrative,
       },
     });
 
@@ -307,7 +309,7 @@ export async function POST(req: NextRequest) {
         characterId,
         age: state.age,
         title: `抉择：${chosenOption.text.slice(0, 12)}`,
-        narrative: result.narrative,
+        narrative: safeNarrative,
         eventType: 'choice',
         effects: JSON.stringify(effectsWithAudit),
       },
@@ -315,7 +317,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      narrative: result.narrative,
+      narrative: safeNarrative,
       changes: result.changes,
       newStatuses: result.newStatuses,
       newItems: result.newItems,

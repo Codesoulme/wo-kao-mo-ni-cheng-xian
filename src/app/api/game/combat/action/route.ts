@@ -1,4 +1,4 @@
-﻿// POST /api/game/combat/action
+// POST /api/game/combat/action
 // 战斗回合行动：执行一回合，并记录隐藏审计。
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,6 +15,7 @@ import {
 } from '@/lib/xianxia/engine';
 import { generateCombatRoundNarrative, generateCombatRoundProposal } from '@/lib/xianxia/llm';
 import { buildStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
+import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 import type { AttributeChange } from '@/lib/xianxia/types';
 import { z } from 'zod';
 
@@ -217,7 +218,7 @@ export async function POST(req: NextRequest) {
           endStatus: result.endStatus,
         });
       }
-      result.round.narrative = narrative;
+      result.round.narrative = sanitizeNarrativeText(narrative);
       if (state.combatSession?.log?.length) {
         const log = [...state.combatSession.log];
         const lastIdx = log.length - 1;

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { executeAIEvent, checkLifespan, applyChanges, stateToResponse, tryBreakthrough, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tryHeartDemonTrial, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { sanitizeEventDraft } from '@/lib/xianxia/display';
 import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-log';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { getRealmInfo } from '@/lib/xianxia/types';
@@ -345,8 +346,8 @@ ${narrative || ''}`);
 
     const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[]; timeAdvance?: any; worldTime?: any; actionProjections?: any[] }[] = [{
       // 主事件只记录这一段时日发生的因果；不要因为最终数值成功突破，就把“冲关前夜/开始冲关”提前包装成已破境。
-      title: aiOutput.title,
-      narrative: aiOutput.narrative,
+      title: sanitizeEventDraft({ title: aiOutput.title, narrative: '' }).title,
+      narrative: sanitizeEventDraft({ title: '', narrative: aiOutput.narrative }).narrative,
       eventType: isFateNode ? 'fate_node' : visibleEventType(aiOutput.eventType, aiOutput.title, aiOutput.narrative),
       effects: [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime: stampedWorldTime, actionProjections: baseActionProjections })],
       timeAdvance,
@@ -365,15 +366,15 @@ ${narrative || ''}`);
       finalWorldCalendar = eventWorldCalendarCursor;
       finalWorldTime = extraWorldTime;
       const extraActions = sanitizeActionProjections(extra.actionProjections);
-      eventDrafts.push({
-        title: extra.title,
-        narrative: extra.narrative,
+      eventDrafts.push(sanitizeEventDraft({
+        title: extra.title || '',
+        narrative: extra.narrative || '',
         eventType: visibleEventType(extra.eventType || 'normal', extra.title, extra.narrative),
         effects: [hiddenEventMeta({ timeAdvance: extraTimeAdvance, worldTime: extraWorldTime, actionProjections: extraActions })],
         timeAdvance: extraTimeAdvance,
         worldTime: extraWorldTime,
         actionProjections: extraActions,
-      });
+      }));
     }
     for (const continuation of sameYearContinuationDrafts) {
       if (continuation.timeAdvance) eventWorldCalendarCursor = advanceWorldCalendar(eventWorldCalendarCursor, continuation.timeAdvance);
@@ -381,11 +382,11 @@ ${narrative || ''}`);
       const continuationWorldTime = continuation.timeAdvance ? stampEventTime(worldTimeStamp(eventWorldCalendarCursor, continuationPhaseHint), continuation.timeAdvance, false) : finalWorldTime;
       finalWorldCalendar = eventWorldCalendarCursor;
       finalWorldTime = continuationWorldTime;
-      eventDrafts.push({
+      eventDrafts.push(sanitizeEventDraft({
         ...continuation,
         worldTime: continuationWorldTime,
         effects: [...continuation.effects, hiddenEventMeta({ timeAdvance: continuation.timeAdvance, worldTime: continuationWorldTime, actionProjections: continuation.actionProjections })],
-      });
+      }));
     }
 
     // 若引擎最终确认已经突破，单独追加一条破境成功记载。
@@ -477,6 +478,8 @@ ${narrative || ''}`);
       ascended: finalState.ascended,
       // Task 20: 是否触发战斗（前端据此打开 CombatModal）
       triggeredCombat: !!finalState.combatSession,
+      // Task: fallback 生成标记——通知前端 AI 调用失败，用了模板生成
+      fallbackGenerated: Boolean(aiOutput.isFallbackGenerated),
       state: stateToResponse(finalState),
     });
   } catch (err: any) {

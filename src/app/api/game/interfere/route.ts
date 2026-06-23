@@ -1,4 +1,4 @@
-﻿// POST /api/game/interfere
+// POST /api/game/interfere
 // 玩家在任意时刻输入"干扰模拟"
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -7,6 +7,7 @@ import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, applySpiritualRootChange, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
     const ctx = buildStateContext(state, recentEvents);
 
     const result = await generateInterfereResponse(ctx, input.trim());
+    const safeNarrative = sanitizeNarrativeText(result.narrative);
 
     // 仅当 accepted 时应用变更
     let died = false;
@@ -118,7 +120,7 @@ export async function POST(req: NextRequest) {
         state = startCombat(state, {
           ...result.triggerCombat,
           contextTitle: '干扰·天道回响',
-          contextNarrative: result.narrative || result.triggerCombat.contextNarrative,
+          contextNarrative: safeNarrative || result.triggerCombat.contextNarrative,
         });
       }
       // 干扰连续性兜底：只要玩家干扰被接受且不是纯数值小动作，写入一条余波线索，
@@ -141,7 +143,7 @@ export async function POST(req: NextRequest) {
         state = addThreads(state, [{
           id: `thread_interfere_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
           title: `${titleBase}余波`,
-          description: `${String(result.narrative || input).slice(0, 90)}。此事尚有余绪未平，${state.name}存了继续追究之心，未敢轻易搁下。`,
+          description: `${String(safeNarrative || input).slice(0, 90)}。此事尚有余绪未平，${state.name}存了继续追究之心，未敢轻易搁下。`,
           category: 'quest',
           startAge: state.age,
           deadlineAge: state.age + 1,
@@ -185,7 +187,7 @@ export async function POST(req: NextRequest) {
         actionId: `interference_${state.age}_${Date.now().toString(36)}`,
         actionType: 'interference',
         title: '干扰·天道回响',
-        summary: result.narrative,
+        summary: safeNarrative,
         tags: ['interference', result.classification || 'unknown'],
         newItems: result.newItems || [],
         removedItems,
@@ -275,7 +277,7 @@ export async function POST(req: NextRequest) {
         age: state.age,
         input: input.trim(),
         classification: result.classification,
-        response: result.narrative,
+        response: safeNarrative,
         effects: JSON.stringify(effectsWithAudit),
         accepted: result.accepted,
       },
@@ -287,7 +289,7 @@ export async function POST(req: NextRequest) {
         characterId,
         age: state.age,
         title: result.accepted ? '干扰·天道回响' : '干扰·世界如常',
-        narrative: result.narrative,
+        narrative: safeNarrative,
         eventType: 'interference',
         effects: JSON.stringify(effectsWithAudit),
       },
@@ -297,7 +299,7 @@ export async function POST(req: NextRequest) {
       success: true,
       classification: result.classification,
       accepted: result.accepted,
-      narrative: result.narrative,
+      narrative: safeNarrative,
       changes: result.accepted ? result.changes : [],
       newStatuses: result.accepted ? result.newStatuses : [],
       newItems: result.accepted ? result.newItems : [],

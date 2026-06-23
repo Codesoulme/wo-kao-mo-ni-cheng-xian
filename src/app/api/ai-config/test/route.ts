@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -51,25 +51,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '请填写模型名' }, { status: 400 });
     }
 
-    const endpoint = `${baseUrl}/chat/completions`;
+    const isAnthropic = /anthropic/i.test(baseUrl) || model.toLowerCase().includes('claude');
     const started = Date.now();
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: '你是一个接口连通性测试助手，只返回 OK。' },
-          { role: 'user', content: '请只回复 OK' },
-        ],
-        max_tokens: 128,
-        temperature: 0,
-        thinking: { type: 'disabled' },
-      }),
-    });
+    let res: Response;
+    if (isAnthropic) {
+      const endpoint = `${baseUrl.replace(/\/+$/, '')}/v1/messages`;
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 128,
+          system: '你是一个接口连通性测试助手，只返回 OK。',
+          messages: [{ role: 'user', content: '请只回复 OK' }],
+        }),
+      });
+    } else {
+      res = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: '你是一个接口连通性测试助手，只返回 OK。' },
+            { role: 'user', content: '请只回复 OK' },
+          ],
+          max_tokens: 128,
+          temperature: 0,
+          thinking: { type: 'disabled' },
+        }),
+      });
+    }
     const elapsedMs = Date.now() - started;
     const text = await res.text();
     let data: any = null;
@@ -84,7 +103,16 @@ export async function POST(req: NextRequest) {
       }, { status: 200 });
     }
 
-    const reply = data?.choices?.[0]?.message?.content || '';
+    let reply = '';
+    if (isAnthropic) {
+      const blocks = data?.content || [];
+      reply = blocks
+        .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
+        .map((b: any) => b.text)
+        .join('\n');
+    } else {
+      reply = data?.choices?.[0]?.message?.content || '';
+    }
     return NextResponse.json({
       success: true,
       status: res.status,
