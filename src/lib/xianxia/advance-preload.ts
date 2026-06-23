@@ -191,6 +191,18 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   if (options.worldCalendar) ctx.worldCalendar = options.worldCalendar;
   if (Array.isArray(options.previousWorldLegacies)) ctx.previousWorldLegacies = options.previousWorldLegacies;
 
+  // ===== 风格锚定 + 实体库：把历史 AI 风格与已用实体喂给 AI 续写 =====
+  const { formatStyleAnchorsForPrompt, extractStyleAnchor, mergeStyleAnchor } = await import('./style-anchor');
+  const { getEntityEntries, formatEntitiesForPrompt, extractEntitiesFromNarrative, mergeEntities } = await import('./entity-store');
+  // 重新导出别名供下方使用
+  const extractStyleAnchorForAge = extractStyleAnchor;
+  const styleAnchors: any[] = (() => {
+    try { return JSON.parse((char as any).styleAnchorsJson || '[]'); } catch { return []; }
+  })();
+  const entityEntries = getEntityEntries(char as any);
+  ctx.styleAnchorsPrompt = formatStyleAnchorsForPrompt(styleAnchors);
+  ctx.entityEntriesPrompt = formatEntitiesForPrompt(entityEntries);
+
   let aiOutput;
   if (sameYearThread) {
     aiOutput = buildThreadContinuationEvent(state, sameYearThread);
@@ -207,7 +219,29 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
       aiOutput = await generateAgeEvent(ctx, isFateNode, qualityMode);
     } catch (llmErr: any) {
       console.error('LLM advance prepare failed, using fallback:', llmErr?.message || llmErr);
-      aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode, { recentEvents });
+      // 风格锚定 + 实体库喂给 fallback：让 fallback 文本"读起来像 AI 写的"
+      const styleAnchorsRaw: any[] = (() => {
+        try { return JSON.parse((char as any).styleAnchorsJson || '[]'); } catch { return []; }
+      })();
+      const fallbackAnchor = styleAnchorsRaw.length ? styleAnchorsRaw[styleAnchorsRaw.length - 1] : null;
+      const fallbackEntities = entityEntries;
+      aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode, { recentEvents, styleAnchor: fallbackAnchor, entityEntries: fallbackEntities });
+    }
+  }
+
+  // ===== 写回：把本次 AI 输出的风格 + 实体合并到 character =====
+  if (aiOutput && aiOutput.narrative && typeof aiOutput.narrative === 'string' && !aiOutput.fallbackGenerated) {
+    try {
+      const newAnchor = extractStyleAnchorForAge(state.age, aiOutput.narrative);
+      const newEntities = extractEntitiesFromNarrative(state.age, aiOutput.narrative);
+      const anchorJson = mergeStyleAnchor(char as any, newAnchor);
+      const entityJson = mergeEntities(char as any, newEntities);
+      await db.character.update({
+        where: { id: char.id },
+        data: { styleAnchorsJson: anchorJson, entityEntriesJson: entityJson },
+      });
+    } catch (e) {
+      console.warn('Failed to persist style anchor / entity entries:', (e as any)?.message);
     }
   }
 

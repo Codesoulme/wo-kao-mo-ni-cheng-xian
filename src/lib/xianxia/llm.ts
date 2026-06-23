@@ -361,6 +361,9 @@ function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean, qualit
 - 少写空泛铺陈，优先写角色今年做了什么、为什么这样做、留下什么后果。
 - 若出现战斗、秘境、拍卖、突破、重大选择，仍按完整关键事件质量书写，不要省略因果。
 ` : '';
+  // 风格锚定 + 实体库：让 AI 续写时维持同一笔触、复用已有 NPC/地点/物件
+  const styleAnchorsBlock = (ctx as any).styleAnchorsPrompt ? `\n${(ctx as any).styleAnchorsPrompt}\n` : '';
+  const entityBlock = (ctx as any).entityEntriesPrompt ? `\n${(ctx as any).entityEntriesPrompt}\n` : '';
   const sc = ctx.character;
   const elements = `金${sc.elements.metal}/木${sc.elements.wood}/水${sc.elements.water}/火${sc.elements.fire}/土${sc.elements.earth}`;
   const statusList = ctx.activeStatuses.length
@@ -467,7 +470,7 @@ ${curInsight || '（尚未生成，本轮请首次生成）'}
 【当前修炼速度来源条目】（引擎权威计算，数字准确，与顶部倍率一致；你必须在 cultivationInsight 文本中引用这些来源与数字，不可编造或增减）
 ${engineFactors}
 ${speedGuidance}
-
+${styleAnchorsBlock}${entityBlock}
 【事件蓝图区】（本轮事件必须围绕此主题展开——天道抽取，你不可更改）
 主题：${ctx.blueprint ? `${ctx.blueprint.name}（分类：${ctx.blueprint.category}）` : '无（自由发挥，但须避免与最近事件类型重复）'}
 ${ctx.blueprint ? `描述：${ctx.blueprint.description}` : ''}

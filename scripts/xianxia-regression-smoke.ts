@@ -1841,6 +1841,55 @@ function smokeFallbackPlainTemplate(): void {
   log('fallback-plain-template', { passed: true, strategy: result.fallbackStrategy });
 }
 
+function smokeStyleAnchorExtraction(): void {
+  // 风格锚定：能从 narrative 提取 tone/句长/标点密度/开头模式/片段样本
+  const { extractStyleAnchor, formatStyleAnchorsForPrompt } = require('../src/lib/xianxia/style-anchor');
+  const narrative = '那年夏天日头毒，茅听澎蹲在院角看蚂蚁搬家。泥土热得烫手，他拿小树枝拨了一下，蚂蚁慌慌张张绕开了。他笑了一下，又去够下一只。午后风起，母亲叫他进屋喝水，他应了一声，却没动。';
+  const anchor = extractStyleAnchor(5, narrative);
+  assert(anchor.age === 5, 'age should be preserved');
+  assert(['tender', 'tense', 'mellow', 'somber', 'epic'].includes(anchor.tone), `tone should be valid, got ${anchor.tone}`);
+  assert(anchor.avgSentenceLen > 0, 'avgSentenceLen should be > 0');
+  assert(anchor.openingPattern.length > 0, 'openingPattern should be non-empty');
+  assert(anchor.sampleSnippet.length > 0, 'sampleSnippet should be non-empty');
+  const prompt = formatStyleAnchorsForPrompt([anchor]);
+  assert(prompt.includes('风格锚定'), 'prompt should include 风格锚定 marker');
+  assert(prompt.includes('茅听澎') || prompt.includes('蚂蚁') || prompt.includes('院角'), 'prompt should include a snippet excerpt');
+  log('style-anchor-extraction', { passed: true, tone: anchor.tone, avgSentenceLen: anchor.avgSentenceLen, snippetLen: anchor.sampleSnippet.length });
+}
+
+function smokeEntityStoreExtraction(): void {
+  // 实体库：能从 narrative 提取 NPC/地点/物品
+  const { extractEntitiesFromNarrative, formatEntitiesForPrompt } = require('../src/lib/xianxia/entity-store');
+  const narrative = '那年夏天，茅听澎蹲在院角看蚂蚁搬家。祖父茅老栓从堂屋拿出半截灰布擦汗，母亲刘氏端来一碗凉茶。青云镇的虎子也跑来玩，带来的小竹笛丢在草丛里。';
+  const entities = extractEntitiesFromNarrative(5, narrative);
+  const npcs = entities.filter((e: any) => e.type === 'npc').map((e: any) => e.name);
+  const places = entities.filter((e: any) => e.type === 'place').map((e: any) => e.name);
+  const items = entities.filter((e: any) => e.type === 'item').map((e: any) => e.name);
+  assert(npcs.length > 0, `should extract at least one NPC, got: ${npcs.join(',')}`);
+  assert(places.length > 0, `should extract at least one place, got: ${places.join(',')}`);
+  const prompt = formatEntitiesForPrompt(entities);
+  assert(prompt.includes('已有素材库'), 'prompt should include 已有素材库 marker');
+  log('entity-store-extraction', { passed: true, npcs, places, items });
+}
+
+function smokeRhythmVariation(): void {
+  // 韵律变化：fallback 生成时能按 style anchor 调整
+  const { applyRhythmVariation, injectEntityFragment } = require('../src/lib/xianxia/advance-fallback');
+  const { extractStyleAnchor } = require('../src/lib/xianxia/style-anchor');
+  const { extractEntitiesFromNarrative } = require('../src/lib/xianxia/entity-store');
+  const narrative = '5岁，她抄着手倚在院门边看日头，半眯着眼。';
+  const anchor = extractStyleAnchor(5, narrative);
+  // 长叙事测试拆句
+  const longText = '茅听澎蹲在院角看蚂蚁搬家，一蹲就是半个时辰，腿都麻了，伸手揉了揉膝盖，又看蚂蚁列队从墙根过。';
+  const varied = applyRhythmVariation(longText, anchor);
+  assert(typeof varied === 'string' && varied.length > 0, 'should produce non-empty varied text');
+  // 实体注入
+  const entities = extractEntitiesFromNarrative(5, narrative);
+  const injected = injectEntityFragment('他在院中玩泥。', entities);
+  assert(injected.length > 0, 'injection should produce non-empty text');
+  log('rhythm-variation', { passed: true, variedLength: varied.length, injectedLength: injected.length });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -1897,6 +1946,9 @@ async function main(): Promise<void> {
   smokeFallbackSameAgeVariant();
   smokeFallbackElementEnrichment();
   smokeFallbackPlainTemplate();
+  smokeStyleAnchorExtraction();
+  smokeEntityStoreExtraction();
+  smokeRhythmVariation();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }

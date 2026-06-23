@@ -110,6 +110,13 @@ model Character {
   // 灵宠有独立 hp/attack/loyalty/satiety，每岁需要喂养（消耗材料类物品）
   petsJson       String   @default("[]")
 
+  // ===== 风格锚定（让 AI 续写时维持同一笔触；让 fallback 模仿 AI 韵律） =====
+  // 最多 3 条；新条目按 LRU 替换。每条含 age/tone/avgSentenceLen/punctuation/openingPattern/sampleSnippet
+  styleAnchorsJson String @default("[]")
+  // ===== 实体库（让 AI 续写时保持 NPC/地点/物品名一致） =====
+  // 最多 30 条；按 useCount+lastUsedAge 权重排序。每条含 type/name/firstAppearedAge/lastUsedAge/useCount/attributes/sourceSnippet
+  entityEntriesJson String @default("[]")
+
   // ===== Task 24 新增 =====
   // 秘境探索记录 JSON（ExplorationRecord[]）—— 玩家已探秘境 + 冷却追踪
   // 每条记录：{ realmId, lastExploredAge, timesExplored, bestReward? }

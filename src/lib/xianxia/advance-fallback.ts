@@ -10,6 +10,9 @@
  *  5. 模板兜底：无历史时用通用模板
  */
 
+import type { StyleAnchor } from './style-anchor';
+import type { EntityEntry } from './entity-store';
+
 type HistoricalEvent = {
   age: number;
   title: string;
@@ -27,6 +30,8 @@ type StoryElements = {
 
 type FallbackOptions = {
   recentEvents?: HistoricalEvent[];
+  styleAnchor?: StyleAnchor | null;
+  entityEntries?: EntityEntry[];
 };
 
 const NPC_HINT_RE = /(?:[一-龥]{2,4})(?:老翁|老妪|老者|姑娘|小子|掌柜|师兄|师姐|师弟|师妹|师尊|长老|前辈|道友|师傅|师父|师叔|师妹|居士|散修|剑客|书生|樵夫|渔夫|药农|村妇|老汉|老者|老叟|老妪|娃儿|孩童|小儿|丫头|少年|少女|青年|中年|大汉|莽汉|老道|老僧)/g;
@@ -376,9 +381,14 @@ export function buildFallbackAgeEvent(state: any, blueprint: any, ctx: any, isFa
     },
   ];
   const picked = actions[seed % actions.length];
+  // 风格锚定 + 实体库注入：让 fallback 文本"读起来像 AI 写的"
+  const anchor = options.styleAnchor ?? null;
+  const entities = options.entityEntries ?? [];
+  let finalNarrative = applyRhythmVariation(picked.narrative, anchor);
+  finalNarrative = injectEntityFragment(finalNarrative, entities);
   return {
     title: picked.title,
-    narrative: picked.narrative,
+    narrative: finalNarrative,
     eventType: isFateNode ? 'fate_node' : 'normal',
     changes: picked.changes,
     newStatuses: [],
@@ -408,6 +418,82 @@ export function buildFallbackAgeEvent(state: any, blueprint: any, ctx: any, isFa
 
 function extractTitleFromNarrative(narrative: string): string | null {
   // 尝试从叙事前几个字抽取主题词作为 title
-  const m = narrative.match(/^[^，。；！？\n]{2,12}/);
+  const m = narrative.match(/^[^，,。.;；:：\n]{2,12}/);
   return m ? m[0].trim() : null;
+}
+
+// ====================================================================
+// 风格锚定 + 实体库接入 —— 让 fallback 文本"读起来像 AI 写的"
+// ====================================================================
+
+/**
+ * 把一段 fallback narrative 按 StyleAnchor 的韵律特征做微调
+ * 1) 句长：超长句拆短句
+ * 2) 对话密度：anchor 有高对话密度时补 1 句引号对话
+ * 3) 拟声词点缀：偶尔插个"啪嗒""吱呀"等
+ */
+export function applyRhythmVariation(text: string, anchor: StyleAnchor | null): string {
+  if (!anchor || !text) return text;
+  let result = text;
+
+  // 1) 句长调整：把超长句按逗号拆开
+  const maxLen = Math.max(20, Math.round(anchor.avgSentenceLen * 1.8));
+  result = result.replace(new RegExp(`([^。！？!?\\n]{${maxLen},}?)([，,])`, 'g'), (m, head, comma) => {
+    if (head.length <= maxLen) return m;
+    const mid = Math.floor(head.length / 2);
+    return head.slice(0, mid) + '。' + head.slice(mid) + comma;
+  });
+
+  // 2) 对话密度
+  if (anchor.punctuation.quote > 0 && !/[""'']/.test(result)) {
+    const sentences = result.split(/(?<=[。！？])/);
+    if (sentences.length >= 2) {
+      const insertAt = Math.min(sentences.length - 1, 1);
+      const dialogueSeeds = ['他低声说', '她应了一声', '他嘟囔一句', '他回头吩咐', '她轻声答'];
+      const seed = dialogueSeeds[Math.abs(anchor.age) % dialogueSeeds.length];
+      sentences[insertAt] = sentences[insertAt] + seed + '：""' + '嗯。"';
+      result = sentences.join('');
+    }
+  }
+
+  // 3) 拟声词点缀
+  if (anchor.punctuation.period >= 3 && anchor.punctuation.quote === 0) {
+    if (!/(啪嗒|吱呀|咚|哐|咔嚓|嗖|哗)/.test(result)) {
+      const sfx = ['吱呀一声', '啪嗒', '嗖地', '哐当一响'][Math.abs(anchor.age) % 4];
+      result = result.replace(/(。，)/, `，${sfx}，`);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 把高权重实体（NPC/地点/物品）注入 fallback narrative
+ */
+export function injectEntityFragment(text: string, entities: EntityEntry[]): string {
+  if (!entities.length || !text) return text;
+  const top = entities.slice(0, 5);
+  const npcs = top.filter(e => e.type === 'npc');
+  const places = top.filter(e => e.type === 'place');
+  const items = top.filter(e => e.type === 'item');
+  let result = text;
+
+  // 1) NPC 嵌入第一句
+  if (npcs.length && !result.includes(npcs[0].name)) {
+    result = result.replace(/(。)/, `，与${npcs[0].name}照了面。`);
+  }
+
+  // 2) 物品：在第一个逗号后插入
+  if (items.length && !result.includes(items[0].name)) {
+    const itemSeeds = ['顺手摸了一下', '瞥见', '想起', '怀里还有'];
+    const seed = itemSeeds[Math.abs(items[0].name.length) % itemSeeds.length];
+    result = result.replace(/(，)/, `，${seed}${items[0].name}，`);
+  }
+
+  // 3) 地点：文末插入"到了XX"
+  if (places.length && !result.includes(places[0].name)) {
+    result = result + `后来到${places[0].name}歇了一晚。`;
+  }
+
+  return result;
 }
