@@ -165,19 +165,37 @@ export function ActionButtons() {
           });
           const data = await res2.json();
           if (!data.success) {
-            // 推进已完成但 LLM 又跑了一次（重复推）→ 同步 db 最新状态 + 显示警告
-            if (/age|已/.test(data.error || '')) {
+            // 推进已完成但 LLM 又跑了一次（重复推 / 待选择 / 已飞升 等）→ 同步 db 最新状态即可
+            // 这些情况下 stream 那侧实际上已经把状态写进了 db
+            const errMsg = data.error || '';
+            const alreadyCompleted = /age|已|选择|飞升|陨落|战斗/.test(errMsg);
+            if (alreadyCompleted) {
               const latest = await syncLatestState(character.id);
               if (latest) {
                 setCharacter({ ...character, ...latest, worldCalendar: data.worldCalendar || worldCalendar });
                 if (data.worldCalendar) setWorldCalendar(data.worldCalendar);
-                toast.warning('流式响应已中断', { description: '事件已写入，但叙事未完整显示。请刷新页面查看最新状态。' });
+                // 同步待选择（stream 触发过 choice 的话）
+                if ((latest as any).pendingChoiceJson || (latest as any).isAtChoice) {
+                  try {
+                    const pendingChoice = (latest as any).pendingChoiceJson ? JSON.parse((latest as any).pendingChoiceJson) : null;
+                    if (pendingChoice?.prompt) {
+                      setPendingChoice({
+                        ...pendingChoice,
+                        contextTitle: pendingChoice.contextTitle,
+                        contextNarrative: pendingChoice.contextNarrative,
+                        contextAge: pendingChoice.contextAge,
+                        contextFateNodeName: pendingChoice.contextFateNodeName,
+                      });
+                    }
+                  } catch {}
+                }
+                toast.warning('流式响应已中断', { description: '事件已写入，但叙事未完整显示。最新状态已同步。' });
                 setNewEventRange(null);
                 finishStreamingNarrative();
               }
               return;
             }
-            throw new Error(data.error || 'fallback failed');
+            throw new Error(errMsg || 'fallback failed');
           }
           // 正常完成：应用结果
           setCharacter({ ...character, ...data.state, worldCalendar: data.worldTime || data.worldCalendar });
