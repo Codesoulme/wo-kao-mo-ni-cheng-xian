@@ -2702,7 +2702,11 @@ export async function generateBirthEvent(name?: string): Promise<BirthResult> {
       name: name?.trim() || generateFallbackName(),
       gender: Math.random() > 0.5 ? 'male' : 'female',
       spiritualRoot: root,
-      rootDetail: `${pickedZh}${rootInfo.name}`.replace('无', '无灵根'),
+      rootDetail: root === 'none'
+        ? '无灵根'
+        : pickedZh
+          ? `${pickedZh}${rootInfo.name}`
+          : rootInfo.name,
       birthplace: '青云山下一处凡人村落',
       family: '农户之家',
       background: '降生之夜，天降甘霖，万物复苏。父母见此子目有灵光，心下大喜，取名为此。家虽清贫，然天性温良，邻里称善。',
