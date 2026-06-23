@@ -805,6 +805,7 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
 - 新获物品：填入 newItems，必须含完整字段与 effects
 - 储物袋获得：填入 newItems（item_type=tool，effects 含 storageCapacity 加成），引擎自动扩容，玩家无需装备
 - 【重要】叙事中提及的物品必须落入 newItems：若 narrative 提到"父亲送我一把木剑""拾得一颗灵草"等，必须把对应物品在 newItems 中给出（含完整字段），不可只叙事不给物品
+- 【物品归属原则】只把**玩家角色本人获得**的东西落入 newItems。若 narrative 里写"祖父的旧物"、"父亲的遗剑"、"母亲的嫁衣"等**他人所属**的物品出现于场景中，**不**写入 newItems；这些物件仍归原文所属之人，玩家角色只是见到/把玩/代为保管叙事，不需要进背包。若玩家确实拿到了他人之物（如"祖父临终前把灰布塞进你手中"），那是事件因果把所有权转移给了角色——此时才计入 newItems，并在 source/narrative 里写明转交原因。不要因为 narrative 出现了物品名就机械塞进 newItems。
 
 【储物袋容量规则——重要】
 - 玩家初始无储物袋，最多只能携带 5 件物品（${invCount}/${storageCap}件${hasBag ? '，已有储物袋' : '，无储物袋'}）
