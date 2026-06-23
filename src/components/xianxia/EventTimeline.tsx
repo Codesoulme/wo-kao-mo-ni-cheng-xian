@@ -12,6 +12,8 @@ interface EventTimelineProps {
   defaultExpandedCount?: number;
   /** 是否显示顶部工具栏（展开/折叠全部），默认 true */
   showToolbar?: boolean;
+  /** 新事件索引范围 [start, end)：这些事件会触发气泡级流式显示 */
+  newEventRange?: { start: number; end: number };
 }
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -136,6 +138,61 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
   );
 }
 
+/**
+ * 气泡级增量显示：narrative 按句切片后逐个出现
+ * - 旧事件/已展开：直接全部显示（无动画）
+ * - 新事件：逐句出现，间隔 180ms；玩家感觉"AI 在写"
+ */
+function StreamingNarrative({ text, isNew }: { text?: string; isNew?: boolean }) {
+  const paragraphs = useMemo(() => splitNarrativeParagraphs(text), [text]);
+  const [visibleCount, setVisibleCount] = useState(isNew ? 0 : paragraphs.length);
+
+  // 新事件 + 内容变化时重置
+  useEffect(() => {
+    if (!isNew) {
+      setVisibleCount(paragraphs.length);
+      return;
+    }
+    setVisibleCount(0);
+    let cancelled = false;
+    let i = 0;
+    const tick = () => {
+      if (cancelled) return;
+      i += 1;
+      setVisibleCount(i);
+      if (i < paragraphs.length) {
+        setTimeout(tick, 180);
+      }
+    };
+    if (paragraphs.length > 0) {
+      setTimeout(tick, 220); // 第一个气泡延迟稍长，让"loading -> 出字"有过渡
+    } else {
+      setVisibleCount(0);
+    }
+    return () => { cancelled = true; };
+  }, [paragraphs, isNew]);
+
+  if (paragraphs.length === 0) return null;
+  return (
+    <>
+      {paragraphs.slice(0, visibleCount).map((p, idx) => (
+        <p
+          key={idx}
+          className={cn(
+            "first-letter:pl-0 transition-opacity duration-300",
+            idx === visibleCount - 1 && isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
+          )}
+        >
+          {p}
+        </p>
+      ))}
+      {isNew && visibleCount < paragraphs.length && (
+        <p className="text-muted-foreground/50 text-[10px] animate-pulse">…</p>
+      )}
+    </>
+  );
+}
+
 function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }, prevEvent?: GameEvent) {
   const displayLabel = cleanVisibleTimeLabel(event.worldTime?.displayLabel);
   // 与上一条事件时间完全一致时，省略本条时间戳
@@ -180,7 +237,7 @@ function eventTypeLabel(event: GameEvent, prevEvent?: GameEvent) {
   return EVENT_LABELS[event.eventType] || '流年';
 }
 
-export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true }: EventTimelineProps) {
+export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true, newEventRange }: EventTimelineProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // 用 Set 记录展开的事件 index（按 events 数组顺序）
@@ -326,6 +383,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
         {events.map((event, idx) => {
           const isLast = idx === events.length - 1;
           const isExpanded = expandedSet.has(idx);
+          const isNewEvent = !!(newEventRange && idx >= newEventRange.start && idx < newEventRange.end);
           const isFate = event.isFateNode || event.eventType === 'fate_node';
           const isDeath = event.eventType === 'death';
           const isAscension = event.eventType === 'ascension';
@@ -430,11 +488,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {isExpanded && (
                   <div className="px-3 pb-2">
                     <div className="space-y-2 text-xs leading-relaxed text-foreground/90 xianxia-prose">
-                      {splitNarrativeParagraphs(event.narrative).map((paragraph, pIdx) => (
-                        <p key={pIdx} className="first-letter:pl-0">
-                          {paragraph}
-                        </p>
-                      ))}
+                      <StreamingNarrative text={event.narrative} isNew={isNewEvent} />
                     </div>
                     {/* 效果 */}
                     {visibleEffects.length > 0 && (

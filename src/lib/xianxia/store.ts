@@ -275,6 +275,9 @@ interface GameState {
   setSelectedHeritage: (selected: SelectedHeritage) => void;
   toggleSelectedHeritage: (item: HeritageItem) => void;
   clearSelectedHeritage: () => void;
+  // 气泡级流式显示：新事件索引范围 [start, end)；null 表示无新事件（关闭动画）
+  newEventRange: { start: number; end: number } | null;
+  setNewEventRange: (range: { start: number; end: number } | null) => void;
   setSettlementResult: (result: SettlementResult | null) => void;
   addHallRecord: (record: SimulationHallRecord) => void;
   setWorldCalendar: (world: WorldCalendarState) => void;
@@ -309,6 +312,7 @@ export const useGameStore = create<GameState>()(
       settlementResult: null,
       worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
       worldLegacies: [],
+      newEventRange: null,
 
       setCharacter: (c) => set({ character: c }),
       setEvents: (e) => set({ events: e }),
@@ -335,6 +339,7 @@ export const useGameStore = create<GameState>()(
         return { heritageVault: [...s.heritageVault, ...fresh] };
       }),
       setSelectedHeritage: (selected) => set({ selectedHeritage: selected }),
+      setNewEventRange: (range) => set({ newEventRange: range }),
       toggleSelectedHeritage: (item) => set((s) => {
         const current = s.selectedHeritage[item.category] || [];
         const exists = current.some((it) => it.id === item.id);

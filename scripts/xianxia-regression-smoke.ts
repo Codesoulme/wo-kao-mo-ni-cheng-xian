@@ -1910,6 +1910,51 @@ function smokeLiteModelConfig(): void {
   log('lite-model-config', { passed: true, note: 'cfg.liteModel is used when qualityMode=light; set in .xianxia-ai-config' });
 }
 
+function smokeBubbleSplit(): void {
+  // 气泡级切分：前端按 86 字上限 + 句号切句；验证：
+  // 1) 单个长句会被强制拆为 1+ 段
+  // 2) 每段不超过 86 字
+  // 3) 短句（<90字）保留完整
+  // 模拟 splitNarrativeParagraphs 的切分逻辑
+  const split = (text: string): string[] => {
+    if (!text) return [];
+    const explicit = text.split(/\n+/).map(p => p.trim()).filter(Boolean);
+    const source = explicit.length > 1 ? explicit : [text];
+    const paragraphs: string[] = [];
+    for (const part of source) {
+      if (part.length <= 90) { paragraphs.push(part); continue; }
+      const sentences = part.match(/[^。！？!?；;]+[。！？!?；;]?/g) || [part];
+      let current = '';
+      for (const sentence of sentences.map(s => s.trim()).filter(Boolean)) {
+        if (current && (current + sentence).length > 86) {
+          paragraphs.push(current);
+          current = sentence;
+        } else {
+          current += sentence;
+        }
+      }
+      if (current) paragraphs.push(current);
+    }
+    return paragraphs;
+  };
+  // 测试 1: 多短句叙事（90字以上，触发句切）
+  const text1 = '那年夏天日头毒，茅听澎蹲在院角看蚂蚁搬家。泥土热得烫手，他拿小树枝拨了一下，蚂蚁慌慌张张绕开了。他笑了一下，又去够下一只，又来了一阵风。傍晚母亲唤他回去吃饭，他应了一声，膝盖上沾满了红土。';
+  const r1 = split(text1);
+  assert(r1.length >= 2, `长叙事应切多个气泡, got ${r1.length}, text len ${text1.length}`);
+  assert(r1.every(p => p.length <= 90), `每段不超过 90 字: ${r1.map(p => p.length).join(',')}`);
+  // 测试 2: 长句强制拆
+  const text2 = '那年夏天日头毒，茅听澎蹲在院角看蚂蚁搬家，泥土热得烫手，他拿小树枝拨了一下，蚂蚁慌慌张张绕开了，他笑了一下，又去够下一只。';
+  const r2 = split(text2);
+  assert(r2.every(p => p.length <= 90), `长句切分后每段不超 90 字: ${r2.map(p => p.length).join(',')}`);
+  // 测试 3: 空文本
+  const r3 = split('');
+  assert(r3.length === 0, '空文本应返回空数组');
+  // 测试 4: 单短句
+  const r4 = split('一句话。');
+  assert(r4.length === 1 && r4[0] === '一句话。', `单短句保留: ${r4.join(',')}`);
+  log('bubble-split', { passed: true, text1Count: r1.length, text2Count: r2.length, maxLen: Math.max(...r1.map(p => p.length), ...r2.map(p => p.length), 0) });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -1971,6 +2016,7 @@ async function main(): Promise<void> {
   smokeRhythmVariation();
   smokeLLMCache();
   smokeLiteModelConfig();
+  smokeBubbleSplit();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }

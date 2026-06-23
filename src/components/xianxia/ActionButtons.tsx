@@ -39,6 +39,7 @@ export function ActionButtons() {
     setMarketOpen,
     setExplorationOpen,
     setWorldCalendar,
+    setNewEventRange,
     reset,
   } = useGameStore();
 
@@ -176,6 +177,11 @@ export function ActionButtons() {
 
       // 添加事件；后端可能返回同一岁多段史册记录
       const returnedEvents = Array.isArray(data.events) && data.events.length ? data.events : [data.event];
+      // 记录新事件索引范围，前端会触发气泡级流式显示
+      const previousEventCount = events.length;
+      setNewEventRange({ start: previousEventCount, end: previousEventCount + returnedEvents.length });
+      // 10 秒后自动清除动画标记（避免翻页后旧事件还触发动画）
+      setTimeout(() => setNewEventRange(null), 10000);
       returnedEvents.forEach((evt: any, idx: number) => addEvent({
         id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
         age: evt.age,
@@ -282,6 +288,10 @@ export function ActionButtons() {
       if (data.breakthrough) setLastBreakthrough(data.breakthrough);
 
       const returnedEvents = Array.isArray(data.events) && data.events.length ? data.events : [];
+      // 批量推进：每段都触发气泡级流式显示
+      const batchStart = events.length;
+      setNewEventRange({ start: batchStart, end: batchStart + returnedEvents.length });
+      setTimeout(() => setNewEventRange(null), 10000);
       returnedEvents.forEach((evt: any, idx: number) => addEvent({
         id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
         age: evt.age,
