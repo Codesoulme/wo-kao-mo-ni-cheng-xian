@@ -136,8 +136,18 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
   );
 }
 
-function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
+function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }, prevEvent?: GameEvent) {
   const displayLabel = cleanVisibleTimeLabel(event.worldTime?.displayLabel);
+  // 与上一条事件时间完全一致时，省略本条时间戳
+  if (prevEvent) {
+    const prevDisplay = cleanVisibleTimeLabel(prevEvent.worldTime?.displayLabel);
+    if (displayLabel && prevDisplay && displayLabel === prevDisplay) return '';
+    // 当本条也没有 displayLabel 但构造出来会等于 prevDisplay 时也省略
+    if (!displayLabel) {
+      const fallback = buildFallbackTimeLabel(event, ageMeta);
+      if (fallback && fallback === prevDisplay) return '';
+    }
+  }
   if (displayLabel) return displayLabel;
   const worldLabel = event.worldTime?.label;
   const segmentLabel = cleanVisibleTimeLabel(event.timeAdvance?.label);
@@ -148,6 +158,26 @@ function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) 
   if (worldLabel) return ageText ? `${ageText}${open}${worldLabel}${close}` : `${open}${worldLabel}${close}`;
   if (segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}` : segmentLabel;
   return ageText || '';
+}
+
+function buildFallbackTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
+  const worldLabel = event.worldTime?.label;
+  const segmentLabel = cleanVisibleTimeLabel(event.timeAdvance?.label);
+  const ageText = ageMeta.isContinuation ? '' : `${event.age}\u5c81`;
+  const open = '\u3010';
+  const close = '\u3011';
+  if (worldLabel && segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}${open}${worldLabel}${close}` : `${segmentLabel}${open}${worldLabel}${close}`;
+  if (worldLabel) return ageText ? `${ageText}${open}${worldLabel}${close}` : `${open}${worldLabel}${close}`;
+  if (segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}` : segmentLabel;
+  return ageText || '';
+}
+
+function eventTypeLabel(event: GameEvent, prevEvent?: GameEvent) {
+  // 与上一条事件类型相同（且都是默认/常规类型时更明显重复）时，省略标签
+  if (prevEvent && prevEvent.eventType === event.eventType) {
+    return '' as const;
+  }
+  return EVENT_LABELS[event.eventType] || '流年';
 }
 
 export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true }: EventTimelineProps) {
@@ -304,6 +334,9 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
           const visibleEffects = (event.effects || []).filter(isVisibleEffect);
           const ageMeta = sameAgeMeta[idx] || { count: 1, index: 1, isContinuation: false };
 
+          const prevEvent = idx > 0 ? events[idx - 1] : undefined;
+          const timeText = eventTimeLabel(event, ageMeta, prevEvent);
+          const typeText = eventTypeLabel(event, prevEvent);
           return (
             <div
               key={event.id || idx}
@@ -349,21 +382,25 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 头部 - 始终可见 */}
                 <div className="flex items-center justify-between mb-0.5 px-3 pt-2">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <span className={cn(
-                      "text-xs font-bold font-serif-cn",
-                      ageMeta.isContinuation ? "text-amber-600 dark:text-amber-300" : "text-primary"
-                    )}>
-                      {eventTimeLabel(event, ageMeta)}
-                    </span>
+                    {timeText && (
+                      <span className={cn(
+                        "text-xs font-bold font-serif-cn",
+                        ageMeta.isContinuation ? "text-amber-600 dark:text-amber-300" : "text-primary"
+                      )}>
+                        {timeText}
+                      </span>
+                    )}
                     {isFate && (
                       <span className="seal text-[9px]">命</span>
                     )}
                     {isBreakthrough && (
                       <span className="text-[9px] px-1 rounded bg-yellow-400/20 text-yellow-600">破</span>
                     )}
-                    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 shrink-0">
-                      {EVENT_LABELS[event.eventType] || '流年'}
-                    </span>
+                    {typeText && (
+                      <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 shrink-0">
+                        {typeText}
+                      </span>
+                    )}
                     {/* Task 20: 事件蓝图主题 chip */}
                     <BlueprintChip blueprint={event.blueprint} eventType={event.eventType} />
                   </div>
