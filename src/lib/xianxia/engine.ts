@@ -72,6 +72,7 @@ import {
 } from './types';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
+import { inferAttributeChangesFromNarrative } from './narrative-inference';
 import { validateAIBoundary, BoundaryValidationTrace } from './ai-boundary-validator';
 import { buildStateChangeLog, StateChangeLogEntry } from './state-change-log';
 import { buildEventSchedulerPlan } from './event-scheduler';
@@ -4592,7 +4593,23 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   };
 
   // 1. Apply attribute changes through EffectResolver / ERPE Lite.
-  const resolvedChanges = resolveAttributeChanges(next, aiOutput.changes || [], {
+  let inputChanges = aiOutput.changes || [];
+  // 引擎兜底：AI 常把 narrative 写得生动但忘记给 changes
+  // 当 changes 几乎为空时，根据 narrative 关键词 + 当前境界自动补一组合理 delta
+  if (inputChanges.length === 0 && aiOutput.narrative) {
+    const fallback = inferAttributeChangesFromNarrative(aiOutput.narrative, next, aiOutput.title || 'ai-event');
+    if (fallback.length > 0) {
+      inputChanges = fallback;
+      trace.push({
+        severity: 'info',
+        code: 'engine_inferred_changes',
+        attribute: '*',
+        message: `Engine inferred ${fallback.length} attribute change(s) from narrative (AI output empty changes)`,
+        source: aiOutput.title || 'ai-event',
+      } as any);
+    }
+  }
+  const resolvedChanges = resolveAttributeChanges(next, inputChanges, {
     bounds: ATTRIBUTE_BOUNDS,
     source: aiOutput.title || 'ai-event',
   });

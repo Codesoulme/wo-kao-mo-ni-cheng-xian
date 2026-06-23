@@ -2005,6 +2005,70 @@ function smokeNarrativeCompletion(): void {
   log('narrative-completion', { passed: true, t1Changed: r1 !== t1, t2Changed: r2 !== t2, t3Changed: r3 !== t3, t4Unchanged: r4 === t4 });
 }
 
+function smokeNarrativeInference(): void {
+  // 引擎兜底：当 AI 漏写 changes 时，从 narrative 关键词 + 当前境界自动推断属性变化
+  const { inferAttributeChangesFromNarrative } = require('../src/lib/xianxia/narrative-inference');
+  // mock 一个 state：凡人 + 凡灵根
+  const baseState = {
+    age: 10, realm: 'qi_refining', spiritualRoot: 'common',
+    cultivationMultiplier: 1, cultivationExp: 0, expToBreak: 100,
+    hp: 100, maxHp: 100, mp: 50, maxMp: 50,
+    attack: 10, defense: 10, speed: 10, luck: 5, comprehension: 5,
+    heartDemon: 0, lifespan: 100,
+  } as any;
+
+  // 测试 1: 修炼叙事 → 推断出 cultivationExp 增加
+  const t1 = '他坐在蒲团上打坐，引入灵气流转三十六周天。';
+  const r1 = inferAttributeChangesFromNarrative(t1, baseState, 'test');
+  assert(r1.length > 0 && r1.some((c: any) => c.attribute === 'cultivationExp' && c.delta > 0),
+    `修炼叙事推断出修为增长: ${JSON.stringify(r1)}`);
+
+  // 测试 2: 战斗叙事 → 推断出 hp 减少
+  const t2 = '他与那妖兽血战三百回合，终是险胜，却也负了伤。';
+  const r2 = inferAttributeChangesFromNarrative(t2, baseState, 'test');
+  assert(r2.some((c: any) => c.attribute === 'hp' && c.delta < 0),
+    `战斗叙事推断出 hp 损耗: ${JSON.stringify(r2)}`);
+
+  // 测试 3: 心魔叙事 → heartDemon 增加
+  const t3 = '那年他心中贪念大盛，杀意渐生，心魔悄然滋生。';
+  const r3 = inferAttributeChangesFromNarrative(t3, baseState, 'test');
+  assert(r3.some((c: any) => c.attribute === 'heartDemon' && c.delta > 0),
+    `心魔叙事推断出心魔增长: ${JSON.stringify(r3)}`);
+
+  // 测试 4: 心境平和 → heartDemon 减少
+  const t4 = '他打坐冥想良久，忽然心性豁达，释怀过往种种。';
+  const r4 = inferAttributeChangesFromNarrative(t4, baseState, 'test');
+  assert(r4.some((c: any) => c.attribute === 'heartDemon' && c.delta < 0),
+    `心境平和叙事推断出心魔减少: ${JSON.stringify(r4)}`);
+
+  // 测试 5: 顿悟 → comprehension 增加
+  const t5 = '他盯着那朵云看了三日三夜，忽然豁然开朗，明悟天地至理。';
+  const r5 = inferAttributeChangesFromNarrative(t5, baseState, 'test');
+  assert(r5.some((c: any) => c.attribute === 'comprehension' && c.delta > 0),
+    `顿悟叙事推断出悟性增长: ${JSON.stringify(r5)}`);
+
+  // 测试 6: 空白 narrative → 不推断
+  const r6 = inferAttributeChangesFromNarrative('', baseState, 'test');
+  assert(r6.length === 0, '空白 narrative 不推断');
+
+  // 测试 7: 纯叙事无关键词 → 不推断
+  const r7 = inferAttributeChangesFromNarrative('他吃了碗米饭。', baseState, 'test');
+  assert(r7.length === 0, `纯叙事无关键词不推断: ${JSON.stringify(r7)}`);
+
+  // 测试 8: 同属性去重（修炼+顿悟 → comprehension 只 1 条）
+  const t8 = '他打坐入定，忽然顿悟，明悟了天地至理。';
+  const r8 = inferAttributeChangesFromNarrative(t8, baseState, 'test');
+  const compCount = r8.filter((c: any) => c.attribute === 'comprehension').length;
+  assert(compCount <= 1, `同属性去重: compCount=${compCount}`);
+
+  log('narrative-inference', {
+    passed: true,
+    t1Changes: r1.length, t2Changes: r2.length, t3Changes: r3.length,
+    t4Changes: r4.length, t5Changes: r5.length, t6Changes: r6.length,
+    t7Changes: r7.length, dedupOk: compCount <= 1
+  });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -2069,6 +2133,7 @@ async function main(): Promise<void> {
   smokeBubbleSplit();
   smokeNarrativeTruncation();
   smokeNarrativeCompletion();
+  smokeNarrativeInference();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
