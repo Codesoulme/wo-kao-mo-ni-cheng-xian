@@ -127,7 +127,7 @@ const SCENE_PROMPTS: Record<string, string> = {
 - 真正的重大抉择、突破、生死关头可生成 hasChoice=true 与 choice 选项；不要因为命节点参考本身就强制给选择。
 - choice 结构必须为：{"prompt":"抉择问题","options":[{"text":"选项文字（必填，勿留空）","hint":"选后可能的叙事倾向（可选）"}]}，2-4 个选项；hasChoice=true 时 options 每项必须有非空 text。
 - 【拍卖会入场规则】若蓝图/情境是拍卖大会、拍卖行、黑市大拍、交易大会等大型拍卖，不要在本轮直接生成完整拍卖长剧情；只能写轻量入场邀请/场外见闻，并设置 hasChoice=true，choice 让玩家确认是否进入（如「入场竞拍」「只在外场观望」「转身离去」）。未确认进入前，不生成逐件拍品、竞拍者资产心理和大段竞价流程，避免无谓消耗。
-- 普通年份主 narrative 140-280字；重大事件可略长但要克制。若同一岁发生多个关键片段（如先闭关、后交易、再旧敌现身/破境），必须用 extraEvents 拆成多条短事件，每条 60-180字，避免主叙事过长或漏写关键过程。
+- 普通年份主 narrative 严格 140-280字（一个气泡舒适显示上限）；若同一岁发生多个关键片段（如先童年趣事、后灵气初触、再破境），必须用 extraEvents 拆成多条短事件，每条 60-180字，依次排好时间戳（timeAdvance.label 写"数日后"/"数月后"等），让前端逐条分气泡显示。绝不写"未完待续"——超长内容必须拆段，不要让一段叙事写几百字。
 - 叙事可适度穿插人物对话让文字更生动：遇到与 NPC 交锁、拜师、论道、讨价还价、交锅、挑衅、告别、眼眼相环等场面时，可用一两句带引号的口语化对白点活人物与气氛。但这是可选手段而非必须：不要每年都堆对话，不要为凑字数而堆砌闲聊；纯闭关、独行、内心戏的年份以叙述为主即可。对话要符合说话人的身份、修为与处境，不要出现出戏或现代腔。
 - 属性变化要合理：修炼获修为、战斗有损耗、奇遇有增益、丹药有效果。
 - 修为自然增长：每岁根据境界与灵根给 cultivationExp 增量（凡人0，炼气10-30，筑基30-80，金丹80-200，更高境界更多）。
@@ -568,7 +568,7 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
 请生成 JSON，schema 如下：
 {
   "title": "事件标题（≤16字）",
-  "narrative": "叙事正文（100-250字，重大事件可略长）",
+  "narrative": "叙事正文（**严格 140-280字**；超过 280 字的内容必须拆成 extraEvents，不要写在一段里）",
   "eventType": "normal | fate_node | choice | combat | breakthrough | death | ascension",
   "changes": [{"attribute":"cultivationExp","delta":10,"reason":"修炼精进"}],
   "newStatuses": [],
@@ -1048,7 +1048,7 @@ async function callLLMText(systemPrompt: string, userPrompt: string): Promise<st
         headers,
         body: JSON.stringify({
           model: cfg.model,
-          max_tokens: 4096,
+          max_tokens: 16384,
           system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
         }),
@@ -1079,6 +1079,7 @@ async function callLLMText(systemPrompt: string, userPrompt: string): Promise<st
     try { data = text ? JSON.parse(text) : null; } catch { data = null; }
     if (!res.ok) throw new Error(`AI 接口请求失败：${aiErrorMessage(data || text, res.status)}`);
     let content = '';
+    let stopReason = '';
     if (isAnthropic) {
       // Anthropic 响应：content 是数组，type=text
       const contentBlocks = data?.content || [];
@@ -1086,8 +1087,13 @@ async function callLLMText(systemPrompt: string, userPrompt: string): Promise<st
         .filter((b: any) => b?.type === 'text' && typeof b.text === 'string')
         .map((b: any) => b.text)
         .join('\n');
+      stopReason = data?.stop_reason || '';
+      if (stopReason === 'max_tokens') {
+        console.warn(`[LLM] Anthropic 响应因 max_tokens 被截断（实际输出 ${data?.usage?.output_tokens || '?'} tokens）。考虑降低 narrative 字数或拆分请求。`);
+      }
     } else {
       content = data?.choices?.[0]?.message?.content || '';
+      stopReason = data?.choices?.[0]?.finish_reason || '';
     }
     if (!content) throw new Error('AI 接口返回为空');
     return content;
