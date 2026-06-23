@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { executeAIEvent, checkLifespan, applyChanges, stateToResponse, tryBreakthrough, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tryHeartDemonTrial, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { sanitizeEventDraft } from '@/lib/xianxia/display';
+import { sanitizeEventDraft, truncateNarrativeAtSentence } from '@/lib/xianxia/display';
 import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-log';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { getRealmInfo } from '@/lib/xianxia/types';
@@ -347,7 +347,8 @@ ${narrative || ''}`);
     const eventDrafts: { title: string; narrative: string; eventType: string; effects: any[]; timeAdvance?: any; worldTime?: any; actionProjections?: any[] }[] = [{
       // 主事件只记录这一段时日发生的因果；不要因为最终数值成功突破，就把“冲关前夜/开始冲关”提前包装成已破境。
       title: sanitizeEventDraft({ title: aiOutput.title, narrative: '' }, finalState.age).title,
-      narrative: sanitizeEventDraft({ title: '', narrative: aiOutput.narrative }, finalState.age).narrative,
+      // AI 偶发超字数输出：超过 420 字时强制截到最近完整句（避免 max_tokens 截断导致半句话）
+      narrative: sanitizeEventDraft({ title: '', narrative: truncateNarrativeAtSentence(aiOutput.narrative, 420) }, finalState.age).narrative,
       eventType: isFateNode ? 'fate_node' : visibleEventType(aiOutput.eventType, aiOutput.title, aiOutput.narrative),
       effects: [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime: stampedWorldTime, actionProjections: baseActionProjections })],
       timeAdvance,
@@ -368,7 +369,7 @@ ${narrative || ''}`);
       const extraActions = sanitizeActionProjections(extra.actionProjections);
       eventDrafts.push(sanitizeEventDraft({
         title: extra.title || '',
-        narrative: extra.narrative || '',
+        narrative: truncateNarrativeAtSentence(extra.narrative || '', 280),
         eventType: visibleEventType(extra.eventType || 'normal', extra.title, extra.narrative),
         effects: [hiddenEventMeta({ timeAdvance: extraTimeAdvance, worldTime: extraWorldTime, actionProjections: extraActions })],
         timeAdvance: extraTimeAdvance,

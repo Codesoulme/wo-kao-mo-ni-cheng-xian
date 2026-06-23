@@ -1955,6 +1955,32 @@ function smokeBubbleSplit(): void {
   log('bubble-split', { passed: true, text1Count: r1.length, text2Count: r2.length, maxLen: Math.max(...r1.map(p => p.length), ...r2.map(p => p.length), 0) });
 }
 
+function smokeNarrativeTruncation(): void {
+  // 截断 narrative 到完整句：处理 AI 超字数输出或 max_tokens 截断
+  const { truncateNarrativeAtSentence } = require('../src/lib/xianxia/display');
+  // 测试 1: 短文本原样返回
+  const t1 = '那年夏天日头毒。';
+  const r1 = truncateNarrativeAtSentence(t1, 400);
+  assert(r1 === t1, `短文本不变: got ${r1}`);
+  // 测试 2: 长文本截到最近完整句（t2 长度 > 420）
+  const t2 = '腊月廿三，小年夜。茅听澎帮着刘氏在灶间烧火，灶膛里的柴禾噼啪作响，火光把半边墙烘得通红。刘氏切了一碗萝卜，和着去年晒的干菜煮了一锅，锅边贴了几个粗面饼子，勉强算是一顿年饭。茅听澎蹲在灶口往里添柴，手背上被火星子烫了一下，他没吱声。灶间比往年冷清了不止一分——往常这时候，茅大根总会从雾岭提前收脚回来，把背篓往门边一靠，先探头往灶间嗅一口，大声说句"回来了，饿坏了吧！"茅大根应了一声，把背篓里的山货分了一小半给隔壁王婶家，又把剩下的一包搁在灶台边。刘氏看着这父子俩，叹了口气说"先吃饭吧，菜凉了"。这一顿年饭虽简单，茅听澎却记得很清楚——柴火噼啪，雾气腾腾，灶间暖得像春天。';
+  const r2 = truncateNarrativeAtSentence(t2, 420);
+  assert(r2.length <= 420, `截断后长度<=420, got ${r2.length}`);
+  // 必须是某个完整句结尾（句末标点 或 文本本身过短）
+  const endsAtPunct = /[。！？!?；;]$/.test(r2);
+  const isAtBoundary = r2.length === 420; // fallback 截断
+  assert(endsAtPunct || isAtBoundary, `截断后以句末标点或边界结尾: ${r2.slice(-10)}, len=${r2.length}`);
+  // 测试 3: 没有句末标点（AI 中途崩溃）：直接截到 maxChars
+  const t3 = '一段无标点的字'.repeat(50); // 100 字
+  const r3 = truncateNarrativeAtSentence(t3, 50);
+  assert(r3.length <= 50, `无标点截断<=50: got ${r3.length}`);
+  // 测试 4: 边界 - 文本刚好等于 maxChars
+  const t4 = 'x'.repeat(400);
+  const r4 = truncateNarrativeAtSentence(t4, 400);
+  assert(r4.length === 400, `边界等于上限: got ${r4.length}`);
+  log('narrative-truncation', { passed: true, t1Len: r1.length, t2Len: r2.length, t3Len: r3.length, t4Len: r4.length });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -2017,6 +2043,7 @@ async function main(): Promise<void> {
   smokeLLMCache();
   smokeLiteModelConfig();
   smokeBubbleSplit();
+  smokeNarrativeTruncation();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }

@@ -156,16 +156,18 @@ function StreamingNarrative({ text, isNew }: { text?: string; isNew?: boolean })
     setVisibleCount(0);
     let cancelled = false;
     let i = 0;
+    // 间隔随段数递减：前 2 段稍慢（让首气泡有悬念感），之后快
+    const intervalFor = (n: number) => n < 2 ? 220 : n < 5 ? 150 : 120;
     const tick = () => {
       if (cancelled) return;
       i += 1;
       setVisibleCount(i);
       if (i < paragraphs.length) {
-        setTimeout(tick, 180);
+        setTimeout(tick, intervalFor(i));
       }
     };
     if (paragraphs.length > 0) {
-      setTimeout(tick, 220); // 第一个气泡延迟稍长，让"loading -> 出字"有过渡
+      setTimeout(tick, 200); // 第一个气泡延迟稍长，让"loading -> 出字"有过渡
     } else {
       setVisibleCount(0);
     }

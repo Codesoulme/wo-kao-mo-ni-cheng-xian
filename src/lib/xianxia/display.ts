@@ -92,6 +92,33 @@ const MECHANISM_PATTERNS: Array<[RegExp, string | ((m: string) => string)]> = [
   [/[（\(【\[][+\-]?\d+[】\)\]\)】]/g, ''],
 ];
 
+/**
+ * 截断 narrative 到最近的完整句子边界
+ * 用于 AI 输出超过字数上限被 max_tokens 截断时
+ * - 如果 text <= maxChars，原样返回
+ * - 如果 text > maxChars，找 maxChars 之前最后一个句末标点（。！？!?），截到那里
+ * - 如果 maxChars 之前没有任何句末标点，截到 maxChars（不推荐：可能也是半句话）
+ */
+export function truncateNarrativeAtSentence(text: string, maxChars: number = 400): string {
+  if (!text || text.length <= maxChars) return text;
+  // 在 maxChars 范围内找最后一个句末标点
+  const slice = text.slice(0, maxChars);
+  const lastPunctIdx = Math.max(
+    slice.lastIndexOf('。'),
+    slice.lastIndexOf('！'),
+    slice.lastIndexOf('？'),
+    slice.lastIndexOf('!'),
+    slice.lastIndexOf('?'),
+    slice.lastIndexOf(';'),
+    slice.lastIndexOf('；'),
+  );
+  if (lastPunctIdx > 0) {
+    return slice.slice(0, lastPunctIdx + 1);
+  }
+  // 没有任何句末标点 → 截到 maxChars
+  return slice;
+}
+
 export function sanitizeNarrativeText(text: string, currentAge?: number): string {
   if (!text || typeof text !== 'string') return text ?? '';
   let result = '';
