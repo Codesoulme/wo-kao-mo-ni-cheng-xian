@@ -155,11 +155,80 @@ export function ActionButtons() {
       // 流式接口：边读 narrative 边触发气泡
       const previousEventCount = events.length;
       setNewEventRange({ start: previousEventCount, end: previousEventCount + 5 }); // 占位：最多 5 段
-      const res = await fetch('/api/game/advance/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
-      });
+      // Fallback：流式中断/失败时调用非流式接口拉完整事件
+      const advanceFallbackNonStream = async (prevCount: number) => {
+        try {
+          const res2 = await fetch('/api/game/advance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
+          });
+          const data = await res2.json();
+          if (!data.success) {
+            // 推进已完成但 LLM 又跑了一次（重复推）→ 同步 db 最新状态 + 显示警告
+            if (/age|已/.test(data.error || '')) {
+              const latest = await syncLatestState(character.id);
+              if (latest) {
+                setCharacter({ ...character, ...latest, worldCalendar: data.worldCalendar || worldCalendar });
+                if (data.worldCalendar) setWorldCalendar(data.worldCalendar);
+                toast.warning('流式响应已中断', { description: '事件已写入，但叙事未完整显示。请刷新页面查看最新状态。' });
+                setNewEventRange(null);
+                finishStreamingNarrative();
+              }
+              return;
+            }
+            throw new Error(data.error || 'fallback failed');
+          }
+          // 正常完成：应用结果
+          setCharacter({ ...character, ...data.state, worldCalendar: data.worldTime || data.worldCalendar });
+          if (data.worldCalendar) setWorldCalendar(data.worldCalendar);
+          setLastChange(data.changes || null);
+          if (data.breakthrough) setLastBreakthrough(data.breakthrough);
+          const returnedEvents = Array.isArray(data.events) && data.events.length ? data.events : [data.event];
+          returnedEvents.forEach((evt: any, idx: number) => addEvent({
+            id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+            age: evt.age,
+            title: evt.title,
+            narrative: evt.narrative,
+            eventType: evt.eventType,
+            effects: evt.effects || (idx === 0 ? (data.changes || []) : []),
+            isFateNode: evt.isFateNode,
+            fateNodeName: evt.fateNodeName,
+            blueprint: evt.blueprint,
+            timeAdvance: evt.timeAdvance,
+            worldTime: evt.worldTime,
+            actionProjections: evt.actionProjections || [],
+            createdAt: evt.createdAt || new Date().toISOString(),
+          }));
+          setNewEventRange({ start: prevCount, end: prevCount + returnedEvents.length });
+          setTimeout(() => setNewEventRange(null), 10000);
+        } catch (e: any) {
+          console.error('[advance fallback] failed:', e?.message);
+          // 最后兜底：sync 最新状态，让 UI 不卡死
+          const latest = await syncLatestState(character.id);
+          if (latest) setCharacter({ ...character, ...latest });
+          toast.error('推进出错', { description: e?.message || '网络中断' });
+          setNewEventRange(null);
+          finishStreamingNarrative();
+        }
+      };
+      let res: Response;
+      try {
+        res = await fetch('/api/game/advance/stream', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
+          signal: AbortSignal.timeout(55_000), // 比服务端 maxDuration 60s 略短
+        });
+      } catch (fetchErr: any) {
+        // 网络中断/abort：fallback 到非流式接口
+        if (fetchErr?.name === 'AbortError' || /aborted|aborted/i.test(fetchErr?.message || '')) {
+          console.warn('[advance stream] aborted, falling back to /api/game/advance');
+          await advanceFallbackNonStream(previousEventCount);
+          return;
+        }
+        throw fetchErr;
+      }
       if (!res.ok || !res.body) {
         const errText = await res.text().catch(() => '');
         throw new Error(`HTTP ${res.status} ${errText.slice(0, 200)}`);
@@ -169,29 +238,37 @@ export function ActionButtons() {
       let buffer = '';
       let doneData: any = null;
       let startedEvent = false;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          let obj: any;
-          try { obj = JSON.parse(trimmed); } catch { continue; }
-          if (obj.type === 'start') {
-            startedEvent = true;
-            // 标记该事件开始 stream（eventIndex = previousEventCount）
-          } else if (obj.type === 'narrative_delta') {
-            if (!startedEvent) startedEvent = true;
-            appendStreamingNarrative(previousEventCount, obj.delta);
-          } else if (obj.type === 'done') {
-            doneData = obj;
-          } else if (obj.type === 'error') {
-            throw new Error(obj.error || 'stream error');
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            let obj: any;
+            try { obj = JSON.parse(trimmed); } catch { continue; }
+            if (obj.type === 'start') {
+              startedEvent = true;
+            } else if (obj.type === 'narrative_delta') {
+              if (!startedEvent) startedEvent = true;
+              appendStreamingNarrative(previousEventCount, obj.delta);
+            } else if (obj.type === 'done') {
+              doneData = obj;
+            } else if (obj.type === 'error') {
+              throw new Error(obj.error || 'stream error');
+            }
           }
         }
+      } catch (readErr: any) {
+        // reader 中断（页面切走/HMR/网络断开）：fallback 到非流式接口拉完整事件
+        console.warn('[advance stream] reader failed:', readErr?.message);
+        finishStreamingNarrative();
+        try { reader.cancel(); } catch {}
+        await advanceFallbackNonStream(previousEventCount);
+        return;
       }
       if (!doneData) throw new Error('流式响应未完成');
 
