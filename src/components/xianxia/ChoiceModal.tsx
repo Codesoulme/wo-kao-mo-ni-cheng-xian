@@ -104,7 +104,7 @@ export function ChoiceModal() {
             )}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 overflow-y-auto xianxia-scroll flex-1">
+        <CardContent className="relative space-y-3 overflow-y-auto xianxia-scroll flex-1">
           {/* 前情提要：命节点事件叙事 */}
           {hasContext && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 overflow-hidden">
@@ -176,7 +176,7 @@ export function ChoiceModal() {
           </div>
 
           {busy && (
-            <div className="text-center text-xs text-muted-foreground animate-pulse pt-1">
+            <div className="absolute bottom-2 left-0 right-0 text-center text-xs text-muted-foreground animate-pulse pointer-events-none">
               <Sparkles className="w-3 h-3 inline mr-1" />
               因果流转中...
             </div>

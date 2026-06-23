@@ -73,6 +73,7 @@ import {
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
 import { inferAttributeChangesFromNarrative } from './narrative-inference';
+import { applyAgeBasedBodyGrowth } from './body-growth';
 import { validateAIBoundary, BoundaryValidationTrace } from './ai-boundary-validator';
 import { buildStateChangeLog, StateChangeLogEntry } from './state-change-log';
 import { buildEventSchedulerPlan } from './event-scheduler';
@@ -4591,6 +4592,20 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     effectResolveTrace.push(...resolved.effectResolveTrace);
     effectResolveWarnings.push(...resolved.effectResolveWarnings);
   };
+
+  // 0. 年龄驱动的身体成长：凡人/低境界角色 attack/defense/speed/maxHp 随年龄自然增长
+  // 修真后属性保留（身体不再退化），但凡人/低境界会逐渐接近 baseline
+  const bodyGrowth = applyAgeBasedBodyGrowth(next, next.age);
+  if (bodyGrowth.growth.attack || bodyGrowth.growth.defense || bodyGrowth.growth.speed || bodyGrowth.growth.maxHp) {
+    next = bodyGrowth.state;
+    effectResolveTrace.push({
+      severity: 'info',
+      code: 'age_body_growth',
+      attribute: '*',
+      message: `Age ${next.age} body growth: factor=${bodyGrowth.factor.toFixed(2)}, realmMult=${bodyGrowth.realmMultiplier.toFixed(2)}, deltas=atk:${bodyGrowth.growth.attack} def:${bodyGrowth.growth.defense} spd:${bodyGrowth.growth.speed} hp:${bodyGrowth.growth.maxHp}`,
+      source: aiOutput.title || 'age-body-growth',
+    });
+  }
 
   // 1. Apply attribute changes through EffectResolver / ERPE Lite.
   let inputChanges = aiOutput.changes || [];

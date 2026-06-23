@@ -2069,6 +2069,77 @@ function smokeNarrativeInference(): void {
   });
 }
 
+function smokeBodyGrowth(): void {
+  // 引擎行为：年龄驱动的身体成长（凡人/低境界）
+  const { applyAgeBasedBodyGrowth } = require('../src/lib/xianxia/body-growth');
+  const baseMortal = {
+    age: 0, realm: 'mortal', spiritualRoot: 'common',
+    cultivationMultiplier: 1, cultivationExp: 0, expToBreak: 100,
+    hp: 50, maxHp: 50, mp: 50, maxMp: 50,
+    attack: 0, defense: 0, speed: 0, luck: 5, comprehension: 5,
+    heartDemon: 0, lifespan: 80,
+  } as any;
+
+  // 测试 1: 0 岁 → 极低
+  let state = applyAgeBasedBodyGrowth(baseMortal, 0).state;
+  assert(state.attack >= 0 && state.attack <= 1, `0岁凡人 attack 在 0-1: ${state.attack}`);
+
+  // 测试 2: 5 岁 → 幼童（baseline ~0.2）
+  state = applyAgeBasedBodyGrowth(baseMortal, 5).state;
+  assert(state.attack >= 1 && state.attack <= 2, `5岁凡人 attack: ${state.attack}`);
+  assert(state.maxHp >= 10, `5岁凡人 maxHp >= 10: ${state.maxHp}`);
+
+  // 测试 3: 10 岁 → 少年（baseline ~0.4）
+  state = applyAgeBasedBodyGrowth(baseMortal, 10).state;
+  assert(state.attack >= 2, `10岁凡人 attack >= 2: ${state.attack}`);
+
+  // 测试 4: 18 岁 → 接近壮年（baseline ~0.75）
+  state = applyAgeBasedBodyGrowth(baseMortal, 18).state;
+  assert(state.attack >= 3, `18岁凡人 attack >= 3: ${state.attack}`);
+
+  // 测试 5: 25 岁 → 壮年 baseline（MORTAL_PEAK.attack=5, factor=1.0, realmMult=1.0）
+  state = applyAgeBasedBodyGrowth(baseMortal, 25).state;
+  assert(state.attack === 5, `25岁凡人 attack = 5: ${state.attack}`);
+  assert(state.defense === 5, `25岁凡人 defense = 5: ${state.defense}`);
+  assert(state.speed === 5, `25岁凡人 speed = 5: ${state.speed}`);
+  assert(state.maxHp === 50, `25岁凡人 maxHp = 50: ${state.maxHp}`);
+
+  // 测试 6: 40 岁 → 壮年巅峰（factor 1.05）
+  state = applyAgeBasedBodyGrowth(baseMortal, 40).state;
+  assert(state.attack >= 5, `40岁凡人 attack >= 5: ${state.attack}`);
+
+  // 测试 7: 60 岁 → 中年衰退
+  state = applyAgeBasedBodyGrowth(baseMortal, 60).state;
+  assert(state.attack <= 5, `60岁凡人 attack <= 5: ${state.attack}`);
+
+  // 测试 8: 修真后属性保留（attack 30 → 80 岁不会掉回 baseline）
+  const advanced = { ...baseMortal, attack: 30, defense: 30, speed: 30, maxHp: 200, realm: 'qi_refining' };
+  state = applyAgeBasedBodyGrowth(advanced, 80).state;
+  assert(state.attack === 30, `修真后 80岁 attack 保留: ${state.attack} (baseline ${Math.round(5 * 0.65 * 1.5)})`);
+  assert(state.maxHp === 200, `修真后 80岁 maxHp 保留: ${state.maxHp}`);
+
+  // 测试 9: 修真境界倍率
+  const golden = { ...baseMortal, realm: 'golden_core' };
+  state = applyAgeBasedBodyGrowth(golden, 25).state;
+  assert(state.attack === 15, `金丹 25岁 attack = 5*1*3 = 15: ${state.attack}`);
+
+  // 测试 10: 100 岁耄耋
+  state = applyAgeBasedBodyGrowth(baseMortal, 100).state;
+  assert(state.attack < 5, `100岁凡人 attack < 5: ${state.attack}`);
+
+  log('body-growth', {
+    passed: true,
+    age0Atk: applyAgeBasedBodyGrowth(baseMortal, 0).state.attack,
+    age5Atk: applyAgeBasedBodyGrowth(baseMortal, 5).state.attack,
+    age10Atk: applyAgeBasedBodyGrowth(baseMortal, 10).state.attack,
+    age25Atk: applyAgeBasedBodyGrowth(baseMortal, 25).state.attack,
+    age60Atk: applyAgeBasedBodyGrowth(baseMortal, 60).state.attack,
+    age100Atk: applyAgeBasedBodyGrowth(baseMortal, 100).state.attack,
+    golden25Atk: applyAgeBasedBodyGrowth(golden, 25).state.attack,
+    advanced80Atk: applyAgeBasedBodyGrowth(advanced, 80).state.attack,
+  });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -2134,6 +2205,7 @@ async function main(): Promise<void> {
   smokeNarrativeTruncation();
   smokeNarrativeCompletion();
   smokeNarrativeInference();
+  smokeBodyGrowth();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
