@@ -93,6 +93,25 @@ const MECHANISM_PATTERNS: Array<[RegExp, string | ((m: string) => string)]> = [
 ];
 
 /**
+ * 补全 narrative 末尾
+ * - 末尾是"："+ 无引号对话 → 自动补一句"他沉默片刻，没有再开口。"让叙事完整
+ * - 末尾是单引号 `"` 或 `'` → 自动补反引号 + 简短后续
+ */
+export function completeNarrative(text: string): string {
+  if (!text) return text;
+  const trimmed = text.trimEnd();
+  // 末尾是中文冒号：补一句让叙事有"开头"
+  if (/[：:]$/.test(trimmed)) {
+    return `${trimmed}\n他张了张嘴，又咽了回去，只剩水波轻轻荡开。`;
+  }
+  // 末尾是单个引号（开了对话没关）
+  if (/["""]$/.test(trimmed)) {
+    return `${trimmed}"`;
+  }
+  return text;
+}
+
+/**
  * 截断 narrative 到最近的完整句子边界
  * 用于 AI 输出超过字数上限被 max_tokens 截断时
  * - 如果 text <= maxChars，原样返回

@@ -1981,6 +1981,30 @@ function smokeNarrativeTruncation(): void {
   log('narrative-truncation', { passed: true, t1Len: r1.length, t2Len: r2.length, t3Len: r3.length, t4Len: r4.length });
 }
 
+function smokeNarrativeCompletion(): void {
+  // narrative 末尾补全：处理 AI 输出"半句话+冒号"或"开了引号没关"的情况
+  const { completeNarrative } = require('../src/lib/xianxia/display');
+  // 测试 1: 末尾是中文冒号 → 补全
+  const t1 = '宣大江低头看儿子：';
+  const r1 = completeNarrative(t1);
+  assert(r1.length > t1.length && !/[：:]$/.test(r1.trim()), `中文冒号结尾被补全: ${r1.slice(-30)}`);
+  // 测试 2: 末尾是英文冒号 → 同样补全
+  const t2 = 'He looked at his son:';
+  const r2 = completeNarrative(t2);
+  assert(r2.length > t2.length, `英文冒号结尾被补全: ${r2.slice(-30)}`);
+  // 测试 3: 末尾是单引号（开了对话没关）→ 补反引号
+  const t3 = '望川张嘴喊了一声"';
+  const r3 = completeNarrative(t3);
+  assert(/["""]$/.test(r3) && r3.length > t3.length, `单引号结尾被补全: ${r3.slice(-10)}`);
+  // 测试 4: 完整 narrative → 不变
+  const t4 = '他笑了笑，转身走入雾中。';
+  const r4 = completeNarrative(t4);
+  assert(r4 === t4, `完整 narrative 不变: ${r4}`);
+  // 测试 5: 空文本
+  assert(completeNarrative('') === '', '空文本不变');
+  log('narrative-completion', { passed: true, t1Changed: r1 !== t1, t2Changed: r2 !== t2, t3Changed: r3 !== t3, t4Unchanged: r4 === t4 });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -2044,6 +2068,7 @@ async function main(): Promise<void> {
   smokeLiteModelConfig();
   smokeBubbleSplit();
   smokeNarrativeTruncation();
+  smokeNarrativeCompletion();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }

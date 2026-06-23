@@ -21,7 +21,7 @@ import {
   buildStateContext,
 } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { sanitizeEventDraft, truncateNarrativeAtSentence } from '@/lib/xianxia/display';
+import { sanitizeEventDraft, truncateNarrativeAtSentence, completeNarrative } from '@/lib/xianxia/display';
 import { clearAdvancePreload, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { generateAgeEventStream } from '@/lib/xianxia/llm';
 import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections, worldTimeStamp } from '@/lib/xianxia/world-time';
@@ -210,7 +210,7 @@ async function runAdvance(req: NextRequest, write: (obj: any) => void, _close: (
   (finalState as any).worldTime = worldTime;
 
   // 11) 构造事件
-  const finalNarrative = truncateNarrativeAtSentence(aiOutput.narrative || '', 420);
+  const finalNarrative = truncateNarrativeAtSentence(completeNarrative(aiOutput.narrative || ''), 420);
   const displayEffects = buildEventDisplayEffects(aiOutput);
   const eventDraft = sanitizeEventDraft({ title: aiOutput.title, narrative: finalNarrative }, finalState.age);
   const eventDrafts: any[] = [{
@@ -237,7 +237,7 @@ async function runAdvance(req: NextRequest, write: (obj: any) => void, _close: (
       const extraActions = sanitizeActionProjections(extra.actionProjections);
       const extraDraft = sanitizeEventDraft({
         title: extra.title || '',
-        narrative: truncateNarrativeAtSentence(extra.narrative || '', 280),
+        narrative: truncateNarrativeAtSentence(completeNarrative(extra.narrative || ''), 280),
         eventType: extra.eventType || 'normal',
         effects: [hiddenEventMeta({ timeAdvance: extraTimeAdvance, worldTime: extraWorldTime, actionProjections: extraActions })],
         timeAdvance: extraTimeAdvance,
