@@ -9,6 +9,7 @@ import { registerItem } from '../src/lib/xianxia/content-registry';
 import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
 import { characterDisplayEntries, entriesForSlot } from '../src/lib/xianxia/display-registry';
 import { sanitizeNarrativeText, sanitizeEventDraft } from '../src/lib/xianxia/display';
+import { buildFallbackAgeEvent } from '../src/lib/xianxia/advance-fallback';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -1777,6 +1778,69 @@ function smokeYoungCharacterNoAdultAction(): void {
   log('smoke-young-character-no-adult-action', { passed: true, summary: summaryText });
 }
 
+function smokeFallbackInfantHardGate(): void {
+  // 6 岁以下必须走幼童分支，不复用历史文本
+  const state: any = { name: '幼童', age: 2, realm: 'mortal', realmLevel: 0, location: '村庄', cultivationMultiplier: 1 };
+  const blueprint: any = { name: '童年趣事', category: 'growth' };
+  const ctx: any = { character: { realmName: '凡人' } };
+  // 即使有大量历史，age=2 也必须走 infant_template 策略
+  const recentEvents = [
+    { age: 1, title: '周岁', narrative: '去年她在青云山脚蹒跚学步，抱着泥巴的哥哥笑了一整年。', eventType: 'normal' },
+    { age: 2, title: '前岁', narrative: '前一年她在溪边看小鱼，被爷爷抱回家。', eventType: 'normal' },
+  ];
+  const result = buildFallbackAgeEvent(state, blueprint, ctx, false, { recentEvents });
+  assert(result.isFallbackGenerated === true, 'fallback must mark isFallbackGenerated');
+  assert(result.fallbackStrategy === 'infant_template', `age 2 must use infant_template, got ${result.fallbackStrategy}`);
+  // 不得复用历史同岁文本里的具体地名
+  assert(!result.narrative.includes('青云山'), `infant fallback must not inject historical location: ${result.narrative}`);
+  assert(!result.narrative.includes('溪边看小鱼'), `infant fallback must not reuse historical narrative: ${result.narrative}`);
+  log('fallback-infant-hard-gate', { passed: true, strategy: result.fallbackStrategy, narrative: result.narrative.slice(0, 40) });
+}
+
+function smokeFallbackSameAgeVariant(): void {
+  // 有同岁历史时优先复用历史文本
+  const state: any = { name: '云岚', age: 18, realm: 'qi_refining', realmLevel: 3, location: '青云山脚', cultivationMultiplier: 1.2 };
+  const blueprint: any = { name: '流年', category: 'daily' };
+  const ctx: any = { character: { realmName: '炼气' } };
+  const recentEvents = [
+    { age: 18, title: '坊市淘宝', narrative: '今年，云岚在坊市里翻找几本旧书，淘到一本前人修炼手札。', eventType: 'normal' },
+    { age: 17, title: '日常', narrative: '去年她把灵气运转调顺了不少。', eventType: 'normal' },
+  ];
+  const result = buildFallbackAgeEvent(state, blueprint, ctx, false, { recentEvents });
+  assert(result.fallbackStrategy === 'same_age_variant', `should use same_age_variant strategy, got ${result.fallbackStrategy}`);
+  assert(result.narrative.includes('云岚'), 'remixed narrative must keep character name');
+  log('fallback-same-age-variant', { passed: true, strategy: result.fallbackStrategy });
+}
+
+function smokeFallbackElementEnrichment(): void {
+  // 无同岁历史但有地点/NPC 出现时，应使用元素注入型模板
+  const state: any = { name: '云岚', age: 30, realm: 'qi_refining', realmLevel: 5, location: '青云山脚', cultivationMultiplier: 1.2 };
+  const blueprint: any = { name: '流年', category: 'daily' };
+  const ctx: any = { character: { realmName: '炼气' } };
+  const recentEvents = [
+    { age: 20, title: '访友', narrative: '她去青云镇外的碧水潭，遇到李掌柜讨教几招，又聊起附近的妖兽出没。', eventType: 'normal' },
+    { age: 21, title: '又访', narrative: '又去青云镇外的碧水潭，遇到李掌柜讨教几招，又聊起附近的妖兽出没。', eventType: 'normal' },
+  ];
+  const result = buildFallbackAgeEvent(state, blueprint, ctx, false, { recentEvents });
+  assert(result.fallbackStrategy === 'enriched_template', `should use enriched_template, got ${result.fallbackStrategy}`);
+  // 必须注入历史地点或 NPC
+  const injectedLocation = result.narrative.includes('碧水潭') || result.narrative.includes('青云镇');
+  const injectedNpc = result.narrative.includes('李掌柜');
+  assert(injectedLocation || injectedNpc, `enriched template must inject historical element, got: ${result.narrative}`);
+  log('fallback-element-enrichment', { passed: true, strategy: result.fallbackStrategy, hasLocation: injectedLocation, hasNpc: injectedNpc });
+}
+
+function smokeFallbackPlainTemplate(): void {
+  // 完全无历史时用纯模板
+  const state: any = { name: '新角色', age: 25, realm: 'qi_refining', realmLevel: 2, location: '未知', cultivationMultiplier: 1 };
+  const blueprint: any = { name: '流年', category: 'daily' };
+  const ctx: any = { character: { realmName: '炼气' } };
+  const result = buildFallbackAgeEvent(state, blueprint, ctx, false, { recentEvents: [] });
+  assert(result.fallbackStrategy === 'plain_template', `should use plain_template, got ${result.fallbackStrategy}`);
+  assert(result.narrative.length > 20, 'plain template must produce non-trivial narrative');
+  log('fallback-plain-template', { passed: true, strategy: result.fallbackStrategy });
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -1829,6 +1893,10 @@ async function main(): Promise<void> {
   smokeSameYearThreadNormalizedProgress100();
   smokeNoMechanismWordsInNarrative();
   smokeYoungCharacterNoAdultAction();
+  smokeFallbackInfantHardGate();
+  smokeFallbackSameAgeVariant();
+  smokeFallbackElementEnrichment();
+  smokeFallbackPlainTemplate();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }

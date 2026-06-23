@@ -207,7 +207,7 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
       aiOutput = await generateAgeEvent(ctx, isFateNode, qualityMode);
     } catch (llmErr: any) {
       console.error('LLM advance prepare failed, using fallback:', llmErr?.message || llmErr);
-      aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode);
+      aiOutput = buildFallbackAgeEvent(state, blueprint, ctx, isFateNode, { recentEvents });
     }
   }
 
