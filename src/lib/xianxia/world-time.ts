@@ -78,7 +78,15 @@ export function clampTimeAdvance(raw: any, fallback?: TimeAdvance): TimeAdvance 
   const amount = Math.max(1, Math.min(maxByUnit[unit], Math.round(Number(raw?.amount || fb.amount || 1))));
   const unitDays: Record<TimeAdvanceUnit, number> = { moment: 0, hour: 0, day: 1, month: 30, season: 90, year: 365, decade: 3650, century: 36500 };
   const naturalDays = amount * unitDays[unit];
-  const elapsedDays = Math.max(0, Math.min(36500 * 3, Math.round(Number(raw?.elapsedDays ?? fb.elapsedDays ?? naturalDays))));
+  // 优先级：raw 显式给的 elapsedDays > raw 的 unit/amount 算的 naturalDays > fb 的 elapsedDays
+  // 这样 AI 传 {unit:'month', amount:3} 不会因为主事件 fallback 是 1 年而被覆盖成 365 天
+  const rawHasAnyTimeFields = raw && (
+    raw.elapsedDays != null || raw.unit != null || raw.amount != null ||
+    raw.label != null || raw.ageDeltaYears != null
+  );
+  const elapsedDays = rawHasAnyTimeFields
+    ? Math.max(0, Math.min(36500 * 3, Math.round(Number(raw?.elapsedDays ?? naturalDays))))
+    : Math.max(0, Math.min(36500 * 3, Math.round(Number(fb.elapsedDays ?? naturalDays))));
   const naturalYears = Math.floor(elapsedDays / 365);
   const ageDeltaYears = Math.max(0, Math.min(300, Math.round(Number(raw?.ageDeltaYears ?? fb.ageDeltaYears ?? naturalYears))));
   const rawLabel = String(raw?.label || fb.label || '').slice(0, 36);
