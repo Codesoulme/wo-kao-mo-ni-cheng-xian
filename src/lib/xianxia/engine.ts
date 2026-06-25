@@ -224,12 +224,18 @@ export function dbToState(c: DBCharacter): CharacterState {
 function cultivationAttributeCategory(category?: string): CultivationAttributeEntry['category'] {
   if (!category) return 'custom';
   const map: Record<string, CultivationAttributeEntry['category']> = {
-    body: '\u8eab\u4f53',
-    spirit: '\u795e\u9b42',
-    dao: '\u9053\u5fb7',
-    combat: '\u6218\u6597',
-    fate: '\u5929\u8fd0',
+    body: 'body',
+    spirit: 'spirit',
+    dao: 'dao',
+    combat: 'combat',
+    fate: 'fate',
     custom: 'custom',
+    // 旧存档中文 category 兼容
+    '\u8eab\u4f53': 'body',
+    '\u795e\u9b42': 'spirit',
+    '\u9053\u5fb7': 'dao',
+    '\u6218\u6597': 'combat',
+    '\u5929\u8fd0': 'fate',
   };
   return map[category] || 'custom';
 }
@@ -238,7 +244,7 @@ export function deriveCultivationAttributes(state: CharacterState): CultivationA
   const byId = new Map<string, CultivationAttributeEntry>();
   for (const attr of state.cultivationAttributes || []) {
     if (!attr || !attr.name || attr.visible === false) continue;
-    byId.set(attr.id || attr.name, { ...attr, id: attr.id || attr.name });
+    byId.set(attr.id || attr.name, { ...attr, id: attr.id || attr.name, category: cultivationAttributeCategory(attr.category) });
   }
   for (const status of state.activeStatuses || []) {
     if (!status || status.category !== 'attribute' || !status.name) continue;
@@ -262,7 +268,7 @@ export function deriveCultivationAttributes(state: CharacterState): CultivationA
     value: core.spiritualSense,
     description: '\u611f\u77e5\u3001\u63a2\u67e5\u3001\u795e\u5ff5\u538b\u5236\u4e0e\u9ad8\u9636\u7981\u5236\u5224\u65ad\u7684\u57fa\u7840\u3002',
     source: '\u5883\u754c\u4e0e\u795e\u9b42\u6d3e\u751f',
-    category: '\u795e\u9b42',
+    category: 'spirit',
     visible: true,
   });
   byId.set('soulStrength', {
@@ -271,7 +277,7 @@ export function deriveCultivationAttributes(state: CharacterState): CultivationA
     value: core.soulStrength,
     description: `\u5f53\u524d\u795e\u9b42\u5883\u754c\uff1a${soul.name}\uff08${soul.gap}\uff09\uff0c\u5f71\u54cd\u5143\u5a74\u51fa\u7a8d\u3001\u593a\u820d\u98ce\u9669\u3001\u5fc3\u9b54\u627f\u53d7\u548c\u795e\u8bc6\u79d8\u672f\u3002`,
     source: '\u5883\u754c\u4e0e\u5fc3\u6027\u6d3e\u751f',
-    category: '\u795e\u9b42',
+    category: 'spirit',
     visible: true,
   });
   byId.set('physicalFoundation', {
@@ -280,7 +286,7 @@ export function deriveCultivationAttributes(state: CharacterState): CultivationA
     value: core.physicalFoundation,
     description: '\u8089\u8eab\u6839\u57fa\u4e0e\u627f\u8f7d\u529b\uff0c\u5f71\u54cd\u91cd\u4f24\u627f\u53d7\u3001\u70bc\u4f53\u673a\u7f18\u548c\u5927\u5883\u754c\u7a81\u7834\u7a33\u5b9a\u5ea6\u3002',
     source: '\u8089\u8eab\u4e0e\u5883\u754c\u6d3e\u751f',
-    category: '\u8eab\u4f53',
+    category: 'body',
     visible: true,
   });
   return [...byId.values()].slice(0, 24);

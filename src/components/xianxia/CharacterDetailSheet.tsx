@@ -216,9 +216,9 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
           <section>
             <SectionTitle icon={<Sword className="w-3.5 h-3.5" />} title="武学·属性" />
             <div className="grid grid-cols-2 gap-2 mt-1.5">
-              <StatCard icon={<Sword className="w-3 h-3" />} label="攻" value={(current as any).combatProjection?.force ?? current.attack} color="#c8453c" info={ATTRIBUTE_INFO.force} onClick={setSelectedAttr} />
-              <StatCard icon={<Shield className="w-3 h-3" />} label="守" value={(current as any).combatProjection?.guard ?? current.defense} color="#2e5c8a" info={ATTRIBUTE_INFO.guard} onClick={setSelectedAttr} />
-              <StatCard icon={<Zap className="w-3 h-3" />} label="敏" value={(current as any).combatProjection?.agility ?? current.speed} color="#d4af37" info={ATTRIBUTE_INFO.agility} onClick={setSelectedAttr} />
+              <StatCard icon={<Sword className="w-3 h-3" />} label="破势" value={(current as any).combatProjection?.force ?? current.attack} color="#c8453c" info={ATTRIBUTE_INFO.force} onClick={setSelectedAttr} />
+              <StatCard icon={<Shield className="w-3 h-3" />} label="护持" value={(current as any).combatProjection?.guard ?? current.defense} color="#2e5c8a" info={ATTRIBUTE_INFO.guard} onClick={setSelectedAttr} />
+              <StatCard icon={<Zap className="w-3 h-3" />} label="机变" value={(current as any).combatProjection?.agility ?? current.speed} color="#d4af37" info={ATTRIBUTE_INFO.agility} onClick={setSelectedAttr} />
               <StatCard icon={<Clover className="w-3 h-3" />} label="气运" value={current.luck} color="#22c55e" info={ATTRIBUTE_INFO.luck} onClick={setSelectedAttr} />
               <StatCard icon={<Brain className="w-3 h-3" />} label="悟性" value={current.comprehension} color="#a855f7" info={ATTRIBUTE_INFO.comprehension} onClick={setSelectedAttr} />
               <StatCard icon={<Coins className="w-3 h-3" />} label="灵石" value={current.spiritStones} color="#d4af37" info={ATTRIBUTE_INFO.spiritStones} onClick={setSelectedAttr} />

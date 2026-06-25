@@ -8,8 +8,14 @@ import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extra
 import { registerItem } from '../src/lib/xianxia/content-registry';
 import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
 import { characterDisplayEntries, entriesForSlot } from '../src/lib/xianxia/display-registry';
-import { sanitizeNarrativeText, sanitizeEventDraft } from '../src/lib/xianxia/display';
-import { buildFallbackAgeEvent } from '../src/lib/xianxia/advance-fallback';
+import { sanitizeNarrativeText, sanitizeEventDraft, truncateNarrativeAtSentence, completeNarrative } from '../src/lib/xianxia/display';
+import { buildFallbackAgeEvent, applyRhythmVariation, injectEntityFragment } from '../src/lib/xianxia/advance-fallback';
+import { extractStyleAnchor, formatStyleAnchorsForPrompt } from '../src/lib/xianxia/style-anchor';
+import { extractEntitiesFromNarrative, formatEntitiesForPrompt } from '../src/lib/xianxia/entity-store';
+import { inferAttributeChangesFromNarrative } from '../src/lib/xianxia/narrative-inference';
+import { applyAgeBasedBodyGrowth } from '../src/lib/xianxia/body-growth';
+import { detectBodyModifier } from '../src/lib/xianxia/narrative-body-modifier';
+import { hashCacheKey } from '../src/lib/xianxia/llm';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -1683,19 +1689,19 @@ async function smokePreloadInvalidationReason(): Promise<void> {
   // 这里只覆盖不依赖完整 char 对象的 early-return case
   const char: any = { age: 10, alive: true, ascended: false, isAtChoice: false, pendingChoiceJson: '', combatStateJson: '' };
   // no_preload
-  assert((await isAdvancePreloadUsable(char, null))?.reason === 'no_preload', 'null preload should return no_preload');
+  assert(((await isAdvancePreloadUsable(char, null)) as any)?.reason === 'no_preload', 'null preload should return no_preload');
   // ageMismatch
-  assert((await isAdvancePreloadUsable({ ...char, age: 11 }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'ageMismatch', 'wrong age should return ageMismatch');
+  assert(((await isAdvancePreloadUsable({ ...char, age: 11 }, { baseAge: 10, baseStateHash: 'same' })) as any)?.reason === 'ageMismatch', 'wrong age should return ageMismatch');
   // characterDead
-  assert((await isAdvancePreloadUsable({ ...char, alive: false }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'characterDead', 'dead character should return characterDead');
+  assert(((await isAdvancePreloadUsable({ ...char, alive: false }, { baseAge: 10, baseStateHash: 'same' })) as any)?.reason === 'characterDead', 'dead character should return characterDead');
   // ascended
-  assert((await isAdvancePreloadUsable({ ...char, ascended: true }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'ascended', 'ascended character should return ascended');
+  assert(((await isAdvancePreloadUsable({ ...char, ascended: true }, { baseAge: 10, baseStateHash: 'same' })) as any)?.reason === 'ascended', 'ascended character should return ascended');
   // isAtChoice
-  assert((await isAdvancePreloadUsable({ ...char, isAtChoice: true }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'isAtChoice', 'at choice should return isAtChoice');
+  assert(((await isAdvancePreloadUsable({ ...char, isAtChoice: true }, { baseAge: 10, baseStateHash: 'same' })) as any)?.reason === 'isAtChoice', 'at choice should return isAtChoice');
   // hasPendingChoice
-  assert((await isAdvancePreloadUsable({ ...char, pendingChoiceJson: '{}' }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'hasPendingChoice', 'pending choice should return hasPendingChoice');
+  assert(((await isAdvancePreloadUsable({ ...char, pendingChoiceJson: '{}' }, { baseAge: 10, baseStateHash: 'same' })) as any)?.reason === 'hasPendingChoice', 'pending choice should return hasPendingChoice');
   // combatOngoing
-  assert((await isAdvancePreloadUsable({ ...char, combatStateJson: '{"status":"ongoing"}' }, { baseAge: 10, baseStateHash: 'same' }))?.reason === 'combatOngoing', 'ongoing combat should return combatOngoing');
+  assert(((await isAdvancePreloadUsable({ ...char, combatStateJson: '{"status":"ongoing"}' }, { baseAge: 10, baseStateHash: 'same' })) as any)?.reason === 'combatOngoing', 'ongoing combat should return combatOngoing');
   log('preload-invalidation-reason', { passed: true });
 }
 
@@ -1843,7 +1849,6 @@ function smokeFallbackPlainTemplate(): void {
 
 function smokeStyleAnchorExtraction(): void {
   // 风格锚定：能从 narrative 提取 tone/句长/标点密度/开头模式/片段样本
-  const { extractStyleAnchor, formatStyleAnchorsForPrompt } = require('../src/lib/xianxia/style-anchor');
   const narrative = '那年夏天日头毒，茅听澎蹲在院角看蚂蚁搬家。泥土热得烫手，他拿小树枝拨了一下，蚂蚁慌慌张张绕开了。他笑了一下，又去够下一只。午后风起，母亲叫他进屋喝水，他应了一声，却没动。';
   const anchor = extractStyleAnchor(5, narrative);
   assert(anchor.age === 5, 'age should be preserved');
@@ -1859,7 +1864,6 @@ function smokeStyleAnchorExtraction(): void {
 
 function smokeEntityStoreExtraction(): void {
   // 实体库：能从 narrative 提取 NPC/地点/物品
-  const { extractEntitiesFromNarrative, formatEntitiesForPrompt } = require('../src/lib/xianxia/entity-store');
   const narrative = '那年夏天，茅听澎蹲在院角看蚂蚁搬家。祖父茅老栓从堂屋拿出半截灰布擦汗，母亲刘氏端来一碗凉茶。青云镇的虎子也跑来玩，带来的小竹笛丢在草丛里。';
   const entities = extractEntitiesFromNarrative(5, narrative);
   const npcs = entities.filter((e: any) => e.type === 'npc').map((e: any) => e.name);
@@ -1874,9 +1878,6 @@ function smokeEntityStoreExtraction(): void {
 
 function smokeRhythmVariation(): void {
   // 韵律变化：fallback 生成时能按 style anchor 调整
-  const { applyRhythmVariation, injectEntityFragment } = require('../src/lib/xianxia/advance-fallback');
-  const { extractStyleAnchor } = require('../src/lib/xianxia/style-anchor');
-  const { extractEntitiesFromNarrative } = require('../src/lib/xianxia/entity-store');
   const narrative = '5岁，她抄着手倚在院门边看日头，半眯着眼。';
   const anchor = extractStyleAnchor(5, narrative);
   // 长叙事测试拆句
@@ -1892,7 +1893,6 @@ function smokeRhythmVariation(): void {
 
 function smokeLLMCache(): void {
   // LLM 缓存：能 set/get 同一个 prompt 5 分钟内
-  const { hashCacheKey } = require('../src/lib/xianxia/llm');
   // hashCacheKey 是 private 函数，做不了直接测试，但能通过重复调用测语义
   const k1 = hashCacheKey('full|sys|user-a');
   const k2 = hashCacheKey('full|sys|user-a');
@@ -1905,7 +1905,6 @@ function smokeLLMCache(): void {
 
 function smokeLiteModelConfig(): void {
   // liteModel 配置：cfg 中有 liteModel 字段时，light mode 应该用 liteModel
-  const cfg = require('../src/lib/xianxia/llm');
   // 验证 type 存在（即使 loadAIConfig 依赖文件）
   log('lite-model-config', { passed: true, note: 'cfg.liteModel is used when qualityMode=light; set in .xianxia-ai-config' });
 }
@@ -1957,7 +1956,6 @@ function smokeBubbleSplit(): void {
 
 function smokeNarrativeTruncation(): void {
   // 截断 narrative 到完整句：处理 AI 超字数输出或 max_tokens 截断
-  const { truncateNarrativeAtSentence } = require('../src/lib/xianxia/display');
   // 测试 1: 短文本原样返回
   const t1 = '那年夏天日头毒。';
   const r1 = truncateNarrativeAtSentence(t1, 400);
@@ -1983,7 +1981,6 @@ function smokeNarrativeTruncation(): void {
 
 function smokeNarrativeCompletion(): void {
   // narrative 末尾补全：处理 AI 输出"半句话+冒号"或"开了引号没关"的情况
-  const { completeNarrative } = require('../src/lib/xianxia/display');
   // 测试 1: 末尾是中文冒号 → 补全
   const t1 = '宣大江低头看儿子：';
   const r1 = completeNarrative(t1);
@@ -2007,7 +2004,6 @@ function smokeNarrativeCompletion(): void {
 
 function smokeNarrativeInference(): void {
   // 引擎兜底：当 AI 漏写 changes 时，从 narrative 关键词 + 当前境界自动推断属性变化
-  const { inferAttributeChangesFromNarrative } = require('../src/lib/xianxia/narrative-inference');
   // mock 一个 state：凡人 + 凡灵根
   const baseState = {
     age: 10, realm: 'qi_refining', spiritualRoot: 'common',
@@ -2071,7 +2067,6 @@ function smokeNarrativeInference(): void {
 
 function smokeBodyGrowth(): void {
   // 引擎行为：年龄驱动的身体成长（凡人/低境界）
-  const { applyAgeBasedBodyGrowth } = require('../src/lib/xianxia/body-growth');
   const baseMortal = {
     age: 0, realm: 'mortal', spiritualRoot: 'common',
     cultivationMultiplier: 1, cultivationExp: 0, expToBreak: 100,
@@ -2142,7 +2137,6 @@ function smokeBodyGrowth(): void {
 
 function smokeBodyModifier(): void {
   // 叙事身体修正：从 narrative 关键词检测身体状态
-  const { detectBodyModifier } = require('../src/lib/xianxia/narrative-body-modifier');
   // 测试 1: 缠绵病榻
   const t1 = '那年寒冬，他缠绵病榻三月有余，瘦得只剩一把骨头。';
   const r1 = detectBodyModifier(t1);
@@ -2185,7 +2179,6 @@ function smokeBodyModifier(): void {
 
 function smokeBodyGrowthWithNarrative(): void {
   // 集成测试：年龄 + 叙事修正 协同工作
-  const { applyAgeBasedBodyGrowth } = require('../src/lib/xianxia/body-growth');
   const baseMortal = {
     age: 0, realm: 'mortal', spiritualRoot: 'common',
     cultivationMultiplier: 1, cultivationExp: 0, expToBreak: 100,
@@ -2302,8 +2295,97 @@ async function main(): Promise<void> {
   smokeBodyGrowth();
   smokeBodyModifier();
   smokeBodyGrowthWithNarrative();
+  smokeCombatLabelsDisplay();
+  smokeMechanismPatternsCombatLabels();
+  smokeEngineCultivationCategoryEnglish();
+  smokeNoModelLeakInUI();
+  smokeOldChineseCategoryCompatibility();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
+}
+
+function smokeCombatLabelsDisplay(): void {
+  // P0 验证：玩家可见 UI 中 攻/守/敏 已回滚为 破势/护持/机变
+  const statusPanelSource = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
+  const detailSource = readFileSync('src/components/xianxia/CharacterDetailSheet.tsx', 'utf-8');
+  // StatusPanel 用 unicode 转义存储中文字符；同时检查字面量和转义序列
+  const hasStatusPanelLabels = statusPanelSource.includes('破势') || statusPanelSource.includes('\\u7834\\u52bf');
+  const hasStatusPanelForbidden = /label\s*:\s*['"]攻['"]|label\s*:\s*['"]守['"]|label\s*:\s*['"]敏['"]/.test(statusPanelSource);
+  assert(!hasStatusPanelForbidden, 'StatusPanel 中不能出现单字 攻/守/敏');
+  assert(hasStatusPanelLabels, 'StatusPanel 应显示 破势/护持/机变');
+  // CharacterDetailSheet 使用字面量中文
+  const forbidden = /label\s*:\s*['"]攻['"]|label\s*:\s*['"]守['"]|label\s*:\s*['"]敏['"]/;
+  assert(!forbidden.test(detailSource), 'CharacterDetailSheet 中不能出现单字 攻/守/敏');
+  assert(detailSource.includes('破势') && detailSource.includes('护持') && detailSource.includes('机变'), 'CharacterDetailSheet 应显示 破势/护持/机变');
+  log('combat-labels-display', { passed: true });
+}
+
+function smokeMechanismPatternsCombatLabels(): void {
+  // P0 验证：display.ts 中 MECHANISM_PATTERNS 的 attack/defense/speed 映射为完整中文 label
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(displaySource.includes("\\battack\\b/gi, '破势'"), 'attack 应映射到 破势');
+  assert(displaySource.includes("\\bdefense\\b/gi, '护持'"), 'defense 应映射到 护持');
+  assert(displaySource.includes("\\bspeed\\b/gi, '机变'"), 'speed 应映射到 机变');
+  assert(!displaySource.includes("\\battack\\b/gi, '攻'"), 'attack 不能再映射到 攻');
+  assert(!displaySource.includes("\\bdefense\\b/gi, '守'"), 'defense 不能再映射到 守');
+  assert(!displaySource.includes("\\bspeed\\b/gi, '敏'"), 'speed 不能再映射到 敏');
+  // 运行时过滤验证
+  assert(sanitizeNarrativeText('attack 提升') === '破势 提升', 'attack 应被 sanitize 为 破势');
+  assert(sanitizeNarrativeText('defense 提升') === '护持 提升', 'defense 应被 sanitize 为 护持');
+  assert(sanitizeNarrativeText('speed 提升') === '机变 提升', 'speed 应被 sanitize 为 机变');
+  // key:value 兜底：attack:12 / attack +12 / attack=12 应被移除
+  assert(!sanitizeNarrativeText('attack:12').includes('attack'), 'attack:12 不应残留 attack');
+  assert(!sanitizeNarrativeText('defense +5').includes('defense'), 'defense +5 不应残留 defense');
+  log('mechanism-patterns-combat-labels', { passed: true });
+}
+
+function smokeEngineCultivationCategoryEnglish(): void {
+  // P1 验证：engine.ts 中 cultivation attribute category enum 为英文
+  const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  //  cultivationAttributeCategory map 输出英文
+  assert(engineSource.includes("body: 'body'"), 'body category 应为英文');
+  assert(engineSource.includes("spirit: 'spirit'"), 'spirit category 应为英文');
+  assert(engineSource.includes("dao: 'dao'"), 'dao category 应为英文');
+  assert(engineSource.includes("combat: 'combat'"), 'combat category 应为英文');
+  assert(engineSource.includes("fate: 'fate'"), 'fate category 应为英文');
+  // core cultivation attribute 硬编码 category 应为英文
+  assert(/category:\s*['"]body['"]/.test(engineSource), 'physicalFoundation category 应为 body');
+  assert(/category:\s*['"]spirit['"]/.test(engineSource), 'spiritualSense/soulStrength category 应为 spirit');
+  log('engine-cultivation-category-english', { passed: true });
+}
+
+function smokeNoModelLeakInUI(): void {
+  // P1 验证：配置页外（非 AIConfigDialog）UI 组件不出现 model/apiKey/baseUrl 等技术词
+  const uiFiles = [
+    'src/components/xianxia/StatusPanel.tsx',
+    'src/components/xianxia/CharacterDetailSheet.tsx',
+    'src/app/page.tsx',
+    'src/components/xianxia/EventTimeline.tsx',
+  ];
+  for (const file of uiFiles) {
+    const source = readFileSync(file, 'utf-8');
+    assert(!/\bmodel\b|\bapiKey\b|\bbaseUrl\b|\bapiKey|\bmodelId\b/i.test(source), `${file} 不应泄露 model/apiKey/baseUrl 等技术词`);
+  }
+  log('no-model-leak-in-ui', { passed: true, files: uiFiles.length });
+}
+
+function smokeOldChineseCategoryCompatibility(): void {
+  // P1 验证：旧存档中的中文 category 能被 normalize 为英文
+  // cultivationAttributeCategory 对中文输入返回英文
+  const state: any = {
+    age: 10,
+    cultivationAttributes: [
+      { id: 'old_body', name: '旧身体', value: 5, description: '', source: '', category: '身体', visible: true },
+      { id: 'old_spirit', name: '旧神魂', value: 3, description: '', source: '', category: '神魂', visible: true },
+    ],
+    activeStatuses: [],
+  };
+  const attrs = deriveCultivationAttributes(state);
+  const bodyAttr = attrs.find((a: any) => a.id === 'old_body');
+  const spiritAttr = attrs.find((a: any) => a.id === 'old_spirit');
+  assert(bodyAttr?.category === 'body', `中文 身体 应被 normalize 为 body, got ${bodyAttr?.category}`);
+  assert(spiritAttr?.category === 'spirit', `中文 神魂 应被 normalize 为 spirit, got ${spiritAttr?.category}`);
+  log('old-chinese-category-compatibility', { passed: true });
 }
 
 main().catch(error => {

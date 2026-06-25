@@ -53,9 +53,9 @@ export function StatusPanel({ character }: StatusPanelProps) {
     { label: '\u4f53\u9b44', value: (character as any).physicalFoundation ?? 0, icon: <Shield className="w-2.5 h-2.5" />, color: '#0f766e' },
   ];
   const quickStats = [
-    { label: '\u653b', value: combatProjection.force ?? character.attack, icon: <Sword className="w-2.5 h-2.5" />, color: '#c8453c' },
-    { label: '\u5b88', value: combatProjection.guard ?? character.defense, icon: <Shield className="w-2.5 h-2.5" />, color: '#2e5c8a' },
-    { label: '\u654f', value: combatProjection.agility ?? character.speed, icon: <Zap className="w-2.5 h-2.5" />, color: '#d4af37' },
+    { label: '\u7834\u52bf', value: combatProjection.force ?? character.attack, icon: <Sword className="w-2.5 h-2.5" />, color: '#c8453c' },
+    { label: '\u62a4\u6301', value: combatProjection.guard ?? character.defense, icon: <Shield className="w-2.5 h-2.5" />, color: '#2e5c8a' },
+    { label: '\u673a\u53d8', value: combatProjection.agility ?? character.speed, icon: <Zap className="w-2.5 h-2.5" />, color: '#d4af37' },
     { label: '\u8fd0', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
     { label: '\u609f', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
   ];

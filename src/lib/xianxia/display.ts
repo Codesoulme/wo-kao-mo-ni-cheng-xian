@@ -77,9 +77,9 @@ const MECHANISM_PATTERNS: Array<[RegExp, string | ((m: string) => string)]> = [
   [/\bmaxHp\b/gi, '气血上限'],
   [/\bmp\b/gi, '灵力'],
   [/\bmaxMp\b/gi, '灵力上限'],
-  [/\battack\b/gi, '攻'],
-  [/\bdefense\b/gi, '守'],
-  [/\bspeed\b/gi, '敏'],
+  [/\battack\b/gi, '破势'],
+  [/\bdefense\b/gi, '护持'],
+  [/\bspeed\b/gi, '机变'],
   [/\breputation\b/gi, '声望'],
   [/\blifespan\b/gi, '寿元'],
   // 数值变化词（AI叙事中最常见的泄露形式）
@@ -91,6 +91,8 @@ const MECHANISM_PATTERNS: Array<[RegExp, string | ((m: string) => string)]> = [
   // 内部/调试元词
   [/\b(?:debug|log|error|test|cache|config|api|route)\b/gi, ''],
   [/\b(?:P0|P1|P2|P3|IDEMPOTENT|preload|pre_load|stateHash)\b/g, ''],
+  // key:value 机制文本兜底（如 attack:12 / attack +12 / attack=12）
+  [/\b(attack|defense|speed)\s*[\:\+\-=]?\s*\d+/gi, ''],
   // 括号内的数值摘要
   [/[（\(【\[][+\-]?\d+[】\)\]\)】]/g, ''],
 ];
