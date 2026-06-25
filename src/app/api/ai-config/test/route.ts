@@ -4,24 +4,44 @@ import path from 'path';
 
 const CONFIG_PATH = path.join(process.cwd(), '.xianxia-ai-config');
 
-type SavedConfig = {
-  baseUrl?: string;
-  apiKey?: string;
-  model?: string;
+type AIProfile = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
   chatId?: string;
   userId?: string;
 };
 
-async function readSavedConfig(): Promise<SavedConfig> {
-  try {
-    return JSON.parse(await fs.readFile(CONFIG_PATH, 'utf-8'));
-  } catch {
-    return {};
-  }
-}
+type MultiConfig = {
+  activeId: string;
+  profiles: AIProfile[];
+};
 
-function normalizeBaseUrl(baseUrl: string) {
-  return baseUrl.trim().replace(/\/+$/, '');
+async function readMultiConfig(): Promise<MultiConfig | null> {
+  try {
+    const raw = await fs.readFile(CONFIG_PATH, 'utf-8');
+    const cfg = JSON.parse(raw);
+    if (Array.isArray(cfg?.profiles) && cfg.profiles.length > 0) {
+      return { activeId: cfg.activeId, profiles: cfg.profiles };
+    }
+    // 旧格式兼容
+    if (cfg?.baseUrl && cfg?.apiKey) {
+      return {
+        activeId: 'legacy_default',
+        profiles: [{
+          id: 'legacy_default', name: '默认接口',
+          baseUrl: cfg.baseUrl, apiKey: cfg.apiKey,
+          model: cfg.model || 'ark-code-latest',
+          chatId: cfg.chatId, userId: cfg.userId,
+        }],
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 function errorMessageFromResponse(body: any, status: number) {
@@ -33,10 +53,34 @@ function errorMessageFromResponse(body: any, status: number) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const saved = await readSavedConfig();
-    const baseUrl = normalizeBaseUrl(String(body?.baseUrl || saved.baseUrl || ''));
-    const apiKey = String(body?.apiKey || saved.apiKey || '').trim();
-    const model = String(body?.model || saved.model || 'ark-code-latest').trim();
+
+    // 支持两种模式：
+    // 1. 传入 profileId → 从配置文件读取该接口进行测试
+    // 2. 传入完整参数 → 直接测试（用于保存前预测试）
+    let baseUrl: string;
+    let apiKey: string;
+    let model: string;
+
+    if (body?.profileId) {
+      const config = await readMultiConfig();
+      if (!config) {
+        return NextResponse.json({ success: false, error: '配置文件不存在' }, { status: 400 });
+      }
+      const profile = config.profiles.find(p => p.id === body.profileId);
+      if (!profile) {
+        return NextResponse.json({ success: false, error: '接口不存在' }, { status: 400 });
+      }
+      baseUrl = profile.baseUrl.trim().replace(/\/+$/, '');
+      apiKey = profile.apiKey.trim();
+      model = profile.model.trim();
+    } else {
+      // 从body直接取参数，fallback到saved配置
+      const saved = await readMultiConfig();
+      const savedProfile = saved?.profiles?.find(p => p.id === saved?.activeId);
+      baseUrl = String(body?.baseUrl || savedProfile?.baseUrl || '').trim().replace(/\/+$/, '');
+      apiKey = String(body?.apiKey || (savedProfile?.apiKey && !body?.baseUrl ? savedProfile.apiKey : '') || '').trim();
+      model = String(body?.model || savedProfile?.model || 'ark-code-latest').trim();
+    }
 
     if (!baseUrl) {
       return NextResponse.json({ success: false, error: '请填写 API Base URL' }, { status: 400 });

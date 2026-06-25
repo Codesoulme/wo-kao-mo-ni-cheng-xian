@@ -3,6 +3,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+// 流式叙事：绕过 React 状态系统，直接更新 DOM
+export interface StreamingState {
+  eventIndex: number;
+  text: string;
+}
+export const streamingRef: { current: StreamingState | null } = { current: null };
+
 
 export type HeritageCategory = 'scripture' | 'fate' | 'pet' | 'artifact' | 'constitution' | 'treasure';
 export type HeritageRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
@@ -279,6 +286,8 @@ interface GameState {
   newEventRange: { start: number; end: number } | null;
   // 真正流式：当前正在写入的 narrative（含主叙事 + 增量和）；为空则走原气泡逻辑
   streamingNarrative: { eventIndex: number; text: string } | null;
+  // 流式结束后、结算完成前的提示文字（'calculating' = 收获结算中）
+  settlingHint: 'calculating' | null;
   setNewEventRange: (range: { start: number; end: number } | null) => void;
   setSettlementResult: (result: SettlementResult | null) => void;
   addHallRecord: (record: SimulationHallRecord) => void;
@@ -286,6 +295,7 @@ interface GameState {
   advanceWorldCalendar: (time?: TimeAdvance | null) => WorldCalendarState;
   addWorldLegacy: (record: WorldLegacyRecord) => void;
   appendStreamingNarrative: (eventIndex: number, delta: string) => void;
+  setStreamingNarrative: (eventIndex: number, text: string) => void;
   finishStreamingNarrative: () => void;
   clearStreamingNarrative: () => void;
   resetWorldLocal: () => void;
@@ -318,6 +328,7 @@ export const useGameStore = create<GameState>()(
       worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
       worldLegacies: [],
       newEventRange: null,
+      settlingHint: null,
       streamingNarrative: null,
 
       setCharacter: (c) => set({ character: c }),
@@ -346,16 +357,35 @@ export const useGameStore = create<GameState>()(
       }),
       setSelectedHeritage: (selected) => set({ selectedHeritage: selected }),
       setNewEventRange: (range) => set({ newEventRange: range }),
-      appendStreamingNarrative: (eventIndex, delta) => set((s) => {
-        const cur = s.streamingNarrative;
+      setSettlingHint: (hint) => set({ settlingHint: hint }),
+      setStreamingNarrative: (eventIndex, text) => {
+        streamingRef.current = { eventIndex, text };
+        set({ streamingNarrative: { eventIndex, text } });
+      },
+      appendStreamingNarrative: (eventIndex, delta) => {
+        // 同时更新 React 状态和模块级 ref（用于直接 DOM 操作）
+        const cur = streamingRef.current;
         if (cur && cur.eventIndex === eventIndex) {
-          return { streamingNarrative: { eventIndex, text: cur.text + delta } };
+          streamingRef.current = { eventIndex, text: cur.text + delta };
+        } else {
+          streamingRef.current = { eventIndex, text: delta };
         }
-        // 新事件：重置
-        return { streamingNarrative: { eventIndex, text: delta } };
-      }),
-      finishStreamingNarrative: () => set({ streamingNarrative: null }),
-      clearStreamingNarrative: () => set({ streamingNarrative: null }),
+        set((s) => {
+          const curState = s.streamingNarrative;
+          if (curState && curState.eventIndex === eventIndex) {
+            return { streamingNarrative: { eventIndex, text: curState.text + delta } };
+          }
+          return { streamingNarrative: { eventIndex, text: delta } };
+        });
+      },
+      finishStreamingNarrative: () => {
+        // 只停 RAF，不清 streamingNarrative，避免组件因状态变 null 而闪动
+        streamingRef.current = null;
+      },
+      clearStreamingNarrative: () => {
+        streamingRef.current = null;
+        set({ streamingNarrative: null });
+      },
       toggleSelectedHeritage: (item) => set((s) => {
         const current = s.selectedHeritage[item.category] || [];
         const exists = current.some((it) => it.id === item.id);

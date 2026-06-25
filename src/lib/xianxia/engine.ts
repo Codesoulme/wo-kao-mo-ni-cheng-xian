@@ -222,8 +222,16 @@ export function dbToState(c: DBCharacter): CharacterState {
   return state;
 }
 function cultivationAttributeCategory(category?: string): CultivationAttributeEntry['category'] {
-  if (category === 'body' || category === 'spirit' || category === 'dao' || category === 'combat' || category === 'fate' || category === 'custom') return category;
-  return 'custom';
+  if (!category) return 'custom';
+  const map: Record<string, CultivationAttributeEntry['category']> = {
+    body: '\u8eab\u4f53',
+    spirit: '\u795e\u9b42',
+    dao: '\u9053\u5fb7',
+    combat: '\u6218\u6597',
+    fate: '\u5929\u8fd0',
+    custom: 'custom',
+  };
+  return map[category] || 'custom';
 }
 
 export function deriveCultivationAttributes(state: CharacterState): CultivationAttributeEntry[] {
@@ -254,7 +262,7 @@ export function deriveCultivationAttributes(state: CharacterState): CultivationA
     value: core.spiritualSense,
     description: '\u611f\u77e5\u3001\u63a2\u67e5\u3001\u795e\u5ff5\u538b\u5236\u4e0e\u9ad8\u9636\u7981\u5236\u5224\u65ad\u7684\u57fa\u7840\u3002',
     source: '\u5883\u754c\u4e0e\u795e\u9b42\u6d3e\u751f',
-    category: 'spirit',
+    category: '\u795e\u9b42',
     visible: true,
   });
   byId.set('soulStrength', {
@@ -263,7 +271,7 @@ export function deriveCultivationAttributes(state: CharacterState): CultivationA
     value: core.soulStrength,
     description: `\u5f53\u524d\u795e\u9b42\u5883\u754c\uff1a${soul.name}\uff08${soul.gap}\uff09\uff0c\u5f71\u54cd\u5143\u5a74\u51fa\u7a8d\u3001\u593a\u820d\u98ce\u9669\u3001\u5fc3\u9b54\u627f\u53d7\u548c\u795e\u8bc6\u79d8\u672f\u3002`,
     source: '\u5883\u754c\u4e0e\u5fc3\u6027\u6d3e\u751f',
-    category: 'spirit',
+    category: '\u795e\u9b42',
     visible: true,
   });
   byId.set('physicalFoundation', {
@@ -272,7 +280,7 @@ export function deriveCultivationAttributes(state: CharacterState): CultivationA
     value: core.physicalFoundation,
     description: '\u8089\u8eab\u6839\u57fa\u4e0e\u627f\u8f7d\u529b\uff0c\u5f71\u54cd\u91cd\u4f24\u627f\u53d7\u3001\u70bc\u4f53\u673a\u7f18\u548c\u5927\u5883\u754c\u7a81\u7834\u7a33\u5b9a\u5ea6\u3002',
     source: '\u8089\u8eab\u4e0e\u5883\u754c\u6d3e\u751f',
-    category: 'body',
+    category: '\u8eab\u4f53',
     visible: true,
   });
   return [...byId.values()].slice(0, 24);
@@ -4615,13 +4623,13 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     const fallback = inferAttributeChangesFromNarrative(aiOutput.narrative, next, aiOutput.title || 'ai-event');
     if (fallback.length > 0) {
       inputChanges = fallback;
-      trace.push({
+      effectResolveTrace.push({
         severity: 'info',
         code: 'engine_inferred_changes',
         attribute: '*',
         message: `Engine inferred ${fallback.length} attribute change(s) from narrative (AI output empty changes)`,
         source: aiOutput.title || 'ai-event',
-      } as any);
+      });
     }
   }
   const resolvedChanges = resolveAttributeChanges(next, inputChanges, {

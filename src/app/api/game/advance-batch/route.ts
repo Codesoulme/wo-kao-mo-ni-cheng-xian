@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       deathReason: finalStep?.deathReason,
       ascended: Boolean(finalStep?.ascended),
       triggeredCombat: Boolean(finalStep?.triggeredCombat),
-      fallbackGenerated: Boolean(finalStep?.fallbackGenerated),
+      fallbackGenerated: Boolean(finalStep?.isFallbackGenerated),
       state: finalStep?.state,
     });
   } catch (err: any) {

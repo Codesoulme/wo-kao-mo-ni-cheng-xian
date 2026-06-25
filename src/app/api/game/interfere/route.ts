@@ -232,7 +232,7 @@ export async function POST(req: NextRequest) {
         luck: state.luck, comprehension: state.comprehension,
         spiritStones: state.spiritStones, reputation: state.reputation,
         alive: state.alive, ascended: state.ascended,
-        causeOfDeath: state.causeOfDeath,
+        causeOfDeath: state.causeOfDeath || '',
         faction: state.faction, master: state.master, location: state.location,
         statusJson: JSON.stringify(state.activeStatuses),
         inventoryJson: JSON.stringify(state.inventory),

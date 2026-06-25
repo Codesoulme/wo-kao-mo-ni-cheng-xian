@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
         spiritStones: finalState.spiritStones,
         reputation: finalState.reputation,
         alive: finalState.alive,
-        causeOfDeath: finalState.causeOfDeath,
+        causeOfDeath: finalState.causeOfDeath || '',
         location: finalState.location,
         statusJson: JSON.stringify(finalState.activeStatuses),
         inventoryJson: JSON.stringify(finalState.inventory),

@@ -51,6 +51,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
         </SheetHeader>
 
         <div className="px-4 py-3 space-y-4">
+          {/* === 核心修炼 === */}
           {/* 境界详情 */}
           <section>
             <SectionTitle icon={<Sparkles className="w-3.5 h-3.5" />} title="境界·修为" />
@@ -104,33 +105,6 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
               />
             </div>
           </section>
-
-          <section>
-            <SectionTitle icon={<Brain className="w-3.5 h-3.5" />} title={"\u795e\u8bc6\u00b7\u9b42\u9b44"} />
-            <div className="grid grid-cols-3 gap-2 mt-1.5">
-              <StatCard icon={<Brain className="w-3 h-3" />} label={"\u795e\u8bc6"} value={(current as any).spiritualSense ?? 0} color="#7c3aed" info={ATTRIBUTE_INFO.spiritualSense} onClick={setSelectedAttr} />
-              <StatCard icon={<Sparkles className="w-3 h-3" />} label={"\u9b42\u9b44"} value={(current as any).soulStrength ?? 0} color="#9333ea" info={ATTRIBUTE_INFO.soulStrength} onClick={setSelectedAttr} />
-              <StatCard icon={<Shield className="w-3 h-3" />} label={"\u4f53\u9b44"} value={(current as any).physicalFoundation ?? 0} color="#0f766e" info={ATTRIBUTE_INFO.physicalFoundation} onClick={setSelectedAttr} />
-            </div>
-            <div className="mt-2 rounded-lg border border-purple-300/30 bg-purple-500/10 p-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-serif-cn font-semibold text-purple-700 dark:text-purple-200">{(current as any).soulRealmName || '\u795e\u9b42\u672a\u663e'}</span>
-                <span className="text-[10px] rounded-full border border-purple-300/40 px-1.5 py-0.5 text-purple-700 dark:text-purple-200">{(current as any).soulRealmGap || '\u8eab\u795e\u672a\u5b9a'}</span>
-              </div>
-            </div>
-          </section>
-
-          {realmTraits && (
-            <section>
-              <SectionTitle icon={<Sparkles className="w-3.5 h-3.5" />} title={"\u5883\u754c\u7279\u6027"} />
-              <div className="mt-1.5 rounded-lg border border-border/60 bg-card/40 p-3 space-y-2">
-                {realmTraits.cultivationMode && <p className="text-[11px] leading-relaxed text-foreground/80">{realmTraits.cultivationMode}</p>}
-                <TraitLine label={"\u80fd\u505a"} values={traitCapabilities} />
-                <TraitLine label={"\u96be\u4e3a"} values={traitLimitations} />
-                <TraitLine label={"\u98ce\u9669"} values={traitRisks} />
-              </div>
-            </section>
-          )}
 
           {/* 灵根·体质 */}
           <section>
@@ -196,6 +170,23 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             </div>
           </section>
 
+          {/* 神识·魂魄 */}
+          <section>
+            <SectionTitle icon={<Brain className="w-3.5 h-3.5" />} title={"\u795e\u8bc6\u00b7\u9b42\u9b44"} />
+            <div className="grid grid-cols-3 gap-2 mt-1.5">
+              <StatCard icon={<Brain className="w-3 h-3" />} label={"\u795e\u8bc6"} value={(current as any).spiritualSense ?? 0} color="#7c3aed" info={ATTRIBUTE_INFO.spiritualSense} onClick={setSelectedAttr} />
+              <StatCard icon={<Sparkles className="w-3 h-3" />} label={"\u9b42\u9b44"} value={(current as any).soulStrength ?? 0} color="#9333ea" info={ATTRIBUTE_INFO.soulStrength} onClick={setSelectedAttr} />
+              <StatCard icon={<Shield className="w-3 h-3" />} label={"\u4f53\u9b44"} value={(current as any).physicalFoundation ?? 0} color="#0f766e" info={ATTRIBUTE_INFO.physicalFoundation} onClick={setSelectedAttr} />
+            </div>
+            <div className="mt-2 rounded-lg border border-purple-300/30 bg-purple-500/10 p-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-serif-cn font-semibold text-purple-700 dark:text-purple-200">{(current as any).soulRealmName || '\u795e\u9b42\u672a\u663e'}</span>
+                <span className="text-[10px] rounded-full border border-purple-300/40 px-1.5 py-0.5 text-purple-700 dark:text-purple-200">{(current as any).soulRealmGap || '\u8eab\u795e\u672a\u5b9a'}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* === 战斗相关 === */}
           {/* 气血灵力 */}
           <section>
             <SectionTitle icon={<Heart className="w-3.5 h-3.5" />} title="气血·灵力" />
@@ -237,6 +228,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             </div>
           </section>
 
+          {/* === 社交背景 === */}
           {/* 师承·所在 */}
           <section>
             <SectionTitle icon={<GraduationCap className="w-3.5 h-3.5" />} title="师承·所在" />
@@ -262,6 +254,21 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             </div>
           </section>
 
+          {/* === 特殊状态 === */}
+          {/* 境界特性 */}
+          {realmTraits && (
+            <section>
+              <SectionTitle icon={<Sparkles className="w-3.5 h-3.5" />} title={"\u5883\u754c\u7279\u6027"} />
+              <div className="mt-1.5 rounded-lg border border-border/60 bg-card/40 p-3 space-y-2">
+                {realmTraits.cultivationMode && <p className="text-[11px] leading-relaxed text-foreground/80">{realmTraits.cultivationMode}</p>}
+                <TraitLine label={"\u80fd\u505a"} values={traitCapabilities} />
+                <TraitLine label={"\u96be\u4e3a"} values={traitLimitations} />
+                <TraitLine label={"\u98ce\u9669"} values={traitRisks} />
+              </div>
+            </section>
+          )}
+
+          {/* 显化之相 */}
           {detailDisplayEntries.length > 0 && (
             <section>
               <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title={'\u663e\u5316\u4e4b\u76f8'} />

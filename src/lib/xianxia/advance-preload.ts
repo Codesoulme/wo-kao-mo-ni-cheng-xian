@@ -240,7 +240,7 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   }
 
   // ===== 写回：把本次 AI 输出的风格 + 实体合并到 character =====
-  if (aiOutput && aiOutput.narrative && typeof aiOutput.narrative === 'string' && !aiOutput.fallbackGenerated) {
+  if (aiOutput && aiOutput.narrative && typeof aiOutput.narrative === 'string' && !aiOutput.isFallbackGenerated) {
     try {
       const newAnchor = extractStyleAnchorForAge(state.age, aiOutput.narrative);
       const newEntities = extractEntitiesFromNarrative(state.age, aiOutput.narrative);

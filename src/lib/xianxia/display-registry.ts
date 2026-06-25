@@ -123,7 +123,7 @@ export function attributeToDisplayEntry(attr: any, index = 0): DisplayEntry | nu
     shortLabel: text(attr?.shortLabel || attr?.shortName, label).slice(0, 8),
     description: text(attr?.description || attr?.summary || attr?.effect),
     detail: text(attr?.detail || attr?.description || attr?.effect),
-    tone: /\u4f53\u8d28|\u5251\u9aa8|\u9053\u80ce|\u8840\u8109/.test(group + label) ? 'rare' : 'mystery',
+    tone: /\u4f53\u8d28|\u5251\u9aa8|\u9053\u80ce|\u8840\u8109|\u795e\u8bc6|\u9b42\u9b44|\u4f53\u9b44|\u795e\u9b42/.test(group + label) ? 'rare' : 'mystery',
     priority: Number.isFinite(Number(attr?.priority ?? attr?.displayPriority)) ? Number(attr?.priority ?? attr?.displayPriority) : 88 - index * 0.01,
     displaySlots: Array.isArray(attr?.displaySlots) ? attr.displaySlots.filter((slot: any): slot is DisplaySlot => SLOT_SET.has(slot)) : defaultSlots,
     renderHint: attr?.renderHint || 'card',

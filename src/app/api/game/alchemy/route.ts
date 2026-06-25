@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
         reputation: finalState.reputation,
         alive: finalState.alive,
         ascended: finalState.ascended,
-        causeOfDeath: finalState.causeOfDeath,
+        causeOfDeath: finalState.causeOfDeath || '',
         faction: finalState.faction,
         master: finalState.master,
         location: finalState.location,

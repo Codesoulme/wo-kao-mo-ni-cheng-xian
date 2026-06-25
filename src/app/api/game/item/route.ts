@@ -48,7 +48,7 @@ function persistableStateData(state: ReturnType<typeof dbToState>) {
     reputation: state.reputation,
     alive: state.alive,
     ascended: state.ascended,
-    causeOfDeath: state.causeOfDeath,
+    causeOfDeath: state.causeOfDeath || '',
     faction: state.faction,
     master: state.master,
     location: state.location,

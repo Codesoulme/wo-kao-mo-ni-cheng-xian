@@ -1,7 +1,7 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
-import { Settings, KeyRound, CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { Settings, KeyRound, CheckCircle2, AlertTriangle, Loader2, Plus, Trash2, Zap, Edit3, Radio } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,14 +9,26 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
+type ProfileListItem = {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKeyMasked: string;
+  model: string;
+  hasChatId: boolean;
+  hasUserId: boolean;
+};
+
 type AIConfigStatus = {
   configured: boolean;
+  activeId: string | null;
+  profiles: ProfileListItem[];
   config?: {
     baseUrl: string;
     apiKeyMasked: string;
     hasChatId: boolean;
     hasUserId: boolean;
-    model?: string;
+    model: string;
   } | null;
 };
 
@@ -26,15 +38,19 @@ type AIConfigDialogProps = {
 
 export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   const [open, setOpen] = useState(false);
-  const [status, setStatus] = useState<AIConfigStatus>({ configured: false, config: null });
-  const [baseUrl, setBaseUrl] = useState('');
-  const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('ark-code-latest');
-  const [chatId, setChatId] = useState('');
-  const [userId, setUserId] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<AIConfigStatus>({ configured: false, activeId: null, profiles: [], config: null });
   const [checking, setChecking] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // 编辑状态：undefined=关闭编辑, null=新建, string=编辑现有
+  const [editingProfileId, setEditingProfileId] = useState<string | null | undefined>(undefined);
+  const [editName, setEditName] = useState('');
+  const [editBaseUrl, setEditBaseUrl] = useState('');
+  const [editApiKey, setEditApiKey] = useState('');
+  const [editModel, setEditModel] = useState('ark-code-latest');
+  const [editChatId, setEditChatId] = useState('');
+  const [editUserId, setEditUserId] = useState('');
 
   const loadStatus = async () => {
     setChecking(true);
@@ -42,45 +58,109 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       const res = await fetch('/api/ai-config', { cache: 'no-store' });
       const data = await res.json();
       setStatus(data);
-      if (data.config?.baseUrl) setBaseUrl(data.config.baseUrl);
-      if (data.config?.model) setModel(data.config.model);
     } catch {
-      setStatus({ configured: false, config: null });
+      setStatus({ configured: false, activeId: null, profiles: [], config: null });
     } finally {
       setChecking(false);
     }
   };
 
-  useEffect(() => {
-    loadStatus();
-  }, []);
+  useEffect(() => { loadStatus(); }, []);
+  useEffect(() => { if (open) loadStatus(); }, [open]);
 
-  useEffect(() => {
-    if (open) loadStatus();
-  }, [open]);
+  // 开始编辑某个现有接口
+  const startEdit = (profile: ProfileListItem) => {
+    setEditingProfileId(profile.id);
+    setEditName(profile.name);
+    setEditBaseUrl(profile.baseUrl);
+    setEditApiKey(''); // 不回显key，让用户选择是否更新
+    setEditModel(profile.model);
+    setEditChatId('');
+    setEditUserId('');
+  };
 
-  const save = async () => {
-    if (loading) return;
-    setLoading(true);
+  // 开始新建接口
+  const startNew = () => {
+    setEditingProfileId(null);
+    setEditName('');
+    setEditBaseUrl('');
+    setEditApiKey('');
+    setEditModel('ark-code-latest');
+    setEditChatId('');
+    setEditUserId('');
+  };
+
+  // 保存当前编辑的接口
+  const saveProfile = async () => {
+    if (saving) return;
+    setSaving(true);
     try {
       const res = await fetch('/api/ai-config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl, apiKey, model, chatId, userId }),
+        body: JSON.stringify({
+          action: 'save',
+          profileId: editingProfileId || undefined,
+          name: editName,
+          baseUrl: editBaseUrl,
+          apiKey: editApiKey,
+          model: editModel,
+          chatId: editChatId,
+          userId: editUserId,
+        }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '保存失败');
-      setStatus({ configured: true, config: data.config });
-      setApiKey('');
-      toast.success('AI 接口配置已保存', { description: '已写入本地 .xianxia-ai-config，不会提交到 Git' });
-      setOpen(false);
+      setStatus({ ...status, activeId: data.activeId, profiles: data.profiles, configured: true });
+      setEditingProfileId(undefined);
+      toast.success('接口配置已保存');
     } catch (err: any) {
-      toast.error('AI 配置保存失败', { description: err.message });
+      toast.error('保存失败', { description: err.message });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  // 切换当前使用的接口
+  const switchProfile = async (profileId: string) => {
+    try {
+      const res = await fetch('/api/ai-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'switch', activeId: profileId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '切换失败');
+      setStatus({ ...status, activeId: data.activeId, profiles: data.profiles });
+      toast.success(`已切换到「${data.profiles.find((p: ProfileListItem) => p.id === data.activeId)?.name || ''}」`);
+    } catch (err: any) {
+      toast.error('切换失败', { description: err.message });
+    }
+  };
+
+  // 删除接口
+  const deleteProfile = async (profileId: string) => {
+    try {
+      const res = await fetch('/api/ai-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', profileId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '删除失败');
+      setStatus({
+        ...status,
+        configured: data.configured ?? data.profiles?.length > 0,
+        activeId: data.activeId,
+        profiles: data.profiles || [],
+      });
+      toast.success('接口已删除');
+    } catch (err: any) {
+      toast.error('删除失败', { description: err.message });
+    }
+  };
+
+  // 测试连接（使用当前编辑的参数）
   const testConnection = async () => {
     if (testing) return;
     setTesting(true);
@@ -88,19 +168,37 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       const res = await fetch('/api/ai-config/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ baseUrl, apiKey, model, chatId, userId }),
+        body: JSON.stringify({ baseUrl: editBaseUrl, apiKey: editApiKey, model: editModel }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '测试连接失败');
-      toast.success('AI 连接测试成功', {
-        description: `模型 ${data.model || model} 可用，耗时 ${data.elapsedMs ?? '?'}ms`,
-      });
+      toast.success('连接测试成功', { description: `模型 ${data.model || editModel} 可用，耗时 ${data.elapsedMs ?? '?'}ms` });
     } catch (err: any) {
-      toast.error('AI 连接测试失败', { description: err.message });
+      toast.error('连接测试失败', { description: err.message });
     } finally {
       setTesting(false);
     }
   };
+
+  // 快速测试某个已保存的接口
+  const quickTest = async (profileId: string) => {
+    try {
+      const res = await fetch('/api/ai-config/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || '测试失败');
+      const profile = status.profiles.find(p => p.id === profileId);
+      toast.success(`「${profile?.name || ''}」连接成功`, { description: `耗时 ${data.elapsedMs ?? '?'}ms` });
+    } catch (err: any) {
+      toast.error('测试失败', { description: err.message });
+    }
+  };
+
+  const showEditForm = editingProfileId !== undefined;
+  const activeId = status.activeId;
 
   const trigger = variant === 'menu' ? (
     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); }} className="text-xs cursor-pointer">
@@ -124,93 +222,207 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setEditingProfileId(undefined); }}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-serif-cn flex items-center gap-2">
             <KeyRound className="w-4 h-4 text-primary" />
             AI 接口配置
           </DialogTitle>
           <DialogDescription>
-            本游戏依赖 AI 生成剧情。配置会保存到项目根目录 .xianxia-ai-config，本地使用，不会上传仓库。
+            支持添加多个 AI 接口，自定义名称，选择使用。配置保存到本地，不会上传仓库。
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className={cn(
-            'rounded-lg border p-3 text-xs flex items-start gap-2',
-            status.configured ? 'border-emerald-500/30 bg-emerald-500/10' : 'border-amber-500/30 bg-amber-500/10'
-          )}>
-            {status.configured ? <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />}
-            <div className="space-y-1 min-w-0">
-              <div className="font-medium">{status.configured ? '当前已配置 AI 接口' : '当前未配置 AI 接口'}</div>
-              {status.config?.baseUrl && <div className="truncate text-muted-foreground">Base URL：{status.config.baseUrl}</div>}
-              {status.config?.apiKeyMasked && <div className="text-muted-foreground">API Key：{status.config.apiKeyMasked}</div>}
-              {status.config?.model && <div className="text-muted-foreground">模型：{status.config.model}</div>}
+        <div className="space-y-3">
+          {/* 接口列表 */}
+          {status.profiles.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="text-xs font-medium text-muted-foreground">已添加的接口</div>
+              {status.profiles.map((profile) => (
+                <div
+                  key={profile.id}
+                  className={cn(
+                    'rounded-lg border p-2 text-xs flex items-start gap-2 transition-colors',
+                    profile.id === activeId
+                      ? 'border-primary/40 bg-primary/10'
+                      : 'border-border/60 bg-card/80 hover:border-primary/30'
+                  )}
+                >
+                  {/* 使用标记 */}
+                  <div className="shrink-0 mt-0.5">
+                    {profile.id === activeId
+                      ? <Radio className="w-3.5 h-3.5 text-primary fill-primary" />
+                      : <Radio className="w-3.5 h-3.5 text-muted-foreground" />
+                    }
+                  </div>
+
+                  <div className="flex-1 min-w-0 space-y-0.5">
+                    <div className="font-medium flex items-center gap-1">
+                      {profile.name}
+                      {profile.id === activeId && <span className="text-primary text-[9px]">使用中</span>}
+                    </div>
+                    <div className="truncate text-muted-foreground">{profile.baseUrl}</div>
+                    <div className="text-muted-foreground">{profile.model} · Key: {profile.apiKeyMasked}</div>
+                  </div>
+
+                  {/* 操作按钮 */}
+                  <div className="shrink-0 flex items-center gap-0.5">
+                    {profile.id !== activeId && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        title="切换使用"
+                        onClick={() => switchProfile(profile.id)}
+                      >
+                        <Radio className="w-3 h-3" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      title="测试连接"
+                      onClick={() => quickTest(profile.id)}
+                    >
+                      <Zap className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      title="编辑"
+                      onClick={() => startEdit(profile)}
+                    >
+                      <Edit3 className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-destructive/70 hover:text-destructive"
+                      title="删除"
+                      onClick={() => deleteProfile(profile.id)}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
 
-          <div className="space-y-2">
-            <label className="text-xs font-medium">API Base URL</label>
-            <Input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              placeholder="例如：https://api.example.com/v1"
-              autoComplete="off"
-            />
-            <p className="text-[10px] text-muted-foreground">请填写兼容 OpenAI Chat Completions 的 Base URL，例如火山方舟接口地址。</p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-medium">API Key</label>
-            <Input
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder={status.configured ? '留空不会复用旧 key；如需更新请重新填写' : '请输入 API Key'}
-              type="password"
-              autoComplete="new-password"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-medium">模型名</label>
-            <Input
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="例如：ark-code-latest"
-              autoComplete="off"
-            />
-            <p className="text-[10px] text-muted-foreground">火山 Ark 接口必须传 model；当前月卡配置可先用 ark-code-latest。</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-2">
-              <label className="text-xs font-medium">chatId（可选）</label>
-              <Input value={chatId} onChange={(e) => setChatId(e.target.value)} placeholder="可选" autoComplete="off" />
+          {/* 无接口提示 */}
+          {status.profiles.length === 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-medium">当前未配置 AI 接口</div>
+                <div className="text-muted-foreground">请添加至少一个接口以开始游戏</div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-medium">userId（可选）</label>
-              <Input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="可选" autoComplete="off" />
-            </div>
-          </div>
+          )}
 
-          <div className="space-y-2 pt-2">
+          {/* 添加新接口按钮 */}
+          {editingProfileId === undefined && (
             <Button
-              variant="secondary"
-              className="w-full"
-              onClick={testConnection}
-              disabled={testing || loading || !baseUrl.trim() || (!status.configured && !apiKey.trim()) || !model.trim()}
+              variant="outline"
+              className="w-full gap-2"
+              onClick={startNew}
             >
-              {testing ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />测试中</> : '测试连接'}
+              <Plus className="w-4 h-4" />
+              添加新接口
             </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)} disabled={loading || testing}>取消</Button>
-              <Button className="flex-1" onClick={save} disabled={loading || testing || !baseUrl.trim() || (!status.configured && !apiKey.trim()) || !model.trim()}>
-                {loading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />保存中</> : '保存配置'}
+          )}
+
+          {/* 编辑/新建表单 */}
+          {editingProfileId !== undefined && (
+            <div className="space-y-3 pt-2 border-t border-border/40">
+              <div className="text-xs font-medium">
+                {editingProfileId ? '编辑接口' : '新建接口'}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium">接口名称</label>
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="例如：豆包、DeepSeek、本地模型"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium">API Base URL</label>
+                <Input
+                  value={editBaseUrl}
+                  onChange={(e) => setEditBaseUrl(e.target.value)}
+                  placeholder="例如：https://api.example.com/v1"
+                  autoComplete="off"
+                />
+                <p className="text-[10px] text-muted-foreground">兼容 OpenAI Chat Completions 的 Base URL</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium">API Key</label>
+                <Input
+                  value={editApiKey}
+                  onChange={(e) => setEditApiKey(e.target.value)}
+                  placeholder={editingProfileId ? '留空保留原 Key；如需更新请重新填写' : '请输入 API Key'}
+                  type="password"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium">模型名</label>
+                <Input
+                  value={editModel}
+                  onChange={(e) => setEditModel(e.target.value)}
+                  placeholder="例如：ark-code-latest、deepseek-chat"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">chatId（可选）</label>
+                  <Input value={editChatId} onChange={(e) => setEditChatId(e.target.value)} placeholder="可选" autoComplete="off" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium">userId（可选）</label>
+                  <Input value={editUserId} onChange={(e) => setEditUserId(e.target.value)} placeholder="可选" autoComplete="off" />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={testConnection}
+                  disabled={testing || saving || !editBaseUrl.trim() || (!editingProfileId && !editApiKey.trim()) || !editModel.trim()}
+                >
+                  {testing ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />测试中</> : <><Zap className="w-3.5 h-3.5 mr-1.5" />测试</>}
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={saveProfile}
+                  disabled={saving || testing || !editBaseUrl.trim() || (!editingProfileId && !status.configured && !editApiKey.trim()) || !editModel.trim()}
+                >
+                  {saving ? <><Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />保存中</> : '保存'}
+                </Button>
+              </div>
+
+              <Button
+                variant="ghost"
+                className="w-full text-xs"
+                onClick={() => setEditingProfileId(undefined)}
+              >
+                取消编辑
               </Button>
             </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -1,4 +1,4 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { dbToState } from '@/lib/xianxia/engine';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       if (char.alive || !char.causeOfDeath) {
         await db.character.update({
           where: { id: characterId },
-          data: { alive: false, causeOfDeath: state.causeOfDeath },
+          data: { alive: false, causeOfDeath: state.causeOfDeath || '' },
         });
       }
     }
