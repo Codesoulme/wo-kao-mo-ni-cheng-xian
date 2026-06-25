@@ -111,6 +111,8 @@ export function ActionButtons() {
     return () => window.clearTimeout(timer);
   }, [character?.id, character?.age, character?.realm, character?.realmLevel, character?.cultivationExp, character?.hp, character?.mp, character?.spiritStones, character?.alive, character?.ascended, character?.isAtChoice, (character as any)?.pendingChoice, character?.combatSession?.status, pendingChoice, loading, events.length]);
 
+  const advanceAbortRef = useRef<AbortController | null>(null);
+
   if (!character) return null;
 
   const isDead = !character.alive;
@@ -150,205 +152,206 @@ export function ActionButtons() {
     setError(null);
     setLastChange(null);
     setLastBreakthrough(null);
+    // 取消上一次的推进请求（如果存在）
+    if (advanceAbortRef.current) {
+      advanceAbortRef.current.abort();
+      advanceAbortRef.current = null;
+    }
     try {
       await ensureAIConfigured();
-      // 流式接口：边读 narrative 边触发气泡
       const previousEventCount = events.length;
-      setNewEventRange({ start: previousEventCount, end: previousEventCount + 5 }); // 占位：最多 5 段
-      // Fallback：流式中断/失败时调用非流式接口拉完整事件
-      const advanceFallbackNonStream = async (prevCount: number) => {
-        try {
-          const res2 = await fetch('/api/game/advance', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
-          });
-          const data = await res2.json();
-          if (!data.success) {
-            // 推进已完成但 LLM 又跑了一次（重复推 / 待选择 / 已飞升 等）→ 同步 db 最新状态即可
-            // 这些情况下 stream 那侧实际上已经把状态写进了 db
-            const errMsg = data.error || '';
-            const alreadyCompleted = /age|已|选择|飞升|陨落|战斗/.test(errMsg);
-            if (alreadyCompleted) {
-              const latest = await syncLatestState(character.id);
-              if (latest) {
-                setCharacter({ ...character, ...latest, worldCalendar: data.worldCalendar || worldCalendar });
-                if (data.worldCalendar) setWorldCalendar(data.worldCalendar);
-                // 同步待选择（stream 触发过 choice 的话）
-                if ((latest as any).pendingChoiceJson || (latest as any).isAtChoice) {
-                  try {
-                    const pendingChoice = (latest as any).pendingChoiceJson ? JSON.parse((latest as any).pendingChoiceJson) : null;
-                    if (pendingChoice?.prompt) {
-                      setPendingChoice({
-                        ...pendingChoice,
-                        contextTitle: pendingChoice.contextTitle,
-                        contextNarrative: pendingChoice.contextNarrative,
-                        contextAge: pendingChoice.contextAge,
-                        contextFateNodeName: pendingChoice.contextFateNodeName,
-                      });
-                    }
-                  } catch {}
-                }
-                toast.warning('流式响应已中断', { description: '事件已写入，但叙事未完整显示。最新状态已同步。' });
-                setNewEventRange(null);
-                finishStreamingNarrative();
-              }
-              return;
-            }
-            throw new Error(errMsg || 'fallback failed');
-          }
-          // 正常完成：应用结果
-          setCharacter({ ...character, ...data.state, worldCalendar: data.worldTime || data.worldCalendar });
-          if (data.worldCalendar) setWorldCalendar(data.worldCalendar);
-          setLastChange(data.changes || null);
-          if (data.breakthrough) setLastBreakthrough(data.breakthrough);
-          const returnedEvents = Array.isArray(data.events) && data.events.length ? data.events : [data.event];
-          returnedEvents.forEach((evt: any, idx: number) => addEvent({
-            id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
-            age: evt.age,
-            title: evt.title,
-            narrative: evt.narrative,
-            eventType: evt.eventType,
-            effects: evt.effects || (idx === 0 ? (data.changes || []) : []),
-            isFateNode: evt.isFateNode,
-            fateNodeName: evt.fateNodeName,
-            blueprint: evt.blueprint,
-            timeAdvance: evt.timeAdvance,
-            worldTime: evt.worldTime,
-            actionProjections: evt.actionProjections || [],
-            createdAt: evt.createdAt || new Date().toISOString(),
-          }));
-          setNewEventRange({ start: prevCount, end: prevCount + returnedEvents.length });
-          setTimeout(() => setNewEventRange(null), 10000);
-        } catch (e: any) {
-          console.error('[advance fallback] failed:', e?.message);
-          // 最后兜底：sync 最新状态，让 UI 不卡死
-          const latest = await syncLatestState(character.id);
-          if (latest) setCharacter({ ...character, ...latest });
-          toast.error('推进出错', { description: e?.message || '网络中断' });
-          setNewEventRange(null);
-          finishStreamingNarrative();
-        }
-      };
-      let res: Response;
-      try {
-        res = await fetch('/api/game/advance/stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
-          signal: AbortSignal.timeout(55_000), // 比服务端 maxDuration 60s 略短
-        });
-      } catch (fetchErr: any) {
-        // 网络中断/abort：fallback 到非流式接口
-        if (fetchErr?.name === 'AbortError' || /aborted|aborted/i.test(fetchErr?.message || '')) {
-          console.warn('[advance stream] aborted, falling back to /api/game/advance');
-          await advanceFallbackNonStream(previousEventCount);
-          return;
-        }
-        throw fetchErr;
+      setNewEventRange({ start: previousEventCount, end: previousEventCount + 5 });
+
+      // ★ 真流式：使用 /api/game/advance-sse（已验证在 Trae IDE 浏览器中可工作 35+ 秒）
+      console.log('[SSE advance] Starting, calling /api/game/advance-sse');
+      const eventIndex = previousEventCount;
+      let fullNarrative = '';
+      let doneData: any = null;
+      const llmToast = toast.loading('天道演算中...', { description: 'AI 正在推演你的命运轨迹' });
+      const setSettlingHint = useGameStore.getState().setSettlingHint;
+
+      const abortCtrl = new AbortController();
+      advanceAbortRef.current = abortCtrl;
+      const response = await fetch('/api/game/advance-sse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
+        signal: abortCtrl.signal,
+      });
+
+      if (!response.body) {
+        throw new Error('No response body');
       }
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => '');
-        throw new Error(`HTTP ${res.status} ${errText.slice(0, 200)}`);
-      }
-      const reader = res.body.getReader();
+
+      // 立即初始化流式状态
+      useGameStore.getState().setStreamingNarrative(eventIndex, '');
+
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
-      let doneData: any = null;
-      let startedEvent = false;
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            let obj: any;
-            try { obj = JSON.parse(trimmed); } catch { continue; }
+
+      // ★ 同步结算：按钮锁定直到done到达，避免异步带来的状态混乱
+      let narrativeCompleted = false;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          console.log('[SSE advance] Stream done');
+          break;
+        }
+
+        const chunkText = decoder.decode(value, { stream: true });
+        buffer += chunkText;
+        // SSE 格式: "event: xxx\ndata: {json}\n\n"
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const part of lines) {
+          if (!part.trim()) continue;
+          const eventLine = part.split('\n').find(l => l.startsWith('event:'));
+          const dataLine = part.split('\n').find(l => l.startsWith('data:'));
+          if (!dataLine) continue;
+          const dataStr = dataLine.slice(5).trim();
+          if (!dataStr) continue;
+          try {
+            const obj = JSON.parse(dataStr);
             if (obj.type === 'start') {
-              startedEvent = true;
+              console.log('[SSE advance] Received start, age:', obj.age);
+              toast.dismiss(llmToast);
+              // ★ 立即清掉旧推进遗留的"收获结算中"提示
+              setSettlingHint(null);
+              // ★ 立即添加一个空 narrative 的占位事件，StreamingNarrative 会显示实时增量文本
+              const placeholderId = `streaming-${Date.now()}`;
+              const newAge = obj.age + (obj.timeAdvance?.ageDeltaYears || 0);
+              const placeholderEvent: any = {
+                id: placeholderId,
+                age: newAge,  // 用新年龄（当前年龄 + 岁数增量），避免 isContinuation 误判
+                title: '命运推演中…',
+                narrative: '',
+                eventType: 'normal',
+                effects: [],
+                isFateNode: false,
+                fateNodeName: undefined,
+                blueprint: undefined,
+                timeAdvance: obj.timeAdvance || undefined,
+                worldTime: obj.worldTime || undefined,
+                actionProjections: [],
+                createdAt: new Date().toISOString(),
+                };
+              // 用 setEvents 替换（不是 addEvent），避免出现两个事件
+              setEvents([...events, placeholderEvent]);
+              // 记录占位 ID，后面 done 时替换
+              (useGameStore.getState() as any)._placeholderId = placeholderId;
+            } else if (obj.type === 'heartbeat') {
+              // 忽略心跳
             } else if (obj.type === 'narrative_delta') {
-              if (!startedEvent) startedEvent = true;
-              appendStreamingNarrative(previousEventCount, obj.delta);
+              fullNarrative += obj.delta;
+              useGameStore.getState().setStreamingNarrative(eventIndex, fullNarrative);
+              // ★ 同步更新占位事件的 narrative 字段，这样 done 到达前气泡也不会空
+              const phId = (useGameStore.getState() as any)._placeholderId;
+              if (phId) {
+                const curEvents = useGameStore.getState().events;
+                setEvents(curEvents.map((e: any) =>
+                  e.id === phId ? { ...e, narrative: fullNarrative } : e
+                ));
+              }
+            } else if (obj.type === 'narrative_complete') {
+              // ★ narrative 字段闭合：LLM 已写完正文，正在生成剩余 JSON 字段
+              // → 显示"收获结算中..."提示，但按钮仍锁定（同步结算）
+              if (!narrativeCompleted) {
+                narrativeCompleted = true;
+                console.log('[SSE advance] narrative_complete, showing settling hint');
+                setSettlingHint('calculating');
+              }
             } else if (obj.type === 'done') {
+              console.log('[SSE advance] Received done, narrative length:', obj.narrative?.length, 'perf:', obj._debug_perf);
               doneData = obj;
             } else if (obj.type === 'error') {
-              throw new Error(obj.error || 'stream error');
+              throw new Error(obj.error || 'SSE error');
             }
+          } catch (e: any) {
+            if (e?.message?.includes('SSE error')) throw e;
+            console.error('[SSE advance] Parse error:', e);
           }
         }
-      } catch (readErr: any) {
-        // reader 中断（页面切走/HMR/网络断开）：fallback 到非流式接口拉完整事件
-        console.warn('[advance stream] reader failed:', readErr?.message);
-        finishStreamingNarrative();
-        try { reader.cancel(); } catch {}
-        await advanceFallbackNonStream(previousEventCount);
-        return;
       }
-      if (!doneData) throw new Error('流式响应未完成');
 
-      // 流结束：清掉 streamingNarrative 标记，让 EventTimeline 走完整 narrative
-      finishStreamingNarrative();
+      if (!doneData) {
+        throw new Error('SSE 响应未完成');
+      }
 
-      // 更新角色
-      setCharacter({ ...character, ...doneData.state, worldCalendar: doneData.worldTime || doneData.worldCalendar });
+      // ★ done 到达：同步更新所有状态
+      // 立即清除结算提示，但保留新事件动画一段时间，避免结算后气泡闪动
+      setSettlingHint(null);
+
+      // ★ 更新角色状态
+      const latestCharacter = useGameStore.getState().character;
+      if (doneData.state) {
+        setCharacter({ ...latestCharacter, ...doneData.state, worldCalendar: doneData.worldTime || doneData.worldCalendar });
+      } else if (doneData.worldCalendar || doneData.worldTime) {
+        setCharacter({ ...latestCharacter, worldCalendar: doneData.worldTime || doneData.worldCalendar });
+      }
       if (doneData.worldCalendar) setWorldCalendar(doneData.worldCalendar);
       setLastChange(doneData.changes || null);
       if (doneData.breakthrough) setLastBreakthrough(doneData.breakthrough);
 
-      // 添加事件
-      const returnedEvents = Array.isArray(doneData.events) && doneData.events.length ? doneData.events : [];
-      returnedEvents.forEach((evt: any, idx: number) => addEvent({
-        id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
-        age: evt.age,
-        title: evt.title,
-        narrative: evt.narrative,
-        eventType: evt.eventType,
-        effects: evt.effects || (idx === 0 ? (doneData.changes || []) : []),
-        isFateNode: evt.isFateNode,
-        fateNodeName: evt.fateNodeName,
-        blueprint: evt.blueprint,
-        timeAdvance: evt.timeAdvance,
-        worldTime: evt.worldTime,
-        actionProjections: evt.actionProjections || [],
-        createdAt: evt.createdAt || new Date().toISOString(),
-      }));
+      // ★ 同步更新占位事件（标题 + narrative + effects + id）
+      const phId = (useGameStore.getState() as any)._placeholderId;
+      if (phId) {
+        const phEvents = useGameStore.getState().events;
+        const savedTimeAdvance = phEvents.find((e: any) => e.id === phId)?.timeAdvance;
+        const savedWorldTime = phEvents.find((e: any) => e.id === phId)?.worldTime;
+        const finalTitle = doneData.title || '天道路漫';
+        const eventId = doneData.eventId || phId;
+        setEvents(phEvents.map((e: any) =>
+          e.id === phId
+            ? {
+                ...e,
+                id: eventId,
+                title: finalTitle,
+                // 优先用更完整的 narrative（流式累积的可能比 doneData 解析的完整）
+                narrative: (doneData.narrative && doneData.narrative.length >= fullNarrative.length)
+                  ? doneData.narrative
+                  : fullNarrative,
+                effects: doneData.changes || [],
+                timeAdvance: savedTimeAdvance,
+                worldTime: savedWorldTime,
+              }
+            : e
+        ));
+        (useGameStore.getState() as any)._placeholderId = null;
+      }
 
-      // 标记新事件气泡（流式已经显示，这里给旧 fallback 流程留入口）
-      setNewEventRange({ start: previousEventCount, end: previousEventCount + returnedEvents.length });
-      setTimeout(() => setNewEventRange(null), 10000);
+      finishStreamingNarrative();
+
+      // 延迟清除新事件高亮动画，让 DOM 稳定后再取消动画，避免结算时气泡闪动
+      window.setTimeout(() => {
+        setNewEventRange(null);
+      }, 3000);
 
       // 待选择
       if (doneData.hasChoice && doneData.choice) {
         setPendingChoice({
           ...doneData.choice,
-          contextTitle: doneData.events?.[0]?.title,
-          contextNarrative: doneData.events?.[0]?.narrative,
-          contextAge: doneData.events?.[0]?.age,
-          contextFateNodeName: doneData.events?.[0]?.fateNodeName,
+          contextTitle: doneData.title,
+          contextNarrative: doneData.narrative,
+          contextAge: doneData.state?.age,
+          contextFateNodeName: undefined,
         });
         toast('因缘转折', { description: '请做出你的抉择' });
-        // 因缘抉择中断自动推进
         autoCancelRef.current = true;
       }
 
-      // Task 20: 触发战斗 → 中断自动推进，提示玩家
-      if (doneData.triggeredCombat || doneData.hasChoice || doneData.events?.[0]?.isFateNode) {
-        // 战斗或选择触发：中断自动推进
-        if (doneData.triggeredCombat) {
-          toast('战斗触发', { description: '请进入战斗界面应战' });
-        }
+      // 触发战斗 → 中断自动推进
+      if (doneData.triggeredCombat) {
+        toast('战斗触发', { description: '请进入战斗界面应战' });
         autoCancelRef.current = true;
       }
 
       if (doneData.breakthrough) {
         if (doneData.breakthrough.major) {
           toast.success('大境界突破！', { description: `踏入新境界` });
-          // 触发突破仪式
-          triggerBreakthroughCeremony(doneData.state, character);
+          triggerBreakthroughCeremony(doneData.state, latestCharacter);
         } else {
           toast.success('小境界突破！', { description: `晋至${doneData.state.realmLevel + 1}层` });
         }
@@ -362,19 +365,27 @@ export function ActionButtons() {
         autoCancelRef.current = true;
       }
       if (doneData.fallbackGenerated) {
-        toast.warning('AI 响应异常', { description: 'AI 生成失败，已使用模板叙事。请检查 AI 配置或额度。' });
+        toast.warning('AI 响应异常', { description: 'AI 生成失败，已使用模板叙事。' });
       }
-      if (!doneData.hasChoice && !(doneData.state && !doneData.state.alive)) {
+      if (!doneData.hasChoice && doneData.state && doneData.state.alive) {
         preloadRef.current.key = null;
-        prepareNextTurn(character.id);
+        prepareNextTurn(latestCharacter?.id);
       }
     } catch (err: any) {
+      // 主动取消（刷新/离开页面/重复点击）不显示错误提示
+      if (err?.name === 'AbortError' || err?.message?.includes('aborted') || err?.message?.includes('AbortError')) {
+        console.log('[advance] Aborted by user or page refresh');
+        return;
+      }
+      console.error('[advance] Error:', err?.message);
       setError(err.message);
       toast.error('推进失败', { description: err.message });
       autoCancelRef.current = true;
+      finishStreamingNarrative();
     } finally {
       advancingRef.current = false;
       setLoading(false);
+      advanceAbortRef.current = null;
     }
   };
 

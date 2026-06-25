@@ -122,6 +122,9 @@ model Character {
   // 每条记录：{ realmId, lastExploredAge, timesExplored, bestReward? }
   exploredRealmsJson String @default("[]")
 
+  // 世界历 JSON（WorldCalendarState）—— 持久化当前世界历，避免刷新后重置
+  worldCalendarJson String @default("{\"eraName\":\"青岚仙历\",\"calendarYear\":5000,\"elapsedDays\":0}")
+
   events          EventLog[]
   choices         ChoiceLog[]
   interferences   InterferenceLog[]

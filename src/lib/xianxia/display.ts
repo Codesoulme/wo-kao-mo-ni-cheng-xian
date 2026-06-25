@@ -21,6 +21,9 @@ export const ATTRIBUTE_LABEL: Record<string, string> = {
   elementFire: '火灵根',
   elementEarth: '土灵根',
   storageCapacity: '储物容量',
+  realm: '境界',
+  realmLevel: '境界层数',
+  spiritualRoot: '灵根',
 
   // 非角色数值属性，但可能出现在物品/事件效果里
   inventory: '物品',
@@ -51,10 +54,10 @@ export function isVisibleNumericEventEffect(eff: any): boolean {
   if (!eff) return false;
   if (eff.kind) return Boolean(String(eff.name || '').trim());
   const attr = String(eff.attribute || '');
-  if (!attr || HIDDEN_EFFECT_ATTRIBUTES.has(attr)) return false;
   const delta = Number(eff.delta || 0);
+  if (!attr || attr === '*' || HIDDEN_EFFECT_ATTRIBUTES.has(attr)) return false;
   if (delta === 0) return false;
-  // 背包数量是内部计数，不用 +1/-1 打断沉浸；保留 reason，如"得 回春符""售 木剑"
+  // 背包数量是内部计数，不用 +1/-1 打断沉浸；保留reason，如"得 回春符""售 木剑"
   if (attr === 'inventory' && !String(eff.reason || '').trim()) return false;
   return true;
 }

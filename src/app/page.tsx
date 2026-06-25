@@ -37,8 +37,8 @@ function useHydrated() {
 export default function Home() {
   const {
     character, events, pendingChoice, settlementResult, hallOfSimulations,
-    setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice, setSettlementResult,
-    newEventRange, streamingNarrative,
+    setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice, setSettlementResult, setWorldCalendar,
+    newEventRange, streamingNarrative, settlingHint,
   } = useGameStore();
   // 当有 pendingChoice 时自动聚焦到故事 Tab
   const [tab, setTab] = useState('story');
@@ -91,6 +91,9 @@ export default function Home() {
         setEvents(data.events || []);
         setChoices(data.choices || []);
         setFateNodes(data.fateNodes || []);
+        if (data.character?.worldCalendar) {
+          setWorldCalendar(data.character.worldCalendar);
+        }
         // 恢复 pendingChoice（修复：页面刷新后 isAtChoice=true 但 pendingChoice 丢失导致卡死）
         if (data.pendingChoice && data.character?.isAtChoice) {
           setPendingChoice(data.pendingChoice);
@@ -103,7 +106,7 @@ export default function Home() {
       cancelled = true;
       if (settlingCharacterIdRef.current === character.id) settlingCharacterIdRef.current = null;
     };
-  }, [hydrated, character?.id, events.length, setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice]);
+  }, [hydrated, character?.id, events.length, setCharacter, setEvents, setChoices, setFateNodes, setPendingChoice, setWorldCalendar]);
 
   useEffect(() => {
     if (!hydrated || !character) return;
@@ -210,7 +213,7 @@ export default function Home() {
                       onScroll={(e) => { storyScrollTopRef.current = e.currentTarget.scrollTop; }}
                       className="flex-1 overflow-y-auto xianxia-scroll px-3 pb-2"
                     >
-                      <EventTimeline events={events} newEventRange={newEventRange ?? undefined} streamingEvent={streamingNarrative ?? undefined} />
+                      <EventTimeline events={events} newEventRange={newEventRange ?? undefined} streamingEvent={streamingNarrative ?? undefined} settlingHint={settlingHint} />
                     </div>
                     {/* 推进按钮 */}
                     <div className="shrink-0 px-3 py-2 border-t border-border/40 bg-card/40">

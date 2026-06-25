@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
         inventoryJson: JSON.stringify(inheritedItems),
         memoryJson: JSON.stringify([`${birth.name}降生于${birth.birthplace}，${birth.family}。${birth.rootDetail}。${statusList.length ? `天生或轮回带有${statusList.map((s: any) => s.name).join('、')}。` : ''}`]),
         petsJson: JSON.stringify(inheritedPets),
+        worldCalendarJson: JSON.stringify(normalizeWorldCalendar(worldCalendar)),
       },
     });
 

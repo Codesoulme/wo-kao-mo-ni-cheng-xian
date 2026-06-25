@@ -47,7 +47,10 @@ export function StartScreen({
       const stateData = await stateRes.json();
       if (!stateData.success) throw new Error('初始化状态失败');
 
-      setCharacter({ ...stateData.character, worldCalendar });
+      setCharacter(stateData.character);
+      if (stateData.character?.worldCalendar) {
+        setWorldCalendar(stateData.character.worldCalendar);
+      }
       setFateNodes(stateData.fateNodes);
       setEvents(stateData.events || []);
       setChoices(stateData.choices || []);

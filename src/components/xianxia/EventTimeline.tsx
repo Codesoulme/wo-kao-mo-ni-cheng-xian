@@ -1,10 +1,10 @@
 'use client';
 
-import { GameEvent } from '@/lib/xianxia/store';
+import { GameEvent, streamingRef } from '@/lib/xianxia/store';
 import { cn } from '@/lib/utils';
 import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } from '@/lib/xianxia/display';
-import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 
 interface EventTimelineProps {
   events: GameEvent[];
@@ -16,6 +16,8 @@ interface EventTimelineProps {
   newEventRange?: { start: number; end: number };
   /** 真正流式：当前正在流式写入的 event */
   streamingEvent?: { eventIndex: number; text: string } | null;
+  /** 结算提示：'calculating' = 收获结算中 */
+  settlingHint?: 'calculating' | null;
 }
 
 const EVENT_ICONS: Record<string, React.ReactNode> = {
@@ -121,8 +123,9 @@ function splitNarrativeParagraphs(text?: string): string[] {
 }
 
 function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: string; name: string }; eventType?: string }) {
-  if (!blueprint || hasInternalVisibleText(blueprint.name)) return null;
-  // “突破前夜/酝酿突破”是生成主题，不是玩家已成功突破的标签；成功破境只由 breakthrough 事件本身呈现。
+  if (!blueprint) return null;
+  if (hasInternalVisibleText(blueprint.name)) return null;
+  // "突破前夜/酝酿突破"是生成主题，不是玩家已成功突破的标签；成功破境只由 breakthrough 事件本身呈现。
   if (blueprint.category === 'cultivation' && /突破|冲关|破境/.test(blueprint.name || '') && eventType !== 'breakthrough') {
     return null;
   }
@@ -141,103 +144,115 @@ function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: strin
 }
 
 /**
- * 气泡级增量显示：narrative 按句切片后逐个出现
- * - 旧事件/已展开：直接全部显示（无动画）
- * - 新事件：逐句出现，间隔 180ms；玩家感觉"AI 在写"
+ * 实时流式显示组件：使用 requestAnimationFrame 轮询 ref，直接操作 DOM
+ * 完全绕过 React 状态系统，实现真正的实时流式效果（参考 Ägir 项目）
  */
-function StreamingNarrative({ text, isNew, streamingText }: { text?: string; isNew?: boolean; streamingText?: string }) {
-  // 真正流式：直接显示 streamingText（已包含 LLM 当前已生成的 narrative）
-  if (streamingText !== undefined) {
-    if (!streamingText) {
-      // 还没收到 delta：显示 typing 指示
-      return <p className="text-muted-foreground/50 text-[10px] animate-pulse">…</p>;
+function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?: string; isNew?: boolean; streamingText?: string; eventIndex: number }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<string>('');
+  const rafRef = useRef<number | null>(null);
+  const streamingEventIdx = useRef<number | null>(null);
+  
+  // 停止动画循环
+  const stopAnimation = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     }
-    const paragraphs = splitNarrativeParagraphs(streamingText);
+  }, []);
+  
+  // 启动动画循环：持续检查 ref 并更新 DOM
+  const startAnimation = useCallback(() => {
+    stopAnimation();
+    
+    const tick = () => {
+      const state = streamingRef.current;
+      const el = contentRef.current;
+      
+      if (!el) {
+        rafRef.current = requestAnimationFrame(tick);
+        return;
+      }
+      
+      if (state && state.eventIndex === streamingEventIdx.current) {
+        const newText = state.text;
+        if (newText !== textRef.current) {
+          el.innerText = newText;
+          textRef.current = newText;
+          el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+      }
+      
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    
+    rafRef.current = requestAnimationFrame(tick);
+  }, [stopAnimation]);
+  
+  // 处理流式状态开始
+  useEffect(() => {
+    if (streamingText !== undefined) {
+      textRef.current = '';
+      streamingEventIdx.current = eventIndex;
+      if (contentRef.current) {
+        contentRef.current.innerText = streamingText;
+      }
+      startAnimation();
+    } else {
+      stopAnimation();
+    }
+    
+    return () => stopAnimation();
+  }, [streamingText, eventIndex, startAnimation, stopAnimation]);
+  
+  // 非流式模式：普通渲染
+  if (streamingText === undefined) {
+    if (!text) return null;
+    const paragraphs = splitNarrativeParagraphs(text);
     return (
       <>
-        {paragraphs.map((p, idx) => (
-          <p key={idx} className="first-letter:pl-0 transition-opacity duration-200">
-            {p}
-            {idx === paragraphs.length - 1 && (
-              <span className="inline-block w-1.5 h-3 ml-0.5 bg-foreground/70 animate-pulse align-middle" />
+        {paragraphs.map((paragraph, idx) => (
+          <p
+            key={idx}
+            className={cn(
+              "first-letter:pl-0 transition-opacity duration-200",
+              idx === paragraphs.length - 1 && isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
             )}
+          >
+            {paragraph}
           </p>
         ))}
       </>
     );
   }
-  const paragraphs = useMemo(() => splitNarrativeParagraphs(text), [text]);
-  const [visibleCount, setVisibleCount] = useState(isNew ? 0 : paragraphs.length);
-
-  // 新事件 + 内容变化时重置
-  useEffect(() => {
-    if (!isNew) {
-      setVisibleCount(paragraphs.length);
-      return;
-    }
-    setVisibleCount(0);
-    let cancelled = false;
-    let i = 0;
-    // 间隔随段数递减：前 2 段稍慢（让首气泡有悬念感），之后快
-    const intervalFor = (n: number) => n < 2 ? 220 : n < 5 ? 150 : 120;
-    const tick = () => {
-      if (cancelled) return;
-      i += 1;
-      setVisibleCount(i);
-      if (i < paragraphs.length) {
-        setTimeout(tick, intervalFor(i));
-      }
-    };
-    if (paragraphs.length > 0) {
-      setTimeout(tick, 200); // 第一个气泡延迟稍长，让"loading -> 出字"有过渡
-    } else {
-      setVisibleCount(0);
-    }
-    return () => { cancelled = true; };
-  }, [paragraphs, isNew]);
-
-  if (paragraphs.length === 0) return null;
+  
+  // 流式模式：占位容器
   return (
-    <>
-      {paragraphs.slice(0, visibleCount).map((p, idx) => (
-        <p
-          key={idx}
-          className={cn(
-            "first-letter:pl-0 transition-opacity duration-300",
-            idx === visibleCount - 1 && isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
-          )}
-        >
-          {p}
-        </p>
-      ))}
-      {isNew && visibleCount < paragraphs.length && (
-        <p className="text-muted-foreground/50 text-[10px] animate-pulse">…</p>
-      )}
-    </>
+    <div ref={contentRef} className={cn(
+      "first-letter:pl-0",
+      isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
+    )} />
   );
 }
 
 function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }, prevEvent?: GameEvent) {
-  const displayLabel = cleanVisibleTimeLabel(event.worldTime?.displayLabel);
-  // 与上一条事件时间完全一致时，省略本条时间戳
-  if (prevEvent) {
-    const prevDisplay = cleanVisibleTimeLabel(prevEvent.worldTime?.displayLabel);
-    if (displayLabel && prevDisplay && displayLabel === prevDisplay) return '';
-    // 当本条也没有 displayLabel 但构造出来会等于 prevDisplay 时也省略
-    if (!displayLabel) {
-      const fallback = buildFallbackTimeLabel(event, ageMeta);
-      if (fallback && fallback === prevDisplay) return '';
-    }
-  }
-  if (displayLabel) return displayLabel;
+  // 优先用完整 displayLabel（通常含世界历），没有则用 label
+  const displayLabel = cleanVisibleTimeLabel(event.worldTime?.displayLabel || event.worldTime?.label);
   const worldLabel = event.worldTime?.label;
   const segmentLabel = cleanVisibleTimeLabel(event.timeAdvance?.label);
   const ageText = ageMeta.isContinuation ? '' : `${event.age}\u5c81`;
   const open = '\u3010';
   const close = '\u3011';
-  if (worldLabel && segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}${open}${worldLabel}${close}` : `${segmentLabel}${open}${worldLabel}${close}`;
-  if (worldLabel) return ageText ? `${ageText}${open}${worldLabel}${close}` : `${open}${worldLabel}${close}`;
-  if (segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}` : segmentLabel;
+
+  // 如果 worldTime/displayLabel 已包含岁数，避免重复拼接
+  const displayLabelHasAge = displayLabel && displayLabel.includes(`${event.age}\u5c81`);
+
+  // 如果有 worldTime，始终显示完整时间（不受 isContinuation 影响）
+  if (displayLabel) return ageText && !displayLabelHasAge ? `${ageText} · ${displayLabel}` : displayLabel;
+  // 兜底：用 worldLabel + segmentLabel 组装
+  if (worldLabel && segmentLabel) return `${ageText} · ${segmentLabel}${open}${worldLabel}${close}`;
+  if (worldLabel) return `${ageText}${open}${worldLabel}${close}`;
+  if (segmentLabel) return `${ageText} · ${segmentLabel}`;
   return ageText || '';
 }
 
@@ -247,9 +262,9 @@ function buildFallbackTimeLabel(event: GameEvent, ageMeta: { isContinuation: boo
   const ageText = ageMeta.isContinuation ? '' : `${event.age}\u5c81`;
   const open = '\u3010';
   const close = '\u3011';
-  if (worldLabel && segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}${open}${worldLabel}${close}` : `${segmentLabel}${open}${worldLabel}${close}`;
-  if (worldLabel) return ageText ? `${ageText}${open}${worldLabel}${close}` : `${open}${worldLabel}${close}`;
-  if (segmentLabel) return ageText ? `${ageText} \u00b7 ${segmentLabel}` : segmentLabel;
+  if (worldLabel && segmentLabel) return `${ageText} · ${segmentLabel}${open}${worldLabel}${close}`;
+  if (worldLabel) return `${ageText}${open}${worldLabel}${close}`;
+  if (segmentLabel) return `${ageText} · ${segmentLabel}`;
   return ageText || '';
 }
 
@@ -261,7 +276,7 @@ function eventTypeLabel(event: GameEvent, prevEvent?: GameEvent) {
   return EVENT_LABELS[event.eventType] || '流年';
 }
 
-export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true, newEventRange, streamingEvent }: EventTimelineProps) {
+export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true, newEventRange, streamingEvent, settlingHint }: EventTimelineProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // 用 Set 记录展开的事件 index（按 events 数组顺序）
@@ -314,8 +329,40 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
     });
   }
 
-  // 只在新增史册事件时滚到本次新增事件的第一条；切换标签页或展开/折叠不改变玩家离开时的位置。
+  // 流式叙事更新时，始终滚动到底部，确保“收获结算中”可见
   useEffect(() => {
+    if (!streamingEvent) return;
+    const timer = window.setTimeout(() => {
+      let node: HTMLElement | null = containerRef.current;
+      while (node) {
+        const style = getComputedStyle(node);
+        const overflowY = style.overflowY;
+        if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+          node.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
+          return;
+        }
+        node = node.parentElement;
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [streamingEvent?.text, streamingEvent?.eventIndex]);
+  useEffect(() => {
+    // 初次加载（如刷新页面后恢复 state）：直接滚到最底部
+    if (events.length > 0 && lastAutoScrollLenRef.current === 0 && !pendingScrollIndex) {
+      const target = endRef.current;
+      if (!target) return;
+      let node: HTMLElement | null = target.parentElement;
+      while (node) {
+        const style = getComputedStyle(node);
+        const overflowY = style.overflowY;
+        if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+          node.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
+          lastAutoScrollLenRef.current = events.length;
+          return;
+        }
+        node = node.parentElement;
+      }
+    }
     if (events.length <= lastAutoScrollLenRef.current) {
       lastAutoScrollLenRef.current = events.length;
       return;
@@ -335,7 +382,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
         const offset = targetRect.top - containerRect.top + node.scrollTop;
         // 滚动后让卡片顶部在容器内 80px 处，给顶部状态栏/标签栏留出视觉空间
         node.scrollTo({ top: Math.max(0, offset - 80), behavior: 'smooth' });
-        setPendingScrollIndex(null);
+        window.setTimeout(() => setPendingScrollIndex(null), 0);
         return;
       }
       node = node.parentElement;
@@ -512,10 +559,10 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {isExpanded && (
                   <div className="px-3 pb-2">
                     <div className="space-y-2 text-xs leading-relaxed text-foreground/90 xianxia-prose">
-                      <StreamingNarrative text={event.narrative} isNew={isNewEvent} streamingText={streamingEvent && isNewEvent ? streamingEvent.text : undefined} />
+                      <StreamingNarrative text={event.narrative} isNew={isNewEvent} streamingText={streamingEvent && isNewEvent ? streamingEvent.text : undefined} eventIndex={idx} />
                     </div>
                     {/* 效果 */}
-                    {visibleEffects.length > 0 && (
+                    {visibleEffects.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1">
                         {visibleEffects.map((eff: any, i: number) => (
                           <span
@@ -533,7 +580,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                           </span>
                         ))}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 )}
 
@@ -562,12 +609,23 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                     )}
                   </div>
                 )}
+                {/* 折叠态结算提示已迁移到事件标题 */}
 
                 {/* 折叠态提示 */}
                 {!isExpanded && (
                   <div className="px-3 pb-1 text-[9px] text-muted-foreground/70 flex items-center gap-1">
                     <ChevronsUpDown className="w-2.5 h-2.5" />
                     <span>点击展开详情</span>
+                  </div>
+                )}
+
+                {/* 收获结算中提示：仅显示在最后一个事件下方 */}
+                {isLast && settlingHint === 'calculating' && (
+                  <div className="px-3 pb-2 -mt-1">
+                    <div className="text-[11px] text-primary/80 italic flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>收获结算中…</span>
+                    </div>
                   </div>
                 )}
               </div>

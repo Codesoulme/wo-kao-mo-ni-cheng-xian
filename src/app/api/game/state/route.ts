@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { dbToState, computeEffectiveCultivationRate, stateToResponse } from '@/lib/xianxia/engine';
 import { FATE_NODES, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
-import { extractEventMeta } from '@/lib/xianxia/world-time';
+import { extractEventMeta, normalizeWorldCalendar } from '@/lib/xianxia/world-time';
 
 export const runtime = 'nodejs';
 
@@ -77,7 +77,7 @@ export async function GET(req: NextRequest) {
         luck: char.luck, comprehension: char.comprehension,
         spiritStones: char.spiritStones, reputation: char.reputation,
         alive: char.alive, ascended: char.ascended,
-        causeOfDeath: char.causeOfDeath,
+        causeOfDeath: char.causeOfDeath || '',
         faction: char.faction, master: char.master, location: char.location,
         fateNodes: state.fateNodes,
         isAtChoice: char.isAtChoice,
@@ -104,6 +104,8 @@ export async function GET(req: NextRequest) {
         pets: state.pets || [],
         // Task 24: 已探秘境记录
         exploredRealms: state.exploredRealms || [],
+        // 世界历
+        worldCalendar: normalizeWorldCalendar(char.worldCalendarJson ? JSON.parse(char.worldCalendarJson) : undefined),
       },
       pendingChoice,
       events: events.map(e => ({
