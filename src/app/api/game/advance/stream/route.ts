@@ -160,8 +160,8 @@ export async function POST(req: NextRequest) {
             // 执行 AI 事件效果
             try {
               console.log('[stream] Before executeAIEvent - state.inventory:', state?.inventory?.length);
-              var execResult = executeAIEvent(state, aiOutput);
-              var finalState = execResult?.state;
+              const execResult = executeAIEvent(state, aiOutput);
+              const finalState = execResult?.state;
               console.log('[stream] After executeAIEvent - finalState.inventory:', finalState?.inventory?.length);
             } catch (execErr: any) {
               console.error('[stream] executeAIEvent failed:', execErr?.message, execErr?.stack);

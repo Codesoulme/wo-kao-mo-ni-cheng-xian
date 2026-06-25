@@ -162,12 +162,21 @@ export function ActionButtons() {
       const previousEventCount = events.length;
       setNewEventRange({ start: previousEventCount, end: previousEventCount + 5 });
 
-      // ★ 真流式：使用 /api/game/advance-sse（已验证在 Trae IDE 浏览器中可工作 35+ 秒）
+      // ★ 清理上次推进遗留：旧占位事件、旧流式叙事、旧结算提示
+      const stalePlaceholderId = (useGameStore.getState() as any)._placeholderId;
+      if (stalePlaceholderId) {
+        const curEvents = useGameStore.getState().events;
+        if (curEvents.some((e: any) => e.id === stalePlaceholderId)) {
+          setEvents(curEvents.filter((e: any) => e.id !== stalePlaceholderId));
+        }
+        (useGameStore.getState() as any)._placeholderId = null;
+      }
+      useGameStore.getState().finishStreamingNarrative();
+      useGameStore.getState().setSettlingHint(null);
       console.log('[SSE advance] Starting, calling /api/game/advance-sse');
       const eventIndex = previousEventCount;
       let fullNarrative = '';
       let doneData: any = null;
-      const llmToast = toast.loading('天道演算中...', { description: 'AI 正在推演你的命运轨迹' });
       const setSettlingHint = useGameStore.getState().setSettlingHint;
 
       const abortCtrl = new AbortController();
@@ -217,7 +226,6 @@ export function ActionButtons() {
             const obj = JSON.parse(dataStr);
             if (obj.type === 'start') {
               console.log('[SSE advance] Received start, age:', obj.age);
-              toast.dismiss(llmToast);
               // ★ 立即清掉旧推进遗留的"收获结算中"提示
               setSettlingHint(null);
               // ★ 立即添加一个空 narrative 的占位事件，StreamingNarrative 会显示实时增量文本

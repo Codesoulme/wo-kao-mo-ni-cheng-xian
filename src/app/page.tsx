@@ -139,6 +139,25 @@ export default function Home() {
     };
   }, [hydrated, character, settlementResult?.characterId, hallOfSimulations, setSettlementResult]);
 
+  // 每小时触发一次代码审查（POST /api/system/review-tick）
+  // 由后端自己判断时间间隔，前端只负责定时触发
+  useEffect(() => {
+    if (!hydrated) return;
+    let cancelled = false;
+    const tickReview = async () => {
+      try {
+        await fetch('/api/system/review-tick', { method: 'POST', cache: 'no-store' });
+      } catch {}
+    };
+    // 进入页面立即打点一次（让后端判断是否跳过）
+    tickReview();
+    const timer = window.setInterval(tickReview, 60 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [hydrated]);
+
   // 防止 hydration mismatch：在客户端 hydration 完成前不渲染 character 相关 UI
   if (!hydrated) {
     return (

@@ -1212,14 +1212,15 @@ export async function callLLMStream(
         messages: [{ role: 'user', content: userPrompt }],
       })
     : JSON.stringify({
-        model,
-        stream: true,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        thinking: { type: 'disabled' },
-      });
+          model,
+          stream: true,
+          max_tokens: 8192,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          thinking: { type: 'disabled' },
+        });
   const endpoint = isAnthropic
     ? `${cfg.baseUrl.replace(/\/+$/, '')}/v1/messages`
     : `${cfg.baseUrl}/chat/completions`;
