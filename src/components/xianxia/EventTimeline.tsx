@@ -215,7 +215,7 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
           <p
             key={idx}
             className={cn(
-              "first-letter:pl-0 transition-opacity duration-200",
+              "first-letter:pl-0 transition-opacity duration-200 indent-4",
               idx === paragraphs.length - 1 && isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
             )}
           >
@@ -225,13 +225,23 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
       </>
     );
   }
-  
-  // 流式模式：占位容器
+
+  // 流式模式：保持段落结构，避免 done 后重排
+  const streamingParagraphs = splitNarrativeParagraphs(streamingText);
   return (
     <div ref={contentRef} className={cn(
-      "first-letter:pl-0",
+      "first-letter:pl-0 space-y-2",
       isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
-    )} />
+    )}>
+      {streamingParagraphs.map((paragraph, idx) => (
+        <p
+          key={idx}
+          className="first-letter:pl-0 indent-4 transition-opacity duration-200"
+        >
+          {paragraph}
+        </p>
+      ))}
+    </div>
   );
 }
 
