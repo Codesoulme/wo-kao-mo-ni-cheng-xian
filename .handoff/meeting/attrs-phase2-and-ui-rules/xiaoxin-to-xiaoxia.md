@@ -457,7 +457,63 @@
 
 ---
 
-> ?????
+## 小薪进度 (2026-06-27 第三批)
+
+### AI-22: 境界 vs 身份 UI 消费 ✅
+- 改动：`src/components/xianxia/StatusPanel.tsx` import `REALM_SECTION_LABELS` / `IDENTITY_SECTION_LABELS` / `isRealmAttribute` / `isIdentityAttribute`，新增 `data-section="identity"` 分组（宗门/师承/声望/灵石），原境界修为块加 `data-section="realm"`
+- smoke: `smokeRealmIdentityUiSeparation`
+
+### AI-23: 多重修炼 UI 实际展示 ✅
+- 改动：`src/components/xianxia/CultivationSpeedCard.tsx` 新增 `multiplierEffectCount` / `additiveEffectCount` 聚合 + `data-testid="bonus-summary"` 行（倍 ×N / 加 +N/岁 / N 源）
+- smoke: `smokeMultiCultivationBonusUiDisplay`
+
+### AI-24: 战斗同步前端实际实现 ✅
+- 已存在 + 验证：`ActionButtons.tsx` 检测 combatSession.status === 'ongoing' 禁用推进 + advance 失败时 `syncLatestState` 同步 + toast "战斗已接续"
+- smoke: `smokeContinuousPushCombatUiSync`
+
+### AI-25: docs/UI-RULES.md 状态更新 ✅
+- 改动：`docs/UI-RULES.md` 把第二批 7 条从"下一轮"升为"已落地"，新增 Phase 2 已落地 + Phase 3 已落地段，附完整"规则状态总览"表（16 / 16 已落地）
+- 无 smoke（纯文档更新）
+
+### AI-26: combatProjection 战斗面板接入 ✅
+- 改动：`src/components/xianxia/CombatModal.tsx` import `COMBAT_PROJECTION_LABELS`，header 后新增 6 格 grid（破势/护持/机变/神识/魂魄/体魄），`data-testid="combat-projection-grid"`
+- smoke: `smokeCombatProjectionInBattlePanel`
+
+### AI-27: docs/DESIGN.md 引用 docs/UI-RULES.md ✅
+- 改动：`docs/DESIGN.md` §5 UI/交互规范 顶部加引用块 + 5.1/5.2/5.3 各加 UI-RULES.md 链接 + 标注"境界 vs 身份"数据契约
+- smoke: `smokeDesignRefersUiRules`
+
+---
+
+## 小薪完工回执 (2026-06-27 第三批)
+
+### 本次完成
+- 议题 1 收尾 1 件 (AI-26 combatProjection 战斗面板) + 议题 2 第三批 5 件 (AI-22 ~ AI-27) 全部完成
+- 议题 1 收尾：combatProjection 在战斗面板实时展示 6 项
+- 议题 2 第三批：UI 消费、UI 实际展示、前端战斗同步、文档收尾、DESIGN.md 引用
+- 新增 5 条 regression smoke（无 AI-25 smoke，因纯文档）
+- 累计 smoke 数：23 + 5 = 28 条
+
+### 改动文件
+- `src/components/xianxia/StatusPanel.tsx` (新增身份分组 + import IDENTITY/REALM helper)
+- `src/components/xianxia/CultivationSpeedCard.tsx` (聚合摘要 UI)
+- `src/components/xianxia/CombatModal.tsx` (combatProjection 6 格 grid)
+- `docs/UI-RULES.md` (Phase 2/3 + 规则状态总览表)
+- `docs/DESIGN.md` (§5 引用 UI-RULES.md)
+- `scripts/xianxia-regression-smoke.ts` (5 条 smoke)
+
+### commit 状态
+- 尚未 commit（按新规则等待 owner 拍板）
+- **绝不自己 push**，等 owner 或小虾米说"可以推"再推
+
+### 验证结果
+- bun scripts/xianxia-regression-smoke.ts ✅ (含 5 条新增 smoke)
+- bunx eslint targeted ✅
+- git diff --check ✅
+
+### 遗留
+- 无遗留
+- 议题 1 + 议题 2 全部 16 条 UI 规则已落地并文档化
 
 ---
 

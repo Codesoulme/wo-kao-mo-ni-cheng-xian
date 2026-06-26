@@ -1,4 +1,4 @@
-﻿# 《我靠模拟成仙》设计文档
+# 《我靠模拟成仙》设计文档
 
 > 文档版本：v0.2
 > 状态：基于 v1.0 技术文档的当前实现对齐版（第一批）
@@ -180,6 +180,11 @@
 
 ## 5. UI/交互规范
 
+> **UI 规则的详细实现细节、维护纪律、smoke 列表请参见 [UI-RULES.md](./UI-RULES.md)。**
+> 本节给出设计原则层的高阶约束；具体 sanitize 函数、UI 组件绑定、规则状态表均在 [UI-RULES.md](./UI-RULES.md) 中维护。
+>
+> 当前已落地规则数：**16 / 16**（参见 UI-RULES.md 的"规则状态总览"表）。
+
 ### 5.1 文案规范
 
 所有玩家可见文案必须中文化，不能显示内部英文 key。
@@ -191,13 +196,19 @@
 - `storageCapacity` → 储物容量
 - `activeStatuses` → 当前状态 / 缘法 / 命格等视语境而定
 
+完整 sanitize 出口请见 [UI-RULES.md §display.ts 统一 sanitize 出口](./UI-RULES.md#displayts-统一-sanitize-出口)。
+
 ### 5.2 长文本适配
 
 修仙叙事天然长文本，UI 必须支持弹窗滚动、标题和关闭按钮不重叠、移动端自适应、长状态/长物品描述折叠或换行、史册默认展开最近事件。
 
+实现位置：`CombatModal` / `ChoiceModal` / `PendingThreadsCard` / `CultivationSpeedCard`。具体规则参见 [UI-RULES.md 规则 8/9/14/15](./UI-RULES.md)。
+
 ### 5.3 信息分层
 
 建议分层：顶部显示年龄、境界、气血/灵力、近期重要状态；角色页显示基础属性、境界、修炼速度、五行、心魔；宝物页显示储物、装备、习得法术；缘法页显示长期状态、命格、牵挂、线索；史册显示事件、战斗、选择、突破、秘境等人生记录。
+
+**境界 vs 身份**（重要数据契约）：境界（realm/realmLevel/cultivationExp/soulRealmName）= 实力台阶；身份（faction/master/location/reputation）= 角色在世界里"是谁"。数据契约见 [UI-RULES.md §Phase 3 已落地 规则 13](./UI-RULES.md)。
 
 ## 6. 数据与接口设计概览
 

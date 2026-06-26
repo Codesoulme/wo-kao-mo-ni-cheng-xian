@@ -22,6 +22,15 @@ export function CultivationSpeedCard() {
   const groupedSources = groupCultivationFactors(factors);
   const visibleSources = showAllSources ? groupedSources : groupedSources.slice(0, 3);
   const hiddenSourceCount = Math.max(0, groupedSources.length - visibleSources.length);
+  // AI-23: 多重加成聚合
+  let multiplierEffectCount = 0;
+  let additiveEffectCount = 0;
+  for (const s of groupedSources) {
+    for (const e of s.effects || []) {
+      if (e.operation === 'multiply') multiplierEffectCount += 1;
+      else if (e.operation === 'add') additiveEffectCount += Math.abs(Number(e.value) || 0);
+    }
+  }
   const insightText: string = character.cultivationInsight || '';
   const hasInsight = insightText.trim().length > 0;
   const canExpandDetails = groupedSources.length > 0 || hasInsight;
@@ -49,8 +58,22 @@ export function CultivationSpeedCard() {
       <CardContent className="pt-1 space-y-2">
         {groupedSources.length > 0 ? (
           <div className="space-y-1">
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1 gap-2">
               <span>来源 · 名称与加成</span>
+              {/* AI-23: 多重加成聚合摘要 */}
+              <span className="flex items-center gap-1 shrink-0" data-testid="bonus-summary">
+                <span className="text-[9px] px-1 rounded bg-emerald-500/10 text-emerald-700/90">
+                  倍 ×{multiplierEffectCount}
+                </span>
+                <span className="text-[9px] px-1 rounded bg-sky-500/10 text-sky-700/90">
+                  加 +{additiveEffectCount}/岁
+                </span>
+                {groupedSources.length > 1 && (
+                  <span className="text-[9px] px-1 rounded bg-muted/70">
+                    {groupedSources.length} 源
+                  </span>
+                )}
+              </span>
               {groupedSources.length > 3 && !showAllSources && (
                 <span>已列 {visibleSources.length}/{groupedSources.length}</span>
               )}

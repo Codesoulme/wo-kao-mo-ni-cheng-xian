@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { CharacterState } from '@/lib/xianxia/store';
 import { filterMeaningfulStatuses, isConstitutionStatus } from '@/lib/xianxia/engine';
+import { REALM_SECTION_LABELS, IDENTITY_SECTION_LABELS, isRealmAttribute, isIdentityAttribute } from '@/lib/xianxia/display';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
 import { Heart, Sparkles, MapPin, ChevronRight, ChevronDown, Sword, Shield, Zap, Clover, Brain, Coins, Sprout } from 'lucide-react';
@@ -173,8 +174,28 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 </div>
               </div>
 
+              {/* AI-22: 身份（宗门/师承/声望/灵石）独立分组，与境界分离 */}
+              <div className="mt-1.5 flex items-center gap-1 flex-wrap text-[10px] text-muted-foreground" data-section="identity">
+                <span className="text-[9px] px-1 py-0.5 rounded bg-sky-500/10 text-sky-700/90 shrink-0">
+                  {IDENTITY_SECTION_LABELS.faction}：{character.faction || '散修'}
+                </span>
+                <span className="text-[9px] px-1 py-0.5 rounded bg-muted/60 shrink-0">
+                  {IDENTITY_SECTION_LABELS.master}：{character.master || '无'}
+                </span>
+                {character.reputation !== undefined && (
+                  <span className="text-[9px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-700/90 shrink-0">
+                    {IDENTITY_SECTION_LABELS.reputation}：{character.reputation}
+                  </span>
+                )}
+                {character.spiritStones !== undefined && (
+                  <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-700/90 shrink-0">
+                    {IDENTITY_SECTION_LABELS.spiritStones}：{character.spiritStones}
+                  </span>
+                )}
+              </div>
+
               {/* 境界与修为同区展示 */}
-              <div className="mt-2 rounded-lg border border-border/50 bg-background/40 px-2 py-1.5">
+              <div className="mt-2 rounded-lg border border-border/50 bg-background/40 px-2 py-1.5" data-section="realm">
                 <div className="flex items-center gap-2 text-[10px]">
                   <span
                     style={{ color: character.realmColor }}

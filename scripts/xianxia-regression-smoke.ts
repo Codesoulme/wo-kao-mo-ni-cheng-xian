@@ -2319,6 +2319,11 @@ async function main(): Promise<void> {
   smokeYinyuanTitleNaturalPhrasing();
   smokeClueCarryOverTextBoundary();
   smokeRealmVsIdentitySeparation();
+  smokeRealmIdentityUiSeparation();
+  smokeMultiCultivationBonusUiDisplay();
+  smokeContinuousPushCombatUiSync();
+  smokeCombatProjectionInBattlePanel();
+  smokeDesignRefersUiRules();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -2405,6 +2410,74 @@ function smokeOldChineseCategoryCompatibility(): void {
   assert(bodyAttr?.category === 'body', `中文 身体 应被 normalize 为 body, got ${bodyAttr?.category}`);
   assert(spiritAttr?.category === 'spirit', `中文 神魂 应被 normalize 为 spirit, got ${spiritAttr?.category}`);
   log('old-chinese-category-compatibility', { passed: true });
+}
+
+function smokeDesignRefersUiRules(): void {
+  // AI-27: docs/DESIGN.md 引用 docs/UI-RULES.md
+  const design = readFileSync('docs/DESIGN.md', 'utf-8');
+  assert(/UI-RULES\.md/.test(design), 'DESIGN.md 应引用 UI-RULES.md');
+  assert(/UI\/交互规范.*UI-RULES|\[UI-RULES\.md\]/.test(design), 'DESIGN.md §5 应给出 UI-RULES.md 链接');
+  // UI-RULES.md 应存在
+  assert(Bun.file('docs/UI-RULES.md').size > 0, 'docs/UI-RULES.md 应存在');
+  // 16 条规则状态应在 UI-RULES.md 提及
+  const uiRules = readFileSync('docs/UI-RULES.md', 'utf-8');
+  assert(/规则状态总览/.test(uiRules), 'UI-RULES.md 应有"规则状态总览"段');
+  log('design-refers-ui-rules', { passed: true });
+}
+
+function smokeCombatProjectionInBattlePanel(): void {
+  // AI-26: combatProjection 战斗面板接入
+  const combatModal = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf-8');
+  assert(/COMBAT_PROJECTION_LABELS/.test(combatModal), 'CombatModal 应引用 COMBAT_PROJECTION_LABELS');
+  assert(/data-testid="combat-projection-grid"/.test(combatModal), 'CombatModal 应有 combat-projection-grid');
+  // 6 项显示
+  assert(/破势/.test(combatModal) && /护持/.test(combatModal) && /机变/.test(combatModal), 'CombatModal 应显示破势/护持/机变');
+  assert(/神识/.test(combatModal) && /魂魄/.test(combatModal) && /体魄/.test(combatModal), 'CombatModal 应显示神识/魂魄/体魄');
+  // 消费 combatProjection
+  assert(/character\.combatProjection/.test(combatModal), 'CombatModal 应消费 character.combatProjection');
+  log('combat-projection-in-battle-panel', { passed: true });
+}
+
+function smokeContinuousPushCombatUiSync(): void {
+  // AI-24: 战斗同步前端实际实现
+  const actionBtnSource = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
+  // inCombat 检测
+  assert(/inCombat\s*=\s*!.*combatSession.*status\s*===\s*'ongoing'/.test(actionBtnSource) || /status\s*===\s*'ongoing'/.test(actionBtnSource), 'ActionButtons 应检测 combatSession.status === ongoing');
+  // advance 失败后 syncLatestState
+  assert(/syncLatestState/.test(actionBtnSource), 'ActionButtons 应在战斗拦截后调用 syncLatestState');
+  // toast 战斗已接续
+  assert(/战斗已接续/.test(actionBtnSource), 'ActionButtons 应 toast "战斗已接续"');
+  // 战斗时禁用推进
+  assert(/战斗进行中/.test(actionBtnSource), 'ActionButtons 应显示"战斗进行中"按钮文案');
+  // syncLatestState 定义在 ActionButtons 内（本身就是 store 的同步封装）
+  const actionBtnSource2 = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
+  assert(/function\s+syncLatestState|const\s+syncLatestState\s*=/.test(actionBtnSource2), 'ActionButtons 应定义 syncLatestState');
+  log('continuous-push-combat-ui-sync', { passed: true });
+}
+
+function smokeMultiCultivationBonusUiDisplay(): void {
+  // AI-23: 多重修炼 UI 实际展示 (聚合摘要)
+  const cardSource = readFileSync('src/components/xianxia/CultivationSpeedCard.tsx', 'utf-8');
+  assert(/multiplierEffectCount/.test(cardSource), 'CultivationSpeedCard 应计算 multiplierEffectCount');
+  assert(/additiveEffectCount/.test(cardSource), 'CultivationSpeedCard 应计算 additiveEffectCount');
+  // 倍数/加法 badge
+  assert(/data-testid="bonus-summary"/.test(cardSource), 'CultivationSpeedCard 应有 data-testid="bonus-summary"');
+  assert(/倍\s*×/.test(cardSource) && /加\s*\+/.test(cardSource), 'CultivationSpeedCard 应显示倍数与加法徽标');
+  // 源数显示
+  assert(/groupedSources\.length\s*>\s*1/.test(cardSource), 'CultivationSpeedCard 应在多源时显示源数');
+  log('multi-cultivation-bonus-ui-display', { passed: true });
+}
+
+function smokeRealmIdentityUiSeparation(): void {
+  // AI-22: 境界 vs 身份 UI 消费 (StatusPanel)
+  const statusPanel = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
+  assert(/IDENTITY_SECTION_LABELS/.test(statusPanel), 'StatusPanel 应消费 IDENTITY_SECTION_LABELS');
+  assert(/REALM_SECTION_LABELS|isRealmAttribute|isIdentityAttribute/.test(statusPanel), 'StatusPanel 应消费 realm/identity helper');
+  // 独立分组：身份（identity）和境界（realm）
+  assert(/data-section="identity"/.test(statusPanel), 'StatusPanel 身份分组应有 data-section="identity"');
+  assert(/data-section="realm"/.test(statusPanel), 'StatusPanel 境界分组应有 data-section="realm"');
+  // 不应该用 attributeLabel 报错字段（备注：消费 IDENTITY_SECTION_LABELS 即可）
+  log('realm-identity-ui-separation', { passed: true });
 }
 
 function smokeRealmVsIdentitySeparation(): void {

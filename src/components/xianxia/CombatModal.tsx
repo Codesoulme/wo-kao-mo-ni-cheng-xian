@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
+import { COMBAT_PROJECTION_LABELS } from '@/lib/xianxia/display';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -425,6 +426,31 @@ export function CombatModal() {
             </div>
           )}
         </CardHeader>
+
+        {/* AI-26: 战斗投影 6 项（破势/护持/机变/神识/魂魄/体魄） */}
+        {character.combatProjection && (
+          <div className="grid grid-cols-6 gap-1 px-3 py-2 border-b border-destructive/20 bg-background/30 shrink-0" data-testid="combat-projection-grid">
+            {(
+              [
+                ['force', '破势', character.combatProjection.force],
+                ['guard', '护持', character.combatProjection.guard],
+                ['agility', '机变', character.combatProjection.agility],
+                ['spiritualAwareness', '神识', character.combatProjection.spiritualAwareness],
+                ['soulStability', '魂魄', character.combatProjection.soulStability],
+                ['bodyTenacity', '体魄', character.combatProjection.bodyTenacity],
+              ] as Array<[keyof typeof COMBAT_PROJECTION_LABELS, string, number]>
+            ).map(([key, fallback, val]) => (
+              <div key={key} className="flex flex-col items-center gap-0.5 min-w-0">
+                <span className="text-[9px] text-muted-foreground truncate">
+                  {COMBAT_PROJECTION_LABELS[key] || fallback}
+                </span>
+                <span className="text-xs font-bold tabular-nums text-foreground/90">
+                  {val}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <CardContent className="flex-1 min-h-0 overflow-hidden p-3 flex flex-col">
           {session && !battleStarted && !endResult && (
