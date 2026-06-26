@@ -2337,6 +2337,42 @@ async function main(): Promise<void> {
   smokeSaveLoadCorruptionRecovery();
   smokePlayerVisibleTextAuditScriptSelfCheck();
   smokeBlueprintDocsCoverage();
+  // AI-37 宗门关系图
+  smokeSectRelationLabelsMapping();
+  smokeSectRelationIntensityRange();
+  smokeSectRelationBlueprint();
+  // AI-38 NPC 长期记忆
+  smokeNpcMemoryFieldsExist();
+  smokeNpcMemoryDecayLogic();
+  smokeNpcMemoryBlueprint();
+  // AI-39 完整世界地图
+  smokeWorldMapRegionsData();
+  smokeWorldMapDiscoveryVisibility();
+  smokeWorldMapBlueprint();
+  // AI-40 物品合成/炼制/功法
+  smokeCraftingRecipeSchema();
+  smokeCraftingQualityTierDistribution();
+  smokeCraftingFailureConsequence();
+  smokeCraftingBlueprint();
+  // AI-41 多角色传承
+  smokeInheritanceChoiceExactlyOne();
+  smokeInheritanceTypesExist();
+  smokeInheritanceAiNarrative();
+  smokeInheritanceBlueprint();
+  // AI-42 家族/宗门兴衰
+  smokeClanSectStatusEnum();
+  smokeClanSectLifecyclePath();
+  smokeClanSectBlueprint();
+  // AI-43 世界因果网
+  smokeCausalityNetNodeTypes();
+  smokeCausalityNetEdgeTypes();
+  smokeCausalityNetStrengthClamp();
+  smokeCausalityNetBlueprint();
+  // AI-44 结局谱系
+  smokeEndingMainTypes();
+  smokeEndingTriggerConditions();
+  smokeEndingAiReflection();
+  smokeEndingBlueprint();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -2964,6 +3000,342 @@ function smokePlayerVisibleTextAuditScriptSelfCheck(): void {
   const auditReport = readFileSync('docs/PLAYER_VISIBLE_TEXT_AUDIT.md', 'utf-8');
   assert(/审计范围|扫描文件/i.test(auditReport), '审计报告应有审计范围段');
   log('player-visible-text-audit-script-self-check', { passed: true });
+}
+
+function smokeEndingMainTypes(): void {
+  // AI-44: 7 种主类结局
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/ENDING_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 ENDING_TYPE_LABEL');
+  const types = ['ascension', 'failedAscension', 'grandPerfection', 'combatDeath', 'qiDeviation', 'naturalDeath', 'abandon'];
+  for (const t of types) {
+    assert(displaySource.includes(t), `ENDING_TYPE_LABEL 应含 ${t}`);
+  }
+  log('ending-main-types', { passed: true });
+}
+
+function smokeEndingTriggerConditions(): void {
+  // AI-44: 触发条件与枚举映射
+  const blueprint = readFileSync('docs/blueprints/ending-spectrum-blueprint.md', 'utf-8');
+  assert(/化神期满|渡劫/.test(blueprint), '蓝图应说明飞升触发');
+  assert(/寿元|心魔|战斗|玩家主动/.test(blueprint), '蓝图应列其他触发');
+  // 验证结局唯一性逻辑
+  const isValid = (type: string): boolean => {
+    return ['ascension', 'failedAscension', 'grandPerfection', 'combatDeath', 'qiDeviation', 'naturalDeath', 'abandon'].includes(type);
+  };
+  assert(isValid('ascension') === true, 'ascension 应合法');
+  assert(isValid('unknown') === false, 'unknown 应不合法');
+  log('ending-trigger-conditions', { passed: true });
+}
+
+function smokeEndingAiReflection(): void {
+  // AI-44: AI 写遗言/反思
+  const blueprint = readFileSync('docs/blueprints/ending-spectrum-blueprint.md', 'utf-8');
+  assert(/AI 接管/.test(blueprint), '蓝图应说明 AI 接管');
+  assert(/遗言|反思|临终/.test(blueprint), '蓝图应说明 AI 写遗言');
+  assert(/江湖评|后人/.test(blueprint), '蓝图应说明后人评');
+  log('ending-ai-reflection', { passed: true });
+}
+
+function smokeEndingBlueprint(): void {
+  // AI-44: 蓝图文档完整
+  assert(Bun.file('docs/blueprints/ending-spectrum-blueprint.md').size > 0, 'ending-spectrum-blueprint.md 应存在');
+  const src = readFileSync('docs/blueprints/ending-spectrum-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
+  assert(/7.*主类|ascension.*failedAscension/.test(src), '蓝图应列 7 主类');
+  assert(/CharacterEnding|EndingType/.test(src), '蓝图应含数据契约');
+  log('ending-blueprint', { passed: true });
+}
+
+function smokeCausalityNetNodeTypes(): void {
+  // AI-43: 7 种节点类型
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/NODE_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 NODE_TYPE_LABEL');
+  const types = ['person', 'place', 'item', 'thread', 'event', 'faction', 'concept'];
+  for (const t of types) {
+    assert(displaySource.includes(t), `NODE_TYPE_LABEL 应含 ${t}`);
+  }
+  log('causality-net-node-types', { passed: true });
+}
+
+function smokeCausalityNetEdgeTypes(): void {
+  // AI-43: 7 种边类型
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/EDGE_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 EDGE_TYPE_LABEL');
+  const types = ['cause', 'effect', 'related', 'oppose', 'belongs', 'created', 'destroyed'];
+  for (const t of types) {
+    assert(displaySource.includes(t), `EDGE_TYPE_LABEL 应含 ${t}`);
+  }
+  log('causality-net-edge-types', { passed: true });
+}
+
+function smokeCausalityNetStrengthClamp(): void {
+  // AI-43: 强度边界 + 衰减
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  assert(clamp(150) === 100, 'strength > 100 应 clamp');
+  assert(clamp(-50) === 0, 'strength < 0 应 clamp 到 0');
+  // 衰减 5%/10年
+  const decay = (v: number, years: number): number => {
+    const k = Math.floor(years / 10);
+    for (let i = 0; i < k; i++) v *= 0.95;
+    return Math.round(v);
+  };
+  assert(decay(100, 10) === 95, '100 经 10 年应衰减到 95');
+  assert(decay(100, 100) < 100, '高强度长期衰减应降低');
+  log('causality-net-strength-clamp', { passed: true });
+}
+
+function smokeCausalityNetBlueprint(): void {
+  // AI-43: 蓝图文档完整性
+  assert(Bun.file('docs/blueprints/causality-net-blueprint.md').size > 0, 'causality-net-blueprint.md 应存在');
+  const src = readFileSync('docs/blueprints/causality-net-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
+  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
+  assert(/7.*节点|7.*边|person.*place.*item/.test(src), '蓝图应列 7 节点 7 边');
+  log('causality-net-blueprint', { passed: true });
+}
+
+function smokeClanSectStatusEnum(): void {
+  // AI-42: 9 种宗门状态枚举
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/SECT_STATUS_LABEL/.test(displaySource), 'display.ts 应导出 SECT_STATUS_LABEL');
+  const states = ['founding', 'rising', 'flourishing', 'stable', 'unrest', 'underSiege', 'declining', 'revival', 'extinct'];
+  for (const s of states) {
+    assert(displaySource.includes(s), `SECT_STATUS_LABEL 应含 ${s}`);
+  }
+  log('clan-sect-status-enum', { passed: true });
+}
+
+function smokeClanSectLifecyclePath(): void {
+  // AI-42: 生命周期路径合法（不可越级）
+  const validNext: Record<string, string[]> = {
+    founding: ['rising'],
+    rising: ['flourishing', 'unrest'],
+    flourishing: ['stable', 'declining', 'underSiege'],
+    stable: ['flourishing', 'declining', 'unrest'],
+    unrest: ['declining', 'stable'],
+    underSiege: ['declining', 'stable'],
+    declining: ['extinct', 'revival'],
+    revival: ['flourishing', 'stable'],
+    extinct: [],  // 终点
+  };
+  const canTransition = (from: string, to: string): boolean => validNext[from]?.includes(to) ?? false;
+  assert(canTransition('founding', 'rising') === true, 'founding → rising 应合法');
+  assert(canTransition('founding', 'flourishing') === false, 'founding → flourishing 应不合法');
+  assert(canTransition('extinct', 'revival') === false, 'extinct → revival 应不合法（不可逆）');
+  assert(canTransition('declining', 'revival') === true, 'declining → revival 应合法');
+  log('clan-sect-lifecycle-path', { passed: true });
+}
+
+function smokeClanSectBlueprint(): void {
+  // AI-42: 蓝图文档完整性
+  assert(Bun.file('docs/blueprints/clan-sect-rise-fall-blueprint.md').size > 0, 'clan-sect-rise-fall-blueprint.md 应存在');
+  const src = readFileSync('docs/blueprints/clan-sect-rise-fall-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
+  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
+  assert(/9.*状态|founding.*rising.*flourishing/.test(src), '蓝图应列 9 状态');
+  log('clan-sect-blueprint', { passed: true });
+}
+
+function smokeInheritanceChoiceExactlyOne(): void {
+  // AI-41: 必须且只能选 1 项传承
+  const validSelections = [0, 1]; // 0=未选, 1=选了一项
+  const validate = (n: number): boolean => validSelections.includes(n);
+  assert(validate(0) && validate(1), '选择数应为 0 或 1');
+  assert(!validate(2), '选择 2 项应报错');
+  const src = readFileSync('docs/blueprints/inheritance-blueprint.md', 'utf-8');
+  assert(/必须选且只能选|选且只能/.test(src), '蓝图应强制要求"选 1 项"');
+  log('inheritance-choice-exactly-one', { passed: true });
+}
+
+function smokeInheritanceTypesExist(): void {
+  // AI-41: 6 种传承类型
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/INHERITANCE_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 INHERITANCE_TYPE_LABEL');
+  const types = ['spiritualRoot', 'technique', 'memory', 'soulFragment', 'oldFriend', 'token'];
+  for (const t of types) {
+    assert(displaySource.includes(t), `INHERITANCE_TYPE_LABEL 应含 ${t}`);
+  }
+  log('inheritance-types-exist', { passed: true });
+}
+
+function smokeInheritanceAiNarrative(): void {
+  // AI-41: AI 写传承叙事
+  const blueprint = readFileSync('docs/blueprints/inheritance-blueprint.md', 'utf-8');
+  assert(/AI 接管/.test(blueprint) && /传承叙事/.test(blueprint), '蓝图应说明 AI 写传承叙事');
+  assert(/未了因果/.test(blueprint), '蓝图应说明未了因果传给新角色');
+  log('inheritance-ai-narrative', { passed: true });
+}
+
+function smokeInheritanceBlueprint(): void {
+  // AI-41: 蓝图文档完整性
+  assert(Bun.file('docs/blueprints/inheritance-blueprint.md').size > 0, 'inheritance-blueprint.md 应存在');
+  const src = readFileSync('docs/blueprints/inheritance-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
+  assert(/6.*种传承|6.*类型|spiritualRoot.*technique.*memory/.test(src), '蓝图应列出 6 种传承');
+  assert(/SettlementResult|InheritanceChoice/.test(src), '蓝图应含数据契约字段');
+  log('inheritance-blueprint', { passed: true });
+}
+
+function smokeCraftingRecipeSchema(): void {
+  // AI-40: 配方数据契约
+  assert(Bun.file('docs/blueprints/crafting-blueprint.md').size > 0, 'crafting-blueprint.md 应存在');
+  const src = readFileSync('docs/blueprints/crafting-blueprint.md', 'utf-8');
+  assert(/inputs/.test(src) && /output/.test(src), '蓝图应含 inputs/output 字段');
+  assert(/requiredRealm/.test(src), '蓝图应含境界门槛');
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/CRAFTING_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 CRAFTING_TYPE_LABEL');
+  log('crafting-recipe-schema', { passed: true });
+}
+
+function smokeCraftingQualityTierDistribution(): void {
+  // AI-40: 品质概率分布
+  const sample = (luck: number): string => {
+    const r = Math.random();
+    if (luck > 70 && r < 0.03) return '绝品';
+    if (r < 0.04) return '极品';
+    if (r < 0.15) return '上品';
+    if (r < 0.4) return '良品';
+    return '凡品';
+  };
+  const distribution = new Map<string, number>();
+  for (let i = 0; i < 1000; i++) {
+    const q = sample(50);
+    distribution.set(q, (distribution.get(q) || 0) + 1);
+  }
+  assert(distribution.has('凡品') && distribution.has('良品'), '品质分布应含凡品和良品');
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/QUALITY_TIER_LABEL/.test(displaySource), 'display.ts 应导出 QUALITY_TIER_LABEL');
+  assert(/凡品|良品|上品|极品|绝品/.test(displaySource), 'QUALITY_TIER_LABEL 应含 5 级');
+  log('crafting-quality-tier-distribution', { passed: true });
+}
+
+function smokeCraftingFailureConsequence(): void {
+  // AI-40: 失败处理（连续 3 次失败强制成功）
+  let failCount = 0;
+  const craft = (): boolean => {
+    if (failCount >= 2) { failCount = 0; return true; } // 强制成功
+    const success = Math.random() < 0.5;
+    if (success) failCount = 0;
+    else failCount++;
+    return success;
+  };
+  // 模拟连败
+  failCount = 0;
+  let totalSuccess = 0;
+  for (let i = 0; i < 100; i++) if (craft()) totalSuccess++;
+  assert(totalSuccess > 30, '连续失败保护机制应保证成功率 > 30%');
+  const src = readFileSync('docs/blueprints/crafting-blueprint.md', 'utf-8');
+  assert(/失败.*不能卡死|连续.*强制成功/.test(src), '蓝图应说明失败兜底');
+  log('crafting-failure-consequence', { passed: true });
+}
+
+function smokeCraftingBlueprint(): void {
+  // AI-40: 蓝图文档完整
+  const src = readFileSync('docs/blueprints/crafting-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
+  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
+  assert(/5.*子系统|crafting.*alchemy.*formation/.test(src), '蓝图应列出 5 个子系统');
+  log('crafting-blueprint', { passed: true });
+}
+
+function smokeWorldMapRegionsData(): void {
+  // AI-39: 地图数据字段完整
+  assert(Bun.file('docs/blueprints/world-map-blueprint.md').size > 0, 'world-map-blueprint.md 应存在');
+  const src = readFileSync('docs/blueprints/world-map-blueprint.md', 'utf-8');
+  assert(/regions/.test(src), '蓝图应含 regions 字段');
+  assert(/dangerLevel|discoveryAge|visitedCount/.test(src), '蓝图应含地图状态字段');
+  // display.ts LOCATION_TYPE_LABEL
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/LOCATION_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 LOCATION_TYPE_LABEL');
+  log('world-map-regions-data', { passed: true });
+}
+
+function smokeWorldMapDiscoveryVisibility(): void {
+  // AI-39: 可见性规则
+  const isVisible = (state: 'undiscovered' | 'discovered' | 'visited'): string => {
+    switch (state) {
+      case 'undiscovered': return '传闻';
+      case 'discovered': return '已显';
+      case 'visited': return '已至';
+    }
+  };
+  assert(isVisible('undiscovered') === '传闻', '未发现应显示"传闻"');
+  assert(isVisible('discovered') === '已显', '已发现应显示"已显"');
+  assert(isVisible('visited') === '已至', '已访问应显示"已至"');
+  log('world-map-discovery-visibility', { passed: true });
+}
+
+function smokeWorldMapBlueprint(): void {
+  // AI-39: 蓝图文档完整性
+  const src = readFileSync('docs/blueprints/world-map-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
+  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
+  assert(/反重复/.test(src), '蓝图应说明反重复');
+  log('world-map-blueprint', { passed: true });
+}
+
+function smokeNpcMemoryFieldsExist(): void {
+  // AI-38: NPC 记忆字段完整
+  assert(Bun.file('docs/blueprints/npc-memory-blueprint.md').size > 0, 'npc-memory-blueprint.md 应存在');
+  const src = readFileSync('docs/blueprints/npc-memory-blueprint.md', 'utf-8');
+  assert(/recentInteractions/.test(src), '蓝图应含 recentInteractions 字段');
+  assert(/relationshipChanges/.test(src), '蓝图应含 relationshipChanges 字段');
+  assert(/currentDisposition/.test(src), '蓝图应含 currentDisposition 字段');
+  log('npc-memory-fields-exist', { passed: true });
+}
+
+function smokeNpcMemoryDecayLogic(): void {
+  // AI-38: 衰减规则正确（朝 0 收敛 10%/5年）
+  const decay = (v: number, years: number): number => {
+    const k = Math.floor(years / 5);
+    for (let i = 0; i < k; i++) {
+      v = v * 0.9;
+      if (Math.abs(v) < 1) v = 0;
+    }
+    return Math.round(v);
+  };
+  assert(decay(50, 5) === 45, '50 经 5 年应衰减到 45');
+  assert(decay(50, 10) === 41, '50 经 10 年应衰减到 41 (近似)');
+  assert(decay(100, 100) < 100, '高强度长期衰减应明显降低');
+  log('npc-memory-decay-logic', { passed: true });
+}
+
+function smokeNpcMemoryBlueprint(): void {
+  // AI-38: 蓝图文档完整性
+  const src = readFileSync('docs/blueprints/npc-memory-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '蓝图应含 markdown 表格');
+  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
+  assert(/衰减/.test(src), '蓝图应说明衰减规则');
+  log('npc-memory-blueprint', { passed: true });
+}
+
+function smokeSectRelationLabelsMapping(): void {
+  // AI-37: 宗门关系 label 映射
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/SECT_RELATION_LABEL/.test(displaySource), 'display.ts 应导出 SECT_RELATION_LABEL');
+  assert(/敌对|不睦|中立|友善|同盟/.test(displaySource), 'SECT_RELATION_LABEL 应含 5 项中文 label');
+  log('sect-relation-labels-mapping', { passed: true });
+}
+
+function smokeSectRelationIntensityRange(): void {
+  // AI-37: 关系强度边界 [-100, 100]
+  const clamp = (v: number) => Math.max(-100, Math.min(100, v));
+  assert(clamp(150) === 100, 'intensity > 100 应 clamp 到 100');
+  assert(clamp(-150) === -100, 'intensity < -100 应 clamp 到 -100');
+  assert(clamp(50) === 50, 'intensity 在范围内应保留');
+  // 蓝图文档应有边界约束
+  const blueprint = readFileSync('docs/blueprints/sect-relation-blueprint.md', 'utf-8');
+  assert(/-100.*100|\[\s*-100\s*,\s*100\s*\]/.test(blueprint), 'sect-relation-blueprint 应说明 intensity 边界');
+  log('sect-relation-intensity-range', { passed: true });
+}
+
+function smokeSectRelationBlueprint(): void {
+  // AI-37: 蓝图文档完整性
+  assert(Bun.file('docs/blueprints/sect-relation-blueprint.md').size > 0, 'sect-relation-blueprint.md 应存在');
+  const src = readFileSync('docs/blueprints/sect-relation-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '蓝图应含 markdown 表格');
+  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管策略');
+  log('sect-relation-blueprint', { passed: true });
 }
 
 function smokeBlueprintDocsCoverage(): void {

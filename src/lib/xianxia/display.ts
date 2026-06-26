@@ -113,6 +113,94 @@ export function sanitizeClueText(text: string): string {
 // AI-21: 境界 vs 身份 分离
 // 境界（realm）：修为层/法力/练气/筑基/金丹…= 实力台阶
 // 身份（identity）：宗门/师承/所在/称号/阵营 = 角色在世界里"是谁"
+export const SECT_RELATION_LABEL = {
+  hostile: '敌对',
+  unfriendly: '不睦',
+  neutral: '中立',
+  friendly: '友善',
+  allied: '同盟',
+} as const;
+
+export const LOCATION_TYPE_LABEL = {
+  mountain: '山脉',
+  river: '河流',
+  forest: '森林',
+  desert: '荒漠',
+  sea: '海洋',
+  city: '城邦',
+  sectBase: '宗门山门',
+  secretRealm: '秘境',
+  ancientBattlefield: '古战场',
+  mortalLand: '凡间',
+} as const;
+
+export const CRAFTING_TYPE_LABEL = {
+  crafting: '合成',
+  alchemy: '炼丹',
+  formation: '布阵',
+  techniqueLearning: '习法',
+  artifactForging: '炼器',
+} as const;
+
+export const QUALITY_TIER_LABEL = {
+  common: '凡品',
+  fine: '良品',
+  superior: '上品',
+  supreme: '极品',
+  legendary: '绝品',
+} as const;
+
+export const INHERITANCE_TYPE_LABEL = {
+  spiritualRoot: '灵根所遗',
+  technique: '功法所继',
+  memory: '一缕前缘',
+  soulFragment: '神识之遗',
+  oldFriend: '故人之谊',
+  token: '信物所托',
+} as const;
+
+export const SECT_STATUS_LABEL = {
+  founding: '初创',
+  rising: '兴起',
+  flourishing: '鼎盛',
+  stable: '守成',
+  unrest: '内忧',
+  underSiege: '外患',
+  declining: '衰败',
+  revival: '复兴',
+  extinct: '灭门',
+} as const;
+
+export const NODE_TYPE_LABEL = {
+  person: '人物',
+  place: '地点',
+  item: '物品',
+  thread: '线索',
+  event: '事件',
+  faction: '势力',
+  concept: '概念',
+} as const;
+
+export const EDGE_TYPE_LABEL = {
+  cause: '因',
+  effect: '果',
+  related: '相关',
+  oppose: '对立',
+  belongs: '所属',
+  created: '创造',
+  destroyed: '破坏',
+} as const;
+
+export const ENDING_TYPE_LABEL = {
+  ascension: '飞升',
+  failedAscension: '飞升失败',
+  grandPerfection: '圆满',
+  combatDeath: '战死',
+  qiDeviation: '走火入魔',
+  naturalDeath: '老死',
+  abandon: '放弃',
+} as const;
+
 export const REALM_SECTION_LABELS = {
   realm: '境界',
   realmLevel: '境界层数',
