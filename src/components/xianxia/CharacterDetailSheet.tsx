@@ -3,11 +3,12 @@
 import { CharacterState, useGameStore } from '@/lib/xianxia/store';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Heart, Sparkles, Sword, Shield, Zap, Clover, Brain, Coins, Star, MapPin, Users, GraduationCap, Flame, Info } from 'lucide-react';
+import { Heart, Sparkles, Sword, Shield, Zap, Clover, Brain, Coins, Star, MapPin, Users, GraduationCap, Flame, Info, ChevronDown } from 'lucide-react';
 import { REALMS, ELEMENTS, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
 import { filterMeaningfulStatuses, isConstitutionStatus } from '@/lib/xianxia/engine';
 import { characterDisplayEntries, entriesForSlot, type DisplayEntry } from '@/lib/xianxia/display-registry';
-import { useState } from 'react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { COMBAT_PROJECTION_LABELS } from '@/lib/xianxia/display';
 
 interface CharacterDetailSheetProps {
   open: boolean;
@@ -36,6 +37,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
     .filter((entry) => entry.kind !== 'status' || !constitutionStatuses.some((status: any) => status.id === entry.raw?.id || status.name === entry.raw?.name))
     .slice(0, 8);
   const [selectedAttr, setSelectedAttr] = useState<AttributeInfo | null>(null);
+  const [combatOpen, setCombatOpen] = useState(false);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -226,6 +228,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
               <StatCard icon={<Flame className="w-3 h-3" />} label="心魔" value={(current as any).heartDemon ?? 0} color={(current as any).heartDemon >= 60 ? '#dc2626' : (current as any).heartDemon >= 30 ? '#d97706' : '#65a30d'} info={ATTRIBUTE_INFO.heartDemon} onClick={setSelectedAttr} />
               <StatCard icon={<Users className="w-3 h-3" />} label="阵营" value={current.faction || '散修'} color="#6b7280" isText info={ATTRIBUTE_INFO.faction} onClick={setSelectedAttr} />
             </div>
+            <CombatProjectionCollapsible projection={(current as any).combatProjection} open={combatOpen} onOpenChange={setCombatOpen} />
           </section>
 
           {/* === 社交背景 === */}
@@ -462,5 +465,77 @@ function AttributeInfoDialog({ info, onOpenChange }: { info: AttributeInfo | nul
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface CombatProjectionCollapsibleProps {
+  projection?: {
+    force: number;
+    guard: number;
+    agility: number;
+    spiritualAwareness: number;
+    soulStability: number;
+    bodyTenacity: number;
+    summary?: string;
+    advantages?: string[];
+    vulnerabilities?: string[];
+  } | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function CombatProjectionCollapsible({ projection, open, onOpenChange }: CombatProjectionCollapsibleProps) {
+  if (!projection) return null;
+  const items = [
+    { key: 'force', value: projection.force, label: COMBAT_PROJECTION_LABELS.force, icon: <Sword className="w-3 h-3" />, color: '#c8453c' },
+    { key: 'guard', value: projection.guard, label: COMBAT_PROJECTION_LABELS.guard, icon: <Shield className="w-3 h-3" />, color: '#2e5c8a' },
+    { key: 'agility', value: projection.agility, label: COMBAT_PROJECTION_LABELS.agility, icon: <Zap className="w-3 h-3" />, color: '#d4af37' },
+    { key: 'spiritualAwareness', value: projection.spiritualAwareness, label: COMBAT_PROJECTION_LABELS.spiritualAwareness, icon: <Brain className="w-3 h-3" />, color: '#7c3aed' },
+    { key: 'soulStability', value: projection.soulStability, label: COMBAT_PROJECTION_LABELS.soulStability, icon: <Sparkles className="w-3 h-3" />, color: '#9333ea' },
+    { key: 'bodyTenacity', value: projection.bodyTenacity, label: COMBAT_PROJECTION_LABELS.bodyTenacity, icon: <Shield className="w-3 h-3" />, color: '#0f766e' },
+  ];
+  return (
+    <Collapsible open={open} onOpenChange={onOpenChange}>
+      <CollapsibleTrigger asChild>
+        <button type="button" className="w-full mt-2 flex items-center justify-between rounded-md border border-border/60 bg-card/40 px-2 py-1.5 text-xs text-muted-foreground hover:bg-primary/5 transition">
+          <span className="flex items-center gap-1.5">
+            <Sword className="w-3 h-3 text-primary/70" />
+            <span className="font-serif-cn">显化之相</span>
+            <span className="text-[10px] opacity-60">破势/护持/机变/神识/魂魄/体魄</span>
+          </span>
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-2 grid grid-cols-2 gap-2 rounded-md border border-border/60 bg-card/40 p-2">
+          {items.map((item) => (
+            <div key={item.key} className="flex items-center gap-2 rounded-md border border-border/40 bg-background/60 p-1.5">
+              <span style={{ color: item.color }}>{item.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] text-muted-foreground truncate">{item.label}</div>
+                <div className="text-sm font-semibold font-serif-cn truncate" style={{ color: item.color }}>{item.value.toLocaleString()}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        {projection.summary && <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed">{projection.summary}</p>}
+        {(projection.advantages && projection.advantages.length > 0) && (
+          <div className="mt-2">
+            <div className="text-[10px] text-muted-foreground mb-1">优势</div>
+            <div className="flex flex-wrap gap-1">
+              {projection.advantages.map((a, i) => <span key={i} className="text-[10px] rounded bg-primary/10 text-primary px-1.5 py-0.5">{a}</span>)}
+            </div>
+          </div>
+        )}
+        {(projection.vulnerabilities && projection.vulnerabilities.length > 0) && (
+          <div className="mt-2">
+            <div className="text-[10px] text-muted-foreground mb-1">隐忧</div>
+            <div className="flex flex-wrap gap-1">
+              {projection.vulnerabilities.map((v, i) => <span key={i} className="text-[10px] rounded bg-destructive/10 text-destructive px-1.5 py-0.5">{v}</span>)}
+            </div>
+          </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

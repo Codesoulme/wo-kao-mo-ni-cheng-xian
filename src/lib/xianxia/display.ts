@@ -1,3 +1,76 @@
+export const COMBAT_PROJECTION_LABELS = {
+  force: '破势',
+  guard: '护持',
+  agility: '机变',
+  spiritualAwareness: '神识',
+  soulStability: '魂魄',
+  bodyTenacity: '体魄',
+} as const;
+
+export const LOADING_LABELS = {
+  advanceTitle: '灵机牵引中…',
+  advanceButton: '灵机牵引中…',
+  preload: '天机未明…',
+  reset: '缘法重定中…',
+  choose: '命数斟酌中…',
+  combat: '战局推演中…',
+  interfere: '因果介入中…',
+  market: '坊市翻动中…',
+  formation: '阵势排布中…',
+  pet: '灵契感应中…',
+  start: '仙缘初启…',
+  aiConfigTest: '通灵测试中…',
+  default: '灵机牵引中…',
+} as const;
+
+export function loadingLabelFor(kind: keyof typeof LOADING_LABELS = 'default'): string {
+  return LOADING_LABELS[kind] || LOADING_LABELS.default;
+}
+
+// 战利品名称清洗：去掉"敌人XX"归因（山匪头目的储物袋、王铁匠的铁锤等），改为通用名
+const LOOT_NAME_DROP: Array<[RegExp, string]> = [
+  // "XX的" + 名词：去掉"XX的"前缀（XX = 任意非引号字符 1-8）
+  [/[一-鿿A-Za-z0-9]{1,8}的(储物袋|包袱|法器|法宝|丹炉|飞剑|剑|刀|锤|弓|法杖|内丹|兽皮|骨骸|骨|爪|牙|鳞|心核|心|玉简|法盘|药瓶|丹药|丹丸)/g, '$1'],
+  // "XX遗留的/留下的/用过的/留下的/留下的" + 名词
+  [/[一-鿿A-Za-z0-9]{1,8}(遗留|留下|剩下|用剩|随身携带|持有|曾用)(的|着)?(储物袋|包袱|法器|法宝|丹炉|飞剑|剑|刀|锤|弓|法杖|内丹|兽皮|骨骸|骨|爪|牙|鳞|心核|心|玉简|法盘|药瓶|丹药|丹丸)/g, '$3'],
+  // "从XX处/上夺得/取得" 这类前缀直接删
+  [/从[一-鿿A-Za-z0-9]{1,8}(处|上|手中|身上|身上)夺取?/g, ''],
+  // 单独"XX遗留物""XX遗物"
+  [/[一-鿿A-Za-z0-9]{1,8}的(遗物|遗留物|遗蜕|遗骸|残骸|尸首|尸体)/g, '残骸'],
+];
+
+export function sanitizeLootName(name: string): string {
+  if (!name) return name;
+  let result = name;
+  for (const [pattern, replacement] of LOOT_NAME_DROP) {
+    result = result.replace(pattern, replacement);
+  }
+  // 去掉开头多余"的一/之"
+  result = result.replace(/^的一|^之/, '');
+  // 兜底：如果包含"的"且后面是物品，且前半段 <= 4 个字，截断到"的"后
+  return result;
+}
+
+// 突破过程文案清洗：把"破境/突破"等终局标签从过程叙事（冲关/临门/准备）中移除
+const BREAKTHROUGH_HIDE_PATTERNS: Array<[RegExp, string]> = [
+  // "破境/突破" + 修饰词（接近终局/未达终局）整段替换为"修行/冲关"
+  [/破\s*境\s*[之的]?\s*[瞬|时|刻|间|瞬息|刹那]?/g, '修行'],
+  [/突\s*破\s*[之的]?\s*[瞬|时|刻|间|瞬息|刹那]?/g, '修行'],
+  // 标题前缀"破境·" / "突破·" 改为"修行·"
+  [/^[【\[]?\s*破\s*境\s*[·:：\-]\s*/gm, '修行·'],
+  [/^[【\[]?\s*突\s*破\s*[·:：\-]\s*/gm, '修行·'],
+];
+
+export function sanitizeBreakthroughProcessText(text: string, isFinalBreakthrough: boolean = false): string {
+  // 最终突破叙事保留"破境/突破"标签
+  if (isFinalBreakthrough || !text) return text;
+  let result = text;
+  for (const [pattern, replacement] of BREAKTHROUGH_HIDE_PATTERNS) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
 export const ATTRIBUTE_LABEL: Record<string, string> = {
   age: '年龄',
   lifespan: '寿元',

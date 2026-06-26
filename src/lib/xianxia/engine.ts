@@ -18,6 +18,7 @@ import {
   REALMS,
   REALM_TRAITS,
   getRealmInfo,
+  CombatProjectionTraits,
   getNextRealm,
   SpiritualRoot,
   SPIRITUAL_ROOTS,
@@ -70,6 +71,7 @@ import {
   PetBondAIOutcome,
   PetCareAIOutcome,
 } from './types';
+import { COMBAT_PROJECTION_LABELS, sanitizeLootName } from './display';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
 import { inferAttributeChangesFromNarrative } from './narrative-inference';
@@ -407,10 +409,10 @@ export function deriveCombatProjection(state: CharacterState) {
     spiritualAwareness: core.spiritualSense,
     soulStability: core.soulStrength,
     bodyTenacity: core.physicalFoundation,
-    forceLabel: '\u7834\u52bf',
-    guardLabel: '\u62a4\u6301',
-    agilityLabel: '\u673a\u53d8',
-    summary: `${realmTraits.combatStyle?.[0] || '\u5faa\u52bf\u6597\u6cd5'}\uff1a\u7834\u52bf${force}\u3001\u62a4\u6301${guard}\u3001\u673a\u53d8${agility}`,
+    forceLabel: COMBAT_PROJECTION_LABELS.force,
+    guardLabel: COMBAT_PROJECTION_LABELS.guard,
+    agilityLabel: COMBAT_PROJECTION_LABELS.agility,
+    summary: `${realmTraits.combatStyle?.[0] || '循势斗法'}：${COMBAT_PROJECTION_LABELS.force}${force}、${COMBAT_PROJECTION_LABELS.guard}${guard}、${COMBAT_PROJECTION_LABELS.agility}${agility}`,
     advantages,
     vulnerabilities,
   };
@@ -1371,7 +1373,7 @@ export function buildCombatVictorySpoils(state: CharacterState, session: CombatS
 
   const seen = new Set<string>();
   const deduped = allItems.filter(item => {
-    item.name = stripLootOwnerPrefix(item.name);
+    item.name = sanitizeLootName(stripLootOwnerPrefix(item.name));
     const key = `${item.name}|${item.item_type}|${item.rarity}`;
     if (seen.has(key)) return false;
     seen.add(key);

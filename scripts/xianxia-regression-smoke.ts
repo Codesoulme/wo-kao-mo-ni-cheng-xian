@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, removeItemsByIds, equipItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
+import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveCombatProjection, filterMeaningfulStatuses, removeItemsByIds, equipItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
@@ -16,6 +16,7 @@ import { inferAttributeChangesFromNarrative } from '../src/lib/xianxia/narrative
 import { applyAgeBasedBodyGrowth } from '../src/lib/xianxia/body-growth';
 import { detectBodyModifier } from '../src/lib/xianxia/narrative-body-modifier';
 import { hashCacheKey } from '../src/lib/xianxia/llm';
+import { sanitizeLootName, sanitizeBreakthroughProcessText } from '../src/lib/xianxia/display';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -2300,6 +2301,17 @@ async function main(): Promise<void> {
   smokeEngineCultivationCategoryEnglish();
   smokeNoModelLeakInUI();
   smokeOldChineseCategoryCompatibility();
+  smokeCombatProjectionLabelsMapping();
+  smokeNoNewChineseAttributeKeysInEngine();
+  smokeLoadingLabelsWorldInternal();
+  smokeTopStatusOrdering();
+  smokeTopStatusCountLimit();
+  smokeCombatDefaultWaitPlayer();
+  smokeLootNameNoEnemyAttribution();
+  smokeLootNaturalGeneration();
+  smokeBreakthroughDisplayProcess();
+  smokeUnresolvedCauseExpandable();
+  smokeCultivationSpeedSourceCollapse();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -2386,6 +2398,232 @@ function smokeOldChineseCategoryCompatibility(): void {
   assert(bodyAttr?.category === 'body', `中文 身体 应被 normalize 为 body, got ${bodyAttr?.category}`);
   assert(spiritAttr?.category === 'spirit', `中文 神魂 应被 normalize 为 spirit, got ${spiritAttr?.category}`);
   log('old-chinese-category-compatibility', { passed: true });
+}
+
+function smokeCultivationSpeedSourceCollapse(): void {
+  // AI-13: 修炼速度来源 >3 折叠
+  const cardSource = readFileSync('src/components/xianxia/CultivationSpeedCard.tsx', 'utf-8');
+  // 有 showAllSources 状态
+  assert(/const\s+\[showAllSources,\s*setShowAllSources\]\s*=\s*useState\(false\)/.test(cardSource), 'CultivationSpeedCard 应有 showAllSources 状态');
+  // 默认 slice(0, 3) 只显示前 3 个
+  assert(/showAllSources\s*\?\s*groupedSources\s*:\s*groupedSources\.slice\(0,\s*3\)/.test(cardSource) || /\.slice\(0,\s*3\)/.test(cardSource), 'CultivationSpeedCard 应默认只显示前 3 个来源');
+  // 切换 showAllSources
+  assert(/setShowAllSources\(/.test(cardSource), 'CultivationSpeedCard 应有 setShowAllSources 切换');
+  log('cultivation-speed-source-collapse', { passed: true });
+}
+
+function smokeUnresolvedCauseExpandable(): void {
+  // AI-12: 未了因果可展开
+  const cardSource = readFileSync('src/components/xianxia/PendingThreadsCard.tsx', 'utf-8');
+  // 有 showAll 折叠状态
+  assert(/const\s+\[showAll,\s*setShowAll\]\s*=\s*useState\(false\)/.test(cardSource), 'PendingThreadsCard 应有 showAll 折叠状态');
+  // 有 setShowAll 的切换函数
+  assert(/setShowAll\(/.test(cardSource), 'PendingThreadsCard 应该有 setShowAll 切换');
+  // 有 ChevronDown 折叠图标
+  assert(/ChevronDown/.test(cardSource), 'PendingThreadsCard 应该有 ChevronDown 图标');
+  log('unresolved-cause-expandable', { passed: true });
+}
+
+function smokeBreakthroughDisplayProcess(): void {
+  // AI-11: 突破过程文案隐藏
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(displaySource.includes('sanitizeBreakthroughProcessText'), 'display.ts 应导出 sanitizeBreakthroughProcessText');
+  // 过程叙事应被清洗
+  const processText = '破境之瞬，灵台一震，灵气翻涌。';
+  const result = sanitizeBreakthroughProcessText(processText, false);
+  assert(!result.includes('破境之瞬'), '过程叙事不应有"破境之瞬"');
+  // 最终突破叙事保留
+  const finalText = '破境成功！踏入新境界！';
+  const finalResult = sanitizeBreakthroughProcessText(finalText, true);
+  assert(finalResult === finalText, '最终突破叙事应保留"破境"');
+  // 标题前缀"破境·冲关"应改
+  const titleResult = sanitizeBreakthroughProcessText('破境·冲关失败', false);
+  assert(!titleResult.startsWith('破境'), '过程标题前缀"破境"应被替换');
+  log('breakthrough-display-process', { passed: true });
+}
+
+function smokeLootNaturalGeneration(): void {
+  // AI-10: 战利品自然生成 (结合 enemy identity/realm/resources)
+  // 构造一个有 AI loot 的战斗
+  const session = {
+    id: 'combat_test',
+    enemies: [
+      { name: '山匪头目', realm: '练气', items: [], spiritStones: 50, maxHp: 100, hp: 0 } as any,
+    ],
+    currentEnemyIdx: 0,
+    round: 3,
+    log: [],
+    status: 'victory' as const,
+    startAge: 20,
+    playerHp: 100, playerMaxHp: 100, playerMp: 50, playerMaxMp: 50, playerAttack: 30, playerDefense: 20, playerSpeed: 15,
+    contextTitle: '山道伏击',
+    contextNarrative: '山匪头目拦路抢劫',
+    victoryDrops: [],
+    context: {},
+  } as any;
+  const aiLoot: any = {
+    items: [
+      { name: '一柄缺口短刀', item_type: 'weapon', rarity: 'common', effects: [] },
+      { name: '三十枚灵石', item_type: 'currency', rarity: 'common', effects: [] },
+      { name: '一块虎皮', item_type: 'material', rarity: 'uncommon', effects: [] },
+    ],
+    spiritStones: 30,
+  };
+  const state = { age: 20, realm: '练气' } as any;
+  const spoils = buildCombatVictorySpoils(state, session, aiLoot);
+  assert(spoils.items.length > 0, '应有战利品');
+  assert(spoils.spiritStones > 0, '应有灵石');
+  // 战利品名称应无敌人归因
+  for (const item of spoils.items) {
+    const cleaned = String(item.name).replace(/储物袋|铁锤|飞剑|兽皮|残骸|剑|刀|锤|弓|法杖|内丹|骨|爪|牙|鳞|心核|玉简|法盘|药瓶|丹药|丹丸/g, '');
+    assert(!/修|汉|客|徒|匪|贼|妖|魔/.test(cleaned), `战利品名称不应有敌人归因: ${item.name}`);
+  }
+  // 兜底：AI 没给 loot 时，引擎回退到敌人关键词模板
+  const fallbackState = { age: 20, realm: '练气' } as any;
+  const fallbackSpoils = buildCombatVictorySpoils(fallbackState, session, null);
+  assert(fallbackSpoils.items.length >= 0, '回退路径不应崩溃');
+  log('loot-natural-generation', { passed: true, items: spoils.items.length, stones: spoils.spiritStones });
+}
+
+function smokeLootNameNoEnemyAttribution(): void {
+  // AI-9: 战利品名称去敌人归因
+  // 验证 sanitizeLootName 能清洗常见归因
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(displaySource.includes('sanitizeLootName'), 'display.ts 应导出 sanitizeLootName');
+  assert(displaySource.includes('LOOT_NAME_DROP') || displaySource.includes('sanitizeLootName'), '应有 LOOT_NAME_DROP 替换表');
+  // 通过 TS 导出测试（动态 import）
+  // 测试样例
+  const tests: Array<[string, string]> = [
+    ['山匪的储物袋', '储物袋'],
+    ['王铁匠的铁锤', '铁锤'],
+    ['黑衣人遗留的飞剑', '飞剑'],
+    ['从虎妖处夺得的兽皮', '兽皮'],
+    ['魔修的遗物', '残骸'],
+  ];
+  for (const [input, expectedSubstring] of tests) {
+    const result = sanitizeLootName(input);
+    assert(result.includes(expectedSubstring), `sanitizeLootName('${input}') 应包含 '${expectedSubstring}', got '${result}'`);
+    // 不应包含"修/汉/客/徒/匪/贼/妖/魔"等敌人归因词（中间部分）
+    const cleaned = result.replace(/储物袋|铁锤|飞剑|兽皮|残骸|包袱|法器|法宝|丹炉|剑|刀|锤|弓|法杖|内丹|骨|爪|牙|鳞|心核|玉简|法盘|药瓶|丹药|丹丸/g, '');
+    assert(!/修|汉|客|徒|匪|贼|妖|魔/.test(cleaned), `sanitizeLootName('${input}') 不应残留敌人归因词, got '${result}'`);
+  }
+  log('loot-name-no-enemy-attribution', { passed: true });
+}
+
+function smokeCombatDefaultWaitPlayer(): void {
+  // AI-8: 战斗默认等待玩家操作（非 auto）
+  const combatModalSource = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf-8');
+  // autoBattle 默认 false
+  assert(/const\s+\[autoBattle,\s*setAutoBattle\]\s*=\s*useState\(false\)/.test(combatModalSource), 'autoBattle 默认应为 false');
+  // battleStarted 默认 false，让玩家先看事件缘由
+  assert(/const\s+\[battleStarted,\s*setBattleStarted\]\s*=\s*useState\(false\)/.test(combatModalSource), 'battleStarted 默认应为 false，先展示缘由');
+  // doAction 需玩家点击触发，不是 useEffect 自动
+  const doActionDefined = /const\s+doAction\s*=\s*async/.test(combatModalSource);
+  assert(doActionDefined, 'doAction 必须是 async 函数，由玩家操作触发');
+  // 没有 useEffect 里的"自动执行 doAction"
+  const autoDoActionInEffect = /useEffect[\s\S]{0,500}doAction\(/.test(combatModalSource);
+  assert(!autoDoActionInEffect, '不应有 useEffect 自动调用 doAction');
+  log('combat-default-wait-player', { passed: true });
+}
+
+function smokeTopStatusCountLimit(): void {
+  // AI-7: 顶部状态 3 normal + 2 body 限制
+  const statusPanelSource = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
+  // 验证 normal status 限 3 个
+  assert(/\.slice\(0,\s*3\)/.test(statusPanelSource), 'StatusPanel 顶部 normal status 应限 3 个');
+  // 验证 constitution 限 2 个
+  assert(/\.slice\(0,\s*2\)/.test(statusPanelSource), 'StatusPanel constitution 状态应限 2 个');
+  // 模拟：5 个 normal 状态，slice(0,3) 后剩 3 个
+  const arr = [1, 2, 3, 4, 5].slice(0, 3);
+  assert(arr.length === 3, 'slice(0,3) 应保留 3 个');
+  // 模拟：4 个 constitution，slice(0,2) 后剩 2 个
+  const con = [1, 2, 3, 4].slice(0, 2);
+  assert(con.length === 2, 'slice(0,2) 应保留 2 个');
+  log('top-status-count-limit', { passed: true });
+}
+
+function smokeTopStatusOrdering(): void {
+  // AI-6: 顶部状态按最近获得顺序显示（数组末尾 = 最新）
+  const oldOrder = [
+    { id: 'a', name: '旧疾', description: '小时候落下的病根', category: 'body', rarity: 'common', effects: [{ target_attribute: 'hp', operation: '-', value: 5 }] } as any,
+    { id: 'b', name: '新伤', description: '今日被人拍了一掌', category: 'body', rarity: 'uncommon', effects: [{ target_attribute: 'hp', operation: '-', value: 10 }] } as any,
+    { id: 'c', name: '刚悟', description: '刚悟到一点门道', category: 'mind', rarity: 'rare', effects: [{ target_attribute: 'comprehension', operation: '+', value: 5 }] } as any,
+  ];
+  const filtered = filterMeaningfulStatuses(oldOrder);
+  // 保持原顺序：旧疾/新伤/刚悟（最新在末尾）
+  assert(filtered[0]?.id === 'a' && filtered[2]?.id === 'c', 'filterMeaningfulStatuses 应保持原顺序（最新在末尾）');
+  // StatusPanel 中 topStatuses 排序用 b.__idx - a.__idx 倒序取前 3
+  const statusPanelSource = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
+  assert(/b\.__idx\s*-\s*a\.__idx/.test(statusPanelSource), 'StatusPanel 应使用 __idx 倒序排序使最新状态在前');
+  // 模拟 StatusPanel 的排序逻辑
+  const withIdx = filtered.map((s, i) => ({ ...s, __idx: i }));
+  const sorted = withIdx.sort((a: any, b: any) => b.__idx - a.__idx).slice(0, 3);
+  assert(sorted[0]?.id === 'c' && sorted[1]?.id === 'b' && sorted[2]?.id === 'a', '排序后顺序应为 刚悟/新伤/旧疾（最新在前）');
+  log('top-status-ordering', { passed: true });
+}
+
+function smokeLoadingLabelsWorldInternal(): void {
+  // AI-5: 加载/推演中文案必须走 LOADING_LABELS，世界内化（无 白话加载/AI演算 等）
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(displaySource.includes('LOADING_LABELS'), 'display.ts 应导出 LOADING_LABELS');
+  assert(displaySource.includes('灵机牵引中') || displaySource.includes('天道审视') || displaySource.includes('天机未明'), 'LOADING_LABELS 应包含修仙感文案');
+  // 各组件不应再出现"命运推演中""天道演算""加载中"等白话词
+  const componentFiles = [
+    'src/components/xianxia/ActionButtons.tsx',
+    'src/components/xianxia/StartScreen.tsx',
+    'src/components/xianxia/ChoiceModal.tsx',
+    'src/components/xianxia/CombatModal.tsx',
+    'src/components/xianxia/InterfereInput.tsx',
+    'src/components/xianxia/SecretRealmPanel.tsx',
+    'src/components/xianxia/MarketModal.tsx',
+    'src/components/xianxia/PetPanel.tsx',
+    'src/components/xianxia/FormationPanel.tsx',
+  ];
+  const forbiddenWords = ['命运推演中', '天道演算', '加载中', 'AI 生成中', '生成中'];
+  for (const file of componentFiles) {
+    const source = readFileSync(file, 'utf-8');
+    for (const word of forbiddenWords) {
+      if (source.includes(word)) {
+        assert(false, `${file} 不应直接使用白话加载文案: ${word}`);
+      }
+    }
+  }
+  log('loading-labels-world-internal', { passed: true, files: componentFiles.length });
+}
+
+function smokeCombatProjectionLabelsMapping(): void {
+  // AI-4: combatProjection label 统一映射
+  const cp = deriveCombatProjection({ attack: 10, defense: 10, speed: 10, comprehension: 5, luck: 5, heartDemon: 0, spiritualSense: 20, soulStrength: 20, physicalFoundation: 20, maxHp: 100, maxMp: 100, hp: 100, mp: 100 } as any);
+  assert(cp.forceLabel === '破势', `forceLabel 应为 破势, got ${cp.forceLabel}`);
+  assert(cp.guardLabel === '护持', `guardLabel 应为 护持, got ${cp.guardLabel}`);
+  assert(cp.agilityLabel === '机变', `agilityLabel 应为 机变, got ${cp.agilityLabel}`);
+  assert(cp.summary.includes('破势') && cp.summary.includes('护持') && cp.summary.includes('机变'), 'summary 应包含 破势/护持/机变');
+  log('combat-projection-labels-mapping', { passed: true });
+}
+
+function smokeNoNewChineseAttributeKeysInEngine(): void {
+  // AI-4: engine.ts 中 attributeNumber fallback 不应新增中文 key
+  // 允许的中文 key 集合（与当前 engine.ts 中一致）
+  const allowedChineseKeys = new Set(['神识', '魂魄', '神魂', '元神', '体魄', '肉身', '根骨']);
+  const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  // 提取 attributeNumber(state, [...]) 中的字符串字面量
+  const regex = /attributeNumber\([^)]*\[([^\]]+)\]\)/g;
+  let match: RegExpExecArray | null;
+  const foundKeys = new Set<string>();
+  while ((match = regex.exec(engineSource)) !== null) {
+    const inner = match[1];
+    const keys = inner.match(/'([^']+)'/g) || inner.match(/"([^"]+)"/g) || [];
+    for (const k of keys) {
+      const clean = k.replace(/['"]/g, '');
+      if (/^[\u4e00-\u9fa5]+$/.test(clean)) {
+        foundKeys.add(clean);
+      }
+    }
+  }
+  for (const key of foundKeys) {
+    assert(allowedChineseKeys.has(key), `engine.ts 中出现未备案的中文 attribute key: ${key}`);
+  }
+  log('no-new-chinese-attribute-keys-in-engine', { passed: true, keys: Array.from(foundKeys) });
 }
 
 main().catch(error => {

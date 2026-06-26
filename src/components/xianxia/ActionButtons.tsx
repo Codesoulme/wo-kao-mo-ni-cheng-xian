@@ -11,6 +11,7 @@ import { REALMS } from '@/lib/xianxia/types';
 import type { CharacterState, GameEvent } from '@/lib/xianxia/store';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
+import { LOADING_LABELS } from '@/lib/xianxia/display';
 
 function latestActionProjections(events: GameEvent[]) {
   const latest = events[events.length - 1];
@@ -234,7 +235,7 @@ export function ActionButtons() {
               const placeholderEvent: any = {
                 id: placeholderId,
                 age: newAge,  // 用新年龄（当前年龄 + 岁数增量），避免 isContinuation 误判
-                title: '命运推演中…',
+                title: LOADING_LABELS.advanceTitle,
                 narrative: '',
                 eventType: 'normal',
                 effects: [],
@@ -528,7 +529,7 @@ export function ActionButtons() {
           )}
         >
           {loading && !isAutoRunning ? (
-            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />天道演算...</>
+            <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{LOADING_LABELS.advanceButton}</>
           ) : isAutoRunning ? (
             <><Loader2 className="w-4 h-4 mr-2 animate-spin" />连推中 {autoCount}/{autoTotal}</>
           ) : isDead ? (
