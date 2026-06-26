@@ -70,6 +70,8 @@ import {
   CombatLootAIOutcome,
   PetBondAIOutcome,
   PetCareAIOutcome,
+  // AI-67
+  HeartDemonType,
 } from './types';
 import { COMBAT_PROJECTION_LABELS, sanitizeLootName } from './display';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
@@ -5782,6 +5784,88 @@ export function startExploration(state: CharacterState, realm: SecretRealm): Cha
   // 标记当前探索的秘境（让 buildStateContext 透传给 AI）
   (newState as any)._currentExploration = realm;
   return newState;
+}
+
+// ==================== AI-67: 天劫 + 心魔独立战斗派生函数 ====================
+// 以下为纯函数派生器，不依赖 db/store，调用方负责持久化。仅作契约层 + 简单逻辑：
+// - deriveTribulationTrigger: 判断境界突破是否触发天劫
+// - resolveTribulationBolt: 渡一道雷的判定
+// - resolveHeartDemon: 心魔试炼判定
+
+/**
+ * AI-67: 判断境界突破是否触发天劫。
+ * 规则：化神及以上每次大境界突破触发 9 道雷劫；其余境界不触发。
+ */
+export function deriveTribulationTrigger(
+  realmBefore: Realm | null,
+  realmAfter: Realm,
+): { triggered: boolean; reason: string } {
+  if (!realmBefore) return { triggered: false, reason: '无前境' };
+  if (realmBefore === realmAfter) return { triggered: false, reason: '同境' };
+  const tribulationRealms: Realm[] = [
+    'deity_transformation', 'void_refinement', 'unity', 'tribulation',
+    'mahayana', 'ascension',
+  ];
+  const isTrigger = tribulationRealms.includes(realmAfter);
+  return isTrigger
+    ? { triggered: true, reason: `${realmBefore} → ${realmAfter} 需渡天劫` }
+    : { triggered: false, reason: `${realmAfter} 不在天劫境界之列` };
+}
+
+/**
+ * AI-67: 渡一道雷的判定。
+ * characterRoll 0-1 + 心魔值 + soulStrength 0-100 + 本命法宝共鸣。
+ */
+export function resolveTribulationBolt(opts: {
+  boltNumber: number;            // 1-9
+  characterRoll: number;         // 0-1
+  heartDemon: number;            // 0-100
+  soulStrength: number;          // 0-100
+  bondedArtifactResonance: boolean;
+}): { passed: boolean; hpRemaining: number; narrative: string } {
+  const baseThreshold = 0.3 + opts.boltNumber * 0.07;
+  const heartDemonPenalty = Math.max(0, (opts.heartDemon - 30) / 200);
+  const soulBonus = opts.soulStrength / 500;
+  const artifactBonus = opts.bondedArtifactResonance ? 0.1 : 0;
+  const effectiveRoll = opts.characterRoll + soulBonus + artifactBonus - heartDemonPenalty;
+  const passed = effectiveRoll >= baseThreshold;
+  const hpDelta = passed ? -Math.max(5, opts.boltNumber * 5) : -30;
+  return {
+    passed,
+    hpRemaining: Math.max(0, Math.min(100, 100 + hpDelta)),
+    narrative: passed
+      ? `第 ${opts.boltNumber} 道天雷落下，险中求胜，气血大损。`
+      : `第 ${opts.boltNumber} 道天雷破防，气血暴跌！`,
+  };
+}
+
+/**
+ * AI-67: 心魔试炼判定。选主导维度为心魔类型。
+ */
+export function resolveHeartDemon(opts: {
+  innerState: { obsession: number; hatred: number; love: number; fear: number; regret: number };
+  resolveRoll: number;          // 0-1
+}): {
+  demonType: HeartDemonType;
+  passed: boolean;
+  narrative: string;
+} {
+  const dims = opts.innerState;
+  const max = Math.max(dims.obsession, dims.hatred, dims.love, dims.fear, dims.regret);
+  let demonType: HeartDemonType = 'obsession';
+  if (dims.hatred === max) demonType = 'hatred';
+  else if (dims.love === max) demonType = 'love';
+  else if (dims.fear === max) demonType = 'fear';
+  else if (dims.regret === max) demonType = 'regret';
+
+  const passed = opts.resolveRoll >= 0.5;
+  return {
+    demonType,
+    passed,
+    narrative: passed
+      ? `心魔（${demonType}）被斩，识海重归澄澈。`
+      : `心魔（${demonType}）反噬，识海动荡！`,
+  };
 }
 
 // 探索结束后更新探索记录（在 explore route 收到 AI 输出后调用）

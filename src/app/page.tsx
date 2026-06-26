@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { StartScreen } from '@/components/xianxia/StartScreen';
 import { StatusPanel } from '@/components/xianxia/StatusPanel';
+import { WorldLegacyPanel } from '@/components/xianxia/WorldLegacyPanel';
 import { EventTimeline } from '@/components/xianxia/EventTimeline';
 import { StatusList } from '@/components/xianxia/StatusList';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
@@ -195,6 +196,11 @@ export default function Home() {
             {/* 状态面板（常驻顶部 - 简化版） */}
             <div className="shrink-0 px-3 py-2">
               <StatusPanel character={character} />
+            </div>
+
+            {/* AI-60: WorldLegacyPanel 折叠区（默认折叠，限 3 条，展开全部） */}
+            <div className="shrink-0 px-3 pb-1" data-testid="world-legacy-section">
+              <WorldLegacyPanel character={character} defaultCollapsed={true} maxCollapsed={3} />
             </div>
 
             {/* Tab 切换 */}

@@ -4,6 +4,55 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
+
+// AI-61: L1 世界观文档注入 — 8 个 docs/world/*.md 读入并拼成 worldKnowledge 段
+const WORLD_DOCS = [
+  'spirit-roots.md',
+  'three-realms.md',
+  'tribulation-heart-demon.md',
+  'spirit-insects-beasts.md',
+  'alchemy-handfeel.md',
+  'formations-restrictions.md',
+  'cross-realm-paths.md',
+  'complicated-relations.md',
+] as const;
+
+let _worldKnowledgeCache: string | null = null;
+let _worldKnowledgeLoading: Promise<string> | null = null;
+
+async function loadWorldKnowledge(): Promise<string> {
+  if (_worldKnowledgeCache !== null) return _worldKnowledgeCache;
+  if (_worldKnowledgeLoading) return _worldKnowledgeLoading;
+  _worldKnowledgeLoading = (async () => {
+    const docsDir = path.join(process.cwd(), 'docs', 'world');
+    const parts: string[] = [];
+    for (const name of WORLD_DOCS) {
+      try {
+        const content = await fs.readFile(path.join(docsDir, name), 'utf-8');
+        // 截断：每个文档前 1500 字足以提供世界观上下文，避免 prompt 过长
+        const trimmed = content.length > 1500 ? `${content.slice(0, 1500)}\n…(略)` : content;
+        parts.push(`### ${name}\n${trimmed}`);
+      } catch {
+        // 文档缺失时静默跳过（开发期允许）
+      }
+    }
+    if (parts.length === 0) {
+      _worldKnowledgeCache = '';
+      return '';
+    }
+    _worldKnowledgeCache = `\n【世界观知识库（L1，仅参考不必逐字遵循）】\n${parts.join('\n\n')}\n`;
+    return _worldKnowledgeCache;
+  })();
+  return _worldKnowledgeLoading;
+}
+
+/**
+ * AI-61: 获取 L1 世界观知识段（非 async 场景用：返回已缓存的同步片段）
+ * 若尚未加载，返回空字符串（不阻塞主流程）
+ */
+export function getWorldKnowledgeSync(): string {
+  return _worldKnowledgeCache ?? '';
+}
 import {
   AIEventOutput,
   ChoiceResultOutput,
@@ -1590,7 +1639,9 @@ function escapeRegExp(s: string): string {
 }
 
 export async function generateAgeEvent(ctx: EngineStateContext, isFateNode: boolean, qualityMode: 'full' | 'light' = 'full'): Promise<AIEventOutput> {
-  const userPrompt = buildAdvancePrompt(ctx, isFateNode, qualityMode);
+  // AI-61: 异步预加载 L1 世界观知识，并拼入 userPrompt
+  const worldKnowledge = await loadWorldKnowledge();
+  const userPrompt = buildAdvancePrompt(ctx, isFateNode, qualityMode) + worldKnowledge;
   const raw = await callLLM(IDENTITY_PROMPT, userPrompt, SCENE_PROMPTS.advance, { qualityMode });
   const sanitized = sanitizeEventOutput(raw, ctx.character.age);
   // 后处理：修正 narrative 中主角年龄数字
@@ -1618,7 +1669,8 @@ export async function generateAgeEventStream(
   qualityMode: 'full' | 'light',
   onNarrativeDelta: (delta: string) => void | Promise<void>,
 ): Promise<AIEventOutput> {
-  const userPrompt = buildAdvancePrompt(ctx, isFateNode, qualityMode);
+  const worldKnowledge = await loadWorldKnowledge();
+  const userPrompt = buildAdvancePrompt(ctx, isFateNode, qualityMode) + worldKnowledge;
   const fullSystem = `${IDENTITY_PROMPT}\n\n${SCENE_PROMPTS.advance}`;
   
   // 调用流式LLM，收集完整的JSON响应
@@ -2939,8 +2991,11 @@ export async function generateBirthEvent(name?: string): Promise<BirthResult> {
 
 注意：不要输出 spiritualRoot 字段，灵根类型已由天道判定为「${root}」，你只需生成对应的 rootDetail 文字描述。`;
 
+  // AI-61: 在出生事件 user prompt 注入 L1 世界观知识
+  const worldKnowledge = await loadWorldKnowledge();
+
   try {
-    const content = await callLLMText(system, user);
+    const content = await callLLMText(system, user + worldKnowledge);
     const raw = parseJSON(content);
     return {
       name: String(raw.name || name || '佚名').slice(0, 12),

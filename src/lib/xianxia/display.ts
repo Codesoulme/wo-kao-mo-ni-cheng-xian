@@ -201,6 +201,87 @@ export const ENDING_TYPE_LABEL = {
   abandon: '放弃',
 } as const;
 
+// AI-62: 炼丹火候等级 label
+export const ALCHEMY_HEAT_LABEL = {
+  micro: '微火',
+  weak: '弱火',
+  moderate: '中火',
+  strong: '强火',
+  extreme: '极火',
+} as const;
+
+// AI-62: 阵法分类 label
+export const FORMATION_CATEGORY_LABEL = {
+  binding: '困阵',
+  slaughter: '杀阵',
+  illusion: '幻阵',
+  defense: '防阵',
+  support: '辅阵',
+  trap: '陷阵',
+} as const;
+
+// AI-63: 法宝本命/外用 label
+export const BONDED_ARTIFACT_LABEL = {
+  bonded: '本命',
+  external: '外用',
+} as const;
+
+// AI-63: 神识共鸣等级 label（4 档）
+export const SOUL_LINK_LEVEL_LABEL = {
+  stranger: '陌路',          // 0-25
+  acquaintance: '初识',      // 26-50
+  resonance: '共鸣',         // 51-75
+  unity: '合一',             // 76-100
+} as const;
+
+// AI-63: 器灵状态 label
+export const ARTIFACT_SPIRIT_LABEL = {
+  dormant: '未醒',           // 器灵沉睡
+  awakening: '初醒',         // 器灵初醒
+  active: '觉醒',            // 器灵觉醒
+} as const;
+
+// AI-64: 道侣状态 label
+export const DAO_LU_LABEL = {
+  none: '未结道侣',
+  daoLu: '道侣',           // 正式结为道侣
+  promise: '未定之缘',     // 互有情愫，未正式结缘
+  severed: '缘尽',         // 道侣离散
+} as const;
+
+// AI-64: 双修进度 label
+export const DUAL_CULTIVATION_LABEL = {
+  initial: '初窥',           // 0-25
+  harmony: '和合',           // 26-50
+  resonance: '共振',         // 51-75
+  unity: '合一',             // 76-100
+} as const;
+
+// AI-66: 宗门历史原因 label
+export const SECT_HISTORY_REASON_LABEL = {
+  joined: '入门',
+  left: '离开',
+  banished: '逐出',
+  ascended: '飞升',
+  retired: '退隐',
+  martyred: '殉道',
+} as const;
+
+// AI-66: 师徒关系 label
+export const RELATION_MENTOR_LABEL = {
+  master: '师',
+  apprentice: '徒',
+  peer: '同门',
+} as const;
+
+// AI-65: 灵宠/灵虫/灵兽类型 label
+export const PET_TYPE_LABEL = {
+  pet: '灵宠',
+  insect: '灵虫',
+  swarm: '虫群',
+  beast: '灵兽',
+} as const;
+
 export const REALM_SECTION_LABELS = {
   realm: '境界',
   realmLevel: '境界层数',

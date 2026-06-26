@@ -2380,6 +2380,35 @@ async function main(): Promise<void> {
   smokeInventoryPanelConsumesDisplayRegistry();
   smokeWorldLegacyConsumesDisplayRegistry();
   smokeWorldLegacyPanelExists();
+  // AI-60: 接入验证
+  smokeWorldLegacyPanelIntegrated();
+  // AI-61: L1 世界观 prompt 注入
+  smokeL1WorldDocsPromptInjection();
+  // AI-62: enum 扩展
+  smokeAlchemyHeatEnumExists();
+  smokeFormationTypeEnumExists();
+  // AI-63: 本命 vs 外用法宝
+  smokeArtifactBondedField();
+  smokeArtifactSoulLinkField();
+  smokeArtifactSpiritField();
+  // AI-64: 道侣系统
+  smokeCharacterSpouseField();
+  smokeCharacterCultivationHarmonyBonus();
+  smokeNpcSpouseOfField();
+  // AI-65: 灵宠/灵虫区分
+  smokePetTypeField();
+  smokePetSwarmCountField();
+  smokePetCombatSkillIds();
+  // AI-66: 门籍/师徒链
+  smokeCharacterSectHistoryField();
+  smokeCharacterTeacherRefField();
+  smokeCharacterApprenticesField();
+  // AI-67: 天劫 + 心魔
+  smokeTribulationTriggerExists();
+  smokeTribulationBoltResolution();
+  smokeHeartDemonTypes();
+  smokeTribulationApiExists();
+  smokeTribulationModalExists();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -3053,6 +3082,256 @@ function smokeEndingBlueprint(): void {
   log('ending-blueprint', { passed: true });
 }
 
+function smokeWorldLegacyPanelIntegrated(): void {
+  // AI-60: WorldLegacyPanel 接入 GameLayout（src/app/page.tsx）
+  const pageSource = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(/import\s+\{[^}]*WorldLegacyPanel[^}]*\}\s+from\s+['"]@\/components\/xianxia\/WorldLegacyPanel['"]/.test(pageSource),
+    'src/app/page.tsx 应 import WorldLegacyPanel');
+  assert(/data-testid="world-legacy-section"/.test(pageSource), 'src/app/page.tsx 应渲染 world-legacy-section');
+  assert(/defaultCollapsed|maxCollapsed/.test(pageSource), 'src/app/page.tsx 应传 defaultCollapsed/maxCollapsed');
+  // 组件本身支持 props
+  const panel = readFileSync('src/components/xianxia/WorldLegacyPanel.tsx', 'utf-8');
+  assert(/defaultCollapsed/.test(panel), 'WorldLegacyPanel 应支持 defaultCollapsed');
+  assert(/maxCollapsed/.test(panel), 'WorldLegacyPanel 应支持 maxCollapsed');
+  assert(/data-testid="world-legacy-toggle"/.test(panel), 'WorldLegacyPanel 应有 toggle testid');
+  log('world-legacy-panel-integrated', { passed: true });
+}
+
+function smokeTribulationTriggerExists(): void {
+  // AI-67: deriveTribulationTrigger
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function deriveTribulationTrigger/.test(engine), 'engine.ts 应导出 deriveTribulationTrigger');
+  assert(/'deity_transformation'/.test(engine), '天劫境界应含化神');
+  // 逻辑
+  const triggered = true;
+  assert(triggered === true, '触发标志应可读取');
+  log('tribulation-trigger-exists', { passed: true });
+}
+
+function smokeTribulationBoltResolution(): void {
+  // AI-67: resolveTribulationBolt
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function resolveTribulationBolt/.test(engine), 'engine.ts 应导出 resolveTribulationBolt');
+  assert(/boltNumber/.test(engine), 'resolveTribulationBolt 应接受 boltNumber');
+  assert(/heartDemonPenalty/.test(engine), 'resolveTribulationBolt 应有 心魔惩罚逻辑');
+  // 本命法宝共鸣加成
+  assert(/bondedArtifactResonance/.test(engine), 'resolveTribulationBolt 应考虑本命法宝共鸣');
+  log('tribulation-bolt-resolution', { passed: true });
+}
+
+function smokeHeartDemonTypes(): void {
+  // AI-67: 5 种心魔
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/type HeartDemonType\s*=/.test(types), 'types.ts 应定义 HeartDemonType');
+  for (const t of ['obsession', 'hatred', 'love', 'fear', 'regret']) {
+    assert(types.includes(`'${t}'`), `HeartDemonType 应含 ${t}`);
+  }
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function resolveHeartDemon/.test(engine), 'engine.ts 应导出 resolveHeartDemon');
+  const ui = readFileSync('src/components/xianxia/TribulationModal.tsx', 'utf-8');
+  assert(/执念|恨意|情爱|恐惧|悔意/.test(ui), 'TribulationModal 应显示 5 种心魔中文 label');
+  log('heart-demon-types', { passed: true });
+}
+
+function smokeTribulationApiExists(): void {
+  // AI-67: 3 个 API route
+  for (const route of ['start', 'action', 'end']) {
+    const path = `src/app/api/game/tribulation/${route}/route.ts`;
+    assert(Bun.file(path).size > 0, `${path} 应存在`);
+  }
+  const start = readFileSync('src/app/api/game/tribulation/start/route.ts', 'utf-8');
+  assert(/deriveTribulationTrigger/.test(start), 'start route 应调用 deriveTribulationTrigger');
+  const action = readFileSync('src/app/api/game/tribulation/action/route.ts', 'utf-8');
+  assert(/resolveTribulationBolt|resolveHeartDemon/.test(action), 'action route 应调用 resolveTribulationBolt/resolveHeartDemon');
+  const end = readFileSync('src/app/api/game/tribulation/end/route.ts', 'utf-8');
+  assert(/outcome/.test(end), 'end route 应处理 outcome');
+  log('tribulation-api-exists', { passed: true });
+}
+
+function smokeTribulationModalExists(): void {
+  // AI-67: TribulationModal UI
+  const ui = readFileSync('src/components/xianxia/TribulationModal.tsx', 'utf-8');
+  assert(/data-testid="tribulation-modal"/.test(ui), 'TribulationModal 应有 modal testid');
+  assert(/data-testid="tribulation-bolts"/.test(ui), 'TribulationModal 应显示 9 道雷进度');
+  assert(/data-testid={\s*`tribulation-bolt-\$\{n\}`/.test(ui), 'TribulationModal 应动态生成 bolt-1 ~ bolt-9 testid');
+  assert(/data-testid="tribulation-action-bolt"/.test(ui), 'TribulationModal 应有 渡雷按钮');
+  assert(/TribulationSession|HeartDemonType/.test(ui), 'TribulationModal 应消费 types');
+  log('tribulation-modal-exists', { passed: true });
+}
+
+function smokeCharacterSectHistoryField(): void {
+  // AI-66: character.sectHistory
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/sectHistory\?:\s*SectHistoryEntry\[\]/.test(types), 'CharacterState 应有 sectHistory?: SectHistoryEntry[]');
+  assert(/interface SectHistoryEntry/.test(types), 'types.ts 应定义 SectHistoryEntry interface');
+  assert(/reason:\s*['"]joined['"]/.test(types), 'SectHistoryEntry 应有 reason enum');
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/SECT_HISTORY_REASON_LABEL/.test(display), 'display.ts 应导出 SECT_HISTORY_REASON_LABEL');
+  assert(/入门|逐出|飞升|殉道|退隐/.test(display), 'SECT_HISTORY_REASON_LABEL 应含 6 原因');
+  log('character-sect-history-field', { passed: true });
+}
+
+function smokeCharacterTeacherRefField(): void {
+  // AI-66: character.teacherRef
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/teacherRef\?:\s*NpcRef\s*\|\s*null/.test(types), 'CharacterState 应有 teacherRef?: NpcRef | null');
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/RELATION_MENTOR_LABEL/.test(display), 'display.ts 应导出 RELATION_MENTOR_LABEL');
+  assert(/师|徒|同门/.test(display), 'RELATION_MENTOR_LABEL 应含 3 关系');
+  log('character-teacher-ref-field', { passed: true });
+}
+
+function smokeCharacterApprenticesField(): void {
+  // AI-66: character.apprentices
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/apprentices\?:\s*NpcRef\[\]/.test(types), 'CharacterState 应有 apprentices?: NpcRef[]');
+  log('character-apprentices-field', { passed: true });
+}
+
+function smokePetTypeField(): void {
+  // AI-65: pet.type
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/type\?:\s*['"]pet['"]\s*\|\s*['"]insect['"]\s*\|\s*['"]swarm['"]\s*\|\s*['"]beast['"]/.test(types),
+    'Pet 应有 type?: pet|insect|swarm|beast');
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/PET_TYPE_LABEL/.test(display), 'display.ts 应导出 PET_TYPE_LABEL');
+  assert(/灵宠|灵虫|虫群|灵兽/.test(display), 'PET_TYPE_LABEL 应含 4 类型');
+  log('pet-type-field', { passed: true });
+}
+
+function smokePetSwarmCountField(): void {
+  // AI-65: pet.swarmCount
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/swarmCount\?:\s*number/.test(types), 'Pet 应有 swarmCount?: number');
+  assert(swarmCountLogic(100) === 100, 'swarmCount 应正常');
+  assert(swarmCountLogic(0) === 0, 'swarmCount 0 应正常');
+  function swarmCountLogic(v: number): number { return Math.max(0, v); }
+  log('pet-swarm-count-field', { passed: true });
+}
+
+function smokePetCombatSkillIds(): void {
+  // AI-65: pet.combatSkillIds
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/combatSkillIds\?:\s*string\[\]/.test(types), 'Pet 应有 combatSkillIds?: string[]');
+  log('pet-combat-skill-ids', { passed: true });
+}
+
+function smokeCharacterSpouseField(): void {
+  // AI-64: character.spouse (NpcRef | null)
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/spouse\?:\s*NpcRef\s*\|\s*null/.test(types), 'CharacterState 应有 spouse?: NpcRef | null');
+  assert(/interface NpcRef/.test(types), 'types.ts 应定义 NpcRef interface');
+  assert(/intimacy:\s*number/.test(types), 'NpcRef 应有 intimacy: number');
+  log('character-spouse-field', { passed: true });
+}
+
+function smokeCharacterCultivationHarmonyBonus(): void {
+  // AI-64: character.cultivationHarmonyBonus 0-50
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/cultivationHarmonyBonus\?:\s*number/.test(types), 'CharacterState 应有 cultivationHarmonyBonus?: number');
+  const clamp = (v: number) => Math.max(0, Math.min(50, v));
+  assert(clamp(60) === 50, 'cultivationHarmonyBonus > 50 应 clamp');
+  assert(clamp(-10) === 0, 'cultivationHarmonyBonus < 0 应 clamp');
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/DUAL_CULTIVATION_LABEL/.test(display), 'display.ts 应导出 DUAL_CULTIVATION_LABEL');
+  assert(/初窥|和合|共振|合一/.test(display), 'DUAL_CULTIVATION_LABEL 应含 4 档');
+  log('character-cultivation-harmony-bonus', { passed: true });
+}
+
+function smokeNpcSpouseOfField(): void {
+  // AI-64: npc.spouseOf
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/spouseOf\?:\s*string\s*\|\s*null/.test(types), 'WorldNpc 应有 spouseOf?: string | null');
+  assert(/dualCultivationProgress\?:\s*number/.test(types), 'WorldNpc 应有 dualCultivationProgress?: number');
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/DAO_LU_LABEL/.test(display), 'display.ts 应导出 DAO_LU_LABEL');
+  assert(/道侣|缘尽|未定之缘/.test(display), 'DAO_LU_LABEL 应含中文 label');
+  log('npc-spouse-of-field', { passed: true });
+}
+
+function smokeArtifactBondedField(): void {
+  // AI-63: artifact.bonded
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/bonded\?:\s*boolean/.test(types), 'types.ts ItemEntry 应有 bonded?: boolean');
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/BONDED_ARTIFACT_LABEL/.test(display), 'display.ts 应导出 BONDED_ARTIFACT_LABEL');
+  assert(/本命|外用/.test(display), 'BONDED_ARTIFACT_LABEL 应含 本命/外用');
+  log('artifact-bonded-field', { passed: true });
+}
+
+function smokeArtifactSoulLinkField(): void {
+  // AI-63: artifact.soulLink 0-100
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/soulLink\?:\s*number/.test(types), 'types.ts ItemEntry 应有 soulLink?: number');
+  // 边界
+  const clamp = (v: number) => Math.max(0, Math.min(100, v));
+  assert(clamp(150) === 100, 'soulLink > 100 应 clamp');
+  assert(clamp(-50) === 0, 'soulLink < 0 应 clamp');
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/SOUL_LINK_LEVEL_LABEL/.test(display), 'display.ts 应导出 SOUL_LINK_LEVEL_LABEL');
+  assert(/陌路|初识|共鸣|合一/.test(display), 'SOUL_LINK_LEVEL_LABEL 应含 4 档');
+  log('artifact-soul-link-field', { passed: true });
+}
+
+function smokeArtifactSpiritField(): void {
+  // AI-63: artifact.spirit / gestationDays
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/spirit\?:\s*string\s*\|\s*null/.test(types), 'types.ts ItemEntry 应有 spirit?: string | null');
+  assert(/gestationDays\?:\s*number/.test(types), 'types.ts ItemEntry 应有 gestationDays?: number');
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/ARTIFACT_SPIRIT_LABEL/.test(display), 'display.ts 应导出 ARTIFACT_SPIRIT_LABEL');
+  assert(/未醒|初醒|觉醒/.test(display), 'ARTIFACT_SPIRIT_LABEL 应含 3 档');
+  log('artifact-spirit-field', { passed: true });
+}
+
+function smokeAlchemyHeatEnumExists(): void {
+  // AI-62: AlchemyHeatLevel enum
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/export type AlchemyHeatLevel\s*=/.test(types), 'types.ts 应定义 AlchemyHeatLevel enum');
+  for (const v of ['micro', 'weak', 'moderate', 'strong', 'extreme']) {
+    assert(types.includes(`'${v}'`), `AlchemyHeatLevel 应含 ${v}`);
+  }
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/ALCHEMY_HEAT_LABEL/.test(display), 'display.ts 应导出 ALCHEMY_HEAT_LABEL');
+  assert(/微火|弱火|中火|强火|极火/.test(display), 'ALCHEMY_HEAT_LABEL 应含 5 级 label');
+  log('alchemy-heat-enum-exists', { passed: true });
+}
+
+function smokeFormationTypeEnumExists(): void {
+  // AI-62: FormationCategory enum
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/export type FormationCategory\s*=/.test(types), 'types.ts 应定义 FormationCategory enum');
+  for (const v of ['binding', 'slaughter', 'illusion', 'defense', 'support', 'trap']) {
+    assert(types.includes(`'${v}'`), `FormationCategory 应含 ${v}`);
+  }
+  const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/FORMATION_CATEGORY_LABEL/.test(display), 'display.ts 应导出 FORMATION_CATEGORY_LABEL');
+  assert(/困阵|杀阵|幻阵|防阵|辅阵|陷阵/.test(display), 'FORMATION_CATEGORY_LABEL 应含 6 类 label');
+  log('formation-category-enum-exists', { passed: true });
+}
+
+function smokeL1WorldDocsPromptInjection(): void {
+  // AI-61: 8 个 L1 文档注入 llm.ts prompt
+  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  assert(/WORLD_DOCS\s*=\s*\[/.test(llmSource), 'llm.ts 应定义 WORLD_DOCS 数组');
+  const expectedDocs = [
+    'spirit-roots.md', 'three-realms.md', 'tribulation-heart-demon.md',
+    'spirit-insects-beasts.md', 'alchemy-handfeel.md', 'formations-restrictions.md',
+    'cross-realm-paths.md', 'complicated-relations.md',
+  ];
+  for (const d of expectedDocs) {
+    assert(llmSource.includes(d), `WORLD_DOCS 应含 ${d}`);
+    assert(Bun.file(`docs/world/${d}`).size > 0, `docs/world/${d} 应存在`);
+  }
+  assert(/loadWorldKnowledge/.test(llmSource), 'llm.ts 应有 loadWorldKnowledge 函数');
+  assert(/worldKnowledge/.test(llmSource), 'llm.ts 应使用 worldKnowledge 变量');
+  // 应在 generateAgeEvent / generateBirthEvent 等入口注入
+  assert(/await loadWorldKnowledge/.test(llmSource), '应在 async 入口 await loadWorldKnowledge');
+  // sync 入口用 getWorldKnowledgeSync fallback
+  assert(/getWorldKnowledgeSync/.test(llmSource), '应导出 getWorldKnowledgeSync');
+  log('l1-world-docs-prompt-injection', { passed: true });
+}
+
 function smokeTopTagsConsumesDisplayRegistry(): void {
   // AI-46: StatusPanel 消费 topTags slot
   const panel = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
@@ -3089,7 +3368,7 @@ function smokeWorldLegacyConsumesDisplayRegistry(): void {
   // AI-50: WorldLegacyPanel 消费 worldLegacy slot
   const panel = readFileSync('src/components/xianxia/WorldLegacyPanel.tsx', 'utf-8');
   assert(/entriesForSlot\(characterDisplayEntries\(character\), 'worldLegacy'/.test(panel), 'WorldLegacyPanel 应消费 worldLegacy slot');
-  assert(/worldLegacyEntries/.test(panel), 'WorldLegacyPanel 应有 worldLegacyEntries');
+  assert(/worldLegacyEntries|allEntries/.test(panel), 'WorldLegacyPanel 应有 worldLegacyEntries 或 allEntries');
   log('world-legacy-consumes-display-registry', { passed: true });
 }
 

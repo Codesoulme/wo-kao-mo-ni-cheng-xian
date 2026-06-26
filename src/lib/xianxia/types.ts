@@ -460,6 +460,11 @@ export interface ItemEntry {
   // 例：「左手」「右手中指」「项链·储物戒指×5」「腰悬」「头戴」
   // 不再限制每种类型装备数量上限——玩家可戴十个戒指、脖挂一串储物戒指等
   equipNote?: string;
+  // AI-63: 本命 vs 外用法宝
+  bonded?: boolean;            // 是否本命（仅能一件，渡劫时共鸣）
+  soulLink?: number;           // 神识共鸣度 0-100
+  spirit?: string | null;      // 器灵名（已觉醒则记）
+  gestationDays?: number;      // 孕育天数（法宝未成形前）
 }
 
 // ==================== 炼丹 AI 产出（AI 主路径，引擎校验落库） ====================
@@ -886,6 +891,17 @@ export interface WorldNpc {
   memory?: string;
   relatedThreadIds?: string[];
   tags?: string[];
+  // AI-64: 道侣系统
+  spouseOf?: string | null;             // 若为某角色道侣，存 characterId
+  dualCultivationProgress?: number;     // 双修进度 0-100
+}
+
+// AI-64: 道侣引用（NpcRef — 简单引用结构）
+export interface NpcRef {
+  npcId: string;
+  npcName: string;
+  intimacy: number;                     // 0-100
+  sinceAge: number;                     // 结缘年龄
 }
 
 export type CausalNodeType = 'event' | 'thread' | 'npc' | 'item' | 'status' | 'realm' | 'memory' | 'choice' | 'combat' | 'pet' | 'system';
@@ -1430,6 +1446,22 @@ export interface CharacterState {
   // 秘境探索记录（ExplorationRecord[]）—— 玩家探索过的秘境 + 冷却追踪
   exploredRealms: ExplorationRecord[];
   discoveredRealms?: SecretRealm[]; // 从未决线索/物品/事件中解析出的剧情秘境
+  // ===== AI-64: 道侣系统 =====
+  spouse?: NpcRef | null;                  // 道侣（若已婚配）
+  cultivationHarmonyBonus?: number;        // 修炼和谐加成 0-50（双修带来的速度加成）
+  // ===== AI-66: 门籍/师徒链 =====
+  sectHistory?: SectHistoryEntry[];        // 宗门历史（加入/离开/原因）
+  teacherRef?: NpcRef | null;              // 师父
+  apprentices?: NpcRef[];                  // 徒弟列表
+}
+
+// ==================== AI-66: 宗门历史条目 ====================
+export interface SectHistoryEntry {
+  sectId: string;
+  sectName: string;
+  joinedAge: number;
+  leftAge?: number;            // 未离开则为 undefined
+  reason: 'joined' | 'left' | 'banished' | 'ascended' | 'retired' | 'martyred';
 }
 
 // ==================== Task 21: 阵法系统 ====================
@@ -1472,6 +1504,41 @@ export interface Formation {
 }
 
 // ==================== Task 23: 灵宠系统 ====================
+
+// AI-62: 炼丹火候等级（5 级：微/弱/中/强/极）—— 不动已有 enum，仅新增
+export type AlchemyHeatLevel = 'micro' | 'weak' | 'moderate' | 'strong' | 'extreme';
+
+// AI-62: 阵法分类（6 类：困/杀/幻/防/辅/陷）—— 已有 FormationType 不动，此为细分类
+export type FormationCategory = 'binding' | 'slaughter' | 'illusion' | 'defense' | 'support' | 'trap';
+
+// ==================== AI-67: 天劫系统 ====================
+// 天劫阶段：开劫 → 9 道雷 → 渡/败
+export type TribulationStage =
+  | 'opening'         // 开劫（天象异变）
+  | 'bolt1' | 'bolt2' | 'bolt3' | 'bolt4' | 'bolt5'
+  | 'bolt6' | 'bolt7' | 'bolt8' | 'bolt9'
+  | 'passed'          // 渡过
+  | 'failed';         // 失败
+
+// 心魔类型（5 种：执/恨/爱/惧/悔）
+export type HeartDemonType = 'obsession' | 'hatred' | 'love' | 'fear' | 'regret';
+
+// 天劫会话
+export interface TribulationSession {
+  id: string;
+  characterId: string;
+  startedAge: number;
+  fromRealm: Realm;
+  toRealm: Realm;
+  currentStage: TribulationStage;
+  boltsCompleted: number;          // 已渡雷数
+  hpRemaining: number;            // 当前气血百分比 0-100
+  heartDemonActive: HeartDemonType | null;  // 当前触发的心魔
+  heartDemonResolved: boolean;
+  narrative: string;              // 渡劫叙事
+  passed: boolean;                // 是否渡过
+  outcome: 'ascended' | 'failed' | 'ongoing' | 'abandoned';
+}
 
 // 灵宠物种——参考《凡人修仙传》修仙世界常见灵宠
 export type PetSpecies =
@@ -1523,6 +1590,10 @@ export interface Pet {
     power: number;           // 技能威力倍率（1.0=普通攻击等价）
     cooldown: number;        // 冷却回合数
   };
+  // AI-65: 灵宠/灵虫区分
+  type?: 'pet' | 'insect' | 'swarm' | 'beast';  // 默认 pet；灵虫=insect；群=swarm；神兽=beast
+  swarmCount?: number;        // 灵虫群数量（仅 type=swarm/insect）
+  combatSkillIds?: string[];  // 战斗技能 id 列表（用于多技能灵兽）
 }
 
 // 灵宠物种 → 默认属性模板
