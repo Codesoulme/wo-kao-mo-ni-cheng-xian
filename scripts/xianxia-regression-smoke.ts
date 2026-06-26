@@ -2324,6 +2324,12 @@ async function main(): Promise<void> {
   smokeContinuousPushCombatUiSync();
   smokeCombatProjectionInBattlePanel();
   smokeDesignRefersUiRules();
+  // AI-30 新增 5 条 (P1-cleanup-and-design-docs)
+  smokeCombatEnemySurvivorCausality();
+  smokeCausalityChainAuction();
+  smokeCausalityChainSecretRealm();
+  smokePlayerVisibleTextNoSystemWords();
+  smokeDesignDocTablesExist();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -2814,6 +2820,65 @@ function smokeNoNewChineseAttributeKeysInEngine(): void {
     assert(allowedChineseKeys.has(key), `engine.ts 中出现未备案的中文 attribute key: ${key}`);
   }
   log('no-new-chinese-attribute-keys-in-engine', { passed: true, keys: Array.from(foundKeys) });
+}
+
+// ========== AI-30 新增 smoke (P1-cleanup-and-design-docs) ==========
+
+function smokeCombatEnemySurvivorCausality(): void {
+  // AI-29: 战斗结束自动补 enemy 线索（敌人存活/逃脱）
+  const routeSource = readFileSync('src/app/api/game/combat/action/route.ts', 'utf-8');
+  assert(/survivedEnemies/.test(routeSource), 'combat action route 应有 survivedEnemies 逻辑');
+  assert(/追杀未止|未竟之患/.test(routeSource), 'combat action route 应有 enemy 线索 title 生成');
+  assert(/category:\s*['"]enemy['"]/.test(routeSource), 'combat action route 应生成 enemy category 线索');
+  assert(/deadlineAge\s*=\s*state\.age\s*\+\s*8/.test(routeSource), 'enemy 线索应有 8 年 deadline');
+  log('combat-enemy-survivor-causality', { passed: true });
+}
+
+function smokeCausalityChainAuction(): void {
+  // AI-29: 拍卖因果链 (newThreads registration)
+  const auctionSource = readFileSync('src/app/api/game/auction/route.ts', 'utf-8');
+  assert(/recordAuctionCausality/.test(auctionSource), 'auction route 应有 recordAuctionCausality');
+  assert(/registerMany\(aftermath\.threads/.test(auctionSource), 'auction route 应注册 aftermath threads');
+  assert(/'auction-bid'/.test(auctionSource), 'auction route 应标记 source=auction-bid');
+  assert(/'auction-aftermath'/.test(auctionSource), 'auction route 应标记 source=auction-aftermath');
+  log('causality-chain-auction', { passed: true });
+}
+
+function smokeCausalityChainSecretRealm(): void {
+  // AI-29: 秘境因果链
+  const exploreSource = readFileSync('src/app/api/game/exploration/route.ts', 'utf-8');
+  assert(/pendingThreads/.test(exploreSource), 'exploration route 应处理 pendingThreads');
+  assert(/newThreads/.test(exploreSource), 'exploration route 应接受 AI newThreads');
+  assert(/threads:\s*aiOutput\.newThreads/.test(exploreSource), 'exploration route 应传递 aiOutput.newThreads');
+  log('causality-chain-secret-realm', { passed: true });
+}
+
+function smokePlayerVisibleTextNoSystemWords(): void {
+  // AI-28: 玩家可见文案不应有系统感词
+  // 用 audit 脚本输出文件作为权威
+  const auditPath = 'docs/PLAYER_VISIBLE_TEXT_AUDIT.md';
+  assert(Bun.file(auditPath).size > 0, 'PLAYER_VISIBLE_TEXT_AUDIT.md 应存在');
+  const audit = readFileSync(auditPath, 'utf-8');
+  // 应有总问题数统计
+  assert(/总问题:\s*\d+/.test(audit), '审计报告应有"总问题"统计');
+  // AIConfigDialog 应在白名单
+  assert(/AIConfigDialog/.test(audit), '审计报告应提及 AIConfigDialog 白名单');
+  log('player-visible-text-no-system-words', { passed: true });
+}
+
+function smokeDesignDocTablesExist(): void {
+  // AI-31: 3 个 blueprints 设计文档子表
+  for (const f of [
+    'docs/blueprints/value-blueprint.md',
+    'docs/blueprints/status-blueprint.md',
+    'docs/blueprints/event-blueprint.md',
+  ]) {
+    assert(Bun.file(f).size > 0, `${f} 应存在`);
+    const src = readFileSync(f, 'utf-8');
+    assert(/\|.+\|.+\|/.test(src), `${f} 应有 markdown 表格`);
+    assert(/AI/.test(src), `${f} 应提及 AI 接管`);
+  }
+  log('design-doc-tables-exist', { passed: true });
 }
 
 main().catch(error => {

@@ -230,6 +230,49 @@ export async function POST(req: NextRequest) {
     }
 
     const usedCombatItem = payload?.itemId ? stateBeforeAction.inventory.filter(item => item.id === payload.itemId) : [];
+    // AI-29: 战斗结束后自动补 enemy 线索（若敌人逃脱/留有余患）
+    const endedStatus = state.combatSession?.status;
+    if (endedStatus && endedStatus !== 'ongoing' && sessionBefore?.enemies?.length) {
+      const survivedEnemies = (sessionBefore.enemies || []).filter((e: any, idx: number) => {
+        const hp = e?.hp ?? 0;
+        return hp > 0;
+      });
+      const deathCause = endedStatus === 'defeat' ? '被' : '';
+      const enemyThreadSource = endedStatus === 'defeat'
+        ? survivedEnemies.map((e: any) => e.name).filter(Boolean).join('、')
+        : '';
+      if (survivedEnemies.length > 0) {
+        // 至少有一个敌人存活（逃脱或留有余患）
+        const enemyNames = survivedEnemies.map((e: any) => e.name).filter(Boolean).join('、');
+        if (enemyNames) {
+          const title = endedStatus === 'defeat' ? `${enemyNames}追杀未止` : `${enemyNames}未竟之患`;
+          const existing = (state.pendingThreads || []).some((t: any) => t.title === title);
+          if (!existing) {
+            const deadlineAge = state.age + 8;
+            const newThread = {
+              id: `thread_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`,
+              title,
+              description: endedStatus === 'defeat'
+                ? `被${enemyNames}击退，伤势未愈，对方扬言必报此仇——${deadlineAge}岁前需设法了结。`
+                : `${enemyNames}在战斗中脱身，留下一桩未了的因果——${deadlineAge}岁前或仍有后患。`,
+              category: 'enemy',
+              startAge: state.age,
+              deadlineAge,
+              status: 'pending',
+              progress: 0,
+              reward: '了断此桩恩怨，或反收为己用',
+              failureCost: '仇敌在后续流年中再次出现',
+              dueInSameYear: false,
+              followUpHint: '若角色不主动寻仇，可由 AI 在下一岁暗示对方行踪',
+            };
+            state = {
+              ...state,
+              pendingThreads: [...(state.pendingThreads || []), newThread],
+            };
+          }
+        }
+      }
+    }
     state = recordActionCausality(state, {
       actionId: `combat_round_${state.age}_${state.combatSession?.id || 'session'}_${result.round?.round || 'round'}_${action}`,
       actionType: 'combat',
