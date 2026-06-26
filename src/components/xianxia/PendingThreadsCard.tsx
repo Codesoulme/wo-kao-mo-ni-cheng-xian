@@ -2,6 +2,7 @@
 
 import { useGameStore } from '@/lib/xianxia/store';
 import { sanitizeClueText } from '@/lib/xianxia/display';
+import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-registry';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -58,6 +59,9 @@ export function PendingThreadsCard() {
   const threads: any[] = sortThreads(sourceThreads);
   const visibleThreads = showAll ? threads : threads.slice(0, 3);
   const hiddenCount = Math.max(0, threads.length - visibleThreads.length);
+  // AI-47: threadPage slot 消费 — AI 创造的 attribute/status 标 threadPage 时也按"命格/仙缘"展示
+  const allDisplayEntries = characterDisplayEntries(character);
+  const threadPageEntries = entriesForSlot(allDisplayEntries, 'threadPage', 6);
 
   return (
     <Card className="paper-texture">
@@ -175,6 +179,22 @@ export function PendingThreadsCard() {
                 <ChevronDown className={cn('w-3 h-3 transition-transform', showAll && 'rotate-180')} />
                 {showAll ? '收起因缘' : `展开其余 ${hiddenCount} 缕因缘`}
               </button>
+            )}
+            {threadPageEntries.length > 0 && (
+              <div className="pt-2 border-t border-border/50 space-y-1" data-testid="thread-page-slot">
+                <div className="text-[10px] text-muted-foreground font-serif-cn">命格印记</div>
+                <div className="flex flex-wrap gap-1">
+                  {threadPageEntries.map((entry) => (
+                    <span
+                      key={entry.id}
+                      className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border bg-violet-50 text-violet-900 border-violet-300 font-serif-cn"
+                      title={entry.description || entry.displayLabel}
+                    >
+                      {entry.shortLabel || entry.displayLabel}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
           </>
         )}

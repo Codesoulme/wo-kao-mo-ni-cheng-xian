@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { CharacterState } from '@/lib/xianxia/store';
 import { filterMeaningfulStatuses, isConstitutionStatus } from '@/lib/xianxia/engine';
 import { REALM_SECTION_LABELS, IDENTITY_SECTION_LABELS, isRealmAttribute, isIdentityAttribute } from '@/lib/xianxia/display';
+import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-registry';
 import { RealmOrb } from './RealmOrb';
 import { CharacterDetailSheet } from './CharacterDetailSheet';
 import { Heart, Sparkles, MapPin, ChevronRight, ChevronDown, Sword, Shield, Zap, Clover, Brain, Coins, Sprout } from 'lucide-react';
@@ -78,6 +79,19 @@ export function StatusPanel({ character }: StatusPanelProps) {
     .filter((attr: any) => attr && attr.visible !== false && attr.name)
     .filter((attr: any) => !coreCultivationAttributeIds.has(attr.id) && !coreCultivationAttributeNames.has(attr.name))
     .slice(0, 3);
+  // AI-46: topTags slot 消费 — AI 创造的 attribute/status 若标记 topTags 也在此呈现
+  const allDisplayEntries = characterDisplayEntries(character);
+  const topTagEntries = entriesForSlot(allDisplayEntries, 'topTags', 5);
+  const topTagToneClass = (tone: string) => {
+    switch (tone) {
+      case 'rare': return 'bg-amber-50 text-amber-900 border-amber-300';
+      case 'good': return 'bg-emerald-50 text-emerald-900 border-emerald-300';
+      case 'bad': return 'bg-rose-50 text-rose-900 border-rose-300';
+      case 'danger': return 'bg-red-50 text-red-900 border-red-400';
+      case 'mystery': return 'bg-violet-50 text-violet-900 border-violet-300';
+      default: return 'bg-stone-50 text-stone-800 border-stone-200';
+    }
+  };
 
   return (
     <>
@@ -291,6 +305,22 @@ export function StatusPanel({ character }: StatusPanelProps) {
                       +{visibleStatuses.length - topStatuses.length}
                     </span>
                   )}
+                </div>
+              )}
+
+              {topTagEntries.length > 0 && (
+                <div className="mt-1.5 flex items-center gap-1 min-w-0 overflow-hidden" data-testid="status-top-tags">
+                  <div className="flex flex-wrap gap-1 min-w-0 flex-1">
+                    {topTagEntries.map((entry) => (
+                      <span
+                        key={entry.id}
+                        className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-serif-cn ${topTagToneClass(entry.tone)}`}
+                        title={entry.description || entry.displayLabel}
+                      >
+                        {entry.shortLabel || entry.displayLabel}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
 

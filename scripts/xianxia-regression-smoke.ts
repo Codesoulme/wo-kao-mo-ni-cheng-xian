@@ -2373,6 +2373,13 @@ async function main(): Promise<void> {
   smokeEndingTriggerConditions();
   smokeEndingAiReflection();
   smokeEndingBlueprint();
+  // AI-46~AI-50 + AI-59: 5 个 slot UI 消费 + 6 条 smoke
+  smokeTopTagsConsumesDisplayRegistry();
+  smokeThreadPageConsumesDisplayRegistry();
+  smokeCombatPanelConsumesDisplayRegistry();
+  smokeInventoryPanelConsumesDisplayRegistry();
+  smokeWorldLegacyConsumesDisplayRegistry();
+  smokeWorldLegacyPanelExists();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -3044,6 +3051,60 @@ function smokeEndingBlueprint(): void {
   assert(/7.*主类|ascension.*failedAscension/.test(src), '蓝图应列 7 主类');
   assert(/CharacterEnding|EndingType/.test(src), '蓝图应含数据契约');
   log('ending-blueprint', { passed: true });
+}
+
+function smokeTopTagsConsumesDisplayRegistry(): void {
+  // AI-46: StatusPanel 消费 topTags slot
+  const panel = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
+  assert(/entriesForSlot\(allDisplayEntries, 'topTags'/.test(panel), 'StatusPanel 应消费 topTags slot');
+  assert(/topTagEntries|topTagToneClass|data-testid="status-top-tags"/.test(panel), 'StatusPanel 应有 topTagEntries + toneClass + testid');
+  log('top-tags-consumes-display-registry', { passed: true });
+}
+
+function smokeThreadPageConsumesDisplayRegistry(): void {
+  // AI-47: PendingThreadsCard 消费 threadPage slot
+  const card = readFileSync('src/components/xianxia/PendingThreadsCard.tsx', 'utf-8');
+  assert(/entriesForSlot\(allDisplayEntries, 'threadPage'/.test(card), 'PendingThreadsCard 应消费 threadPage slot');
+  assert(/threadPageEntries|data-testid="thread-page-slot"/.test(card), 'PendingThreadsCard 应有 threadPageEntries + testid');
+  log('thread-page-consumes-display-registry', { passed: true });
+}
+
+function smokeCombatPanelConsumesDisplayRegistry(): void {
+  // AI-48: CombatModal 消费 combatPanel slot
+  const modal = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf-8');
+  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'combatPanel'/.test(modal), 'CombatModal 应消费 combatPanel slot');
+  assert(/data-testid="combat-panel-slot"/.test(modal), 'CombatModal 应有 testid');
+  log('combat-panel-consumes-display-registry', { passed: true });
+}
+
+function smokeInventoryPanelConsumesDisplayRegistry(): void {
+  // AI-49: InventoryPanel 消费 inventoryPanel slot
+  const panel = readFileSync('src/components/xianxia/InventoryPanel.tsx', 'utf-8');
+  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'inventoryPanel'/.test(panel), 'InventoryPanel 应消费 inventoryPanel slot');
+  assert(/inventoryPanelEntries|data-testid="inventory-panel-slot"/.test(panel), 'InventoryPanel 应有 inventoryPanelEntries + testid');
+  log('inventory-panel-consumes-display-registry', { passed: true });
+}
+
+function smokeWorldLegacyConsumesDisplayRegistry(): void {
+  // AI-50: WorldLegacyPanel 消费 worldLegacy slot
+  const panel = readFileSync('src/components/xianxia/WorldLegacyPanel.tsx', 'utf-8');
+  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'worldLegacy'/.test(panel), 'WorldLegacyPanel 应消费 worldLegacy slot');
+  assert(/worldLegacyEntries/.test(panel), 'WorldLegacyPanel 应有 worldLegacyEntries');
+  log('world-legacy-consumes-display-registry', { passed: true });
+}
+
+function smokeWorldLegacyPanelExists(): void {
+  // AI-50: WorldLegacyPanel 文件存在
+  assert(Bun.file('src/components/xianxia/WorldLegacyPanel.tsx').size > 0, 'WorldLegacyPanel.tsx 应存在');
+  const src = readFileSync('src/components/xianxia/WorldLegacyPanel.tsx', 'utf-8');
+  assert(/export function WorldLegacyPanel/.test(src), 'WorldLegacyPanel.tsx 应导出组件');
+  assert(/data-testid="world-legacy-panel"/.test(src), 'WorldLegacyPanel 应有 testid');
+  // 7 个 slot 全覆盖（除 characterDetail/statusPage 原本就消费的外）
+  const registry = readFileSync('src/lib/xianxia/display-registry.ts', 'utf-8');
+  for (const slot of ['topTags', 'threadPage', 'combatPanel', 'inventoryPanel', 'worldLegacy']) {
+    assert(registry.includes(slot), `display-registry.ts 应定义 ${slot} slot`);
+  }
+  log('world-legacy-panel-exists', { passed: true });
 }
 
 function smokeCausalityNetNodeTypes(): void {

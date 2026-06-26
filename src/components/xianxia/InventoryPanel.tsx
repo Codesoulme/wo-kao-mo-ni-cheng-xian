@@ -29,6 +29,7 @@ import {
 import { FormationPanel } from './FormationPanel';
 import { PetPanel } from './PetPanel';
 import { formatItemEffectLabel } from '@/lib/xianxia/display';
+import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-registry';
 import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 
 const RARITY_COLORS: Record<string, string> = {
@@ -263,6 +264,8 @@ export function InventoryPanel() {
   const visibleTechniques = showAllArts ? learnedTechniques : learnedTechniques.slice(0, 3);
   const visibleSpells = showAllArts ? learnedSpells : learnedSpells.slice(0, 3);
   const toggleBagGroup = (type: string) => setExpandedBagGroups(prev => ({ ...prev, [type]: !prev[type] }));
+  // AI-49: inventoryPanel slot 消费 — AI 创造的物品 effect tag 在此呈现
+  const inventoryPanelEntries = entriesForSlot(characterDisplayEntries(character), 'inventoryPanel', 8);
 
   return (
     <div className="space-y-3 pb-2">
@@ -735,6 +738,24 @@ export function InventoryPanel() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* AI-49: inventoryPanel slot 消费 — AI 创造的物品 effect tag 在此呈现 */}
+      {inventoryPanelEntries.length > 0 && (
+        <div className="px-1 pt-1" data-testid="inventory-panel-slot">
+          <div className="text-[10px] text-muted-foreground mb-1">此身物品所系</div>
+          <div className="flex flex-wrap gap-1">
+            {inventoryPanelEntries.map((entry) => (
+              <span
+                key={entry.id}
+                className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border bg-stone-50 text-stone-800 border-stone-200 font-serif-cn"
+                title={entry.description || entry.displayLabel}
+              >
+                {entry.shortLabel || entry.displayLabel}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

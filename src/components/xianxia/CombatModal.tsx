@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { COMBAT_PROJECTION_LABELS } from '@/lib/xianxia/display';
+import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-registry';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -451,6 +452,34 @@ export function CombatModal() {
             ))}
           </div>
         )}
+
+        {/* AI-48: combatPanel slot 消费 — AI 创造的战时 effect / 临时 buff 在此呈现 */}
+        {(() => {
+          const combatEntries = entriesForSlot(characterDisplayEntries(character), 'combatPanel', 8);
+          if (combatEntries.length === 0) return null;
+          return (
+            <div className="px-3 py-1.5 border-b border-destructive/20 bg-background/40 shrink-0" data-testid="combat-panel-slot">
+              <div className="flex flex-wrap gap-1">
+                {combatEntries.map((entry) => {
+                  const toneClass = entry.tone === 'good' ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                    : entry.tone === 'bad' || entry.tone === 'danger' ? 'bg-rose-50 text-rose-900 border-rose-300'
+                    : entry.tone === 'rare' ? 'bg-amber-50 text-amber-900 border-amber-300'
+                    : entry.tone === 'mystery' ? 'bg-violet-50 text-violet-900 border-violet-300'
+                    : 'bg-stone-50 text-stone-800 border-stone-200';
+                  return (
+                    <span
+                      key={entry.id}
+                      className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border font-serif-cn ${toneClass}`}
+                      title={entry.description || entry.displayLabel}
+                    >
+                      {entry.shortLabel || entry.displayLabel}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
 
         <CardContent className="flex-1 min-h-0 overflow-hidden p-3 flex flex-col">
           {session && !battleStarted && !endResult && (
