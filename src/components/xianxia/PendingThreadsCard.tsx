@@ -1,6 +1,7 @@
 'use client';
 
 import { useGameStore } from '@/lib/xianxia/store';
+import { sanitizeClueText } from '@/lib/xianxia/display';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -241,6 +242,8 @@ function sanitizeThreadText(text: string): string {
     .replace(new RegExp('\\u89d2\\u8272\\u5e94\\u4e3b\\u52a8', 'g'), '\u5fc3\u4e2d\u5df2\u6709\u5ff5\u5934\uff0c\u6b32')
     .replace(new RegExp('\\u4e0d\\u80fd\\u88ab\\u540e\\u7eed\\u6d41\\u5e74\\u9057\\u5fd8', 'g'), '\u4ecd\u4e0d\u53ef\u8f7b\u653e')
     .replace(new RegExp('\\u540e\\u7eed\\u6d41\\u5e74', 'g'), '\u6765\u5e74\u5c81\u6708')
+    // AI-20: 委托给 display.ts 统一 sanitize
+    .replace(/^.*$/s, (m) => sanitizeClueText(m))
     .trim();
 }
 

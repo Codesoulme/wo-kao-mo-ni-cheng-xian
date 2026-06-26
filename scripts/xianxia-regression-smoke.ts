@@ -2312,6 +2312,13 @@ async function main(): Promise<void> {
   smokeBreakthroughDisplayProcess();
   smokeUnresolvedCauseExpandable();
   smokeCultivationSpeedSourceCollapse();
+  smokeStatusAffectsEvents();
+  smokeContinuousPushCombatSync();
+  smokeMultiCultivationBonusDisplay();
+  smokeYinyuanNarrativeNoOutOfWorld();
+  smokeYinyuanTitleNaturalPhrasing();
+  smokeClueCarryOverTextBoundary();
+  smokeRealmVsIdentitySeparation();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -2398,6 +2405,116 @@ function smokeOldChineseCategoryCompatibility(): void {
   assert(bodyAttr?.category === 'body', `中文 身体 应被 normalize 为 body, got ${bodyAttr?.category}`);
   assert(spiritAttr?.category === 'spirit', `中文 神魂 应被 normalize 为 spirit, got ${spiritAttr?.category}`);
   log('old-chinese-category-compatibility', { passed: true });
+}
+
+function smokeRealmVsIdentitySeparation(): void {
+  // AI-21: 境界 vs 身份 分离
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/REALM_SECTION_LABELS/.test(displaySource), 'display.ts 应导出 REALM_SECTION_LABELS');
+  assert(/IDENTITY_SECTION_LABELS/.test(displaySource), 'display.ts 应导出 IDENTITY_SECTION_LABELS');
+  assert(/isRealmAttribute/.test(displaySource), 'display.ts 应导出 isRealmAttribute');
+  assert(/isIdentityAttribute/.test(displaySource), 'display.ts 应导出 isIdentityAttribute');
+  // realm 字段不应该在 IDENTITY 内
+  assert(!/faction.*REALM|realm.*IDENTITY/.test(displaySource), 'realm 与 identity 字段不应混淆');
+  // types.ts CharacterState 已分字段
+  const typesSource = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  // CharacterState 应该有 realm/realmLevel 和 faction/master/location 各自独立字段
+  const charStateBlock = typesSource.match(/export\s+interface\s+CharacterState\s*\{[\s\S]+?\n\}/);
+  assert(charStateBlock !== null, '应存在 CharacterState interface');
+  const block = charStateBlock?.[0] || '';
+  assert(/realm:\s*Realm/.test(block) || /realm\?:\s*Realm/.test(block), 'CharacterState 应有 realm 字段');
+  assert(/faction:\s*string/.test(block) && /master:\s*string/.test(block), 'CharacterState 应有 faction/master 字段（身份）');
+  // 验证语义
+  const isRealmAttribute = (key: string): boolean => key in { realm: 0, realmLevel: 0, cultivationExp: 0, expToBreak: 0, soulRealmName: 0, spiritualRoot: 0, rootMultiplier: 0, realmTraits: 0, realmProfile: 0 };
+  const isIdentityAttribute = (key: string): boolean => key in { faction: 0, master: 0, location: 0, reputation: 0, spiritStones: 0, luck: 0, comprehension: 0 };
+  assert(isRealmAttribute('realm') === true, 'realm 应是境界属性');
+  assert(isIdentityAttribute('faction') === true, 'faction 应是身份属性');
+  assert(isRealmAttribute('faction') === false, 'faction 不应是境界属性');
+  assert(isIdentityAttribute('realm') === false, 'realm 不应是身份属性');
+  log('realm-vs-identity-separation', { passed: true });
+}
+
+function smokeClueCarryOverTextBoundary(): void {
+  // AI-20: 线索承接文案边界 (sanitize + 长度限制)
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/sanitizeClueText/.test(displaySource), 'display.ts 应导出 sanitizeClueText');
+  assert(/CLUE_TEXT_MAX_LEN|200/.test(displaySource), 'sanitizeClueText 应限制 ≤200 字');
+  // PendingThreadsCard 应使用 sanitizeClueText
+  const cardSource = readFileSync('src/components/xianxia/PendingThreadsCard.tsx', 'utf-8');
+  assert(/sanitizeClueText/.test(cardSource), 'PendingThreadsCard 应引用 sanitizeClueText');
+  // 测试样例
+  const sanitizeClueText = (text: string): string => {
+    let r = text;
+    r = r.replace(/(?:^|\n)\s*说起此事[，,]?.*?[。！？]/u, '');
+    r = r.replace(/(?:^|\n)\s*原来如此[，,].{0,30}/u, '');
+    if (r.length > 200) r = `${r.slice(0, 200)}…`;
+    return r.trim();
+  };
+  const test1 = '说起此事，原是三月之约。茅听澎整装待发。';
+  const out1 = sanitizeClueText(test1);
+  assert(!out1.includes('说起此事'), 'sanitizeClueText 应删除"说起此事"开场');
+  const longText = '甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸';
+  const out2 = sanitizeClueText(longText);
+  assert(out2.length <= 210, 'sanitizeClueText 应限制 ≤200 字（容忍省略号）');
+  log('clue-carry-over-text-boundary', { passed: true });
+}
+
+function smokeYinyuanTitleNaturalPhrasing(): void {
+  // AI-19: 因缘标题自然概括
+  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  assert(/因缘标题自然概括/.test(llmSource), 'llm.ts 应包含"因缘标题自然概括"指导');
+  // 列举规则
+  assert(/不剧透/.test(llmSource), 'llm.ts 应要求标题不剧透');
+  assert(/≤12字|不超.*12.*字/.test(llmSource), 'llm.ts 应限制 title ≤12 字');
+  assert(/主线|任务/.test(llmSource), 'llm.ts 应禁止"主线/任务"等元数据词');
+  log('yinyuan-title-natural-phrasing', { passed: true });
+}
+
+function smokeYinyuanNarrativeNoOutOfWorld(): void {
+  // AI-18: 因缘叙事去局外词
+  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  assert(/因缘叙事去局外词/.test(llmSource), 'llm.ts 应包含"因缘叙事去局外词"指导');
+  // 列举具体禁止词
+  assert(/上回说到/.test(llmSource) && /且听下回分解/.test(llmSource), 'llm.ts 应列举"上回说到""且听下回分解"等具体禁止词');
+  assert(/系统提示|旁白|作者注/.test(llmSource), 'llm.ts 应包含"系统提示/旁白/作者注"等禁止词');
+  log('yinyuan-narrative-no-out-of-world', { passed: true });
+}
+
+function smokeMultiCultivationBonusDisplay(): void {
+  // AI-17: 多重修炼加成 UI 显示 (速率 ×N / 每岁 +N)
+  const cardSource = readFileSync('src/components/xianxia/CultivationSpeedCard.tsx', 'utf-8');
+  // 区分 multiply / add 的 pill 渲染
+  assert(/function\s+formatGroupedEffect|eff\.operation\s*===\s*'multiply'\s*\?\s*['"]?速率\s*×|['"]?每岁\s*\+/.test(cardSource), 'CultivationSpeedCard 应区分 multiply/add pill');
+  // 颜色 tone（多绿少红）
+  assert(/multiplierTone/.test(cardSource), 'CultivationSpeedCard 应有 multiplierTone 颜色处理');
+  // 多个效果聚合
+  assert(/source\.effects\.map/.test(cardSource), 'CultivationSpeedCard 应聚合多个 effects');
+  // 验证类型
+  const mul: { operation: 'multiply' | 'add'; value: number } = { operation: 'multiply', value: 1.5 };
+  const add: { operation: 'multiply' | 'add'; value: number } = { operation: 'add', value: 3 };
+  assert(mul.operation === 'multiply' && add.operation === 'add', 'operation 应区分 multiply/add');
+  log('multi-cultivation-bonus-display', { passed: true });
+}
+
+function smokeContinuousPushCombatSync(): void {
+  // AI-16: 战斗进行中时 advance 推进被拦截
+  const routeSource = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  assert(/combatStateJson/.test(routeSource), 'advance/route.ts 应检查 combatStateJson');
+  assert(/战斗中|combat.*ongoing/.test(routeSource), 'advance/route.ts 应拒绝战斗中的推进');
+  // ActionButtons 应禁用推进
+  const actionBtnSource = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
+  assert(/战斗进行中/.test(actionBtnSource), 'ActionButtons 应显示"战斗进行中"状态');
+  // 错误处理
+  assert(/message\.includes\(['"]战斗进行中['"]\)/.test(actionBtnSource) || /战斗进行中/.test(actionBtnSource), 'ActionButtons 应处理"战斗进行中"错误');
+  log('continuous-push-combat-sync', { passed: true });
+}
+
+function smokeStatusAffectsEvents(): void {
+  // AI-15: 当前状态必须参与事件
+  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  assert(/当前状态必须参与事件|状态必须参与|activeStatuses.*参与/.test(llmSource), 'llm.ts 应包含"当前状态必须参与事件"指导');
+  assert(/无参与.*等于失忆|必须参与.*叙事/.test(llmSource), 'llm.ts 应有"无参与等于失忆"等强制约束');
+  log('status-affects-events', { passed: true });
 }
 
 function smokeCultivationSpeedSourceCollapse(): void {

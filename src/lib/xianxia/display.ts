@@ -71,6 +71,78 @@ export function sanitizeBreakthroughProcessText(text: string, isFinalBreakthroug
   return result;
 }
 
+// AI-20: 线索承接文案边界
+// 1. 去掉"承接式"冗余开场（"说起这事""话说此事""原来如此"）
+// 2. 限制单条 ≤200 字（防止 AI 把整段前情回放）
+// 3. 重复句合并
+const CLUE_TEXT_TRIM = [
+  // 前情回放式开场
+  [/(?:^|\n)\s*说起(?:此事|这桩事|前事|前缘).*?[。！？]/u, ''],
+  [/(?:^|\n)\s*话?说(?:此事|起那桩|到此事|起前事|那桩事).*?[。！？]/u, ''],
+  [/(?:^|\n)\s*原来如此[，,].{0,30}/u, ''],
+  [/(?:^|\n)\s*且说.{0,30}/u, ''],
+];
+const CLUE_TEXT_MAX_LEN = 200;
+
+export function sanitizeClueText(text: string): string {
+  if (!text) return text;
+  let result = text;
+  for (const [pattern] of CLUE_TEXT_TRIM) {
+    result = result.replace(pattern, '');
+  }
+  // 折叠连续空行
+  result = result.replace(/\n{3,}/g, '\n\n');
+  // 长度截断（按句号/分号边界优先）
+  if (result.length > CLUE_TEXT_MAX_LEN) {
+    const sliced = result.slice(0, CLUE_TEXT_MAX_LEN);
+    const lastPunct = Math.max(
+      sliced.lastIndexOf('。'),
+      sliced.lastIndexOf('；'),
+      sliced.lastIndexOf('！'),
+      sliced.lastIndexOf('？'),
+    );
+    if (lastPunct > CLUE_TEXT_MAX_LEN * 0.6) {
+      result = sliced.slice(0, lastPunct + 1);
+    } else {
+      result = `${sliced}…`;
+    }
+  }
+  return result.trim();
+}
+
+// AI-21: 境界 vs 身份 分离
+// 境界（realm）：修为层/法力/练气/筑基/金丹…= 实力台阶
+// 身份（identity）：宗门/师承/所在/称号/阵营 = 角色在世界里"是谁"
+export const REALM_SECTION_LABELS = {
+  realm: '境界',
+  realmLevel: '境界层数',
+  cultivationExp: '修为',
+  expToBreak: '破境进度',
+  soulRealmName: '神魂境界',
+  spiritualRoot: '灵根',
+  rootMultiplier: '灵根倍率',
+  realmTraits: '境界特性',
+  realmProfile: '境界画像',
+} as const;
+
+export const IDENTITY_SECTION_LABELS = {
+  faction: '宗门',
+  master: '师承',
+  location: '所在',
+  reputation: '声望',
+  spiritStones: '灵石',
+  luck: '气运',
+  comprehension: '悟性',
+} as const;
+
+export function isRealmAttribute(key: string): boolean {
+  return key in REALM_SECTION_LABELS;
+}
+
+export function isIdentityAttribute(key: string): boolean {
+  return key in IDENTITY_SECTION_LABELS;
+}
+
 export const ATTRIBUTE_LABEL: Record<string, string> = {
   age: '年龄',
   lifespan: '寿元',
