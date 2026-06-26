@@ -187,9 +187,9 @@ export function ChoiceModal() {
       <Dialog open={aiConfigPromptOpen} onOpenChange={setAiConfigPromptOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="font-serif-cn">需要配置 AI 接口</DialogTitle>
+            <DialogTitle className="font-serif-cn">灵桥未通</DialogTitle>
             <DialogDescription>
-              天道抉择需要 AI 生成后续剧情。请先配置 API Base URL 和 API Key，保存后回到此处继续选择。
+              天道抉择需借灵桥传讯，方能由天机推演后事。请先设灵桥，置妥后回到此处继续抉择。
             </DialogDescription>
           </DialogHeader>
           <AIConfigDialog variant="start" />

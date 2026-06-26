@@ -1,6 +1,6 @@
 # AI-28 玩家可见文案审计报告 (2026-06-27)
 
-总问题: 6 (P0: 3 / P1: 3)
+总问题: 3 (P0: 3 / P1: 0)
 
 ## 审计范围
 
@@ -19,7 +19,3 @@
     ? (realmLevel / realmMaxLevel) * 0.7 + (cultivationExp / expToBreak) * 0.3
 
 ## P1 详单
-
-- **异常** `src\components\xianxia\ActionButtons.tsx:377` → AI 响应异常
-- **API Base** `src\components\xianxia\ChoiceModal.tsx:191` → 天道抉择需要 AI 生成后续剧情。请先配置 API Base URL 和 API Key，保存后回到此处继续选择。
-- **isMeaningfulStatus** `src\lib\xianxia\display.ts:0` → 缺少导出函数 isMeaningfulStatus

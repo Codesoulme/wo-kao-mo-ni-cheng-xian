@@ -2330,6 +2330,13 @@ async function main(): Promise<void> {
   smokeCausalityChainSecretRealm();
   smokePlayerVisibleTextNoSystemWords();
   smokeDesignDocTablesExist();
+  // AI-36 新增 6 条 (p1-fixups-p2-pilot)
+  smokePlayerVisibleTextNoSystemWordsAfterFix();
+  smokeSaveLoadIntegrity();
+  smokeSaveLoadBackwardCompat();
+  smokeSaveLoadCorruptionRecovery();
+  smokePlayerVisibleTextAuditScriptSelfCheck();
+  smokeBlueprintDocsCoverage();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -2879,6 +2886,100 @@ function smokeDesignDocTablesExist(): void {
     assert(/AI/.test(src), `${f} 应提及 AI 接管`);
   }
   log('design-doc-tables-exist', { passed: true });
+}
+
+// ========== AI-36 新增 smoke (p1-fixups-p2-pilot) ==========
+
+function smokePlayerVisibleTextNoSystemWordsAfterFix(): void {
+  // AI-32/33: 玩家可见文案世界内化（修复后验证）
+  const actionBtnSource = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
+  assert(!/AI 响应异常/.test(actionBtnSource), 'ActionButtons 不应再有"AI 响应异常"文案');
+  assert(/灵机未通/.test(actionBtnSource), 'ActionButtons 应使用"灵机未通"世界内文案');
+  const choiceModalSource = readFileSync('src/components/xianxia/ChoiceModal.tsx', 'utf-8');
+  assert(!/需要配置 AI 接口/.test(choiceModalSource), 'ChoiceModal 不应再有"需要配置 AI 接口"文案');
+  assert(!/API Base URL 和 API Key/.test(choiceModalSource), 'ChoiceModal 不应再有"API Base URL 和 API Key"');
+  assert(/灵桥未通/.test(choiceModalSource), 'ChoiceModal 应使用"灵桥未通"世界内文案');
+  log('player-visible-text-no-system-words-after-fix', { passed: true });
+}
+
+function smokeSaveLoadIntegrity(): void {
+  // AI-35: 存档完整性 (schema 完整 + 关键字段存在)
+  const schema = readFileSync('prisma/schema.prisma', 'utf-8');
+  const requiredFields = [
+    'id', 'name', 'age', 'lifespan', 'realm', 'realmLevel',
+    'cultivationExp', 'expToBreak', 'hp', 'mp', 'alive',
+    'faction', 'master', 'location',
+    'pendingThreadsJson', 'combatStateJson', 'worldFactsJson',
+    'npcsJson', 'causalGraphJson', 'petsJson', 'worldCalendarJson',
+    'EventLog', 'ChoiceLog', 'InterferenceLog',
+  ];
+  for (const f of requiredFields) {
+    assert(schema.includes(f), `prisma schema 应包含 ${f}`);
+  }
+  // SAVE-LOAD.md 应存在
+  assert(Bun.file('docs/SAVE-LOAD.md').size > 0, 'docs/SAVE-LOAD.md 应存在');
+  log('save-load-integrity', { passed: true });
+}
+
+function smokeSaveLoadBackwardCompat(): void {
+  // AI-35: 存档向后兼容 (JSON 字段 try-parse + default fallback)
+  // 验证 display.ts 或 engine.ts 至少有一处 try-parse JSON 字段
+  const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  const hasTryParse = /JSON\.parse.*try|catch.*JSON|try\s*\{[^}]*JSON\.parse/s.test(engineSource + displaySource);
+  assert(hasTryParse, 'engine.ts/display.ts 应有 JSON parse 错误兜底');
+  // 验证 SAVE-LOAD.md §3 描述兼容策略
+  const saveLoadDoc = readFileSync('docs/SAVE-LOAD.md', 'utf-8');
+  assert(/向后兼容|兼容性|backward.?compat/i.test(saveLoadDoc), 'SAVE-LOAD.md 应有兼容策略段');
+  log('save-load-backward-compat', { passed: true });
+}
+
+function smokeSaveLoadCorruptionRecovery(): void {
+  // AI-35: 存档损坏恢复
+  const saveLoadDoc = readFileSync('docs/SAVE-LOAD.md', 'utf-8');
+  assert(/损坏恢复|corruption|recovery|兜底|fallback/i.test(saveLoadDoc), 'SAVE-LOAD.md 应有损坏恢复段');
+  // 蓝图应有错误处理路径表格
+  const blueprint = readFileSync('docs/blueprints/save-load-blueprint.md', 'utf-8');
+  assert(/错误处理|错误类型|兜底策略/.test(blueprint), 'save-load-blueprint.md 应有错误处理路径');
+  // 模拟 JSON parse 失败 → default
+  const tryParse = (s: string, fallback: any): any => {
+    try { return JSON.parse(s); } catch { return fallback; }
+  };
+  const corruptedResult = tryParse('invalid{json', []);
+  assert(Array.isArray(corruptedResult) && corruptedResult.length === 0, '损坏 JSON 应 fallback 到 []');
+  assert(JSON.stringify(tryParse('{"a":1}', {})) === '{"a":1}', '正常 JSON 应正常解析');
+  log('save-load-corruption-recovery', { passed: true });
+}
+
+function smokePlayerVisibleTextAuditScriptSelfCheck(): void {
+  // AI-28: 审计脚本自身正确性
+  assert(Bun.file('scripts/player-visible-text-audit.py').size > 0, '审计脚本应存在');
+  const script = readFileSync('scripts/player-visible-text-audit.py', 'utf-8');
+  // 应有 P0/P1 分类
+  assert(/P0_PATTERNS|P0_KEY_PATTERNS/.test(script), '审计脚本应有 P0 规则');
+  assert(/P1_PATTERNS/.test(script), '审计脚本应有 P1 规则');
+  // 应有白名单
+  assert(/WHITELIST|TECHNICAL_FILE/i.test(script), '审计脚本应有白名单机制');
+  // 应有审计范围段
+  const auditReport = readFileSync('docs/PLAYER_VISIBLE_TEXT_AUDIT.md', 'utf-8');
+  assert(/审计范围|扫描文件/i.test(auditReport), '审计报告应有审计范围段');
+  log('player-visible-text-audit-script-self-check', { passed: true });
+}
+
+function smokeBlueprintDocsCoverage(): void {
+  // AI-31 + AI-35: 蓝图文档覆盖度
+  const blueprints = [
+    'docs/blueprints/value-blueprint.md',
+    'docs/blueprints/status-blueprint.md',
+    'docs/blueprints/event-blueprint.md',
+    'docs/blueprints/save-load-blueprint.md',
+  ];
+  for (const f of blueprints) {
+    assert(Bun.file(f).size > 0, `${f} 应存在`);
+    const src = readFileSync(f, 'utf-8');
+    assert(/\|.+\|.+\|/.test(src), `${f} 应有 markdown 表格`);
+  }
+  log('blueprint-docs-coverage', { passed: true });
 }
 
 main().catch(error => {

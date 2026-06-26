@@ -374,7 +374,7 @@ export function ActionButtons() {
         autoCancelRef.current = true;
       }
       if (doneData.fallbackGenerated) {
-        toast.warning('AI 响应异常', { description: 'AI 生成失败，已使用模板叙事。' });
+        toast.warning('灵机未通', { description: '天道推演暂歇，已依天机本相续接。' });
       }
       if (!doneData.hasChoice && doneData.state && doneData.state.alive) {
         preloadRef.current.key = null;

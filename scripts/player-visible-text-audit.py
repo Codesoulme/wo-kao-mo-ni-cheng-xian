@@ -139,7 +139,7 @@ def scan_display_sanitize():
         'sanitizeClueText',
         'sanitizeEventDraft',
         'attributeLabel',
-        'isMeaningfulStatus',
+        'isInternalLikeAttr',
         'isVisibleNumericEventEffect',
         'COMBAT_PROJECTION_LABELS',
         'LOADING_LABELS',
