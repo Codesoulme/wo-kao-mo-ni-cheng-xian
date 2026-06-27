@@ -226,7 +226,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
               <StatCard icon={<Brain className="w-3 h-3" />} label="悟性" value={current.comprehension} color="#a855f7" info={ATTRIBUTE_INFO.comprehension} onClick={setSelectedAttr} />
               <StatCard icon={<Coins className="w-3 h-3" />} label="灵石" value={current.spiritStones} color="#d4af37" info={ATTRIBUTE_INFO.spiritStones} onClick={setSelectedAttr} />
               <StatCard icon={<Star className="w-3 h-3" />} label="声望" value={current.reputation} color="#f97316" info={ATTRIBUTE_INFO.reputation} onClick={setSelectedAttr} />
-              <StatCard icon={<Flame className="w-3 h-3" />} label="心魔" value={(current as any).heartDemon ?? 0} color={(current as any).heartDemon >= 60 ? '#dc2626' : (current as any).heartDemon >= 30 ? '#d97706' : '#65a30d'} info={ATTRIBUTE_INFO.heartDemon} onClick={setSelectedAttr} />
+              <StatCard icon={<Flame className="w-3 h-3" />} label="心魔" value={(current as any).heartDemon ?? 0} color={(current as any).heartDemon >= 60 ? '#dc2626' : (current as any).heartDemon >= 30 ? '#d97706' : '#7c3aed'} info={ATTRIBUTE_INFO.heartDemon} onClick={setSelectedAttr} />
               <StatCard icon={<Users className="w-3 h-3" />} label="阵营" value={current.faction || '散修'} color="#6b7280" isText info={ATTRIBUTE_INFO.faction} onClick={setSelectedAttr} />
             </div>
             <CombatProjectionCollapsible projection={(current as any).combatProjection} open={combatOpen} onOpenChange={setCombatOpen} />

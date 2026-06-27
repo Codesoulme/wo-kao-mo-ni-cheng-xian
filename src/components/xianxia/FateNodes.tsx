@@ -23,7 +23,7 @@ export function FateNodes({ onSelect }: FateNodesProps) {
   return (
     <div className="space-y-2">
       <div className="text-xs text-muted-foreground px-1 mb-2">
-        命节点 · 主线八大关口
+        因缘转折 · 主线八大关口
       </div>
       <div className="relative">
         {/* 主线 */}

@@ -1,8 +1,8 @@
-import { readFileSync, existsSync } from 'fs';
+﻿import { readFileSync, existsSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveCombatProjection, filterMeaningfulStatuses, removeItemsByIds, equipItemsByIds, equipItem, unequipItem, addThreads, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse, deriveCombatStance, resolveCombatStanceShift, deriveCombatResource, resolveCombatResourceDrain, checkCombatResourceSufficient, deriveBreakthroughStage, resolveBreakthroughOutcome, detectCombatStalemate, resolveStalemateBreak, deriveComboChain, resolveComboDamage, sanitizeCombatLog, novelizeCombatLog,computeCultivationFactors, computeEffectiveCultivationRate,  deriveLootFromOpponent, resolveLootConditions, deriveStatusExpiry, resolveStatusRemoval, derivePetCultivationSuggestion, resolvePetSkillLearn, deriveRecipeUnlock, resolvePillCrafting, deriveFormationStack, resolveFormationConflict, deriveBidderAction, resolveAuctionEnd, deriveThreadChain, resolveThreadContinuation, deriveBottleSpiritAffect, deriveSwordAptitudeProgress, resolveFakeDeath, deriveNPCMemoryUpdate, deriveNPCBehavior, deriveRumorTrigger, resolveRumorReliability } from '../src/lib/xianxia/engine';
+import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveCombatProjection, filterMeaningfulStatuses, removeItemsByIds, equipItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse, deriveCombatStance, resolveCombatStanceShift, deriveCombatResource, resolveCombatResourceDrain, checkCombatResourceSufficient, deriveBreakthroughStage, resolveBreakthroughOutcome, detectCombatStalemate, resolveStalemateBreak, deriveComboChain, resolveComboDamage, sanitizeCombatLog, novelizeCombatLog, deriveLootFromOpponent, resolveLootConditions, deriveStatusExpiry, resolveStatusRemoval, derivePetCultivationSuggestion, resolvePetSkillLearn, deriveRecipeUnlock, resolvePillCrafting, deriveFormationStack, resolveFormationConflict, deriveBidderAction, resolveAuctionEnd, deriveThreadChain, resolveThreadContinuation, deriveBottleSpiritAffect, deriveSwordAptitudeProgress, resolveFakeDeath, deriveNPCMemoryUpdate, deriveNPCBehavior, deriveRumorTrigger, resolveRumorReliability } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
 import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain } from '../src/lib/xianxia/types';
@@ -296,8 +296,8 @@ function smokeSchedulerContinuity(): void {
     age: 20,
     questEntries: [{
       id: 'quest_auction_aftermath',
-      title: '阴鸦客的暗中盯梢',
-      summary: '拍得旧洞府铜钥后，阴鸦客神色微冷。',
+      title: '闃撮甫瀹㈢殑鏆椾腑鐩ⅱ',
+      summary: '鎷嶅緱鏃ф礊搴滈摐閽ュ悗锛岄槾楦﹀绁炶壊寰喎銆?,
       kind: 'quest',
       stage: 'open',
       progress: 10,
@@ -305,30 +305,30 @@ function smokeSchedulerContinuity(): void {
       dueAge: 21,
       urgency: 5,
       sourceThreadId: 'auction_aftermath_x',
-      currentHook: '后续流年可让阴鸦客因旧洞府铜钥盯上角色，低频触发盯梢、试探、劫杀或交易。',
-      rewardHint: '化解仇怨或反夺线索',
-      failureHint: '坊市外被盯梢、截杀或被引入圈套',
+      currentHook: '鍚庣画娴佸勾鍙闃撮甫瀹㈠洜鏃ф礊搴滈摐閽ョ洴涓婅鑹诧紝浣庨瑙﹀彂鐩ⅱ銆佽瘯鎺€佸姭鏉€鎴栦氦鏄撱€?,
+      rewardHint: '鍖栬В浠囨€ㄦ垨鍙嶅ず绾跨储',
+      failureHint: '鍧婂競澶栬鐩ⅱ銆佹埅鏉€鎴栬寮曞叆鍦堝',
       tags: ['quest', 'auction'],
     }],
     pendingThreads: [{
       id: 'auction_aftermath_x',
-      title: '阴鸦客的暗中盯梢',
-      description: '角色在拍卖会拍得旧洞府铜钥后，阴鸦客神色微冷。',
+      title: '闃撮甫瀹㈢殑鏆椾腑鐩ⅱ',
+      description: '瑙掕壊鍦ㄦ媿鍗栦細鎷嶅緱鏃ф礊搴滈摐閽ュ悗锛岄槾楦﹀绁炶壊寰喎銆?,
       category: 'quest',
       startAge: 20,
       deadlineAge: 21,
       status: 'pending',
       progress: 10,
-      followUpHint: '后续流年可让阴鸦客因旧洞府铜钥盯上角色，低频触发盯梢、试探、劫杀或交易。',
-      reward: '化解仇怨或反夺线索',
-      failureCost: '坊市外被盯梢、截杀或被引入圈套',
+      followUpHint: '鍚庣画娴佸勾鍙闃撮甫瀹㈠洜鏃ф礊搴滈摐閽ョ洴涓婅鑹诧紝浣庨瑙﹀彂鐩ⅱ銆佽瘯鎺€佸姭鏉€鎴栦氦鏄撱€?,
+      reward: '鍖栬В浠囨€ㄦ垨鍙嶅ず绾跨储',
+      failureCost: '鍧婂競澶栬鐩ⅱ銆佹埅鏉€鎴栬寮曞叆鍦堝',
     }],
     npcs: [{
-      id: 'auction_npc_阴鸦客',
-      name: '阴鸦客',
-      description: '拍卖会中对旧洞府铜钥格外在意的竞拍者。',
-      memory: '在拍卖会中因旧洞府铜钥落入角色手中而记下一笔。',
-      role: '竞拍失利者',
+      id: 'auction_npc_闃撮甫瀹?,
+      name: '闃撮甫瀹?,
+      description: '鎷嶅崠浼氫腑瀵规棫娲炲簻閾滈挜鏍煎鍦ㄦ剰鐨勭珵鎷嶈€呫€?,
+      memory: '鍦ㄦ媿鍗栦細涓洜鏃ф礊搴滈摐閽ヨ惤鍏ヨ鑹叉墜涓€岃涓嬩竴绗斻€?,
+      role: '绔炴媿澶卞埄鑰?,
       attitude: 'hostile',
       relationshipScore: -25,
       lastSeenAge: 20,
@@ -338,10 +338,10 @@ function smokeSchedulerContinuity(): void {
     causalGraph: { nodes: [{ id: 'thread_node', refId: 'auction_aftermath_x' }], edges: [{ from: 'event_node', to: 'thread_node', type: 'created', age: 20 }] },
   };
   const plan = buildEventSchedulerPlan(state);
-  assert(plan.focus?.title === '阴鸦客', 'scheduler should focus hostile auction aftermath NPC');
+  assert(plan.focus?.title === '闃撮甫瀹?, 'scheduler should focus hostile auction aftermath NPC');
   assert((plan.focus?.priority || 0) >= 60, 'scheduler focus priority should be high');
-  assert(plan.hints.some(h => h.kind === 'quest' && h.title.includes('盯梢')), 'scheduler should include related quest hint');
-  assert(plan.hints.some(h => h.kind === 'npc' && h.reason.includes('自主倾向') && h.reason.includes('截杀')), 'scheduler should include NPC autonomous hostile echo');
+  assert(plan.hints.some(h => h.kind === 'quest' && h.title.includes('鐩ⅱ')), 'scheduler should include related quest hint');
+  assert(plan.hints.some(h => h.kind === 'npc' && h.reason.includes('鑷富鍊惧悜') && h.reason.includes('鎴潃')), 'scheduler should include NPC autonomous hostile echo');
   log('scheduler-continuity', { passed: true, focus: plan.focus?.title, priority: plan.focus?.priority, hints: plan.hints.length });
 }
 
@@ -349,30 +349,30 @@ function smokeBoundaryFactChecks(): void {
   const state: any = {
     age: 20,
     spiritStones: 100,
-    inventory: [{ id: 'key_1', name: '旧洞府铜钥', description: '拍卖所得', item_type: 'tool', rarity: 'epic', effects: [], source: '拍卖会' }],
-    equipped: [{ id: 'ring_1', name: '青玉戒', description: '旧物', item_type: 'accessory', rarity: 'rare', effects: [], source: '旧年' }],
+    inventory: [{ id: 'key_1', name: '鏃ф礊搴滈摐閽?, description: '鎷嶅崠鎵€寰?, item_type: 'tool', rarity: 'epic', effects: [], source: '鎷嶅崠浼? }],
+    equipped: [{ id: 'ring_1', name: '闈掔帀鎴?, description: '鏃х墿', item_type: 'accessory', rarity: 'rare', effects: [], source: '鏃у勾' }],
     pendingThreads: [
-      { id: 'closed_x', title: '旧洞府铜钥的旧主线索', description: '旧洞府铜钥已经查明', category: 'mystery', startAge: 18, deadlineAge: 19, status: 'resolved', progress: 100 },
-      { id: 'open_y', title: '阴鸦客的暗中盯梢', description: '阴鸦客盯上角色', category: 'enemy', startAge: 20, deadlineAge: 21, status: 'pending', progress: 10 },
+      { id: 'closed_x', title: '鏃ф礊搴滈摐閽ョ殑鏃т富绾跨储', description: '鏃ф礊搴滈摐閽ュ凡缁忔煡鏄?, category: 'mystery', startAge: 18, deadlineAge: 19, status: 'resolved', progress: 100 },
+      { id: 'open_y', title: '闃撮甫瀹㈢殑鏆椾腑鐩ⅱ', description: '闃撮甫瀹㈢洴涓婅鑹?, category: 'enemy', startAge: 20, deadlineAge: 21, status: 'pending', progress: 10 },
     ],
     questEntries: [],
-    npcs: [{ id: 'auction_npc_阴鸦客', name: '阴鸦客', description: '敌意竞拍者', attitude: 'hostile', relationshipScore: -25, firstMetAge: 20, lastSeenAge: 20, source: 'auction', tags: ['auction'] }],
-    worldFacts: [{ id: 'fact_洞府', kind: 'realm', title: '旧洞府铜钥', summary: '拍卖会出现的钥匙', confidence: 0.9, firstSeenAge: 20, lastSeenAge: 20, source: 'auction' }],
+    npcs: [{ id: 'auction_npc_闃撮甫瀹?, name: '闃撮甫瀹?, description: '鏁屾剰绔炴媿鑰?, attitude: 'hostile', relationshipScore: -25, firstMetAge: 20, lastSeenAge: 20, source: 'auction', tags: ['auction'] }],
+    worldFacts: [{ id: 'fact_娲炲簻', kind: 'realm', title: '鏃ф礊搴滈摐閽?, summary: '鎷嶅崠浼氬嚭鐜扮殑閽ュ寵', confidence: 0.9, firstSeenAge: 20, lastSeenAge: 20, source: 'auction' }],
   };
   const output: any = {
-    title: '旧线再起',
-    narrative: '阴鸦客忽然改口称善，旧洞府铜钥的旧主线索再次开启。',
+    title: '鏃х嚎鍐嶈捣',
+    narrative: '闃撮甫瀹㈠拷鐒舵敼鍙ｇО鍠勶紝鏃ф礊搴滈摐閽ョ殑鏃т富绾跨储鍐嶆寮€鍚€?,
     changes: [],
     newStatuses: [],
-    newItems: [{ id: 'ring_1', name: '青玉戒', description: '又得一枚', item_type: 'accessory', rarity: 'rare', effects: [], source: '奇遇' }],
+    newItems: [{ id: 'ring_1', name: '闈掔帀鎴?, description: '鍙堝緱涓€鏋?, item_type: 'accessory', rarity: 'rare', effects: [], source: '濂囬亣' }],
     removedItemIds: ['missing_item'],
     equipItemIds: ['missing_equip'],
     unequipItemIds: ['missing_unequip'],
-    newThreads: [{ id: 'new_closed', title: '旧洞府铜钥的旧主线索', description: '旧洞府铜钥已经查明', category: 'mystery', startAge: 20, deadlineAge: 22, status: 'pending', progress: 0 }],
+    newThreads: [{ id: 'new_closed', title: '鏃ф礊搴滈摐閽ョ殑鏃т富绾跨储', description: '鏃ф礊搴滈摐閽ュ凡缁忔煡鏄?, category: 'mystery', startAge: 20, deadlineAge: 22, status: 'pending', progress: 0 }],
     advanceThreads: [{ id: 'closed_x', progressDelta: 10 }],
     completeThreadIds: [],
     failThreadIds: [],
-    newNpcs: [{ id: 'auction_npc_阴鸦客', name: '阴鸦客', description: '忽然转为友善', attitude: 'friendly', relationshipScore: 80, firstMetAge: 20, lastSeenAge: 20, source: 'ai' }],
+    newNpcs: [{ id: 'auction_npc_闃撮甫瀹?, name: '闃撮甫瀹?, description: '蹇界劧杞负鍙嬪杽', attitude: 'friendly', relationshipScore: 80, firstMetAge: 20, lastSeenAge: 20, source: 'ai' }],
   };
   const codes = validateAIBoundary(state, output).trace.map(t => t.code);
   const required = [
@@ -396,32 +396,32 @@ function smokeNarrativeContract(): void {
     equipped: [],
     pendingThreads: [],
     questEntries: [],
-    npcs: [{ id: 'npc_shadow', name: '阴鸦客', description: '敌意竞拍者', attitude: 'hostile', relationshipScore: -20, firstMetAge: 29, lastSeenAge: 30, source: 'auction' }],
-    worldFacts: [{ id: 'wf_market', kind: 'location', title: '青岚坊市', summary: '拍卖余波未散', confidence: 0.8, firstSeenAge: 29, lastSeenAge: 30, source: 'smoke', tags: ['location', 'market'] }],
+    npcs: [{ id: 'npc_shadow', name: '闃撮甫瀹?, description: '鏁屾剰绔炴媿鑰?, attitude: 'hostile', relationshipScore: -20, firstMetAge: 29, lastSeenAge: 30, source: 'auction' }],
+    worldFacts: [{ id: 'wf_market', kind: 'location', title: '闈掑矚鍧婂競', summary: '鎷嶅崠浣欐尝鏈暎', confidence: 0.8, firstSeenAge: 29, lastSeenAge: 30, source: 'smoke', tags: ['location', 'market'] }],
     eventSchedule: {
       generatedAtAge: 30,
-      focus: { id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '阴鸦客', reason: '阴鸦客暗中盯梢。', requiredAction: 'echo_or_develop' },
-      hints: [{ id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '阴鸦客', reason: '阴鸦客暗中盯梢。', requiredAction: 'echo_or_develop' }],
-      pressureMap: { topThreat: '阴鸦客', topOpportunity: '青岚坊市', focalLocation: '青岚坊市', focalActor: '阴鸦客', likelyEventTypes: ['威胁回响'], summary: '最大威胁：阴鸦客；最大机会：青岚坊市；事件倾向：威胁回响' },
+      focus: { id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '闃撮甫瀹?, reason: '闃撮甫瀹㈡殫涓洴姊€?, requiredAction: 'echo_or_develop' },
+      hints: [{ id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '闃撮甫瀹?, reason: '闃撮甫瀹㈡殫涓洴姊€?, requiredAction: 'echo_or_develop' }],
+      pressureMap: { topThreat: '闃撮甫瀹?, topOpportunity: '闈掑矚鍧婂競', focalLocation: '闈掑矚鍧婂競', focalActor: '闃撮甫瀹?, likelyEventTypes: ['濞佽儊鍥炲搷'], summary: '鏈€澶у▉鑳侊細闃撮甫瀹紱鏈€澶ф満浼氾細闈掑矚鍧婂競锛涗簨浠跺€惧悜锛氬▉鑳佸洖鍝? },
       warnings: [],
     },
   };
   const baseOutput: any = {
-    title: '坊外微影',
-    narrative: '沈砚秋在青岚坊市外觉出阴鸦客的目光，暂且避入人群。',
+    title: '鍧婂寰奖',
+    narrative: '娌堢牃绉嬪湪闈掑矚鍧婂競澶栬鍑洪槾楦﹀鐨勭洰鍏夛紝鏆備笖閬垮叆浜虹兢銆?,
     eventType: 'normal',
     changes: [],
     newStatuses: [],
     newItems: [],
-    memory: '阴鸦客在青岚坊市外盯梢。',
+    memory: '闃撮甫瀹㈠湪闈掑矚鍧婂競澶栫洴姊€?,
     hasChoice: false,
   };
   const missingCodes = validateAIBoundary(state, baseOutput).trace.map(t => t.code);
   assert(missingCodes.includes('missing_narrative_contract'), 'missing contract should warn under pressure map');
-  const unknownCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', narrativeOutcome: 'vanished', usedScheduleHintIds: ['seh_missing'], usedWorldFactIds: ['wf_missing'], usedNpcIds: ['npc_missing'], contractNote: '承接阴鸦客威胁。' } }).trace.map(t => t.code);
+  const unknownCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', narrativeOutcome: 'vanished', usedScheduleHintIds: ['seh_missing'], usedWorldFactIds: ['wf_missing'], usedNpcIds: ['npc_missing'], contractNote: '鎵挎帴闃撮甫瀹㈠▉鑳併€? } }).trace.map(t => t.code);
   assert(unknownCodes.includes('unknown_schedule_hint_reference') && unknownCodes.includes('unknown_world_fact_reference') && unknownCodes.includes('unknown_npc_contract_reference'), 'unknown narrative contract references should warn');
   assert(unknownCodes.includes('invalid_narrative_outcome'), 'invalid narrative outcome should warn');
-  const okCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', narrativeOutcome: 'advanced', usedScheduleHintIds: ['seh_npc_shadow'], usedWorldFactIds: ['wf_market'], usedNpcIds: ['npc_shadow'], contractNote: '承接最大威胁阴鸦客的盯梢。' } }).trace.map(t => t.code);
+  const okCodes = validateAIBoundary(state, { ...baseOutput, narrativeContract: { narrativeFocus: 'npc', narrativeOutcome: 'advanced', usedScheduleHintIds: ['seh_npc_shadow'], usedWorldFactIds: ['wf_market'], usedNpcIds: ['npc_shadow'], contractNote: '鎵挎帴鏈€澶у▉鑳侀槾楦﹀鐨勭洴姊€? } }).trace.map(t => t.code);
   assert(!okCodes.includes('missing_narrative_contract') && !okCodes.includes('unknown_schedule_hint_reference'), 'valid narrative contract should not raise contract warnings');
   log('narrative-contract', { passed: true, missingCodes: missingCodes.length, unknownCodes: unknownCodes.length, okCodes: okCodes.length });
 }
@@ -429,155 +429,155 @@ function smokeNarrativeContract(): void {
 function smokeWorldFactsLite(): void {
   const state: any = {
     age: 42,
-    location: '青岚坊市',
-    faction: '青岚宗',
+    location: '闈掑矚鍧婂競',
+    faction: '闈掑矚瀹?,
     npcs: [{
       id: 'npc_shadow',
-      name: '阴鸦客',
-      description: '拍卖会中盯上旧洞府铜钥的散修。',
-      role: '竞拍失利者',
-      faction: '黑鸦会',
+      name: '闃撮甫瀹?,
+      description: '鎷嶅崠浼氫腑鐩笂鏃ф礊搴滈摐閽ョ殑鏁ｄ慨銆?,
+      role: '绔炴媿澶卞埄鑰?,
+      faction: '榛戦甫浼?,
       attitude: 'hostile',
       relationshipScore: -30,
       firstMetAge: 41,
       lastSeenAge: 42,
-      lastKnownLocation: '青岚坊市',
+      lastKnownLocation: '闈掑矚鍧婂競',
       source: 'auction',
-      memory: '因旧洞府铜钥落入角色手中而记下一笔。',
+      memory: '鍥犳棫娲炲簻閾滈挜钀藉叆瑙掕壊鎵嬩腑鑰岃涓嬩竴绗斻€?,
       tags: ['auction', 'aftermath'],
     }],
     pendingThreads: [{
       id: 'thread_key',
-      title: '旧洞府铜钥的旧主线索',
-      description: '旧洞府铜钥牵动一座失落洞府。',
+      title: '鏃ф礊搴滈摐閽ョ殑鏃т富绾跨储',
+      description: '鏃ф礊搴滈摐閽ョ壍鍔ㄤ竴搴уけ钀芥礊搴溿€?,
       category: 'mystery',
       startAge: 41,
       deadlineAge: 45,
       status: 'pending',
       progress: 20,
-      followUpHint: '可循铜钥禁制探查洞府旧主。',
+      followUpHint: '鍙惊閾滈挜绂佸埗鎺㈡煡娲炲簻鏃т富銆?,
     }],
     discoveredRealms: [],
     worldFacts: [],
   };
   const facts = deriveWorldFactsFromState(state, 'smoke');
-  assert(facts.some(f => f.kind === 'location' && f.title === '青岚坊市' && f.tags?.includes('market')), 'world facts should derive market location fact');
-  assert(facts.some(f => f.kind === 'faction' && f.title === '青岚宗' && f.tags?.includes('current')), 'world facts should derive current faction fact');
-  assert(facts.some(f => f.kind === 'faction' && f.title === '黑鸦会' && f.tags?.includes('hostile')), 'world facts should derive NPC-linked faction fact');
+  assert(facts.some(f => f.kind === 'location' && f.title === '闈掑矚鍧婂競' && f.tags?.includes('market')), 'world facts should derive market location fact');
+  assert(facts.some(f => f.kind === 'faction' && f.title === '闈掑矚瀹? && f.tags?.includes('current')), 'world facts should derive current faction fact');
+  assert(facts.some(f => f.kind === 'faction' && f.title === '榛戦甫浼? && f.tags?.includes('hostile')), 'world facts should derive NPC-linked faction fact');
   assert(facts.some(f => f.kind === 'realm' && f.tags?.includes('realm-hint')), 'world facts should derive realm hint from key/thread text');
   const refreshed: any = refreshWorldFacts(state, 'smoke');
   const plan = buildEventSchedulerPlan({ ...refreshed, questEntries: [], causalGraph: { nodes: [], edges: [] } });
-  assert(plan.hints.some(h => h.kind === 'world' && h.title === '青岚坊市'), 'scheduler should include location world fact hint');
+  assert(plan.hints.some(h => h.kind === 'world' && h.title === '闈掑矚鍧婂競'), 'scheduler should include location world fact hint');
   log('worldfacts-lite', { passed: true, facts: facts.length, hints: plan.hints.length });
 }
 
 function smokeFactionLocationStateProfiles(): void {
   const state: any = {
     age: 46,
-    location: '青岚坊市',
+    location: '闈掑矚鍧婂競',
     npcs: [{
       id: 'npc_shadow',
-      name: '阴鸦客',
-      faction: '黑鸦会',
+      name: '闃撮甫瀹?,
+      faction: '榛戦甫浼?,
       attitude: 'hostile',
       relationshipScore: -40,
       firstMetAge: 44,
       lastSeenAge: 46,
-      lastKnownLocation: '青岚坊市',
+      lastKnownLocation: '闈掑矚鍧婂競',
       source: 'auction',
       tags: ['auction', 'aftermath'],
     }],
     pendingThreads: [{
       id: 'thread_ambush',
-      title: '坊市外的黑鸦盯梢',
-      description: '黑鸦会在青岚坊市外盯梢，可能截杀夺钥。',
+      title: '鍧婂競澶栫殑榛戦甫鐩ⅱ',
+      description: '榛戦甫浼氬湪闈掑矚鍧婂競澶栫洴姊紝鍙兘鎴潃澶洪挜銆?,
       category: 'enemy',
       startAge: 45,
       deadlineAge: 47,
       status: 'pending',
       progress: 30,
-      followUpHint: '可让黑鸦会追责、通缉或伏击。',
+      followUpHint: '鍙榛戦甫浼氳拷璐ｃ€侀€氱級鎴栦紡鍑汇€?,
     }],
     questEntries: [],
     causalGraph: { nodes: [], edges: [] },
     worldFacts: [
-      { id: 'wf_location_market', kind: 'location', title: '青岚坊市', summary: '近期拍卖余波未散。', confidence: 0.8, firstSeenAge: 44, lastSeenAge: 46, source: 'smoke', tags: ['location', 'market', 'auction', 'event-consequence'] },
-      { id: 'wf_faction_black', kind: 'faction', title: '黑鸦会', summary: '黑鸦会与旧洞府铜钥余波相连。', confidence: 0.8, firstSeenAge: 44, lastSeenAge: 46, source: 'smoke', tags: ['faction', 'hostile', 'danger'] },
+      { id: 'wf_location_market', kind: 'location', title: '闈掑矚鍧婂競', summary: '杩戞湡鎷嶅崠浣欐尝鏈暎銆?, confidence: 0.8, firstSeenAge: 44, lastSeenAge: 46, source: 'smoke', tags: ['location', 'market', 'auction', 'event-consequence'] },
+      { id: 'wf_faction_black', kind: 'faction', title: '榛戦甫浼?, summary: '榛戦甫浼氫笌鏃ф礊搴滈摐閽ヤ綑娉㈢浉杩炪€?, confidence: 0.8, firstSeenAge: 44, lastSeenAge: 46, source: 'smoke', tags: ['faction', 'hostile', 'danger'] },
     ],
   };
   const locationProfile = deriveWorldFactStateProfile(state.worldFacts[0], state);
   const factionProfile = deriveWorldFactStateProfile(state.worldFacts[1], state);
-  assert(locationProfile?.summary.includes('危险度') && locationProfile.summary.includes('交易活跃') && locationProfile.summary.includes('近期传闻'), 'location profile should expose danger/trade/rumor state');
-  assert(factionProfile?.summary.includes('追责压力') && factionProfile.summary.includes('观察倾向') && factionProfile.summary.includes('NPC关联压力'), 'faction profile should expose pressure/observation/npc state');
+  assert(locationProfile?.summary.includes('鍗遍櫓搴?) && locationProfile.summary.includes('浜ゆ槗娲昏穬') && locationProfile.summary.includes('杩戞湡浼犻椈'), 'location profile should expose danger/trade/rumor state');
+  assert(factionProfile?.summary.includes('杩借矗鍘嬪姏') && factionProfile.summary.includes('瑙傚療鍊惧悜') && factionProfile.summary.includes('NPC鍏宠仈鍘嬪姏'), 'faction profile should expose pressure/observation/npc state');
   const plan = buildEventSchedulerPlan(state);
-  assert(plan.hints.some(h => h.title === '青岚坊市' && h.reason.includes('地点画像')), 'scheduler should include location state profile');
-  assert(plan.hints.some(h => h.title === '黑鸦会' && h.reason.includes('势力画像') && h.reason.includes('追责')), 'scheduler should include faction state profile');
+  assert(plan.hints.some(h => h.title === '闈掑矚鍧婂競' && h.reason.includes('鍦扮偣鐢诲儚')), 'scheduler should include location state profile');
+  assert(plan.hints.some(h => h.title === '榛戦甫浼? && h.reason.includes('鍔垮姏鐢诲儚') && h.reason.includes('杩借矗')), 'scheduler should include faction state profile');
   log('faction-location-state', { passed: true, location: locationProfile?.summary, faction: factionProfile?.summary, hints: plan.hints.length });
 }
 
 function smokeWorldPressureOpportunityMap(): void {
   const state: any = {
     age: 47,
-    location: '青岚坊市',
+    location: '闈掑矚鍧婂競',
     npcs: [{
       id: 'npc_shadow',
-      name: '阴鸦客',
-      faction: '黑鸦会',
+      name: '闃撮甫瀹?,
+      faction: '榛戦甫浼?,
       attitude: 'hostile',
       relationshipScore: -45,
       firstMetAge: 44,
       lastSeenAge: 47,
-      lastKnownLocation: '青岚坊市',
+      lastKnownLocation: '闈掑矚鍧婂競',
       source: 'auction',
-      memory: '因旧洞府铜钥落入角色手中而记下一笔。',
+      memory: '鍥犳棫娲炲簻閾滈挜钀藉叆瑙掕壊鎵嬩腑鑰岃涓嬩竴绗斻€?,
       tags: ['auction', 'aftermath', 'rivalry'],
     }],
     pendingThreads: [{
       id: 'thread_key',
-      title: '旧洞府铜钥的旧主线索',
-      description: '旧洞府铜钥牵动一座失落洞府。',
+      title: '鏃ф礊搴滈摐閽ョ殑鏃т富绾跨储',
+      description: '鏃ф礊搴滈摐閽ョ壍鍔ㄤ竴搴уけ钀芥礊搴溿€?,
       category: 'mystery',
       startAge: 45,
       deadlineAge: 48,
       status: 'pending',
       progress: 45,
-      followUpHint: '可循铜钥禁制探查洞府旧主，也可能遭阴鸦客截杀。',
+      followUpHint: '鍙惊閾滈挜绂佸埗鎺㈡煡娲炲簻鏃т富锛屼篃鍙兘閬槾楦﹀鎴潃銆?,
     }],
     questEntries: [],
     causalGraph: { nodes: [], edges: [] },
     worldFacts: [
-      { id: 'wf_location_market', kind: 'location', title: '青岚坊市', summary: '近期拍卖余波未散。', confidence: 0.8, firstSeenAge: 44, lastSeenAge: 47, source: 'smoke', tags: ['location', 'market', 'auction', 'event-consequence'] },
-      { id: 'wf_faction_black', kind: 'faction', title: '黑鸦会', summary: '黑鸦会与旧洞府铜钥余波相连。', confidence: 0.8, firstSeenAge: 44, lastSeenAge: 47, source: 'smoke', tags: ['faction', 'hostile', 'danger'] },
-      { id: 'wf_realm_key', kind: 'realm', title: '旧洞府铜钥', summary: '旧洞府铜钥或可开启遗府。', confidence: 0.8, firstSeenAge: 45, lastSeenAge: 47, source: 'smoke', tags: ['realm', 'realm-hint'] },
+      { id: 'wf_location_market', kind: 'location', title: '闈掑矚鍧婂競', summary: '杩戞湡鎷嶅崠浣欐尝鏈暎銆?, confidence: 0.8, firstSeenAge: 44, lastSeenAge: 47, source: 'smoke', tags: ['location', 'market', 'auction', 'event-consequence'] },
+      { id: 'wf_faction_black', kind: 'faction', title: '榛戦甫浼?, summary: '榛戦甫浼氫笌鏃ф礊搴滈摐閽ヤ綑娉㈢浉杩炪€?, confidence: 0.8, firstSeenAge: 44, lastSeenAge: 47, source: 'smoke', tags: ['faction', 'hostile', 'danger'] },
+      { id: 'wf_realm_key', kind: 'realm', title: '鏃ф礊搴滈摐閽?, summary: '鏃ф礊搴滈摐閽ユ垨鍙紑鍚仐搴溿€?, confidence: 0.8, firstSeenAge: 45, lastSeenAge: 47, source: 'smoke', tags: ['realm', 'realm-hint'] },
     ],
   };
   const plan = buildEventSchedulerPlan(state);
   const map = plan.pressureMap || buildWorldPressureOpportunityMap(state, plan.hints);
-  assert(map.topThreat === '阴鸦客' || map.topThreat === '黑鸦会', 'pressure map should pick hostile NPC/faction as top threat');
+  assert(map.topThreat === '闃撮甫瀹? || map.topThreat === '榛戦甫浼?, 'pressure map should pick hostile NPC/faction as top threat');
   assert(!!map.topOpportunity, 'pressure map should expose a top opportunity');
-  assert(map.focalLocation === '青岚坊市', 'pressure map should pick focal location');
-  assert(map.focalActor === '阴鸦客' || map.focalActor === '黑鸦会', 'pressure map should pick focal actor/faction');
-  assert(map.likelyEventTypes.some(t => ['威胁回响', '势力施压', '机缘推进', '秘境异动'].includes(t)), 'pressure map should expose likely event types');
-  assert(map.summary.includes('最大威胁') && map.summary.includes('事件倾向'), 'pressure map should have readable summary');
+  assert(map.focalLocation === '闈掑矚鍧婂競', 'pressure map should pick focal location');
+  assert(map.focalActor === '闃撮甫瀹? || map.focalActor === '榛戦甫浼?, 'pressure map should pick focal actor/faction');
+  assert(map.likelyEventTypes.some(t => ['濞佽儊鍥炲搷', '鍔垮姏鏂藉帇', '鏈虹紭鎺ㄨ繘', '绉樺寮傚姩'].includes(t)), 'pressure map should expose likely event types');
+  assert(map.summary.includes('鏈€澶у▉鑳?) && map.summary.includes('浜嬩欢鍊惧悜'), 'pressure map should have readable summary');
   log('world-pressure-map', { passed: true, summary: map.summary, hints: plan.hints.length });
 }
 
 function smokeWorldMemoryPressureDecay(): void {
   const baseState: any = {
     age: 50,
-    location: '青岚坊市',
+    location: '闈掑矚鍧婂競',
     pendingThreads: [],
     questEntries: [],
     causalGraph: { nodes: [], edges: [] },
     worldFacts: [],
     npcs: [{
       id: 'npc_shadow',
-      name: '阴鸦客',
-      faction: '黑鸦会',
+      name: '闃撮甫瀹?,
+      faction: '榛戦甫浼?,
       attitude: 'hostile',
       relationshipScore: -50,
       lastSeenAge: 50,
-      memory: '阴鸦客因旧洞府铜钥盯上角色。',
+      memory: '闃撮甫瀹㈠洜鏃ф礊搴滈摐閽ョ洴涓婅鑹层€?,
       tags: ['auction', 'aftermath', 'rivalry'],
     }],
   };
@@ -588,39 +588,39 @@ function smokeWorldMemoryPressureDecay(): void {
   const cooledPlan = buildEventSchedulerPlan({
     ...baseState,
     narrativeContractFeedback: [
-      { age: 48, title: '坊外微影', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
-      { age: 49, title: '黑羽窥市', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
+      { age: 48, title: '鍧婂寰奖', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
+      { age: 49, title: '榛戠窘绐ュ競', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
     ],
   });
   const cooledNpc = cooledPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
   assert(cooledNpc && cooledNpc.priority < noFeedbackNpc!.priority, 'recently repeated NPC focus should cool down');
   const cooledNpcHint = cooledNpc!;
-  assert(cooledNpcHint.reason.includes('记忆潮汐'), 'cooled hint should explain memory tide adjustment');
+  assert(cooledNpcHint.reason.includes('璁板繂娼睈'), 'cooled hint should explain memory tide adjustment');
 
   const boostedPlan = buildEventSchedulerPlan({
     ...baseState,
     narrativeContractFeedback: [
-      { age: 49, title: '日常炼气', narrativeFocus: 'daily', focusHintId: 'seh_npc_npc_shadow', focusHintTitle: '阴鸦客', usedNpcIds: [], usedScheduleHintIds: [], usedWorldFactIds: [], topThreat: '阴鸦客', warningCodes: ['top_schedule_focus_not_declared'] },
+      { age: 49, title: '鏃ュ父鐐兼皵', narrativeFocus: 'daily', focusHintId: 'seh_npc_npc_shadow', focusHintTitle: '闃撮甫瀹?, usedNpcIds: [], usedScheduleHintIds: [], usedWorldFactIds: [], topThreat: '闃撮甫瀹?, warningCodes: ['top_schedule_focus_not_declared'] },
     ],
   });
   const boostedNpc = boostedPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
   assert(boostedNpc && boostedNpc.priority > noFeedbackNpc!.priority, 'previously ignored high-pressure focus should warm up');
-  assert(boostedPlan.warnings.some(w => w.includes('承接不足')), 'pressure decay warnings should mention insufficient previous carryover');
+  assert(boostedPlan.warnings.some(w => w.includes('鎵挎帴涓嶈冻')), 'pressure decay warnings should mention insufficient previous carryover');
   log('world-memory-pressure-decay', { passed: true, base: noFeedbackNpc!.priority, cooled: cooledNpcHint.priority, boosted: boostedNpc!.priority });
 }
 
 function smokeWorldMemoryResolution(): void {
   const state: any = {
     age: 50,
-    location: '青岚坊市',
+    location: '闈掑矚鍧婂競',
     causalGraph: { nodes: [], edges: [] },
-    worldFacts: [{ id: 'wf_old', kind: 'event', title: '旧怨余波', summary: '此事已了，只余旧人口风。', confidence: 0.9, firstSeenAge: 44, lastSeenAge: 49, source: 'smoke', tags: ['consequence'] }],
-    npcs: [{ id: 'npc_shadow', name: '阴鸦客', attitude: 'hostile', relationshipScore: -50, lastSeenAge: 50, memory: '阴鸦客因旧洞府铜钥盯上角色。', tags: ['auction', 'aftermath'] }],
-    pendingThreads: [{ id: 'thread_due', title: '三日之约', description: '阴鸦客约在坊外了断旧事。', category: 'quest', startAge: 49, deadlineAge: 50, status: 'pending', progress: 70, followUpHint: '若不赴约，阴鸦客会转为追杀。' }],
+    worldFacts: [{ id: 'wf_old', kind: 'event', title: '鏃ф€ㄤ綑娉?, summary: '姝や簨宸蹭簡锛屽彧浣欐棫浜哄彛椋庛€?, confidence: 0.9, firstSeenAge: 44, lastSeenAge: 49, source: 'smoke', tags: ['consequence'] }],
+    npcs: [{ id: 'npc_shadow', name: '闃撮甫瀹?, attitude: 'hostile', relationshipScore: -50, lastSeenAge: 50, memory: '闃撮甫瀹㈠洜鏃ф礊搴滈摐閽ョ洴涓婅鑹层€?, tags: ['auction', 'aftermath'] }],
+    pendingThreads: [{ id: 'thread_due', title: '涓夋棩涔嬬害', description: '闃撮甫瀹㈢害鍦ㄥ潑澶栦簡鏂棫浜嬨€?, category: 'quest', startAge: 49, deadlineAge: 50, status: 'pending', progress: 70, followUpHint: '鑻ヤ笉璧寸害锛岄槾楦﹀浼氳浆涓鸿拷鏉€銆? }],
     questEntries: [],
     narrativeContractFeedback: [
-      { age: 48, title: '坊外微影', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
-      { age: 49, title: '黑羽窥市', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
+      { age: 48, title: '鍧婂寰奖', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
+      { age: 49, title: '榛戠窘绐ュ競', narrativeFocus: 'npc', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] },
     ],
   };
   const plan = buildEventSchedulerPlan(state);
@@ -628,7 +628,7 @@ function smokeWorldMemoryResolution(): void {
   const npc = plan.hints.find(h => h.id === 'seh_npc_npc_shadow');
   const oldFact = plan.hints.find(h => h.relatedFactIds?.includes('wf_old'));
   assert(due?.resolutionStage === 'escalating', 'due thread should be escalating');
-  assert(due?.resolutionHint?.includes('完成') || due?.resolutionHint?.includes('失败'), 'escalating hint should tell AI to resolve or fail');
+  assert(due?.resolutionHint?.includes('瀹屾垚') || due?.resolutionHint?.includes('澶辫触'), 'escalating hint should tell AI to resolve or fail');
   assert(npc?.resolutionStage === 'cooling', 'recently repeated NPC should enter cooling stage');
   assert(oldFact?.resolutionStage === 'resolved', 'resolved world fact should stay resolved/background-like');
   log('world-memory-resolution', { passed: true, due: due?.resolutionStage, npc: npc?.resolutionStage, fact: oldFact?.resolutionStage });
@@ -637,18 +637,18 @@ function smokeWorldMemoryResolution(): void {
 function smokeWorldMemoryOutcomeFeedback(): void {
   const baseState: any = {
     age: 60,
-    location: '青岚坊市',
+    location: '闈掑矚鍧婂競',
     pendingThreads: [],
     questEntries: [],
     causalGraph: { nodes: [], edges: [] },
     worldFacts: [],
     npcs: [{
       id: 'npc_shadow',
-      name: '阴鸦客',
+      name: '闃撮甫瀹?,
       attitude: 'hostile',
       relationshipScore: -50,
       lastSeenAge: 60,
-      memory: '阴鸦客仍惦记旧洞府铜钥。',
+      memory: '闃撮甫瀹粛鎯﹁鏃ф礊搴滈摐閽ャ€?,
       tags: ['auction', 'aftermath'],
     }],
   };
@@ -658,7 +658,7 @@ function smokeWorldMemoryOutcomeFeedback(): void {
 
   const resolvedPlan = buildEventSchedulerPlan({
     ...baseState,
-    narrativeContractFeedback: [{ age: 59, title: '旧怨了结', narrativeFocus: 'npc', narrativeOutcome: 'resolved', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] }],
+    narrativeContractFeedback: [{ age: 59, title: '鏃ф€ㄤ簡缁?, narrativeFocus: 'npc', narrativeOutcome: 'resolved', usedNpcIds: ['npc_shadow'], usedScheduleHintIds: ['seh_npc_npc_shadow'], usedWorldFactIds: [], warningCodes: [] }],
   });
   const resolvedNpc = resolvedPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
   assert(resolvedNpc && resolvedNpc.priority < baseNpc!.priority, 'resolved outcome should lower repeated focus priority');
@@ -666,11 +666,11 @@ function smokeWorldMemoryOutcomeFeedback(): void {
 
   const ignoredPlan = buildEventSchedulerPlan({
     ...baseState,
-    narrativeContractFeedback: [{ age: 59, title: '闭门炼气', narrativeFocus: 'daily', narrativeOutcome: 'ignored', focusHintId: 'seh_npc_npc_shadow', focusHintTitle: '阴鸦客', topThreat: '阴鸦客', usedNpcIds: [], usedScheduleHintIds: [], usedWorldFactIds: [], warningCodes: [] }],
+    narrativeContractFeedback: [{ age: 59, title: '闂棬鐐兼皵', narrativeFocus: 'daily', narrativeOutcome: 'ignored', focusHintId: 'seh_npc_npc_shadow', focusHintTitle: '闃撮甫瀹?, topThreat: '闃撮甫瀹?, usedNpcIds: [], usedScheduleHintIds: [], usedWorldFactIds: [], warningCodes: [] }],
   });
   const ignoredNpc = ignoredPlan.hints.find(h => h.id === 'seh_npc_npc_shadow');
   assert(ignoredNpc && ignoredNpc.priority > baseNpc!.priority, 'ignored outcome should warm up high-pressure focus');
-  assert(ignoredPlan.warnings.some(w => w.includes('承接不足')), 'ignored outcome should produce carryover warning');
+  assert(ignoredPlan.warnings.some(w => w.includes('鎵挎帴涓嶈冻')), 'ignored outcome should produce carryover warning');
   log('world-memory-outcome-feedback', { passed: true, base: baseNpc!.priority, resolved: resolvedNpc!.priority, ignored: ignoredNpc!.priority, stage: resolvedNpc!.resolutionStage });
 }
 
@@ -703,14 +703,14 @@ function smokeThreadOutcomeSync(): void {
     fateNodes: [],
     pendingThreads: [{
       id: 'auction_aftermath_x',
-      title: '阴鸦客的暗中盯梢',
-      description: '阴鸦客仍因旧洞府铜钥盯上角色。',
+      title: '闃撮甫瀹㈢殑鏆椾腑鐩ⅱ',
+      description: '闃撮甫瀹粛鍥犳棫娲炲簻閾滈挜鐩笂瑙掕壊銆?,
       category: 'enemy',
       startAge: 21,
       deadlineAge: 24,
       status: 'pending',
       progress: 20,
-      followUpHint: '后续需处理阴鸦客的试探、截杀或交易。',
+      followUpHint: '鍚庣画闇€澶勭悊闃撮甫瀹㈢殑璇曟帰銆佹埅鏉€鎴栦氦鏄撱€?,
     }],
     questEntries: [],
     npcs: [],
@@ -720,13 +720,13 @@ function smokeThreadOutcomeSync(): void {
     exploredRealms: [],
   };
   const output: any = {
-    title: '旧怨了结',
-    narrative: '角色顺藤摸瓜，终于寻到阴鸦客藏身之处，以证据和灵契逼其退去，这桩铜钥旧怨暂告一段落。',
+    title: '鏃ф€ㄤ簡缁?,
+    narrative: '瑙掕壊椤鸿棨鎽哥摐锛岀粓浜庡鍒伴槾楦﹀钘忚韩涔嬪锛屼互璇佹嵁鍜岀伒濂戦€煎叾閫€鍘伙紝杩欐々閾滈挜鏃ф€ㄦ殏鍛婁竴娈佃惤銆?,
     eventType: 'normal',
     changes: [],
     newStatuses: [],
     newItems: [],
-    memory: '阴鸦客与旧洞府铜钥的旧怨已被压下。',
+    memory: '闃撮甫瀹笌鏃ф礊搴滈摐閽ョ殑鏃ф€ㄥ凡琚帇涓嬨€?,
     hasChoice: false,
     newThreads: [],
     advanceThreads: [],
@@ -738,7 +738,7 @@ function smokeThreadOutcomeSync(): void {
       usedScheduleHintIds: ['seh_thread_auction_aftermath_x'],
       usedWorldFactIds: [],
       usedNpcIds: [],
-      contractNote: '阴鸦客旧怨已了结。',
+      contractNote: '闃撮甫瀹㈡棫鎬ㄥ凡浜嗙粨銆?,
     },
   };
   const result = executeAIEvent(baseState, output);
@@ -748,8 +748,8 @@ function smokeThreadOutcomeSync(): void {
 
   const advanced = executeAIEvent(baseState, {
     ...output,
-    title: '旧怨推进',
-    narrativeContract: { ...output.narrativeContract, narrativeOutcome: 'advanced', contractNote: '查到阴鸦客去向。' },
+    title: '鏃ф€ㄦ帹杩?,
+    narrativeContract: { ...output.narrativeContract, narrativeOutcome: 'advanced', contractNote: '鏌ュ埌闃撮甫瀹㈠幓鍚戙€? },
   });
   const advancedThread = advanced.state.pendingThreads.find((t: any) => t.id === 'auction_aftermath_x');
   assert(advancedThread?.status === 'pending', 'advanced narrative outcome should not close thread');
@@ -757,8 +757,8 @@ function smokeThreadOutcomeSync(): void {
 
   const echoed = executeAIEvent(baseState, {
     ...output,
-    title: '旧怨余声',
-    narrativeContract: { ...output.narrativeContract, narrativeOutcome: 'echoed', contractNote: '只是听闻阴鸦客仍在坊间出没。' },
+    title: '鏃ф€ㄤ綑澹?,
+    narrativeContract: { ...output.narrativeContract, narrativeOutcome: 'echoed', contractNote: '鍙槸鍚椈闃撮甫瀹粛鍦ㄥ潑闂村嚭娌°€? },
   });
   const echoedThread = echoed.state.pendingThreads.find((t: any) => t.id === 'auction_aftermath_x');
   assert(echoedThread?.status === 'pending' && echoedThread?.progress === 20, 'echoed outcome should not mutate thread state');
@@ -849,11 +849,11 @@ function smokeThreadProgressAutoResolve(): void {
 function smokeWorldEventConsequences(): void {
   const state: any = {
     age: 45,
-    location: '青岚坊市',
+    location: '闈掑矚鍧婂競',
     npcs: [{
       id: 'npc_shadow',
-      name: '阴鸦客',
-      faction: '黑鸦会',
+      name: '闃撮甫瀹?,
+      faction: '榛戦甫浼?,
       attitude: 'hostile',
       relationshipScore: -30,
       firstMetAge: 44,
@@ -864,17 +864,17 @@ function smokeWorldEventConsequences(): void {
     discoveredRealms: [],
     worldFacts: [],
     causalGraph: {
-      nodes: [{ id: 'event_auction', type: 'event', label: '旧洞府铜钥落槌', age: 45, summary: '拍卖会上旧洞府铜钥落入角色手中，阴鸦客记下一笔。', tags: ['auction', 'trade'] }],
+      nodes: [{ id: 'event_auction', type: 'event', label: '鏃ф礊搴滈摐閽ヨ惤妲?, age: 45, summary: '鎷嶅崠浼氫笂鏃ф礊搴滈摐閽ヨ惤鍏ヨ鑹叉墜涓紝闃撮甫瀹㈣涓嬩竴绗斻€?, tags: ['auction', 'trade'] }],
       edges: [],
     },
   };
   const facts = deriveWorldEventConsequences(state, 'auction-bid');
   assert(facts.some(f => f.kind === 'event' && f.tags?.includes('consequence') && f.tags?.includes('auction')), 'event consequence should derive auction aftermath fact');
-  assert(facts.some(f => f.kind === 'location' && f.title === '青岚坊市' && f.tags?.includes('event-consequence')), 'event consequence should enrich location fact');
-  assert(facts.some(f => f.kind === 'faction' && f.title === '黑鸦会' && f.tags?.includes('hostile')), 'event consequence should derive hostile faction pressure');
+  assert(facts.some(f => f.kind === 'location' && f.title === '闈掑矚鍧婂競' && f.tags?.includes('event-consequence')), 'event consequence should enrich location fact');
+  assert(facts.some(f => f.kind === 'faction' && f.title === '榛戦甫浼? && f.tags?.includes('hostile')), 'event consequence should derive hostile faction pressure');
   const refreshed: any = refreshWorldFacts(state, 'auction-bid');
   const plan = buildEventSchedulerPlan({ ...refreshed, questEntries: [] });
-  assert(plan.hints.some(h => h.kind === 'world' && h.reason.includes('余波')), 'scheduler should include world event consequence hint');
+  assert(plan.hints.some(h => h.kind === 'world' && h.reason.includes('浣欐尝')), 'scheduler should include world event consequence hint');
   log('world-event-consequences', { passed: true, facts: facts.length, hints: plan.hints.length });
 }
 
@@ -886,12 +886,12 @@ function smokeActionCausality(): void {
   const next: any = recordActionCausality(state, {
     actionId: 'smoke_trade_1',
     actionType: 'trade',
-    title: '坊市换宝',
-    summary: '烟测交易因果',
+    title: '鍧婂競鎹㈠疂',
+    summary: '鐑熸祴浜ゆ槗鍥犳灉',
     tags: ['smoke', 'trade'],
-    newItems: [{ id: 'smoke_item', name: '烟测玉简', description: '用于回归测试', item_type: 'scripture', rarity: 'rare', effects: [], source: 'smoke' } as any],
-    threads: [{ id: 'smoke_thread', title: '烟测线索', description: '用于回归测试', category: 'quest', startAge: 30, deadlineAge: 31, status: 'pending', progress: 10 } as any],
-    statuses: [{ id: 'smoke_status', name: '烟测状态', description: '用于回归测试', category: 'special', rarity: 'common', effects: [], source: 'smoke' } as any],
+    newItems: [{ id: 'smoke_item', name: '鐑熸祴鐜夌畝', description: '鐢ㄤ簬鍥炲綊娴嬭瘯', item_type: 'scripture', rarity: 'rare', effects: [], source: 'smoke' } as any],
+    threads: [{ id: 'smoke_thread', title: '鐑熸祴绾跨储', description: '鐢ㄤ簬鍥炲綊娴嬭瘯', category: 'quest', startAge: 30, deadlineAge: 31, status: 'pending', progress: 10 } as any],
+    statuses: [{ id: 'smoke_status', name: '鐑熸祴鐘舵€?, description: '鐢ㄤ簬鍥炲綊娴嬭瘯', category: 'special', rarity: 'common', effects: [], source: 'smoke' } as any],
   });
   const graph = next.causalGraph || { nodes: [], edges: [] };
   assert(graph.nodes.length >= 4, 'recordActionCausality should add action/item/thread/status nodes');
@@ -901,13 +901,13 @@ function smokeActionCausality(): void {
 }
 
 function smokeHiddenAudit(): void {
-  const effects = appendStateChangeAuditEffect([{ kind: 'visible', text: '可见效果' }], [{ code: 'attribute_applied', source: 'effect', message: '修为增长' } as any]);
+  const effects = appendStateChangeAuditEffect([{ kind: 'visible', text: '鍙鏁堟灉' }], [{ code: 'attribute_applied', source: 'effect', message: '淇负澧為暱' } as any]);
   assert(effects.some((effect: any) => effect?.kind === '__audit_state_change_log' && effect.hidden === true), 'hidden audit effect should be appended');
 
-  const narrativeEffects = appendNarrativeContractAuditEffect([{ kind: 'visible', text: '可见效果' }], {
+  const narrativeEffects = appendNarrativeContractAuditEffect([{ kind: 'visible', text: '鍙鏁堟灉' }], {
     output: {
-      title: '坊外微影',
-      narrative: '阴鸦客仍在坊外盯梢。',
+      title: '鍧婂寰奖',
+      narrative: '闃撮甫瀹粛鍦ㄥ潑澶栫洴姊€?,
       eventType: 'normal',
       changes: [],
       newStatuses: [],
@@ -918,14 +918,14 @@ function smokeHiddenAudit(): void {
         usedScheduleHintIds: ['seh_npc_shadow'],
         usedWorldFactIds: ['wf_market'],
         usedNpcIds: ['npc_shadow'],
-        contractNote: '承接阴鸦客盯梢。',
+        contractNote: '鎵挎帴闃撮甫瀹㈢洴姊€?,
       },
     } as any,
     eventSchedule: {
       generatedAtAge: 30,
-      focus: { id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '阴鸦客', reason: '阴鸦客暗中盯梢。', requiredAction: 'echo_or_develop' },
+      focus: { id: 'seh_npc_shadow', kind: 'npc', priority: 120, title: '闃撮甫瀹?, reason: '闃撮甫瀹㈡殫涓洴姊€?, requiredAction: 'echo_or_develop' },
       hints: [],
-      pressureMap: { topThreat: '阴鸦客', topOpportunity: '青岚坊市', focalLocation: '青岚坊市', focalActor: '阴鸦客', likelyEventTypes: ['威胁回响'], summary: '最大威胁：阴鸦客；最大机会：青岚坊市' },
+      pressureMap: { topThreat: '闃撮甫瀹?, topOpportunity: '闈掑矚鍧婂競', focalLocation: '闈掑矚鍧婂競', focalActor: '闃撮甫瀹?, likelyEventTypes: ['濞佽儊鍥炲搷'], summary: '鏈€澶у▉鑳侊細闃撮甫瀹紱鏈€澶ф満浼氾細闈掑矚鍧婂競' },
       warnings: [],
     } as any,
     boundaryEntries: [{ id: 'scl_30_boundary_top_schedule_focus_not_declared_0', age: 30, source: 'boundary', severity: 'info', code: 'top_schedule_focus_not_declared', message: 'AI did not clearly declare top schedule focus.' } as any],
@@ -937,11 +937,11 @@ function smokeHiddenAudit(): void {
   assert(audit?.contract?.narrativeOutcome === 'advanced', 'narrative contract audit should persist contract outcome');
   assert(audit?.warnings?.some((entry: any) => entry.code === 'top_schedule_focus_not_declared'), 'narrative contract audit should persist related boundary entries');
 
-  const feedback = extractNarrativeContractFeedback([{ age: 30, title: '坊外微影', effects: JSON.stringify(narrativeEffects) }]);
+  const feedback = extractNarrativeContractFeedback([{ age: 30, title: '鍧婂寰奖', effects: JSON.stringify(narrativeEffects) }]);
   assert(feedback.length === 1, 'narrative contract feedback should be extracted from hidden audit');
   assert(feedback[0].narrativeFocus === 'npc', 'feedback should preserve narrative focus');
   assert(feedback[0].narrativeOutcome === 'advanced', 'feedback should preserve narrative outcome');
-  assert(feedback[0].topThreat === '阴鸦客', 'feedback should preserve pressure map threat');
+  assert(feedback[0].topThreat === '闃撮甫瀹?, 'feedback should preserve pressure map threat');
   assert(feedback[0].usedNpcIds.includes('npc_shadow'), 'feedback should preserve used npc ids');
   assert(feedback[0].warningCodes.includes('top_schedule_focus_not_declared'), 'feedback should preserve contract warning codes');
   log('hidden-audit', { passed: true, effects: effects.length, narrativeAudit: Boolean(audit), feedback: feedback.length });
@@ -949,25 +949,25 @@ function smokeHiddenAudit(): void {
 
 function smokeSameYearContinuation(): void {
   const state: any = {
-    name: '沈砚秋',
+    name: '娌堢牃绉?,
     age: 21,
     pendingThreads: [{
       id: 'sect_trial_same_year',
-      title: '三月后的入门比试',
-      description: '青岚山执事约定三月后在外门石坪验看根骨与斗法胆气。',
+      title: '涓夋湀鍚庣殑鍏ラ棬姣旇瘯',
+      description: '闈掑矚灞辨墽浜嬬害瀹氫笁鏈堝悗鍦ㄥ闂ㄧ煶鍧獙鐪嬫牴楠ㄤ笌鏂楁硶鑳嗘皵銆?,
       category: 'competition',
       startAge: 21,
       deadlineAge: 21,
       status: 'pending',
       progress: 20,
       dueInSameYear: true,
-      followUpHint: '同岁三月后赴外门石坪参加入门比试，不能拖到下一年。',
+      followUpHint: '鍚屽瞾涓夋湀鍚庤荡澶栭棬鐭冲潽鍙傚姞鍏ラ棬姣旇瘯锛屼笉鑳芥嫋鍒颁笅涓€骞淬€?,
     }],
   };
   const threads = getSameYearThreads(state);
   assert(threads.length === 1, 'same-year thread should be selected before cross-year advance');
   const output = buildThreadContinuationEvent(state, threads[0]);
-  assert(output.title.includes('约期已至'), 'same-year competition continuation should use appointment title');
+  assert(output.title.includes('绾︽湡宸茶嚦'), 'same-year competition continuation should use appointment title');
   assert(output.advanceThreads?.length === 0, 'same-year continuation should no longer use partial advance');
   assert(output.completeThreadIds?.includes('sect_trial_same_year'), 'same-year continuation should complete the selected thread');
   log('same-year-continuation', { passed: true, age: state.age, title: output.title });
@@ -978,19 +978,19 @@ function smokeSameYearContinuationDedup(): void {
   // Verify that after a same-year continuation completes a thread,
   // getSameYearThreads no longer returns it (preventing duplicate events)
   const state: any = {
-    name: '测试弟子',
+    name: '娴嬭瘯寮熷瓙',
     age: 21,
     pendingThreads: [{
       id: 'sect_trial_same_year',
-      title: '月后入门比试',
-      description: '按约前往石坪参加入门比试',
+      title: '鏈堝悗鍏ラ棬姣旇瘯',
+      description: '鎸夌害鍓嶅線鐭冲潽鍙傚姞鍏ラ棬姣旇瘯',
       category: 'competition',
       startAge: 21,
       deadlineAge: 21,
       status: 'pending',
       progress: 20,
       dueInSameYear: true,
-      followUpHint: '同岁月后前往石坪参加入门比试',
+      followUpHint: '鍚屽瞾鏈堝悗鍓嶅線鐭冲潽鍙傚姞鍏ラ棬姣旇瘯',
     }],
   };
   const threadsBefore = getSameYearThreads(state);
@@ -1011,9 +1011,9 @@ function smokeSameYearContinuationDedup(): void {
 }
 function smokeAnnualNarrativePrompt(): void {
   const source = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
-  assert(source.includes('年龄推进不是“一年只发生一件事”'), 'advance prompt should require annual multi-part narration');
-  assert(source.includes('dueInSameYear=true 表示下一次岁月流转会优先处理同岁后续'), 'advance prompt should explain same-year continuation behavior');
-  assert(source.includes('必须用 extraEvents 拆成多条短事件'), 'advance prompt should require extraEvents for multiple key beats');
+  assert(source.includes('骞撮緞鎺ㄨ繘涓嶆槸鈥滀竴骞村彧鍙戠敓涓€浠朵簨鈥?), 'advance prompt should require annual multi-part narration');
+  assert(source.includes('dueInSameYear=true 琛ㄧず涓嬩竴娆″瞾鏈堟祦杞細浼樺厛澶勭悊鍚屽瞾鍚庣画'), 'advance prompt should explain same-year continuation behavior');
+  assert(source.includes('蹇呴』鐢?extraEvents 鎷嗘垚澶氭潯鐭簨浠?), 'advance prompt should require extraEvents for multiple key beats');
   log('annual-narrative-prompt', { passed: true });
 }
 
@@ -1079,7 +1079,7 @@ async function smokeAuctionDbRoute(): Promise<void> {
   };
   const char = await db.character.create({
     data: {
-      name: `回归烟测_${Date.now()}`,
+      name: `鍥炲綊鐑熸祴_${Date.now()}`,
       age: 18,
       lifespan: 100,
       realm: 'qi_refining',
@@ -1087,13 +1087,13 @@ async function smokeAuctionDbRoute(): Promise<void> {
       spiritStones: 20000,
       luck: 50,
       comprehension: 50,
-      location: '青岚坊市',
+      location: '闈掑矚鍧婂競',
       storageCapacity: 20,
     },
   });
   await call({ characterId: char.id, action: 'invite' });
   const enter = await call({ characterId: char.id, action: 'enter' });
-  const keyLot = enter.auction.lots.find((lot: any) => lot.item?.name?.includes('铜钥')) || enter.auction.lots.at(-1);
+  const keyLot = enter.auction.lots.find((lot: any) => lot.item?.name?.includes('閾滈挜')) || enter.auction.lots.at(-1);
   const bid = await call({ characterId: char.id, action: 'bid', lotId: keyLot.id, bid: 18000 });
   const fresh = await db.character.findUnique({ where: { id: char.id } });
   assert(fresh, 'auction db smoke character should exist after bid');
@@ -1379,7 +1379,7 @@ function smokeCombatArtFallbackNames(): void {
   const names = arts.map((art: any) => art.name);
   assert(names.length >= 3, 'scripture fallback combat arts should be generated');
   assert(new Set(names).size === names.length, 'scripture fallback combat art names should be unique');
-  assert(!names.includes('\u884c\u6c14\u672f\u5f0f'), 'scripture fallback combat art names should not collapse to generic 行气术式');
+  assert(!names.includes('\u884c\u6c14\u672f\u5f0f'), 'scripture fallback combat art names should not collapse to generic 琛屾皵鏈紡');
   log('combat-art-fallback-names', { passed: true, names: names.join('|') });
 }
 
@@ -1389,65 +1389,65 @@ function smokeCombatArtFallbackNames(): void {
 
 function smokeArtifactCultivationMisclassification(): void {
   const state: any = normalizeCultivationState({
-    spiritualRoot: 'heavenly', rootDetail: '金天灵根', rootMultiplier: 3,
+    spiritualRoot: 'heavenly', rootDetail: '閲戝ぉ鐏垫牴', rootMultiplier: 3,
     activeStatuses: [], inventory: [], pets: [], heartDemon: 0,
     hp: 50, maxHp: 50, mp: 20, maxMp: 20,
     equipped: [
       {
-        id: 'old_bad_artifact', name: '黄牙瘦汉的残光护符', description: '内藏灵禁：残光护幕。', item_type: 'scripture', rarity: 'uncommon', source: '战利所得',
+        id: 'old_bad_artifact', name: '榛勭墮鐦︽眽鐨勬畫鍏夋姢绗?, description: '鍐呰棌鐏电锛氭畫鍏夋姢骞曘€?, item_type: 'scripture', rarity: 'uncommon', source: '鎴樺埄鎵€寰?,
         effects: [
-          { target_attribute: 'defense', operation: 'add', value: 16, description: '护身+16' },
-          { target_attribute: 'cultivationExp', operation: 'multiply', value: 1.7, description: '修习此功法，修为流转加速×1.7' },
+          { target_attribute: 'defense', operation: 'add', value: 16, description: '鎶よ韩+16' },
+          { target_attribute: 'cultivationExp', operation: 'multiply', value: 1.7, description: '淇範姝ゅ姛娉曪紝淇负娴佽浆鍔犻€熋?.7' },
         ],
-        technique: { kind: 'artifact', artifactAbilities: [{ name: '残光护幕', description: '护身灵禁', trigger: 'auto', element: 'none', power: 1.1 }] },
+        technique: { kind: 'artifact', artifactAbilities: [{ name: '娈嬪厜鎶ゅ箷', description: '鎶よ韩鐏电', trigger: 'auto', element: 'none', power: 1.1 }] },
       },
-      { id: 'real_scripture', name: '斗法心得玉简', description: '修炼心得。', item_type: 'scripture', rarity: 'uncommon', source: '测试', effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.45, description: '参悟修行×1.45' }] },
+      { id: 'real_scripture', name: '鏂楁硶蹇冨緱鐜夌畝', description: '淇偧蹇冨緱銆?, item_type: 'scripture', rarity: 'uncommon', source: '娴嬭瘯', effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.45, description: '鍙傛偀淇脳1.45' }] },
     ],
   } as any);
   const artifact = state.equipped.find((it: any) => it.id === 'old_bad_artifact');
   assert(artifact?.item_type === 'artifact', 'artifact technique should override old scripture misclassification');
-  assert(artifact?.name === '残光护符', 'enemy possessive prefix should be stripped during normalization');
+  assert(artifact?.name === '娈嬪厜鎶ょ', 'enemy possessive prefix should be stripped during normalization');
   assert(!artifact?.effects?.some((e: any) => e.target_attribute === 'cultivationExp'), 'auto-injected scripture cultivation effect should be removed from artifact');
-  assert(!state.cultivationFactors.some((f: any) => f.name === '残光护符'), 'artifact should not appear as scripture cultivation factor');
+  assert(!state.cultivationFactors.some((f: any) => f.name === '娈嬪厜鎶ょ'), 'artifact should not appear as scripture cultivation factor');
   assert(Math.abs(state.cultivationMultiplier - 4.35) < 0.001, 'only root and real scripture should multiply cultivation rate');
   console.log(JSON.stringify({ smoke: 'artifact-cultivation-misclassification', passed: true, multiplier: state.cultivationMultiplier }));
 }
 
 function smokeCombatTacticalProjection() {
   let state: any = {
-    id: 'tactical_smoke', name: '观势者', age: 23, realmName: '炼气二层', rootType: '五行杂灵根', rootMultiplier: 1,
+    id: 'tactical_smoke', name: '瑙傚娍鑰?, age: 23, realmName: '鐐兼皵浜屽眰', rootType: '浜旇鏉傜伒鏍?, rootMultiplier: 1,
     spiritStones: 0, inventory: [], equipped: [], statuses: [], eventLog: [], hp: 90, maxHp: 90, mp: 45, maxMp: 45, attack: 18, defense: 14, speed: 13,
     combatSession: {
-      id: 'combat_tactical_smoke', enemies: [{ id: 'blade_rogue', name: '短刃劫修', description: '脚步飘忽，护身薄弱。', hp: 70, maxHp: 70, attack: 15, defense: 8, speed: 12 }],
+      id: 'combat_tactical_smoke', enemies: [{ id: 'blade_rogue', name: '鐭垉鍔慨', description: '鑴氭椋樺拷锛屾姢韬杽寮便€?, hp: 70, maxHp: 70, attack: 15, defense: 8, speed: 12 }],
       currentEnemyIdx: 0, round: 1, log: [], status: 'ongoing', startAge: 23,
       playerHp: 90, playerMaxHp: 90, playerMp: 45, playerMaxMp: 45, playerAttack: 18, playerDefense: 14, playerSpeed: 13, playerSkills: [], playerItems: [],
     },
   } as any;
   const proposal = {
-    playerActionLabel: '错步逼近', playerActionType: 'attack' as const, playerDamage: 6,
-    enemyBeats: [{ enemyIdx: 0, action: '横刃退守', actionType: 'defend', damageToPlayer: 0 }],
-    tacticalSituation: { tempo: 'opening' as const, advantage: 'player' as const, reason: '敌人退守时右肩护势短暂散开。', playerOpening: '右肩护势换气', suggestedFocus: '趁破绽逼其移步' },
+    playerActionLabel: '閿欐閫艰繎', playerActionType: 'attack' as const, playerDamage: 6,
+    enemyBeats: [{ enemyIdx: 0, action: '妯垉閫€瀹?, actionType: 'defend', damageToPlayer: 0 }],
+    tacticalSituation: { tempo: 'opening' as const, advantage: 'player' as const, reason: '鏁屼汉閫€瀹堟椂鍙宠偐鎶ゅ娍鐭殏鏁ｅ紑銆?, playerOpening: '鍙宠偐鎶ゅ娍鎹㈡皵', suggestedFocus: '瓒佺牬缁介€煎叾绉绘' },
     nextActions: [
-      { id: 'press-shoulder', name: '逼肩夺步', description: '顺着右肩护势空隙压上半步，迫其阵脚再乱。', actionType: 'other' as const, intent: '沿破绽扩大优势', tags: ['opening'] },
-      { id: 'feint-flee', name: '佯退诱追', description: '故意后撤半丈，引其短刃追出护势。', actionType: 'other' as const, risk: '若敌人不追，攻势会暂缓。', tags: ['ai-context'] },
+      { id: 'press-shoulder', name: '閫艰偐澶烘', description: '椤虹潃鍙宠偐鎶ゅ娍绌洪殭鍘嬩笂鍗婃锛岃揩鍏堕樀鑴氬啀涔便€?, actionType: 'other' as const, intent: '娌跨牬缁芥墿澶т紭鍔?, tags: ['opening'] },
+      { id: 'feint-flee', name: '浣€€璇辫拷', description: '鏁呮剰鍚庢挙鍗婁笀锛屽紩鍏剁煭鍒冭拷鍑烘姢鍔裤€?, actionType: 'other' as const, risk: '鑻ユ晫浜轰笉杩斤紝鏀诲娍浼氭殏缂撱€?, tags: ['ai-context'] },
     ],
-    narrative: '你错步贴近，逼得短刃劫修横刃退守；他右肩护势在换气时微微一散，露出一线可乘之机。',
+    narrative: '浣犻敊姝ヨ创杩戯紝閫煎緱鐭垉鍔慨妯垉閫€瀹堬紱浠栧彸鑲╂姢鍔垮湪鎹㈡皵鏃跺井寰竴鏁ｏ紝闇插嚭涓€绾垮彲涔樹箣鏈恒€?,
   };
   state = executeCombatRoundWithProposal(state, 'attack', { optionId: 'basic-body-strike' }, proposal).state;
   const session = state.combatSession!;
   assert(session.tacticalSituation?.tempo === 'opening', 'AI tactical tempo should persist on combat session');
-  assert(session.actionPalette?.other.options.some((o: any) => o.name === '逼肩夺步' && (o.tags || []).includes('ai-context')), 'AI next actions should project into action palette');
-  assert(session.log[0].tacticalSituation?.playerOpening === '右肩护势换气', 'round log should preserve tactical read');
+  assert(session.actionPalette?.other.options.some((o: any) => o.name === '閫艰偐澶烘' && (o.tags || []).includes('ai-context')), 'AI next actions should project into action palette');
+  assert(session.log[0].tacticalSituation?.playerOpening === '鍙宠偐鎶ゅ娍鎹㈡皵', 'round log should preserve tactical read');
   console.log(JSON.stringify({ smoke: 'combat-tactical-projection', passed: true, tempo: session.tacticalSituation.tempo, option: session.actionPalette.other.options[0].name }));
 }
 
 function smokeCombatStalemateBreakNode() {
   let state: any = {
     id: 'stalemate_smoke',
-    name: '试战者',
+    name: '璇曟垬鑰?,
     age: 22,
-    realmName: '炼气一层',
-    rootType: '五行杂灵根',
+    realmName: '鐐兼皵涓€灞?,
+    rootType: '浜旇鏉傜伒鏍?,
     rootMultiplier: 1,
     spiritStones: 0,
     inventory: [],
@@ -1463,7 +1463,7 @@ function smokeCombatStalemateBreakNode() {
     speed: 10,
     combatSession: {
       id: 'combat_stalemate_smoke',
-      enemies: [{ id: 'iron_guard', name: '铁甲散修', description: '护体法器厚重，攻势沉稳。', hp: 80, maxHp: 80, attack: 8, defense: 45, speed: 8 }],
+      enemies: [{ id: 'iron_guard', name: '閾佺敳鏁ｄ慨', description: '鎶や綋娉曞櫒鍘氶噸锛屾敾鍔挎矇绋炽€?, hp: 80, maxHp: 80, attack: 8, defense: 45, speed: 8 }],
       currentEnemyIdx: 0,
       round: 1,
       log: [],
@@ -1481,18 +1481,18 @@ function smokeCombatStalemateBreakNode() {
     },
   } as any;
   const proposal = {
-    playerActionLabel: '试探攻势',
+    playerActionLabel: '璇曟帰鏀诲娍',
     playerActionType: 'attack' as const,
     playerDamage: 1,
-    enemyBeats: [{ enemyIdx: 0, action: '沉甲迫近', actionType: 'attack', damageToPlayer: 1 }],
-    narrative: '两人气机相撞，护身灵光彼此磨过，谁也未能真正撕开对方门户。',
+    enemyBeats: [{ enemyIdx: 0, action: '娌夌敳杩繎', actionType: 'attack', damageToPlayer: 1 }],
+    narrative: '涓や汉姘旀満鐩告挒锛屾姢韬伒鍏夊郊姝ょ（杩囷紝璋佷篃鏈兘鐪熸鎾曞紑瀵规柟闂ㄦ埛銆?,
   };
   state = executeCombatRoundWithProposal(state, 'attack', { optionId: 'basic-body-strike' }, proposal).state;
   state = executeCombatRoundWithProposal(state, 'attack', { optionId: 'basic-body-strike' }, proposal).state;
   state = executeCombatRoundWithProposal(state, 'attack', { optionId: 'basic-body-strike' }, proposal).state;
   const session = state.combatSession!;
   assert(session.pendingImpulse?.reason === 'stalemate', 'low-progress combat should trigger stalemate break impulse');
-  assert((session.actionPalette?.other.options || []).some((o: any) => (o.tags || []).includes('stalemate-breaker')), 'stalemate should expose breaker options in 应变');
+  assert((session.actionPalette?.other.options || []).some((o: any) => (o.tags || []).includes('stalemate-breaker')), 'stalemate should expose breaker options in 搴斿彉');
   console.log(JSON.stringify({ smoke: 'combat-stalemate-break-node', passed: true, prompt: session.pendingImpulse.prompt.slice(0, 24) }));
 }
 
@@ -1502,19 +1502,19 @@ function smokeCombatResolvedSceneDedupe(): void {
     age: 9,
     hp: 80, maxHp: 80, mp: 40, maxMp: 40,
     attack: 12, defense: 8, speed: 7,
-    realm: 'qi_refining', realmLevel: 2, spiritualRoot: 'heavenly', rootDetail: '土天灵根',
+    realm: 'qi_refining', realmLevel: 2, spiritualRoot: 'heavenly', rootDetail: '鍦熷ぉ鐏垫牴',
     elements: { metal: 0, wood: 0, water: 0, fire: 0, earth: 100 },
     inventory: [], equipped: [], activeStatuses: [], pendingThreads: [
-      { id: 'thread_old_scene', title: '晒谷场冲突后续', description: '平拓与虎子在晒谷场旧嫌未平。', category: 'enemy', startAge: 9, deadlineAge: 9, status: 'pending', progress: 60 },
-      { id: 'thread_revenge', title: '虎子逃脱报复', description: '虎子败走后可能寻人报复。', category: 'enemy', startAge: 9, deadlineAge: 10, status: 'pending', progress: 5 },
+      { id: 'thread_old_scene', title: '鏅掕胺鍦哄啿绐佸悗缁?, description: '骞虫嫇涓庤檸瀛愬湪鏅掕胺鍦烘棫瀚屾湭骞炽€?, category: 'enemy', startAge: 9, deadlineAge: 9, status: 'pending', progress: 60 },
+      { id: 'thread_revenge', title: '铏庡瓙閫冭劚鎶ュ', description: '铏庡瓙璐ヨ蛋鍚庡彲鑳藉浜烘姤澶嶃€?, category: 'enemy', startAge: 9, deadlineAge: 10, status: 'pending', progress: 5 },
     ],
     questEntries: [], npcs: [], worldFacts: [],
-    causalGraph: { nodes: [{ id: 'event_combat_end_9_old', type: 'combat', label: '战斗得胜', age: 9, summary: '战斗得胜，平拓在晒谷场胜过虎子，狗蛋在旁惊魂未定。' }], edges: [] },
+    causalGraph: { nodes: [{ id: 'event_combat_end_9_old', type: 'combat', label: '鎴樻枟寰楄儨', age: 9, summary: '鎴樻枟寰楄儨锛屽钩鎷撳湪鏅掕胺鍦鸿儨杩囪檸瀛愶紝鐙楄泲鍦ㄦ梺鎯婇瓊鏈畾銆? }], edges: [] },
   } as any);
   const next = startCombat(state, {
-    contextTitle: '晒谷场遇故嫌',
-    contextNarrative: '未时的晒谷场，虎子带着同伴又围住狗蛋。',
-    enemies: [{ id: 'enemy_huzi', name: '虎子', hp: 50, attack: 8, defense: 5, speed: 5 }],
+    contextTitle: '鏅掕胺鍦洪亣鏁呭珜',
+    contextNarrative: '鏈椂鐨勬檼璋峰満锛岃檸瀛愬甫鐫€鍚屼即鍙堝洿浣忕嫍铔嬨€?,
+    enemies: [{ id: 'enemy_huzi', name: '铏庡瓙', hp: 50, attack: 8, defense: 5, speed: 5 }],
   } as any);
   assert(!next.combatSession, 'resolved same-age combat scene should not start again');
   const oldScene = (next.pendingThreads || []).find((thread: any) => thread.id === 'thread_old_scene');
@@ -1544,7 +1544,7 @@ function smokeCombatTechniqueSpellSplit(): void {
   assert(palette.technique?.label === '\u529f\u6cd5', 'combat palette should expose a separate technique group');
   assert(palette.technique.options.some((option: any) => option.itemId === 'scripture_cloud'), 'scripture-derived combat art should appear under technique');
   assert(!palette.spell.options.some((option: any) => option.itemId === 'scripture_cloud'), 'scripture-derived technique should not be mixed into spell group');
-  assert(palette.spell.options.some((option: any) => option.itemId === 'artifact_pearl' && option.source === 'artifact' && option.name === '潮息水幕'), 'artifact innate ability should remain available as spell-like artifact art and show ability name');
+  assert(palette.spell.options.some((option: any) => option.itemId === 'artifact_pearl' && option.source === 'artifact' && option.name === '娼伅姘村箷'), 'artifact innate ability should remain available as spell-like artifact art and show ability name');
   log('combat-technique-spell-split', { passed: true, technique: palette.technique.options.map((o: any) => o.name).join('|'), spell: palette.spell.options.map((o: any) => o.name).join('|') });
 }
 
@@ -1571,22 +1571,22 @@ function smokeEnemyLootArtifactNaming(): void {
 function smokeAiDrivenCombatActionPalette(): void {
   const state: any = {
     id: 'c-palette',
-    name: '试剑者',
+    name: '璇曞墤鑰?,
     age: 20,
-    activeStatuses: [{ id: 'bound', name: '手脚被缚', description: '双手双脚被妖藤束住', category: 'debuff', duration: 1, effects: [] }],
-    equipped: [{ id: 'sword-qingyun', name: '青云剑', description: '一柄青色法剑', item_type: 'weapon', rarity: 'rare', effects: [{ target_attribute: 'attack', operation: 'add', value: 12 }] }],
+    activeStatuses: [{ id: 'bound', name: '鎵嬭剼琚細', description: '鍙屾墜鍙岃剼琚钘ゆ潫浣?, category: 'debuff', duration: 1, effects: [] }],
+    equipped: [{ id: 'sword-qingyun', name: '闈掍簯鍓?, description: '涓€鏌勯潚鑹叉硶鍓?, item_type: 'weapon', rarity: 'rare', effects: [{ target_attribute: 'attack', operation: 'add', value: 12 }] }],
     inventory: [],
   };
   const session: any = {
     id: 'battle-palette',
-    enemies: [{ id: 'enemy', name: '藤妖', description: '缠绕成形', hp: 80, maxHp: 80, attack: 12, defense: 4, speed: 8 }],
+    enemies: [{ id: 'enemy', name: '钘ゅ', description: '缂犵粫鎴愬舰', hp: 80, maxHp: 80, attack: 12, defense: 4, speed: 8 }],
     currentEnemyIdx: 0,
     round: 1,
     log: [],
     status: 'ongoing',
     startAge: 20,
-    contextTitle: '藤网缠身',
-    contextNarrative: '你被妖藤绑住手脚，剑柄近在身侧却难以挥动。',
+    contextTitle: '钘ょ綉缂犺韩',
+    contextNarrative: '浣犺濡栬棨缁戜綇鎵嬭剼锛屽墤鏌勮繎鍦ㄨ韩渚у嵈闅句互鎸ュ姩銆?,
     playerHp: 60,
     playerMaxHp: 100,
     playerMp: 30,
@@ -1601,7 +1601,7 @@ function smokeAiDrivenCombatActionPalette(): void {
   const weapon = palette.basicAttack.options.find(o => o.id === 'weapon-sword-qingyun');
   assert(weapon && !weapon.enabled, 'bound scene should disable weapon basic attack');
   assert(palette.other.options.some(o => o.id === 'other-break-binding' && o.enabled), 'bound scene should expose AI-style other interaction');
-  assert(palette.other.label === '应变', 'other action group should be named 应变');
+  assert(palette.other.label === '搴斿彉', 'other action group should be named 搴斿彉');
   log('ai-driven-combat-action-palette', { passed: true, basicEnabled: palette.basicAttack.enabled, other: palette.other.options.map(o => o.name).join('|') });
 }
 
@@ -1665,12 +1665,11 @@ function smokeMarketStockCache(): void {
 }
 
 function smokeClosedThreadCannotBeAdvanced(): void {
-  // P0 修复验证：resolved/failed 线程不能再推进
-  const baseState: any = {
+  // P0 淇楠岃瘉锛歳esolved/failed 绾跨▼涓嶈兘鍐嶆帹杩?  const baseState: any = {
     age: 20, pendingThreads: [
-      { id: 't1', title: '已了结线索', category: 'mystery', startAge: 18, status: 'resolved', progress: 100 },
-      { id: 't2', title: '失败线索', category: 'mystery', startAge: 18, status: 'failed', progress: 30 },
-      { id: 't3', title: '进行中线索', category: 'mystery', startAge: 19, status: 'pending', progress: 40 },
+      { id: 't1', title: '宸蹭簡缁撶嚎绱?, category: 'mystery', startAge: 18, status: 'resolved', progress: 100 },
+      { id: 't2', title: '澶辫触绾跨储', category: 'mystery', startAge: 18, status: 'failed', progress: 30 },
+      { id: 't3', title: '杩涜涓嚎绱?, category: 'mystery', startAge: 19, status: 'pending', progress: 40 },
     ],
   };
   const advancedResolved = advanceThread(baseState, 't1', 20);
@@ -1687,9 +1686,8 @@ function smokeClosedThreadCannotBeAdvanced(): void {
 }
 
 async function smokePreloadInvalidationReason(): Promise<void> {
-  // P1 修复验证：isAdvancePreloadUsable 返回具体失效原因
-  // 注意：buildAdvanceStateHash 需要完整 CharacterRecord（Prisma字段），smoke 环境不完整
-  // 这里只覆盖不依赖完整 char 对象的 early-return case
+  // P1 淇楠岃瘉锛歩sAdvancePreloadUsable 杩斿洖鍏蜂綋澶辨晥鍘熷洜
+  // 娉ㄦ剰锛歜uildAdvanceStateHash 闇€瑕佸畬鏁?CharacterRecord锛圥risma瀛楁锛夛紝smoke 鐜涓嶅畬鏁?  // 杩欓噷鍙鐩栦笉渚濊禆瀹屾暣 char 瀵硅薄鐨?early-return case
   const char: any = { age: 10, alive: true, ascended: false, isAtChoice: false, pendingChoiceJson: '', combatStateJson: '' };
   // no_preload
   assert(((await isAdvancePreloadUsable(char, null)) as any)?.reason === 'no_preload', 'null preload should return no_preload');
@@ -1709,36 +1707,32 @@ async function smokePreloadInvalidationReason(): Promise<void> {
 }
 
 function smokeSameYearThreadNormalizedProgress100(): void {
-  // P0 修复验证：getSameYearThreads 读取线程前统一归一化
-  // normalizeThreadsCompletion 把 progress=100 → resolved，getSameYearThreads 的 t.progress < 100 条件会把已完成的线程排除
+  // P0 淇楠岃瘉锛歡etSameYearThreads 璇诲彇绾跨▼鍓嶇粺涓€褰掍竴鍖?  // normalizeThreadsCompletion 鎶?progress=100 鈫?resolved锛実etSameYearThreads 鐨?t.progress < 100 鏉′欢浼氭妸宸插畬鎴愮殑绾跨▼鎺掗櫎
   const state: any = {
     age: 21, pendingThreads: [
-      { id: 'same_y1', title: '同岁已满线索', category: 'competition', startAge: 21, deadlineAge: 21, status: 'pending', progress: 100, dueInSameYear: true },
-      { id: 'same_y2', title: '同岁待续线索', category: 'competition', startAge: 21, deadlineAge: 21, status: 'pending', progress: 60, dueInSameYear: true },
+      { id: 'same_y1', title: '鍚屽瞾宸叉弧绾跨储', category: 'competition', startAge: 21, deadlineAge: 21, status: 'pending', progress: 100, dueInSameYear: true },
+      { id: 'same_y2', title: '鍚屽瞾寰呯画绾跨储', category: 'competition', startAge: 21, deadlineAge: 21, status: 'pending', progress: 60, dueInSameYear: true },
     ],
   };
   const threads = getSameYearThreads(state);
-  // same_y1: progress=100 → normalizeThreadsCompletion 转为 resolved → getSameYearThreads 过滤掉（t.progress < 100）
-  assert(!threads.find((t: any) => t.id === 'same_y1'), 'progress=100 thread should be excluded from same-year scheduling (already resolved)');
-  // same_y2: progress=60, pending → 保留
+  // same_y1: progress=100 鈫?normalizeThreadsCompletion 杞负 resolved 鈫?getSameYearThreads 杩囨护鎺夛紙t.progress < 100锛?  assert(!threads.find((t: any) => t.id === 'same_y1'), 'progress=100 thread should be excluded from same-year scheduling (already resolved)');
+  // same_y2: progress=60, pending 鈫?淇濈暀
   assert(threads.find((t: any) => t.id === 'same_y2'), 'pending thread should still appear in same-year scheduling');
   log('same-year-thread-normalized-progress100', { passed: true });
 }
 
 function smokeNoMechanismWordsInNarrative(): void {
-  // 文案过滤层验证：sanitizeNarrativeText 应移除内部机制词
-  // 验证策略：检查结果中不包含字段名、调试元词等机制词；不检查数值残留（来自原始文本，预期会部分残留）
-  const inputOutputs: Array<[string, RegExp[]]> = [
-    ['你获得了 cultivationExp 50点修为', [/\bcultivationExp\b/i]],                          // cultivationExp 字段必须清除
-    ['心魔heartDemon增加了2层', [/\bheartDemon\b/i]],                                       // heartDemon 字段必须清除
-    ['剩余灵石 spiritStones 100颗', [/\bspiritStones?\b/i]],                               // spiritStones 字段必须清除
-    ['你的 pendingThreads 中有一条新线索', [/\bpendingThreads?\b/i]],                       // pendingThreads 字段必须清除
-    ['触发 progress 50 的进度判定', [/\bprogress\b/i]],                                      // progress 字段必须清除
-    ['debug error cache api', [/\b(?:debug|log|error|test|cache)\b/i]],                  // 调试元词必须清除
-    ['P0 P1 preload stateHash', [/\b(?:P0|P1|preload|stateHash)\b/]],                   // 内部标记词必须清除
-    ['气血上限 maxHp 已满', [/\bmaxHp\b/i]],                                                // maxHp 字段必须清除
-    ['攻击 attack 提升', [/\battack\b/i]],                                                  // attack 字段必须清除
-    ['普通叙事文字无变化', []],                                                               // 无机制词保持不变
+  // 鏂囨杩囨护灞傞獙璇侊細sanitizeNarrativeText 搴旂Щ闄ゅ唴閮ㄦ満鍒惰瘝
+  // 楠岃瘉绛栫暐锛氭鏌ョ粨鏋滀腑涓嶅寘鍚瓧娈靛悕銆佽皟璇曞厓璇嶇瓑鏈哄埗璇嶏紱涓嶆鏌ユ暟鍊兼畫鐣欙紙鏉ヨ嚜鍘熷鏂囨湰锛岄鏈熶細閮ㄥ垎娈嬬暀锛?  const inputOutputs: Array<[string, RegExp[]]> = [
+    ['浣犺幏寰椾簡 cultivationExp 50鐐逛慨涓?, [/\bcultivationExp\b/i]],                          // cultivationExp 瀛楁蹇呴』娓呴櫎
+    ['蹇冮瓟heartDemon澧炲姞浜?灞?, [/\bheartDemon\b/i]],                                       // heartDemon 瀛楁蹇呴』娓呴櫎
+    ['鍓╀綑鐏电煶 spiritStones 100棰?, [/\bspiritStones?\b/i]],                               // spiritStones 瀛楁蹇呴』娓呴櫎
+    ['浣犵殑 pendingThreads 涓湁涓€鏉℃柊绾跨储', [/\bpendingThreads?\b/i]],                       // pendingThreads 瀛楁蹇呴』娓呴櫎
+    ['瑙﹀彂 progress 50 鐨勮繘搴﹀垽瀹?, [/\bprogress\b/i]],                                      // progress 瀛楁蹇呴』娓呴櫎
+    ['debug error cache api', [/\b(?:debug|log|error|test|cache)\b/i]],                  // 璋冭瘯鍏冭瘝蹇呴』娓呴櫎
+    ['P0 P1 preload stateHash', [/\b(?:P0|P1|preload|stateHash)\b/]],                   // 鍐呴儴鏍囪璇嶅繀椤绘竻闄?    ['姘旇涓婇檺 maxHp 宸叉弧', [/\bmaxHp\b/i]],                                                // maxHp 瀛楁蹇呴』娓呴櫎
+    ['鏀诲嚮 attack 鎻愬崌', [/\battack\b/i]],                                                  // attack 瀛楁蹇呴』娓呴櫎
+    ['鏅€氬彊浜嬫枃瀛楁棤鍙樺寲', []],                                                               // 鏃犳満鍒惰瘝淇濇寔涓嶅彉
   ];
   let allPassed = true;
   for (const [input, forbidden] of inputOutputs) {
@@ -1749,15 +1743,14 @@ function smokeNoMechanismWordsInNarrative(): void {
       log('mechanism-word-filter-failed', { input, forbidden: remaining.map(r => r.source), got: result });
     }
   }
-  // 关键字段替换映射正确性
-  assert(sanitizeNarrativeText('spiritStones') === '灵石', 'spiritStones should map to 灵石');
-  assert(sanitizeNarrativeText('cultivationExp') === '修为', 'cultivationExp should map to 修为');
-  assert(sanitizeNarrativeText('heartDemon') === '心魔', 'heartDemon should map to 心魔');
-  assert(sanitizeNarrativeText('pendingThreads') === '因缘线索', 'pendingThreads should map to 因缘线索');
+  // 鍏抽敭瀛楁鏇挎崲鏄犲皠姝ｇ‘鎬?  assert(sanitizeNarrativeText('spiritStones') === '鐏电煶', 'spiritStones should map to 鐏电煶');
+  assert(sanitizeNarrativeText('cultivationExp') === '淇负', 'cultivationExp should map to 淇负');
+  assert(sanitizeNarrativeText('heartDemon') === '蹇冮瓟', 'heartDemon should map to 蹇冮瓟');
+  assert(sanitizeNarrativeText('pendingThreads') === '鍥犵紭绾跨储', 'pendingThreads should map to 鍥犵紭绾跨储');
   assert(sanitizeNarrativeText('debug cache error') === '', 'debug words should be removed');
   assert(allPassed, 'sanitizeNarrativeText should clean all mechanism words correctly');
-  // sanitizeEventDraft 验证
-  const draft = sanitizeEventDraft({ title: '标题含 cultivationExp', narrative: '修为+30点 spiritStones 消耗' });
+  // sanitizeEventDraft 楠岃瘉
+  const draft = sanitizeEventDraft({ title: '鏍囬鍚?cultivationExp', narrative: '淇负+30鐐?spiritStones 娑堣€? });
   assert(!draft.title.includes('cultivationExp'), 'draft title should be sanitized');
   assert(!draft.narrative.includes('cultivationExp'), 'draft narrative should be sanitized');
   assert(!draft.narrative.includes('spiritStones'), 'draft narrative should have spiritStones replaced');
@@ -1765,10 +1758,9 @@ function smokeNoMechanismWordsInNarrative(): void {
 }
 
 function smokeYoungCharacterNoAdultAction(): void {
-  // 幼龄角色（age < 12）不应触发成人化事件调度
-  // 验证 buildWorldPressureOpportunityMap 对幼龄角色不推荐成人化活动
-  const youngState: any = {
-    name: '小童',
+  // 骞奸緞瑙掕壊锛坅ge < 12锛変笉搴旇Е鍙戞垚浜哄寲浜嬩欢璋冨害
+  // 楠岃瘉 buildWorldPressureOpportunityMap 瀵瑰辜榫勮鑹蹭笉鎺ㄨ崘鎴愪汉鍖栨椿鍔?  const youngState: any = {
+    name: '灏忕',
     age: 7,
     lifespan: 80,
     realm: 'mortal',
@@ -1777,73 +1769,72 @@ function smokeYoungCharacterNoAdultAction(): void {
     activeStatuses: [],
     inventory: [],
     equipped: [],
-    location: '村庄',
+    location: '鏉戝簞',
   };
   const pressureMap = buildWorldPressureOpportunityMap(youngState, []);
-  // 幼龄角色 summary 中不应出现成人化关键词
-  const summaryText = pressureMap.summary || '';
-  const adultKeywords = /交易|拍卖|秘境|洞府|遗迹|传承|宗门|历练|闯荡|修行|闭关/;
+  // 骞奸緞瑙掕壊 summary 涓笉搴斿嚭鐜版垚浜哄寲鍏抽敭璇?  const summaryText = pressureMap.summary || '';
+  const adultKeywords = /浜ゆ槗|鎷嶅崠|绉樺|娲炲簻|閬楄抗|浼犳壙|瀹楅棬|鍘嗙粌|闂崱|淇|闂叧/;
   assert(!adultKeywords.test(summaryText), `young child (age 7) world pressure summary should not contain adult activities: ${summaryText}`);
   log('smoke-young-character-no-adult-action', { passed: true, summary: summaryText });
 }
 
 function smokeFallbackInfantHardGate(): void {
-  // 6 岁以下必须走幼童分支，不复用历史文本
-  const state: any = { name: '幼童', age: 2, realm: 'mortal', realmLevel: 0, location: '村庄', cultivationMultiplier: 1 };
-  const blueprint: any = { name: '童年趣事', category: 'growth' };
-  const ctx: any = { character: { realmName: '凡人' } };
-  // 即使有大量历史，age=2 也必须走 infant_template 策略
+  // 6 宀佷互涓嬪繀椤昏蛋骞肩鍒嗘敮锛屼笉澶嶇敤鍘嗗彶鏂囨湰
+  const state: any = { name: '骞肩', age: 2, realm: 'mortal', realmLevel: 0, location: '鏉戝簞', cultivationMultiplier: 1 };
+  const blueprint: any = { name: '绔ュ勾瓒ｄ簨', category: 'growth' };
+  const ctx: any = { character: { realmName: '鍑′汉' } };
+  // 鍗充娇鏈夊ぇ閲忓巻鍙诧紝age=2 涔熷繀椤昏蛋 infant_template 绛栫暐
   const recentEvents = [
-    { age: 1, title: '周岁', narrative: '去年她在青云山脚蹒跚学步，抱着泥巴的哥哥笑了一整年。', eventType: 'normal' },
-    { age: 2, title: '前岁', narrative: '前一年她在溪边看小鱼，被爷爷抱回家。', eventType: 'normal' },
+    { age: 1, title: '鍛ㄥ瞾', narrative: '鍘诲勾濂瑰湪闈掍簯灞辫剼韫掕窔瀛︽锛屾姳鐫€娉ュ反鐨勫摜鍝ョ瑧浜嗕竴鏁村勾銆?, eventType: 'normal' },
+    { age: 2, title: '鍓嶅瞾', narrative: '鍓嶄竴骞村ス鍦ㄦ邯杈圭湅灏忛奔锛岃鐖风埛鎶卞洖瀹躲€?, eventType: 'normal' },
   ];
   const result = buildFallbackAgeEvent(state, blueprint, ctx, false, { recentEvents });
   assert(result.isFallbackGenerated === true, 'fallback must mark isFallbackGenerated');
   assert(result.fallbackStrategy === 'infant_template', `age 2 must use infant_template, got ${result.fallbackStrategy}`);
-  // 不得复用历史同岁文本里的具体地名
-  assert(!result.narrative.includes('青云山'), `infant fallback must not inject historical location: ${result.narrative}`);
-  assert(!result.narrative.includes('溪边看小鱼'), `infant fallback must not reuse historical narrative: ${result.narrative}`);
+  // 涓嶅緱澶嶇敤鍘嗗彶鍚屽瞾鏂囨湰閲岀殑鍏蜂綋鍦板悕
+  assert(!result.narrative.includes('闈掍簯灞?), `infant fallback must not inject historical location: ${result.narrative}`);
+  assert(!result.narrative.includes('婧竟鐪嬪皬楸?), `infant fallback must not reuse historical narrative: ${result.narrative}`);
   log('fallback-infant-hard-gate', { passed: true, strategy: result.fallbackStrategy, narrative: result.narrative.slice(0, 40) });
 }
 
 function smokeFallbackSameAgeVariant(): void {
-  // 有同岁历史时优先复用历史文本
-  const state: any = { name: '云岚', age: 18, realm: 'qi_refining', realmLevel: 3, location: '青云山脚', cultivationMultiplier: 1.2 };
-  const blueprint: any = { name: '流年', category: 'daily' };
-  const ctx: any = { character: { realmName: '炼气' } };
+  // 鏈夊悓宀佸巻鍙叉椂浼樺厛澶嶇敤鍘嗗彶鏂囨湰
+  const state: any = { name: '浜戝矚', age: 18, realm: 'qi_refining', realmLevel: 3, location: '闈掍簯灞辫剼', cultivationMultiplier: 1.2 };
+  const blueprint: any = { name: '娴佸勾', category: 'daily' };
+  const ctx: any = { character: { realmName: '鐐兼皵' } };
   const recentEvents = [
-    { age: 18, title: '坊市淘宝', narrative: '今年，云岚在坊市里翻找几本旧书，淘到一本前人修炼手札。', eventType: 'normal' },
-    { age: 17, title: '日常', narrative: '去年她把灵气运转调顺了不少。', eventType: 'normal' },
+    { age: 18, title: '鍧婂競娣樺疂', narrative: '浠婂勾锛屼簯宀氬湪鍧婂競閲岀炕鎵惧嚑鏈棫涔︼紝娣樺埌涓€鏈墠浜轰慨鐐兼墜鏈€?, eventType: 'normal' },
+    { age: 17, title: '鏃ュ父', narrative: '鍘诲勾濂规妸鐏垫皵杩愯浆璋冮『浜嗕笉灏戙€?, eventType: 'normal' },
   ];
   const result = buildFallbackAgeEvent(state, blueprint, ctx, false, { recentEvents });
   assert(result.fallbackStrategy === 'same_age_variant', `should use same_age_variant strategy, got ${result.fallbackStrategy}`);
-  assert(result.narrative.includes('云岚'), 'remixed narrative must keep character name');
+  assert(result.narrative.includes('浜戝矚'), 'remixed narrative must keep character name');
   log('fallback-same-age-variant', { passed: true, strategy: result.fallbackStrategy });
 }
 
 function smokeFallbackElementEnrichment(): void {
-  // 无同岁历史但有地点/NPC 出现时，应使用元素注入型模板
-  const state: any = { name: '云岚', age: 30, realm: 'qi_refining', realmLevel: 5, location: '青云山脚', cultivationMultiplier: 1.2 };
-  const blueprint: any = { name: '流年', category: 'daily' };
-  const ctx: any = { character: { realmName: '炼气' } };
+  // 鏃犲悓宀佸巻鍙蹭絾鏈夊湴鐐?NPC 鍑虹幇鏃讹紝搴斾娇鐢ㄥ厓绱犳敞鍏ュ瀷妯℃澘
+  const state: any = { name: '浜戝矚', age: 30, realm: 'qi_refining', realmLevel: 5, location: '闈掍簯灞辫剼', cultivationMultiplier: 1.2 };
+  const blueprint: any = { name: '娴佸勾', category: 'daily' };
+  const ctx: any = { character: { realmName: '鐐兼皵' } };
   const recentEvents = [
-    { age: 20, title: '访友', narrative: '她去青云镇外的碧水潭，遇到李掌柜讨教几招，又聊起附近的妖兽出没。', eventType: 'normal' },
-    { age: 21, title: '又访', narrative: '又去青云镇外的碧水潭，遇到李掌柜讨教几招，又聊起附近的妖兽出没。', eventType: 'normal' },
+    { age: 20, title: '璁垮弸', narrative: '濂瑰幓闈掍簯闀囧鐨勭ⅶ姘存江锛岄亣鍒版潕鎺屾煖璁ㄦ暀鍑犳嫑锛屽張鑱婅捣闄勮繎鐨勫鍏藉嚭娌°€?, eventType: 'normal' },
+    { age: 21, title: '鍙堣', narrative: '鍙堝幓闈掍簯闀囧鐨勭ⅶ姘存江锛岄亣鍒版潕鎺屾煖璁ㄦ暀鍑犳嫑锛屽張鑱婅捣闄勮繎鐨勫鍏藉嚭娌°€?, eventType: 'normal' },
   ];
   const result = buildFallbackAgeEvent(state, blueprint, ctx, false, { recentEvents });
   assert(result.fallbackStrategy === 'enriched_template', `should use enriched_template, got ${result.fallbackStrategy}`);
-  // 必须注入历史地点或 NPC
-  const injectedLocation = result.narrative.includes('碧水潭') || result.narrative.includes('青云镇');
-  const injectedNpc = result.narrative.includes('李掌柜');
+  // 蹇呴』娉ㄥ叆鍘嗗彶鍦扮偣鎴?NPC
+  const injectedLocation = result.narrative.includes('纰ф按娼?) || result.narrative.includes('闈掍簯闀?);
+  const injectedNpc = result.narrative.includes('鏉庢帉鏌?);
   assert(injectedLocation || injectedNpc, `enriched template must inject historical element, got: ${result.narrative}`);
   log('fallback-element-enrichment', { passed: true, strategy: result.fallbackStrategy, hasLocation: injectedLocation, hasNpc: injectedNpc });
 }
 
 function smokeFallbackPlainTemplate(): void {
-  // 完全无历史时用纯模板
-  const state: any = { name: '新角色', age: 25, realm: 'qi_refining', realmLevel: 2, location: '未知', cultivationMultiplier: 1 };
-  const blueprint: any = { name: '流年', category: 'daily' };
-  const ctx: any = { character: { realmName: '炼气' } };
+  // 瀹屽叏鏃犲巻鍙叉椂鐢ㄧ函妯℃澘
+  const state: any = { name: '鏂拌鑹?, age: 25, realm: 'qi_refining', realmLevel: 2, location: '鏈煡', cultivationMultiplier: 1 };
+  const blueprint: any = { name: '娴佸勾', category: 'daily' };
+  const ctx: any = { character: { realmName: '鐐兼皵' } };
   const result = buildFallbackAgeEvent(state, blueprint, ctx, false, { recentEvents: [] });
   assert(result.fallbackStrategy === 'plain_template', `should use plain_template, got ${result.fallbackStrategy}`);
   assert(result.narrative.length > 20, 'plain template must produce non-trivial narrative');
@@ -1851,8 +1842,8 @@ function smokeFallbackPlainTemplate(): void {
 }
 
 function smokeStyleAnchorExtraction(): void {
-  // 风格锚定：能从 narrative 提取 tone/句长/标点密度/开头模式/片段样本
-  const narrative = '那年夏天日头毒，茅听澎蹲在院角看蚂蚁搬家。泥土热得烫手，他拿小树枝拨了一下，蚂蚁慌慌张张绕开了。他笑了一下，又去够下一只。午后风起，母亲叫他进屋喝水，他应了一声，却没动。';
+  // 椋庢牸閿氬畾锛氳兘浠?narrative 鎻愬彇 tone/鍙ラ暱/鏍囩偣瀵嗗害/寮€澶存ā寮?鐗囨鏍锋湰
+  const narrative = '閭ｅ勾澶忓ぉ鏃ュご姣掞紝鑼呭惉婢庤共鍦ㄩ櫌瑙掔湅铓傝殎鎼銆傛偿鍦熺儹寰楃儷鎵嬶紝浠栨嬁灏忔爲鏋濇嫧浜嗕竴涓嬶紝铓傝殎鎱屾厡寮犲紶缁曞紑浜嗐€備粬绗戜簡涓€涓嬶紝鍙堝幓澶熶笅涓€鍙€傚崍鍚庨璧凤紝姣嶄翰鍙粬杩涘眿鍠濇按锛屼粬搴斾簡涓€澹帮紝鍗存病鍔ㄣ€?;
   const anchor = extractStyleAnchor(5, narrative);
   assert(anchor.age === 5, 'age should be preserved');
   assert(['tender', 'tense', 'mellow', 'somber', 'epic'].includes(anchor.tone), `tone should be valid, got ${anchor.tone}`);
@@ -1860,14 +1851,14 @@ function smokeStyleAnchorExtraction(): void {
   assert(anchor.openingPattern.length > 0, 'openingPattern should be non-empty');
   assert(anchor.sampleSnippet.length > 0, 'sampleSnippet should be non-empty');
   const prompt = formatStyleAnchorsForPrompt([anchor]);
-  assert(prompt.includes('风格锚定'), 'prompt should include 风格锚定 marker');
-  assert(prompt.includes('茅听澎') || prompt.includes('蚂蚁') || prompt.includes('院角'), 'prompt should include a snippet excerpt');
+  assert(prompt.includes('椋庢牸閿氬畾'), 'prompt should include 椋庢牸閿氬畾 marker');
+  assert(prompt.includes('鑼呭惉婢?) || prompt.includes('铓傝殎') || prompt.includes('闄㈣'), 'prompt should include a snippet excerpt');
   log('style-anchor-extraction', { passed: true, tone: anchor.tone, avgSentenceLen: anchor.avgSentenceLen, snippetLen: anchor.sampleSnippet.length });
 }
 
 function smokeEntityStoreExtraction(): void {
-  // 实体库：能从 narrative 提取 NPC/地点/物品
-  const narrative = '那年夏天，茅听澎蹲在院角看蚂蚁搬家。祖父茅老栓从堂屋拿出半截灰布擦汗，母亲刘氏端来一碗凉茶。青云镇的虎子也跑来玩，带来的小竹笛丢在草丛里。';
+  // 瀹炰綋搴擄細鑳戒粠 narrative 鎻愬彇 NPC/鍦扮偣/鐗╁搧
+  const narrative = '閭ｅ勾澶忓ぉ锛岃寘鍚編韫插湪闄㈣鐪嬭殏铓佹惉瀹躲€傜鐖惰寘鑰佹爴浠庡爞灞嬫嬁鍑哄崐鎴伆甯冩摝姹楋紝姣嶄翰鍒樻皬绔潵涓€纰楀噳鑼躲€傞潚浜戦晣鐨勮檸瀛愪篃璺戞潵鐜╋紝甯︽潵鐨勫皬绔圭瑳涓㈠湪鑽変笡閲屻€?;
   const entities = extractEntitiesFromNarrative(5, narrative);
   const npcs = entities.filter((e: any) => e.type === 'npc').map((e: any) => e.name);
   const places = entities.filter((e: any) => e.type === 'place').map((e: any) => e.name);
@@ -1875,29 +1866,26 @@ function smokeEntityStoreExtraction(): void {
   assert(npcs.length > 0, `should extract at least one NPC, got: ${npcs.join(',')}`);
   assert(places.length > 0, `should extract at least one place, got: ${places.join(',')}`);
   const prompt = formatEntitiesForPrompt(entities);
-  assert(prompt.includes('已有素材库'), 'prompt should include 已有素材库 marker');
+  assert(prompt.includes('宸叉湁绱犳潗搴?), 'prompt should include 宸叉湁绱犳潗搴?marker');
   log('entity-store-extraction', { passed: true, npcs, places, items });
 }
 
 function smokeRhythmVariation(): void {
-  // 韵律变化：fallback 生成时能按 style anchor 调整
-  const narrative = '5岁，她抄着手倚在院门边看日头，半眯着眼。';
+  // 闊靛緥鍙樺寲锛歠allback 鐢熸垚鏃惰兘鎸?style anchor 璋冩暣
+  const narrative = '5宀侊紝濂规妱鐫€鎵嬪€氬湪闄㈤棬杈圭湅鏃ュご锛屽崐鐪潃鐪笺€?;
   const anchor = extractStyleAnchor(5, narrative);
-  // 长叙事测试拆句
-  const longText = '茅听澎蹲在院角看蚂蚁搬家，一蹲就是半个时辰，腿都麻了，伸手揉了揉膝盖，又看蚂蚁列队从墙根过。';
+  // 闀垮彊浜嬫祴璇曟媶鍙?  const longText = '鑼呭惉婢庤共鍦ㄩ櫌瑙掔湅铓傝殎鎼锛屼竴韫插氨鏄崐涓椂杈帮紝鑵块兘楹讳簡锛屼几鎵嬫弶浜嗘弶鑶濈洊锛屽張鐪嬭殏铓佸垪闃熶粠澧欐牴杩囥€?;
   const varied = applyRhythmVariation(longText, anchor);
   assert(typeof varied === 'string' && varied.length > 0, 'should produce non-empty varied text');
-  // 实体注入
+  // 瀹炰綋娉ㄥ叆
   const entities = extractEntitiesFromNarrative(5, narrative);
-  const injected = injectEntityFragment('他在院中玩泥。', entities);
+  const injected = injectEntityFragment('浠栧湪闄腑鐜╂偿銆?, entities);
   assert(injected.length > 0, 'injection should produce non-empty text');
   log('rhythm-variation', { passed: true, variedLength: varied.length, injectedLength: injected.length });
 }
 
 function smokeLLMCache(): void {
-  // LLM 缓存：能 set/get 同一个 prompt 5 分钟内
-  // hashCacheKey 是 private 函数，做不了直接测试，但能通过重复调用测语义
-  const k1 = hashCacheKey('full|sys|user-a');
+  // LLM 缂撳瓨锛氳兘 set/get 鍚屼竴涓?prompt 5 鍒嗛挓鍐?  // hashCacheKey 鏄?private 鍑芥暟锛屽仛涓嶄簡鐩存帴娴嬭瘯锛屼絾鑳介€氳繃閲嶅璋冪敤娴嬭涔?  const k1 = hashCacheKey('full|sys|user-a');
   const k2 = hashCacheKey('full|sys|user-a');
   const k3 = hashCacheKey('full|sys|user-b');
   assert(k1 === k2, 'same input should produce same hash');
@@ -1907,17 +1895,14 @@ function smokeLLMCache(): void {
 }
 
 function smokeLiteModelConfig(): void {
-  // liteModel 配置：cfg 中有 liteModel 字段时，light mode 应该用 liteModel
-  // 验证 type 存在（即使 loadAIConfig 依赖文件）
-  log('lite-model-config', { passed: true, note: 'cfg.liteModel is used when qualityMode=light; set in .xianxia-ai-config' });
+  // liteModel 閰嶇疆锛歝fg 涓湁 liteModel 瀛楁鏃讹紝light mode 搴旇鐢?liteModel
+  // 楠岃瘉 type 瀛樺湪锛堝嵆浣?loadAIConfig 渚濊禆鏂囦欢锛?  log('lite-model-config', { passed: true, note: 'cfg.liteModel is used when qualityMode=light; set in .xianxia-ai-config' });
 }
 
 function smokeBubbleSplit(): void {
-  // 气泡级切分：前端按 86 字上限 + 句号切句；验证：
-  // 1) 单个长句会被强制拆为 1+ 段
-  // 2) 每段不超过 86 字
-  // 3) 短句（<90字）保留完整
-  // 模拟 splitNarrativeParagraphs 的切分逻辑
+  // 姘旀场绾у垏鍒嗭細鍓嶇鎸?86 瀛椾笂闄?+ 鍙ュ彿鍒囧彞锛涢獙璇侊細
+  // 1) 鍗曚釜闀垮彞浼氳寮哄埗鎷嗕负 1+ 娈?  // 2) 姣忔涓嶈秴杩?86 瀛?  // 3) 鐭彞锛?90瀛楋級淇濈暀瀹屾暣
+  // 妯℃嫙 splitNarrativeParagraphs 鐨勫垏鍒嗛€昏緫
   const split = (text: string): string[] => {
     if (!text) return [];
     const explicit = text.split(/\n+/).map(p => p.trim()).filter(Boolean);
@@ -1925,7 +1910,7 @@ function smokeBubbleSplit(): void {
     const paragraphs: string[] = [];
     for (const part of source) {
       if (part.length <= 90) { paragraphs.push(part); continue; }
-      const sentences = part.match(/[^。！？!?；;]+[。！？!?；;]?/g) || [part];
+      const sentences = part.match(/[^銆傦紒锛??锛?]+[銆傦紒锛??锛?]?/g) || [part];
       let current = '';
       for (const sentence of sentences.map(s => s.trim()).filter(Boolean)) {
         if (current && (current + sentence).length > 86) {
@@ -1939,76 +1924,64 @@ function smokeBubbleSplit(): void {
     }
     return paragraphs;
   };
-  // 测试 1: 多短句叙事（90字以上，触发句切）
-  const text1 = '那年夏天日头毒，茅听澎蹲在院角看蚂蚁搬家。泥土热得烫手，他拿小树枝拨了一下，蚂蚁慌慌张张绕开了。他笑了一下，又去够下一只，又来了一阵风。傍晚母亲唤他回去吃饭，他应了一声，膝盖上沾满了红土。';
+  // 娴嬭瘯 1: 澶氱煭鍙ュ彊浜嬶紙90瀛椾互涓婏紝瑙﹀彂鍙ュ垏锛?  const text1 = '閭ｅ勾澶忓ぉ鏃ュご姣掞紝鑼呭惉婢庤共鍦ㄩ櫌瑙掔湅铓傝殎鎼銆傛偿鍦熺儹寰楃儷鎵嬶紝浠栨嬁灏忔爲鏋濇嫧浜嗕竴涓嬶紝铓傝殎鎱屾厡寮犲紶缁曞紑浜嗐€備粬绗戜簡涓€涓嬶紝鍙堝幓澶熶笅涓€鍙紝鍙堟潵浜嗕竴闃甸銆傚倣鏅氭瘝浜插敜浠栧洖鍘诲悆楗紝浠栧簲浜嗕竴澹帮紝鑶濈洊涓婃簿婊′簡绾㈠湡銆?;
   const r1 = split(text1);
-  assert(r1.length >= 2, `长叙事应切多个气泡, got ${r1.length}, text len ${text1.length}`);
-  assert(r1.every(p => p.length <= 90), `每段不超过 90 字: ${r1.map(p => p.length).join(',')}`);
-  // 测试 2: 长句强制拆
-  const text2 = '那年夏天日头毒，茅听澎蹲在院角看蚂蚁搬家，泥土热得烫手，他拿小树枝拨了一下，蚂蚁慌慌张张绕开了，他笑了一下，又去够下一只。';
+  assert(r1.length >= 2, `闀垮彊浜嬪簲鍒囧涓皵娉? got ${r1.length}, text len ${text1.length}`);
+  assert(r1.every(p => p.length <= 90), `姣忔涓嶈秴杩?90 瀛? ${r1.map(p => p.length).join(',')}`);
+  // 娴嬭瘯 2: 闀垮彞寮哄埗鎷?  const text2 = '閭ｅ勾澶忓ぉ鏃ュご姣掞紝鑼呭惉婢庤共鍦ㄩ櫌瑙掔湅铓傝殎鎼锛屾偿鍦熺儹寰楃儷鎵嬶紝浠栨嬁灏忔爲鏋濇嫧浜嗕竴涓嬶紝铓傝殎鎱屾厡寮犲紶缁曞紑浜嗭紝浠栫瑧浜嗕竴涓嬶紝鍙堝幓澶熶笅涓€鍙€?;
   const r2 = split(text2);
-  assert(r2.every(p => p.length <= 90), `长句切分后每段不超 90 字: ${r2.map(p => p.length).join(',')}`);
-  // 测试 3: 空文本
-  const r3 = split('');
-  assert(r3.length === 0, '空文本应返回空数组');
-  // 测试 4: 单短句
-  const r4 = split('一句话。');
-  assert(r4.length === 1 && r4[0] === '一句话。', `单短句保留: ${r4.join(',')}`);
+  assert(r2.every(p => p.length <= 90), `闀垮彞鍒囧垎鍚庢瘡娈典笉瓒?90 瀛? ${r2.map(p => p.length).join(',')}`);
+  // 娴嬭瘯 3: 绌烘枃鏈?  const r3 = split('');
+  assert(r3.length === 0, '绌烘枃鏈簲杩斿洖绌烘暟缁?);
+  // 娴嬭瘯 4: 鍗曠煭鍙?  const r4 = split('涓€鍙ヨ瘽銆?);
+  assert(r4.length === 1 && r4[0] === '涓€鍙ヨ瘽銆?, `鍗曠煭鍙ヤ繚鐣? ${r4.join(',')}`);
   log('bubble-split', { passed: true, text1Count: r1.length, text2Count: r2.length, maxLen: Math.max(...r1.map(p => p.length), ...r2.map(p => p.length), 0) });
 }
 
 function smokeNarrativeTruncation(): void {
-  // 截断 narrative 到完整句：处理 AI 超字数输出或 max_tokens 截断
-  // 测试 1: 短文本原样返回
-  const t1 = '那年夏天日头毒。';
+  // 鎴柇 narrative 鍒板畬鏁村彞锛氬鐞?AI 瓒呭瓧鏁拌緭鍑烘垨 max_tokens 鎴柇
+  // 娴嬭瘯 1: 鐭枃鏈師鏍疯繑鍥?  const t1 = '閭ｅ勾澶忓ぉ鏃ュご姣掋€?;
   const r1 = truncateNarrativeAtSentence(t1, 400);
-  assert(r1 === t1, `短文本不变: got ${r1}`);
-  // 测试 2: 长文本截到最近完整句（t2 长度 > 420）
-  const t2 = '腊月廿三，小年夜。茅听澎帮着刘氏在灶间烧火，灶膛里的柴禾噼啪作响，火光把半边墙烘得通红。刘氏切了一碗萝卜，和着去年晒的干菜煮了一锅，锅边贴了几个粗面饼子，勉强算是一顿年饭。茅听澎蹲在灶口往里添柴，手背上被火星子烫了一下，他没吱声。灶间比往年冷清了不止一分——往常这时候，茅大根总会从雾岭提前收脚回来，把背篓往门边一靠，先探头往灶间嗅一口，大声说句"回来了，饿坏了吧！"茅大根应了一声，把背篓里的山货分了一小半给隔壁王婶家，又把剩下的一包搁在灶台边。刘氏看着这父子俩，叹了口气说"先吃饭吧，菜凉了"。这一顿年饭虽简单，茅听澎却记得很清楚——柴火噼啪，雾气腾腾，灶间暖得像春天。';
+  assert(r1 === t1, `鐭枃鏈笉鍙? got ${r1}`);
+  // 娴嬭瘯 2: 闀挎枃鏈埅鍒版渶杩戝畬鏁村彞锛坱2 闀垮害 > 420锛?  const t2 = '鑵婃湀寤夸笁锛屽皬骞村銆傝寘鍚編甯潃鍒樻皬鍦ㄧ伓闂寸儳鐏紝鐏惰啗閲岀殑鏌寸鍣煎暘浣滃搷锛岀伀鍏夋妸鍗婅竟澧欑儤寰楅€氱孩銆傚垬姘忓垏浜嗕竴纰楄悵鍗滐紝鍜岀潃鍘诲勾鏅掔殑骞茶彍鐓簡涓€閿咃紝閿呰竟璐翠簡鍑犱釜绮楅潰楗煎瓙锛屽媺寮虹畻鏄竴椤垮勾楗€傝寘鍚編韫插湪鐏跺彛寰€閲屾坊鏌达紝鎵嬭儗涓婅鐏槦瀛愮儷浜嗕竴涓嬶紝浠栨病鍚卞０銆傜伓闂存瘮寰€骞村喎娓呬簡涓嶆涓€鍒嗏€斺€斿線甯歌繖鏃跺€欙紝鑼呭ぇ鏍规€讳細浠庨浘宀彁鍓嶆敹鑴氬洖鏉ワ紝鎶婅儗绡撳線闂ㄨ竟涓€闈狅紝鍏堟帰澶村線鐏堕棿鍡呬竴鍙ｏ紝澶у０璇村彞"鍥炴潵浜嗭紝楗垮潖浜嗗惂锛?鑼呭ぇ鏍瑰簲浜嗕竴澹帮紝鎶婅儗绡撻噷鐨勫北璐у垎浜嗕竴灏忓崐缁欓殧澹佺帇濠跺锛屽張鎶婂墿涓嬬殑涓€鍖呮悂鍦ㄧ伓鍙拌竟銆傚垬姘忕湅鐫€杩欑埗瀛愪咯锛屽徆浜嗗彛姘旇"鍏堝悆楗惂锛岃彍鍑変簡"銆傝繖涓€椤垮勾楗櫧绠€鍗曪紝鑼呭惉婢庡嵈璁板緱寰堟竻妤氣€斺€旀煷鐏櫦鍟紝闆炬皵鑵捐吘锛岀伓闂存殩寰楀儚鏄ュぉ銆?;
   const r2 = truncateNarrativeAtSentence(t2, 420);
-  assert(r2.length <= 420, `截断后长度<=420, got ${r2.length}`);
-  // 必须是某个完整句结尾（句末标点 或 文本本身过短）
-  const endsAtPunct = /[。！？!?；;]$/.test(r2);
-  const isAtBoundary = r2.length === 420; // fallback 截断
-  assert(endsAtPunct || isAtBoundary, `截断后以句末标点或边界结尾: ${r2.slice(-10)}, len=${r2.length}`);
-  // 测试 3: 没有句末标点（AI 中途崩溃）：直接截到 maxChars
-  const t3 = '一段无标点的字'.repeat(50); // 100 字
-  const r3 = truncateNarrativeAtSentence(t3, 50);
-  assert(r3.length <= 50, `无标点截断<=50: got ${r3.length}`);
-  // 测试 4: 边界 - 文本刚好等于 maxChars
+  assert(r2.length <= 420, `鎴柇鍚庨暱搴?=420, got ${r2.length}`);
+  // 蹇呴』鏄煇涓畬鏁村彞缁撳熬锛堝彞鏈爣鐐?鎴?鏂囨湰鏈韩杩囩煭锛?  const endsAtPunct = /[銆傦紒锛??锛?]$/.test(r2);
+  const isAtBoundary = r2.length === 420; // fallback 鎴柇
+  assert(endsAtPunct || isAtBoundary, `鎴柇鍚庝互鍙ユ湯鏍囩偣鎴栬竟鐣岀粨灏? ${r2.slice(-10)}, len=${r2.length}`);
+  // 娴嬭瘯 3: 娌℃湁鍙ユ湯鏍囩偣锛圓I 涓€斿穿婧冿級锛氱洿鎺ユ埅鍒?maxChars
+  const t3 = '涓€娈垫棤鏍囩偣鐨勫瓧'.repeat(50); // 100 瀛?  const r3 = truncateNarrativeAtSentence(t3, 50);
+  assert(r3.length <= 50, `鏃犳爣鐐规埅鏂?=50: got ${r3.length}`);
+  // 娴嬭瘯 4: 杈圭晫 - 鏂囨湰鍒氬ソ绛変簬 maxChars
   const t4 = 'x'.repeat(400);
   const r4 = truncateNarrativeAtSentence(t4, 400);
-  assert(r4.length === 400, `边界等于上限: got ${r4.length}`);
+  assert(r4.length === 400, `杈圭晫绛変簬涓婇檺: got ${r4.length}`);
   log('narrative-truncation', { passed: true, t1Len: r1.length, t2Len: r2.length, t3Len: r3.length, t4Len: r4.length });
 }
 
 function smokeNarrativeCompletion(): void {
-  // narrative 末尾补全：处理 AI 输出"半句话+冒号"或"开了引号没关"的情况
-  // 测试 1: 末尾是中文冒号 → 补全
-  const t1 = '宣大江低头看儿子：';
+  // narrative 鏈熬琛ュ叏锛氬鐞?AI 杈撳嚭"鍗婂彞璇?鍐掑彿"鎴?寮€浜嗗紩鍙锋病鍏?鐨勬儏鍐?  // 娴嬭瘯 1: 鏈熬鏄腑鏂囧啋鍙?鈫?琛ュ叏
+  const t1 = '瀹ｅぇ姹熶綆澶寸湅鍎垮瓙锛?;
   const r1 = completeNarrative(t1);
-  assert(r1.length > t1.length && !/[：:]$/.test(r1.trim()), `中文冒号结尾被补全: ${r1.slice(-30)}`);
-  // 测试 2: 末尾是英文冒号 → 同样补全
+  assert(r1.length > t1.length && !/[锛?]$/.test(r1.trim()), `涓枃鍐掑彿缁撳熬琚ˉ鍏? ${r1.slice(-30)}`);
+  // 娴嬭瘯 2: 鏈熬鏄嫳鏂囧啋鍙?鈫?鍚屾牱琛ュ叏
   const t2 = 'He looked at his son:';
   const r2 = completeNarrative(t2);
-  assert(r2.length > t2.length, `英文冒号结尾被补全: ${r2.slice(-30)}`);
-  // 测试 3: 末尾是单引号（开了对话没关）→ 补反引号
-  const t3 = '望川张嘴喊了一声"';
+  assert(r2.length > t2.length, `鑻辨枃鍐掑彿缁撳熬琚ˉ鍏? ${r2.slice(-30)}`);
+  // 娴嬭瘯 3: 鏈熬鏄崟寮曞彿锛堝紑浜嗗璇濇病鍏筹級鈫?琛ュ弽寮曞彿
+  const t3 = '鏈涘窛寮犲槾鍠婁簡涓€澹?';
   const r3 = completeNarrative(t3);
-  assert(/["""]$/.test(r3) && r3.length > t3.length, `单引号结尾被补全: ${r3.slice(-10)}`);
-  // 测试 4: 完整 narrative → 不变
-  const t4 = '他笑了笑，转身走入雾中。';
+  assert(/["""]$/.test(r3) && r3.length > t3.length, `鍗曞紩鍙风粨灏捐琛ュ叏: ${r3.slice(-10)}`);
+  // 娴嬭瘯 4: 瀹屾暣 narrative 鈫?涓嶅彉
+  const t4 = '浠栫瑧浜嗙瑧锛岃浆韬蛋鍏ラ浘涓€?;
   const r4 = completeNarrative(t4);
-  assert(r4 === t4, `完整 narrative 不变: ${r4}`);
-  // 测试 5: 空文本
-  assert(completeNarrative('') === '', '空文本不变');
+  assert(r4 === t4, `瀹屾暣 narrative 涓嶅彉: ${r4}`);
+  // 娴嬭瘯 5: 绌烘枃鏈?  assert(completeNarrative('') === '', '绌烘枃鏈笉鍙?);
   log('narrative-completion', { passed: true, t1Changed: r1 !== t1, t2Changed: r2 !== t2, t3Changed: r3 !== t3, t4Unchanged: r4 === t4 });
 }
 
 function smokeNarrativeInference(): void {
-  // 引擎兜底：当 AI 漏写 changes 时，从 narrative 关键词 + 当前境界自动推断属性变化
-  // mock 一个 state：凡人 + 凡灵根
-  const baseState = {
+  // 寮曟搸鍏滃簳锛氬綋 AI 婕忓啓 changes 鏃讹紝浠?narrative 鍏抽敭璇?+ 褰撳墠澧冪晫鑷姩鎺ㄦ柇灞炴€у彉鍖?  // mock 涓€涓?state锛氬嚒浜?+ 鍑＄伒鏍?  const baseState = {
     age: 10, realm: 'qi_refining', spiritualRoot: 'common',
     cultivationMultiplier: 1, cultivationExp: 0, expToBreak: 100,
     hp: 100, maxHp: 100, mp: 50, maxMp: 50,
@@ -2016,49 +1989,47 @@ function smokeNarrativeInference(): void {
     heartDemon: 0, lifespan: 100,
   } as any;
 
-  // 测试 1: 修炼叙事 → 推断出 cultivationExp 增加
-  const t1 = '他坐在蒲团上打坐，引入灵气流转三十六周天。';
+  // 娴嬭瘯 1: 淇偧鍙欎簨 鈫?鎺ㄦ柇鍑?cultivationExp 澧炲姞
+  const t1 = '浠栧潗鍦ㄨ挷鍥笂鎵撳潗锛屽紩鍏ョ伒姘旀祦杞笁鍗佸叚鍛ㄥぉ銆?;
   const r1 = inferAttributeChangesFromNarrative(t1, baseState, 'test');
   assert(r1.length > 0 && r1.some((c: any) => c.attribute === 'cultivationExp' && c.delta > 0),
-    `修炼叙事推断出修为增长: ${JSON.stringify(r1)}`);
+    `淇偧鍙欎簨鎺ㄦ柇鍑轰慨涓哄闀? ${JSON.stringify(r1)}`);
 
-  // 测试 2: 战斗叙事 → 推断出 hp 减少
-  const t2 = '他与那妖兽血战三百回合，终是险胜，却也负了伤。';
+  // 娴嬭瘯 2: 鎴樻枟鍙欎簨 鈫?鎺ㄦ柇鍑?hp 鍑忓皯
+  const t2 = '浠栦笌閭ｅ鍏借鎴樹笁鐧惧洖鍚堬紝缁堟槸闄╄儨锛屽嵈涔熻礋浜嗕激銆?;
   const r2 = inferAttributeChangesFromNarrative(t2, baseState, 'test');
   assert(r2.some((c: any) => c.attribute === 'hp' && c.delta < 0),
-    `战斗叙事推断出 hp 损耗: ${JSON.stringify(r2)}`);
+    `鎴樻枟鍙欎簨鎺ㄦ柇鍑?hp 鎹熻€? ${JSON.stringify(r2)}`);
 
-  // 测试 3: 心魔叙事 → heartDemon 增加
-  const t3 = '那年他心中贪念大盛，杀意渐生，心魔悄然滋生。';
+  // 娴嬭瘯 3: 蹇冮瓟鍙欎簨 鈫?heartDemon 澧炲姞
+  const t3 = '閭ｅ勾浠栧績涓椽蹇靛ぇ鐩涳紝鏉€鎰忔笎鐢燂紝蹇冮瓟鎮勭劧婊嬬敓銆?;
   const r3 = inferAttributeChangesFromNarrative(t3, baseState, 'test');
   assert(r3.some((c: any) => c.attribute === 'heartDemon' && c.delta > 0),
-    `心魔叙事推断出心魔增长: ${JSON.stringify(r3)}`);
+    `蹇冮瓟鍙欎簨鎺ㄦ柇鍑哄績榄斿闀? ${JSON.stringify(r3)}`);
 
-  // 测试 4: 心境平和 → heartDemon 减少
-  const t4 = '他打坐冥想良久，忽然心性豁达，释怀过往种种。';
+  // 娴嬭瘯 4: 蹇冨骞冲拰 鈫?heartDemon 鍑忓皯
+  const t4 = '浠栨墦鍧愬啣鎯宠壇涔咃紝蹇界劧蹇冩€ц眮杈撅紝閲婃€€杩囧線绉嶇銆?;
   const r4 = inferAttributeChangesFromNarrative(t4, baseState, 'test');
   assert(r4.some((c: any) => c.attribute === 'heartDemon' && c.delta < 0),
-    `心境平和叙事推断出心魔减少: ${JSON.stringify(r4)}`);
+    `蹇冨骞冲拰鍙欎簨鎺ㄦ柇鍑哄績榄斿噺灏? ${JSON.stringify(r4)}`);
 
-  // 测试 5: 顿悟 → comprehension 增加
-  const t5 = '他盯着那朵云看了三日三夜，忽然豁然开朗，明悟天地至理。';
+  // 娴嬭瘯 5: 椤挎偀 鈫?comprehension 澧炲姞
+  const t5 = '浠栫洴鐫€閭ｆ湹浜戠湅浜嗕笁鏃ヤ笁澶滐紝蹇界劧璞佺劧寮€鏈楋紝鏄庢偀澶╁湴鑷崇悊銆?;
   const r5 = inferAttributeChangesFromNarrative(t5, baseState, 'test');
   assert(r5.some((c: any) => c.attribute === 'comprehension' && c.delta > 0),
-    `顿悟叙事推断出悟性增长: ${JSON.stringify(r5)}`);
+    `椤挎偀鍙欎簨鎺ㄦ柇鍑烘偀鎬у闀? ${JSON.stringify(r5)}`);
 
-  // 测试 6: 空白 narrative → 不推断
-  const r6 = inferAttributeChangesFromNarrative('', baseState, 'test');
-  assert(r6.length === 0, '空白 narrative 不推断');
+  // 娴嬭瘯 6: 绌虹櫧 narrative 鈫?涓嶆帹鏂?  const r6 = inferAttributeChangesFromNarrative('', baseState, 'test');
+  assert(r6.length === 0, '绌虹櫧 narrative 涓嶆帹鏂?);
 
-  // 测试 7: 纯叙事无关键词 → 不推断
-  const r7 = inferAttributeChangesFromNarrative('他吃了碗米饭。', baseState, 'test');
-  assert(r7.length === 0, `纯叙事无关键词不推断: ${JSON.stringify(r7)}`);
+  // 娴嬭瘯 7: 绾彊浜嬫棤鍏抽敭璇?鈫?涓嶆帹鏂?  const r7 = inferAttributeChangesFromNarrative('浠栧悆浜嗙绫抽キ銆?, baseState, 'test');
+  assert(r7.length === 0, `绾彊浜嬫棤鍏抽敭璇嶄笉鎺ㄦ柇: ${JSON.stringify(r7)}`);
 
-  // 测试 8: 同属性去重（修炼+顿悟 → comprehension 只 1 条）
-  const t8 = '他打坐入定，忽然顿悟，明悟了天地至理。';
+  // 娴嬭瘯 8: 鍚屽睘鎬у幓閲嶏紙淇偧+椤挎偀 鈫?comprehension 鍙?1 鏉★級
+  const t8 = '浠栨墦鍧愬叆瀹氾紝蹇界劧椤挎偀锛屾槑鎮熶簡澶╁湴鑷崇悊銆?;
   const r8 = inferAttributeChangesFromNarrative(t8, baseState, 'test');
   const compCount = r8.filter((c: any) => c.attribute === 'comprehension').length;
-  assert(compCount <= 1, `同属性去重: compCount=${compCount}`);
+  assert(compCount <= 1, `鍚屽睘鎬у幓閲? compCount=${compCount}`);
 
   log('narrative-inference', {
     passed: true,
@@ -2069,7 +2040,7 @@ function smokeNarrativeInference(): void {
 }
 
 function smokeBodyGrowth(): void {
-  // 引擎行为：年龄驱动的身体成长（凡人/低境界）
+  // 寮曟搸琛屼负锛氬勾榫勯┍鍔ㄧ殑韬綋鎴愰暱锛堝嚒浜?浣庡鐣岋級
   const baseMortal = {
     age: 0, realm: 'mortal', spiritualRoot: 'common',
     cultivationMultiplier: 1, cultivationExp: 0, expToBreak: 100,
@@ -2078,52 +2049,45 @@ function smokeBodyGrowth(): void {
     heartDemon: 0, lifespan: 80,
   } as any;
 
-  // 测试 1: 0 岁 → 极低
+  // 娴嬭瘯 1: 0 宀?鈫?鏋佷綆
   let state = applyAgeBasedBodyGrowth(baseMortal, 0).state;
-  assert(state.attack >= 0 && state.attack <= 1, `0岁凡人 attack 在 0-1: ${state.attack}`);
+  assert(state.attack >= 0 && state.attack <= 1, `0宀佸嚒浜?attack 鍦?0-1: ${state.attack}`);
 
-  // 测试 2: 5 岁 → 幼童（baseline ~0.2）
-  state = applyAgeBasedBodyGrowth(baseMortal, 5).state;
-  assert(state.attack >= 1 && state.attack <= 2, `5岁凡人 attack: ${state.attack}`);
-  assert(state.maxHp >= 10, `5岁凡人 maxHp >= 10: ${state.maxHp}`);
+  // 娴嬭瘯 2: 5 宀?鈫?骞肩锛坆aseline ~0.2锛?  state = applyAgeBasedBodyGrowth(baseMortal, 5).state;
+  assert(state.attack >= 1 && state.attack <= 2, `5宀佸嚒浜?attack: ${state.attack}`);
+  assert(state.maxHp >= 10, `5宀佸嚒浜?maxHp >= 10: ${state.maxHp}`);
 
-  // 测试 3: 10 岁 → 少年（baseline ~0.4）
-  state = applyAgeBasedBodyGrowth(baseMortal, 10).state;
-  assert(state.attack >= 2, `10岁凡人 attack >= 2: ${state.attack}`);
+  // 娴嬭瘯 3: 10 宀?鈫?灏戝勾锛坆aseline ~0.4锛?  state = applyAgeBasedBodyGrowth(baseMortal, 10).state;
+  assert(state.attack >= 2, `10宀佸嚒浜?attack >= 2: ${state.attack}`);
 
-  // 测试 4: 18 岁 → 接近壮年（baseline ~0.75）
-  state = applyAgeBasedBodyGrowth(baseMortal, 18).state;
-  assert(state.attack >= 3, `18岁凡人 attack >= 3: ${state.attack}`);
+  // 娴嬭瘯 4: 18 宀?鈫?鎺ヨ繎澹勾锛坆aseline ~0.75锛?  state = applyAgeBasedBodyGrowth(baseMortal, 18).state;
+  assert(state.attack >= 3, `18宀佸嚒浜?attack >= 3: ${state.attack}`);
 
-  // 测试 5: 25 岁 → 壮年 baseline（MORTAL_PEAK.attack=5, factor=1.0, realmMult=1.0）
-  state = applyAgeBasedBodyGrowth(baseMortal, 25).state;
-  assert(state.attack === 5, `25岁凡人 attack = 5: ${state.attack}`);
-  assert(state.defense === 5, `25岁凡人 defense = 5: ${state.defense}`);
-  assert(state.speed === 5, `25岁凡人 speed = 5: ${state.speed}`);
-  assert(state.maxHp === 50, `25岁凡人 maxHp = 50: ${state.maxHp}`);
+  // 娴嬭瘯 5: 25 宀?鈫?澹勾 baseline锛圡ORTAL_PEAK.attack=5, factor=1.0, realmMult=1.0锛?  state = applyAgeBasedBodyGrowth(baseMortal, 25).state;
+  assert(state.attack === 5, `25宀佸嚒浜?attack = 5: ${state.attack}`);
+  assert(state.defense === 5, `25宀佸嚒浜?defense = 5: ${state.defense}`);
+  assert(state.speed === 5, `25宀佸嚒浜?speed = 5: ${state.speed}`);
+  assert(state.maxHp === 50, `25宀佸嚒浜?maxHp = 50: ${state.maxHp}`);
 
-  // 测试 6: 40 岁 → 壮年巅峰（factor 1.05）
-  state = applyAgeBasedBodyGrowth(baseMortal, 40).state;
-  assert(state.attack >= 5, `40岁凡人 attack >= 5: ${state.attack}`);
+  // 娴嬭瘯 6: 40 宀?鈫?澹勾宸呭嘲锛坒actor 1.05锛?  state = applyAgeBasedBodyGrowth(baseMortal, 40).state;
+  assert(state.attack >= 5, `40宀佸嚒浜?attack >= 5: ${state.attack}`);
 
-  // 测试 7: 60 岁 → 中年衰退
+  // 娴嬭瘯 7: 60 宀?鈫?涓勾琛伴€€
   state = applyAgeBasedBodyGrowth(baseMortal, 60).state;
-  assert(state.attack <= 5, `60岁凡人 attack <= 5: ${state.attack}`);
+  assert(state.attack <= 5, `60宀佸嚒浜?attack <= 5: ${state.attack}`);
 
-  // 测试 8: 修真后属性保留（attack 30 → 80 岁不会掉回 baseline）
-  const advanced = { ...baseMortal, attack: 30, defense: 30, speed: 30, maxHp: 200, realm: 'qi_refining' };
+  // 娴嬭瘯 8: 淇湡鍚庡睘鎬т繚鐣欙紙attack 30 鈫?80 宀佷笉浼氭帀鍥?baseline锛?  const advanced = { ...baseMortal, attack: 30, defense: 30, speed: 30, maxHp: 200, realm: 'qi_refining' };
   state = applyAgeBasedBodyGrowth(advanced, 80).state;
-  assert(state.attack === 30, `修真后 80岁 attack 保留: ${state.attack} (baseline ${Math.round(5 * 0.65 * 1.5)})`);
-  assert(state.maxHp === 200, `修真后 80岁 maxHp 保留: ${state.maxHp}`);
+  assert(state.attack === 30, `淇湡鍚?80宀?attack 淇濈暀: ${state.attack} (baseline ${Math.round(5 * 0.65 * 1.5)})`);
+  assert(state.maxHp === 200, `淇湡鍚?80宀?maxHp 淇濈暀: ${state.maxHp}`);
 
-  // 测试 9: 修真境界倍率
+  // 娴嬭瘯 9: 淇湡澧冪晫鍊嶇巼
   const golden = { ...baseMortal, realm: 'golden_core' };
   state = applyAgeBasedBodyGrowth(golden, 25).state;
-  assert(state.attack === 15, `金丹 25岁 attack = 5*1*3 = 15: ${state.attack}`);
+  assert(state.attack === 15, `閲戜腹 25宀?attack = 5*1*3 = 15: ${state.attack}`);
 
-  // 测试 10: 100 岁耄耋
-  state = applyAgeBasedBodyGrowth(baseMortal, 100).state;
-  assert(state.attack < 5, `100岁凡人 attack < 5: ${state.attack}`);
+  // 娴嬭瘯 10: 100 宀佽€勮€?  state = applyAgeBasedBodyGrowth(baseMortal, 100).state;
+  assert(state.attack < 5, `100宀佸嚒浜?attack < 5: ${state.attack}`);
 
   log('body-growth', {
     passed: true,
@@ -2139,40 +2103,38 @@ function smokeBodyGrowth(): void {
 }
 
 function smokeBodyModifier(): void {
-  // 叙事身体修正：从 narrative 关键词检测身体状态
-  // 测试 1: 缠绵病榻
-  const t1 = '那年寒冬，他缠绵病榻三月有余，瘦得只剩一把骨头。';
+  // 鍙欎簨韬綋淇锛氫粠 narrative 鍏抽敭璇嶆娴嬭韩浣撶姸鎬?  // 娴嬭瘯 1: 缂犵坏鐥呮
+  const t1 = '閭ｅ勾瀵掑啲锛屼粬缂犵坏鐥呮涓夋湀鏈変綑锛岀槮寰楀彧鍓╀竴鎶婇澶淬€?;
   const r1 = detectBodyModifier(t1);
-  assert(r1.mode === 'critically_ill' && r1.multiplier === 0.30, `缠绵病榻 → critically_ill 0.3x: ${JSON.stringify(r1)}`);
+  assert(r1.mode === 'critically_ill' && r1.multiplier === 0.30, `缂犵坏鐥呮 鈫?critically_ill 0.3x: ${JSON.stringify(r1)}`);
 
-  // 测试 2: 久病
-  const t2 = '他自幼体弱，瘦弱不堪。';
+  // 娴嬭瘯 2: 涔呯梾
+  const t2 = '浠栬嚜骞间綋寮憋紝鐦﹀急涓嶅牚銆?;
   const r2 = detectBodyModifier(t2);
-  assert(r2.mode === 'weak' && r2.multiplier === 0.50, `体弱瘦弱 → weak 0.5x: ${JSON.stringify(r2)}`);
+  assert(r2.mode === 'weak' && r2.multiplier === 0.50, `浣撳急鐦﹀急 鈫?weak 0.5x: ${JSON.stringify(r2)}`);
 
-  // 测试 3: 病愈（"初愈"必须先匹配，不能被"久病"抢先）
-  const t3 = '他久病初愈，下了床慢慢走了一圈。';
+  // 娴嬭瘯 3: 鐥呮剤锛?鍒濇剤"蹇呴』鍏堝尮閰嶏紝涓嶈兘琚?涔呯梾"鎶㈠厛锛?  const t3 = '浠栦箙鐥呭垵鎰堬紝涓嬩簡搴婃參鎱㈣蛋浜嗕竴鍦堛€?;
   const r3 = detectBodyModifier(t3);
-  assert(r3.mode === 'recovered' && r3.multiplier === 1.0, `久病初愈 → recovered 1.0x: ${JSON.stringify(r3)}`);
+  assert(r3.mode === 'recovered' && r3.multiplier === 1.0, `涔呯梾鍒濇剤 鈫?recovered 1.0x: ${JSON.stringify(r3)}`);
 
-  // 测试 4: 健康
-  const t4 = '他在山间采药，每日劳作，身体愈发健壮。';
+  // 娴嬭瘯 4: 鍋ュ悍
+  const t4 = '浠栧湪灞遍棿閲囪嵂锛屾瘡鏃ュ姵浣滐紝韬綋鎰堝彂鍋ュ．銆?;
   const r4 = detectBodyModifier(t4);
-  assert(r4.mode === 'healthy' && r4.multiplier === 1.0, `健康 → healthy 1.0x: ${JSON.stringify(r4)}`);
+  assert(r4.mode === 'healthy' && r4.multiplier === 1.0, `鍋ュ悍 鈫?healthy 1.0x: ${JSON.stringify(r4)}`);
 
-  // 测试 5: 重病
-  const t5 = '那日他忽染重病，一病不起，气息奄奄。';
+  // 娴嬭瘯 5: 閲嶇梾
+  const t5 = '閭ｆ棩浠栧拷鏌撻噸鐥咃紝涓€鐥呬笉璧凤紝姘旀伅濂勫銆?;
   const r5 = detectBodyModifier(t5);
-  assert(r5.mode === 'critically_ill', `气息奄奄 → critically_ill: ${JSON.stringify(r5)}`);
+  assert(r5.mode === 'critically_ill', `姘旀伅濂勫 鈫?critically_ill: ${JSON.stringify(r5)}`);
 
-  // 测试 6: 先天不足
-  const t6 = '他生来先天不足，体弱多病。';
+  // 娴嬭瘯 6: 鍏堝ぉ涓嶈冻
+  const t6 = '浠栫敓鏉ュ厛澶╀笉瓒筹紝浣撳急澶氱梾銆?;
   const r6 = detectBodyModifier(t6);
-  assert(r6.mode === 'weak', `先天不足 → weak: ${JSON.stringify(r6)}`);
+  assert(r6.mode === 'weak', `鍏堝ぉ涓嶈冻 鈫?weak: ${JSON.stringify(r6)}`);
 
-  // 测试 7: 空 narrative
+  // 娴嬭瘯 7: 绌?narrative
   const r7 = detectBodyModifier('');
-  assert(r7.mode === 'healthy' && r7.multiplier === 1.0, `空 → healthy: ${JSON.stringify(r7)}`);
+  assert(r7.mode === 'healthy' && r7.multiplier === 1.0, `绌?鈫?healthy: ${JSON.stringify(r7)}`);
 
   log('body-modifier', {
     passed: true,
@@ -2181,7 +2143,7 @@ function smokeBodyModifier(): void {
 }
 
 function smokeBodyGrowthWithNarrative(): void {
-  // 集成测试：年龄 + 叙事修正 协同工作
+  // 闆嗘垚娴嬭瘯锛氬勾榫?+ 鍙欎簨淇 鍗忓悓宸ヤ綔
   const baseMortal = {
     age: 0, realm: 'mortal', spiritualRoot: 'common',
     cultivationMultiplier: 1, cultivationExp: 0, expToBreak: 100,
@@ -2190,43 +2152,43 @@ function smokeBodyGrowthWithNarrative(): void {
     heartDemon: 0, lifespan: 80,
   } as any;
 
-  // 测试 1: 25 岁健康凡人 → attack 5
-  let s = applyAgeBasedBodyGrowth(baseMortal, 25, '他打猎归来，酒足饭饱，身体健壮。').state;
-  assert(s.attack === 5, `25岁健康凡人 attack=5: ${s.attack}`);
+  // 娴嬭瘯 1: 25 宀佸仴搴峰嚒浜?鈫?attack 5
+  let s = applyAgeBasedBodyGrowth(baseMortal, 25, '浠栨墦鐚庡綊鏉ワ紝閰掕冻楗ケ锛岃韩浣撳仴澹€?).state;
+  assert(s.attack === 5, `25宀佸仴搴峰嚒浜?attack=5: ${s.attack}`);
 
-  // 测试 2: 25 岁体弱凡人 → attack 应该是 round(5*1*0.5)=round(2.5)=3 但 current 0 → max(0, 3) = 3
-  s = applyAgeBasedBodyGrowth(baseMortal, 25, '他自幼体弱，瘦弱不堪，连锄头都举不起。').state;
-  assert(s.attack === 3, `25岁体弱凡人 attack=3: ${s.attack}`);
+  // 娴嬭瘯 2: 25 宀佷綋寮卞嚒浜?鈫?attack 搴旇鏄?round(5*1*0.5)=round(2.5)=3 浣?current 0 鈫?max(0, 3) = 3
+  s = applyAgeBasedBodyGrowth(baseMortal, 25, '浠栬嚜骞间綋寮憋紝鐦﹀急涓嶅牚锛岃繛閿勫ご閮戒妇涓嶈捣銆?).state;
+  assert(s.attack === 3, `25宀佷綋寮卞嚒浜?attack=3: ${s.attack}`);
 
-  // 测试 3: 25 岁缠绵病榻 → attack 应该是 round(5*0.3)=round(1.5)=2
-  s = applyAgeBasedBodyGrowth(baseMortal, 25, '他缠绵病榻，气息奄奄，濒临死亡。').state;
-  assert(s.attack === 2, `25岁重病凡人 attack=2: ${s.attack}`);
+  // 娴嬭瘯 3: 25 宀佺紶缁电梾姒?鈫?attack 搴旇鏄?round(5*0.3)=round(1.5)=2
+  s = applyAgeBasedBodyGrowth(baseMortal, 25, '浠栫紶缁电梾姒伙紝姘旀伅濂勫锛屾繏涓存浜°€?).state;
+  assert(s.attack === 2, `25宀侀噸鐥呭嚒浜?attack=2: ${s.attack}`);
 
-  // 测试 4: 修真后 25 岁 + 重病叙事 → attack 保留修真巅峰
+  // 娴嬭瘯 4: 淇湡鍚?25 宀?+ 閲嶇梾鍙欎簨 鈫?attack 淇濈暀淇湡宸呭嘲
   const advanced = { ...baseMortal, attack: 30, defense: 30, speed: 30, maxHp: 200, realm: 'golden_core' };
-  s = applyAgeBasedBodyGrowth(advanced, 25, '他缠绵病榻，卧床不起。').state;
-  assert(s.attack === 30, `修真者重病 attack 保留: ${s.attack}`);
+  s = applyAgeBasedBodyGrowth(advanced, 25, '浠栫紶缁电梾姒伙紝鍗у簥涓嶈捣銆?).state;
+  assert(s.attack === 30, `淇湡鑰呴噸鐥?attack 淇濈暀: ${s.attack}`);
 
-  // 测试 5: 病愈后 → 拉回 baseline
+  // 娴嬭瘯 5: 鐥呮剤鍚?鈫?鎷夊洖 baseline
   const sick = { ...baseMortal, attack: 2, defense: 2, speed: 2, maxHp: 20 };
-  s = applyAgeBasedBodyGrowth(sick, 25, '他久病初愈，下床活动，身体正在恢复。').state;
-  assert(s.attack === 5, `病愈后 attack 拉回 5: ${s.attack}`);
-  assert(s.maxHp === 50, `病愈后 maxHp 拉回 50: ${s.maxHp}`);
+  s = applyAgeBasedBodyGrowth(sick, 25, '浠栦箙鐥呭垵鎰堬紝涓嬪簥娲诲姩锛岃韩浣撴鍦ㄦ仮澶嶃€?).state;
+  assert(s.attack === 5, `鐥呮剤鍚?attack 鎷夊洖 5: ${s.attack}`);
+  assert(s.maxHp === 50, `鐥呮剤鍚?maxHp 鎷夊洖 50: ${s.maxHp}`);
 
-  // 测试 6: 体弱修真者 → body 仍受 modifier 影响
-  // 修真后 maxHp 200，body 成长 baseline * 0.5 = 25 → max(200, 25) = 200 保留
+  // 娴嬭瘯 6: 浣撳急淇湡鑰?鈫?body 浠嶅彈 modifier 褰卞搷
+  // 淇湡鍚?maxHp 200锛宐ody 鎴愰暱 baseline * 0.5 = 25 鈫?max(200, 25) = 200 淇濈暀
   const adv2 = { ...baseMortal, attack: 30, maxHp: 200, realm: 'qi_refining' };
-  s = applyAgeBasedBodyGrowth(adv2, 25, '他自幼体弱，虽已炼气仍气血两亏。').state;
-  assert(s.attack === 30, `修真体弱者 attack 仍保留: ${s.attack}`);
-  assert(s.maxHp === 200, `修真体弱者 maxHp 仍保留: ${s.maxHp}`);
+  s = applyAgeBasedBodyGrowth(adv2, 25, '浠栬嚜骞间綋寮憋紝铏藉凡鐐兼皵浠嶆皵琛€涓や簭銆?).state;
+  assert(s.attack === 30, `淇湡浣撳急鑰?attack 浠嶄繚鐣? ${s.attack}`);
+  assert(s.maxHp === 200, `淇湡浣撳急鑰?maxHp 浠嶄繚鐣? ${s.maxHp}`);
 
   log('body-growth-narrative', {
     passed: true,
-    healthy25: applyAgeBasedBodyGrowth(baseMortal, 25, '健康').state.attack,
-    weak25: applyAgeBasedBodyGrowth(baseMortal, 25, '体弱').state.attack,
-    sick25: applyAgeBasedBodyGrowth(baseMortal, 25, '缠绵病榻').state.attack,
-    advSick25: applyAgeBasedBodyGrowth(advanced, 25, '缠绵病榻').state.attack,
-    recovered: applyAgeBasedBodyGrowth(sick, 25, '久病初愈').state.attack,
+    healthy25: applyAgeBasedBodyGrowth(baseMortal, 25, '鍋ュ悍').state.attack,
+    weak25: applyAgeBasedBodyGrowth(baseMortal, 25, '浣撳急').state.attack,
+    sick25: applyAgeBasedBodyGrowth(baseMortal, 25, '缂犵坏鐥呮').state.attack,
+    advSick25: applyAgeBasedBodyGrowth(advanced, 25, '缂犵坏鐥呮').state.attack,
+    recovered: applyAgeBasedBodyGrowth(sick, 25, '涔呯梾鍒濇剤').state.attack,
   });
 }
 
@@ -2326,111 +2288,107 @@ async function main(): Promise<void> {
   smokeContinuousPushCombatUiSync();
   smokeCombatProjectionInBattlePanel();
   smokeDesignRefersUiRules();
-  // AI-30 新增 5 条 (P1-cleanup-and-design-docs)
+  // AI-30 鏂板 5 鏉?(P1-cleanup-and-design-docs)
   smokeCombatEnemySurvivorCausality();
   smokeCausalityChainAuction();
   smokeCausalityChainSecretRealm();
   smokePlayerVisibleTextNoSystemWords();
   smokeDesignDocTablesExist();
-  // AI-36 新增 6 条 (p1-fixups-p2-pilot)
+  // AI-36 鏂板 6 鏉?(p1-fixups-p2-pilot)
   smokePlayerVisibleTextNoSystemWordsAfterFix();
   smokeSaveLoadIntegrity();
   smokeSaveLoadBackwardCompat();
   smokeSaveLoadCorruptionRecovery();
   smokePlayerVisibleTextAuditScriptSelfCheck();
   smokeBlueprintDocsCoverage();
-  // AI-37 宗门关系图
-  smokeSectRelationLabelsMapping();
+  // AI-37 瀹楅棬鍏崇郴鍥?  smokeSectRelationLabelsMapping();
   smokeSectRelationIntensityRange();
   smokeSectRelationBlueprint();
-  // AI-38 NPC 长期记忆
+  // AI-38 NPC 闀挎湡璁板繂
   smokeNpcMemoryFieldsExist();
   smokeNpcMemoryDecayLogic();
   smokeNpcMemoryBlueprint();
-  // AI-39 完整世界地图
+  // AI-39 瀹屾暣涓栫晫鍦板浘
   smokeWorldMapRegionsData();
   smokeWorldMapDiscoveryVisibility();
   smokeWorldMapBlueprint();
-  // AI-40 物品合成/炼制/功法
+  // AI-40 鐗╁搧鍚堟垚/鐐煎埗/鍔熸硶
   smokeCraftingRecipeSchema();
   smokeCraftingQualityTierDistribution();
   smokeCraftingFailureConsequence();
   smokeCraftingBlueprint();
-  // AI-41 多角色传承
-  smokeInheritanceChoiceExactlyOne();
+  // AI-41 澶氳鑹蹭紶鎵?  smokeInheritanceChoiceExactlyOne();
   smokeInheritanceTypesExist();
   smokeInheritanceAiNarrative();
   smokeInheritanceBlueprint();
-  // AI-42 家族/宗门兴衰
+  // AI-42 瀹舵棌/瀹楅棬鍏磋“
   smokeClanSectStatusEnum();
   smokeClanSectLifecyclePath();
   smokeClanSectBlueprint();
-  // AI-43 世界因果网
-  smokeCausalityNetNodeTypes();
+  // AI-43 涓栫晫鍥犳灉缃?  smokeCausalityNetNodeTypes();
   smokeCausalityNetEdgeTypes();
   smokeCausalityNetStrengthClamp();
   smokeCausalityNetBlueprint();
-  // AI-44 结局谱系
+  // AI-44 缁撳眬璋辩郴
   smokeEndingMainTypes();
   smokeEndingTriggerConditions();
   smokeEndingAiReflection();
   smokeEndingBlueprint();
-  // AI-46~AI-50 + AI-59: 5 个 slot UI 消费 + 6 条 smoke
+  // AI-46~AI-50 + AI-59: 5 涓?slot UI 娑堣垂 + 6 鏉?smoke
   smokeTopTagsConsumesDisplayRegistry();
   smokeThreadPageConsumesDisplayRegistry();
   smokeCombatPanelConsumesDisplayRegistry();
   smokeInventoryPanelConsumesDisplayRegistry();
   smokeWorldLegacyConsumesDisplayRegistry();
   smokeWorldLegacyPanelExists();
-  // AI-60: 接入验证
+  // AI-60: 鎺ュ叆楠岃瘉
   smokeWorldLegacyPanelIntegrated();
-  // AI-61: L1 世界观 prompt 注入
+  // AI-61: L1 涓栫晫瑙?prompt 娉ㄥ叆
   smokeL1WorldDocsPromptInjection();
-  // AI-62: enum 扩展
+  // AI-62: enum 鎵╁睍
   smokeAlchemyHeatEnumExists();
   smokeFormationTypeEnumExists();
-  // AI-63: 本命 vs 外用法宝
+  // AI-63: 鏈懡 vs 澶栫敤娉曞疂
   smokeArtifactBondedField();
   smokeArtifactSoulLinkField();
   smokeArtifactSpiritField();
-  // AI-64: 道侣系统
+  // AI-64: 閬撲荆绯荤粺
   smokeCharacterSpouseField();
   smokeCharacterCultivationHarmonyBonus();
   smokeNpcSpouseOfField();
-  // AI-65: 灵宠/灵虫区分
+  // AI-65: 鐏靛疇/鐏佃櫕鍖哄垎
   smokePetTypeField();
   smokePetSwarmCountField();
   smokePetCombatSkillIds();
-  // AI-66: 门籍/师徒链
-  smokeCharacterSectHistoryField();
+  // AI-66: 闂ㄧ睄/甯堝緬閾?  smokeCharacterSectHistoryField();
   smokeCharacterTeacherRefField();
   smokeCharacterApprenticesField();
-  // AI-67: 天劫 + 心魔
+  // AI-67: 澶╁姭 + 蹇冮瓟
   smokeTribulationTriggerExists();
   smokeTribulationBoltResolution();
   smokeHeartDemonTypes();
   smokeTribulationApiExists();
   smokeTribulationModalExists();
-  // AI-68: 飞升机制
+  // AI-68: 椋炲崌鏈哄埗
   smokeAscensionRequirementsExist();
   smokeAscensionEligibilityCheck();
   smokeAscensionTriggerDerivation();
   smokeAscensionApiExists();
   smokeAscensionModalExists();
-  // AI-69: 三界 NPC + 跨域通道
+  // AI-69: 涓夌晫 NPC + 璺ㄥ煙閫氶亾
   smokeNpcWorldTierField();
   smokeCrossRealmPathsDerivation();
   smokeCrossRealmDocsExist();
-  // AI-70: 禁制机制
+  // AI-70: 绂佸埗鏈哄埗
   smokeRestrictionTypesExist();
   smokeRestrictionAccessCheck();
   smokeRestrictionTriggerDerivation();
   smokeRestrictionApiExists();
   smokeRestrictionModalExists();
-  // AI-71: 禁制 + 洞府联动
+  // AI-71: 绂佸埗 + 娲炲簻鑱斿姩
   smokeSecretRealmRestrictionField();
   smokeRealmEnterCheckDerivation();
-  // AI-72: GameLayout 接入
+  // AI-72: GameLayout 鎺ュ叆
   smokeAscensionModalIntegrated();
   smokeRestrictionModalIntegrated();
   smokeAllL3ModalsInLayout();
@@ -2438,16 +2396,16 @@ async function main(): Promise<void> {
   smokePrismaSchemaAscensionPending();
   smokePrismaSchemaRestrictionPending();
   smokeBackUpScriptExists();
-  // AI-74: TribulationModal 接入
+  // AI-74: TribulationModal 鎺ュ叆
   smokeTribulationModalFullyIntegrated();
   smokeTribulationCallbackWired();
   smokeTribulationApiFullFlow();
-  // AI-75: L3 集成测试
+  // AI-75: L3 闆嗘垚娴嬭瘯
   smokeL3IntegrationScriptExists();
   smokeL3AutoTestScriptExists();
   smokeL3TesterComponentExists();
   smokeAllL3SmokesRun();
-  // AI-76: 性能基线
+  // AI-76: 鎬ц兘鍩虹嚎
   smokeEngineBenchScriptExists();
   smokeEnginePerformanceBaseline();
   smokeHotPathOptimized();
@@ -2589,17 +2547,17 @@ function smokeAi93ResolveStatusRemoval(): void {
 
 function smokeAi95PetCultivationSuggestion(): void {
   // AI-95: derivePetCultivationSuggestion returns path by keyword (Chinese-only keywords)
-  // Keywords: combat:[锋,锐,猛,破,噬,猎,爪,牙,杀] / assist:[护,养,愈,柔,伴,庇,医,灵] / transform:[化形,蜕变,人形,九尾,蛟龙,仙鹤,凤] / contract:[心,契,羁,念,魂,约]
+  // Keywords: combat:[閿?閿?鐚?鐮?鍣?鐚?鐖?鐗?鏉€] / assist:[鎶?鍏?鎰?鏌?浼?搴?鍖?鐏礭 / transform:[鍖栧舰,铚曞彉,浜哄舰,涔濆熬,铔熼緳,浠欓工,鍑 / contract:[蹇?濂?缇?蹇?榄?绾
   const char: any = { id: 'c1', realm: 'qi_refining', realmLevel: 1 };
   // Use CJK chars to hit the keyword tables.\u200B-style escapes ensure ASCII-only source.
-  const combatPet = derivePetCultivationSuggestion({ name: '锋锐猎爪兽', description: '猛兽' }, char as any);
-  assert(combatPet === 'combat', "锋/锐/猛/爪 should -> combat, got=" + combatPet);
-  const assistPet = derivePetCultivationSuggestion({ name: '柔护灵', description: '医养之伴' }, char as any);
-  assert(assistPet === 'assist', "柔/护/医 should -> assist, got=" + assistPet);
-  const transformPet = derivePetCultivationSuggestion({ name: '九尾狐', description: '化形' }, char as any);
-  assert(transformPet === 'transform', "九尾/化形 should -> transform, got=" + transformPet);
-  const contractPet = derivePetCultivationSuggestion({ name: '心契之灵', description: '羁绊契约' }, char as any);
-  assert(contractPet === 'contract', "心/契/羁 should -> contract, got=" + contractPet);
+  const combatPet = derivePetCultivationSuggestion({ name: '閿嬮攼鐚庣埅鍏?, description: '鐚涘吔' }, char as any);
+  assert(combatPet === 'combat', "閿?閿?鐚?鐖?should -> combat, got=" + combatPet);
+  const assistPet = derivePetCultivationSuggestion({ name: '鏌旀姢鐏?, description: '鍖诲吇涔嬩即' }, char as any);
+  assert(assistPet === 'assist', "鏌?鎶?鍖?should -> assist, got=" + assistPet);
+  const transformPet = derivePetCultivationSuggestion({ name: '涔濆熬鐙?, description: '鍖栧舰' }, char as any);
+  assert(transformPet === 'transform', "涔濆熬/鍖栧舰 should -> transform, got=" + transformPet);
+  const contractPet = derivePetCultivationSuggestion({ name: '蹇冨涔嬬伒', description: '缇佺粖濂戠害' }, char as any);
+  assert(contractPet === 'contract', "蹇?濂?缇?should -> contract, got=" + contractPet);
   log('ai95-pet-cultivation-suggestion', { passed: true, combatPet, assistPet, transformPet, contractPet });
 }
 
@@ -2800,7 +2758,7 @@ function smokeAi103RumorReliability(): void {
   assert(after0 >= 0.05, '0y should keep non-zero');
   log('ai103-rumor-reliability', { passed: true, after5, after100 });
 }
-  // AI-94 / AI-102: HeartIntentPanel 相关
+  // AI-94 / AI-102: HeartIntentPanel 鐩稿叧
   // Worker A (AI-91~AI-103)
   smokeAi91SanitizeCombatLog();
   smokeAi91NovelizeCombatLog();
@@ -2829,61 +2787,56 @@ function smokeAi103RumorReliability(): void {
   smokeHeartIntentStoreUpdate();
   smokeHeartIntentLabel();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
-
-  pgRunPhaseGGSmokes();}
+}
 
 function smokeCombatLabelsDisplay(): void {
-  // P0 验证：玩家可见 UI 中 攻/守/敏 已回滚为 破势/护持/机变
+  // P0 楠岃瘉锛氱帺瀹跺彲瑙?UI 涓?鏀?瀹?鏁?宸插洖婊氫负 鐮村娍/鎶ゆ寔/鏈哄彉
   const statusPanelSource = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
   const detailSource = readFileSync('src/components/xianxia/CharacterDetailSheet.tsx', 'utf-8');
-  // StatusPanel 用 unicode 转义存储中文字符；同时检查字面量和转义序列
-  const hasStatusPanelLabels = statusPanelSource.includes('破势') || statusPanelSource.includes('\\u7834\\u52bf');
-  const hasStatusPanelForbidden = /label\s*:\s*['"]攻['"]|label\s*:\s*['"]守['"]|label\s*:\s*['"]敏['"]/.test(statusPanelSource);
-  assert(!hasStatusPanelForbidden, 'StatusPanel 中不能出现单字 攻/守/敏');
-  assert(hasStatusPanelLabels, 'StatusPanel 应显示 破势/护持/机变');
-  // CharacterDetailSheet 使用字面量中文
-  const forbidden = /label\s*:\s*['"]攻['"]|label\s*:\s*['"]守['"]|label\s*:\s*['"]敏['"]/;
-  assert(!forbidden.test(detailSource), 'CharacterDetailSheet 中不能出现单字 攻/守/敏');
-  assert(detailSource.includes('破势') && detailSource.includes('护持') && detailSource.includes('机变'), 'CharacterDetailSheet 应显示 破势/护持/机变');
+  // StatusPanel 鐢?unicode 杞箟瀛樺偍涓枃瀛楃锛涘悓鏃舵鏌ュ瓧闈㈤噺鍜岃浆涔夊簭鍒?  const hasStatusPanelLabels = statusPanelSource.includes('鐮村娍') || statusPanelSource.includes('\\u7834\\u52bf');
+  const hasStatusPanelForbidden = /label\s*:\s*['"]鏀籟'"]|label\s*:\s*['"]瀹圼'"]|label\s*:\s*['"]鏁廩'"]/.test(statusPanelSource);
+  assert(!hasStatusPanelForbidden, 'StatusPanel 涓笉鑳藉嚭鐜板崟瀛?鏀?瀹?鏁?);
+  assert(hasStatusPanelLabels, 'StatusPanel 搴旀樉绀?鐮村娍/鎶ゆ寔/鏈哄彉');
+  // CharacterDetailSheet 浣跨敤瀛楅潰閲忎腑鏂?  const forbidden = /label\s*:\s*['"]鏀籟'"]|label\s*:\s*['"]瀹圼'"]|label\s*:\s*['"]鏁廩'"]/;
+  assert(!forbidden.test(detailSource), 'CharacterDetailSheet 涓笉鑳藉嚭鐜板崟瀛?鏀?瀹?鏁?);
+  assert(detailSource.includes('鐮村娍') && detailSource.includes('鎶ゆ寔') && detailSource.includes('鏈哄彉'), 'CharacterDetailSheet 搴旀樉绀?鐮村娍/鎶ゆ寔/鏈哄彉');
   log('combat-labels-display', { passed: true });
 }
 
 function smokeMechanismPatternsCombatLabels(): void {
-  // P0 验证：display.ts 中 MECHANISM_PATTERNS 的 attack/defense/speed 映射为完整中文 label
+  // P0 楠岃瘉锛歞isplay.ts 涓?MECHANISM_PATTERNS 鐨?attack/defense/speed 鏄犲皠涓哄畬鏁翠腑鏂?label
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(displaySource.includes("\\battack\\b/gi, '破势'"), 'attack 应映射到 破势');
-  assert(displaySource.includes("\\bdefense\\b/gi, '护持'"), 'defense 应映射到 护持');
-  assert(displaySource.includes("\\bspeed\\b/gi, '机变'"), 'speed 应映射到 机变');
-  assert(!displaySource.includes("\\battack\\b/gi, '攻'"), 'attack 不能再映射到 攻');
-  assert(!displaySource.includes("\\bdefense\\b/gi, '守'"), 'defense 不能再映射到 守');
-  assert(!displaySource.includes("\\bspeed\\b/gi, '敏'"), 'speed 不能再映射到 敏');
-  // 运行时过滤验证
-  assert(sanitizeNarrativeText('attack 提升') === '破势 提升', 'attack 应被 sanitize 为 破势');
-  assert(sanitizeNarrativeText('defense 提升') === '护持 提升', 'defense 应被 sanitize 为 护持');
-  assert(sanitizeNarrativeText('speed 提升') === '机变 提升', 'speed 应被 sanitize 为 机变');
-  // key:value 兜底：attack:12 / attack +12 / attack=12 应被移除
-  assert(!sanitizeNarrativeText('attack:12').includes('attack'), 'attack:12 不应残留 attack');
-  assert(!sanitizeNarrativeText('defense +5').includes('defense'), 'defense +5 不应残留 defense');
+  assert(displaySource.includes("\\battack\\b/gi, '鐮村娍'"), 'attack 搴旀槧灏勫埌 鐮村娍');
+  assert(displaySource.includes("\\bdefense\\b/gi, '鎶ゆ寔'"), 'defense 搴旀槧灏勫埌 鎶ゆ寔');
+  assert(displaySource.includes("\\bspeed\\b/gi, '鏈哄彉'"), 'speed 搴旀槧灏勫埌 鏈哄彉');
+  assert(!displaySource.includes("\\battack\\b/gi, '鏀?"), 'attack 涓嶈兘鍐嶆槧灏勫埌 鏀?);
+  assert(!displaySource.includes("\\bdefense\\b/gi, '瀹?"), 'defense 涓嶈兘鍐嶆槧灏勫埌 瀹?);
+  assert(!displaySource.includes("\\bspeed\\b/gi, '鏁?"), 'speed 涓嶈兘鍐嶆槧灏勫埌 鏁?);
+  // 杩愯鏃惰繃婊ら獙璇?  assert(sanitizeNarrativeText('attack 鎻愬崌') === '鐮村娍 鎻愬崌', 'attack 搴旇 sanitize 涓?鐮村娍');
+  assert(sanitizeNarrativeText('defense 鎻愬崌') === '鎶ゆ寔 鎻愬崌', 'defense 搴旇 sanitize 涓?鎶ゆ寔');
+  assert(sanitizeNarrativeText('speed 鎻愬崌') === '鏈哄彉 鎻愬崌', 'speed 搴旇 sanitize 涓?鏈哄彉');
+  // key:value 鍏滃簳锛歛ttack:12 / attack +12 / attack=12 搴旇绉婚櫎
+  assert(!sanitizeNarrativeText('attack:12').includes('attack'), 'attack:12 涓嶅簲娈嬬暀 attack');
+  assert(!sanitizeNarrativeText('defense +5').includes('defense'), 'defense +5 涓嶅簲娈嬬暀 defense');
   log('mechanism-patterns-combat-labels', { passed: true });
 }
 
 function smokeEngineCultivationCategoryEnglish(): void {
-  // P1 验证：engine.ts 中 cultivation attribute category enum 为英文
-  const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  //  cultivationAttributeCategory map 输出英文
-  assert(engineSource.includes("body: 'body'"), 'body category 应为英文');
-  assert(engineSource.includes("spirit: 'spirit'"), 'spirit category 应为英文');
-  assert(engineSource.includes("dao: 'dao'"), 'dao category 应为英文');
-  assert(engineSource.includes("combat: 'combat'"), 'combat category 应为英文');
-  assert(engineSource.includes("fate: 'fate'"), 'fate category 应为英文');
-  // core cultivation attribute 硬编码 category 应为英文
-  assert(/category:\s*['"]body['"]/.test(engineSource), 'physicalFoundation category 应为 body');
-  assert(/category:\s*['"]spirit['"]/.test(engineSource), 'spiritualSense/soulStrength category 应为 spirit');
+  // P1 楠岃瘉锛歟ngine.ts 涓?cultivation attribute category enum 涓鸿嫳鏂?  const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  //  cultivationAttributeCategory map 杈撳嚭鑻辨枃
+  assert(engineSource.includes("body: 'body'"), 'body category 搴斾负鑻辨枃');
+  assert(engineSource.includes("spirit: 'spirit'"), 'spirit category 搴斾负鑻辨枃');
+  assert(engineSource.includes("dao: 'dao'"), 'dao category 搴斾负鑻辨枃');
+  assert(engineSource.includes("combat: 'combat'"), 'combat category 搴斾负鑻辨枃');
+  assert(engineSource.includes("fate: 'fate'"), 'fate category 搴斾负鑻辨枃');
+  // core cultivation attribute 纭紪鐮?category 搴斾负鑻辨枃
+  assert(/category:\s*['"]body['"]/.test(engineSource), 'physicalFoundation category 搴斾负 body');
+  assert(/category:\s*['"]spirit['"]/.test(engineSource), 'spiritualSense/soulStrength category 搴斾负 spirit');
   log('engine-cultivation-category-english', { passed: true });
 }
 
 function smokeNoModelLeakInUI(): void {
-  // P1 验证：配置页外（非 AIConfigDialog）UI 组件不出现 model/apiKey/baseUrl 等技术词
+  // P1 楠岃瘉锛氶厤缃〉澶栵紙闈?AIConfigDialog锛塙I 缁勪欢涓嶅嚭鐜?model/apiKey/baseUrl 绛夋妧鏈瘝
   const uiFiles = [
     'src/components/xianxia/StatusPanel.tsx',
     'src/components/xianxia/CharacterDetailSheet.tsx',
@@ -2892,257 +2845,237 @@ function smokeNoModelLeakInUI(): void {
   ];
   for (const file of uiFiles) {
     const source = readFileSync(file, 'utf-8');
-    assert(!/\bmodel\b|\bapiKey\b|\bbaseUrl\b|\bapiKey|\bmodelId\b/i.test(source), `${file} 不应泄露 model/apiKey/baseUrl 等技术词`);
+    assert(!/\bmodel\b|\bapiKey\b|\bbaseUrl\b|\bapiKey|\bmodelId\b/i.test(source), `${file} 涓嶅簲娉勯湶 model/apiKey/baseUrl 绛夋妧鏈瘝`);
   }
   log('no-model-leak-in-ui', { passed: true, files: uiFiles.length });
 }
 
 function smokeOldChineseCategoryCompatibility(): void {
-  // P1 验证：旧存档中的中文 category 能被 normalize 为英文
-  // cultivationAttributeCategory 对中文输入返回英文
-  const state: any = {
+  // P1 楠岃瘉锛氭棫瀛樻。涓殑涓枃 category 鑳借 normalize 涓鸿嫳鏂?  // cultivationAttributeCategory 瀵逛腑鏂囪緭鍏ヨ繑鍥炶嫳鏂?  const state: any = {
     age: 10,
     cultivationAttributes: [
-      { id: 'old_body', name: '旧身体', value: 5, description: '', source: '', category: '身体', visible: true },
-      { id: 'old_spirit', name: '旧神魂', value: 3, description: '', source: '', category: '神魂', visible: true },
+      { id: 'old_body', name: '鏃ц韩浣?, value: 5, description: '', source: '', category: '韬綋', visible: true },
+      { id: 'old_spirit', name: '鏃х榄?, value: 3, description: '', source: '', category: '绁為瓊', visible: true },
     ],
     activeStatuses: [],
   };
   const attrs = deriveCultivationAttributes(state);
   const bodyAttr = attrs.find((a: any) => a.id === 'old_body');
   const spiritAttr = attrs.find((a: any) => a.id === 'old_spirit');
-  assert(bodyAttr?.category === 'body', `中文 身体 应被 normalize 为 body, got ${bodyAttr?.category}`);
-  assert(spiritAttr?.category === 'spirit', `中文 神魂 应被 normalize 为 spirit, got ${spiritAttr?.category}`);
+  assert(bodyAttr?.category === 'body', `涓枃 韬綋 搴旇 normalize 涓?body, got ${bodyAttr?.category}`);
+  assert(spiritAttr?.category === 'spirit', `涓枃 绁為瓊 搴旇 normalize 涓?spirit, got ${spiritAttr?.category}`);
   log('old-chinese-category-compatibility', { passed: true });
 }
 
 function smokeDesignRefersUiRules(): void {
-  // AI-27: docs/DESIGN.md 引用 docs/UI-RULES.md
+  // AI-27: docs/DESIGN.md 寮曠敤 docs/UI-RULES.md
   const design = readFileSync('docs/DESIGN.md', 'utf-8');
-  assert(/UI-RULES\.md/.test(design), 'DESIGN.md 应引用 UI-RULES.md');
-  assert(/UI\/交互规范.*UI-RULES|\[UI-RULES\.md\]/.test(design), 'DESIGN.md §5 应给出 UI-RULES.md 链接');
-  // UI-RULES.md 应存在
-  assert(Bun.file('docs/UI-RULES.md').size > 0, 'docs/UI-RULES.md 应存在');
-  // 16 条规则状态应在 UI-RULES.md 提及
+  assert(/UI-RULES\.md/.test(design), 'DESIGN.md 搴斿紩鐢?UI-RULES.md');
+  assert(/UI\/浜や簰瑙勮寖.*UI-RULES|\[UI-RULES\.md\]/.test(design), 'DESIGN.md 搂5 搴旂粰鍑?UI-RULES.md 閾炬帴');
+  // UI-RULES.md 搴斿瓨鍦?  assert(Bun.file('docs/UI-RULES.md').size > 0, 'docs/UI-RULES.md 搴斿瓨鍦?);
+  // 16 鏉¤鍒欑姸鎬佸簲鍦?UI-RULES.md 鎻愬強
   const uiRules = readFileSync('docs/UI-RULES.md', 'utf-8');
-  assert(/规则状态总览/.test(uiRules), 'UI-RULES.md 应有"规则状态总览"段');
+  assert(/瑙勫垯鐘舵€佹€昏/.test(uiRules), 'UI-RULES.md 搴旀湁"瑙勫垯鐘舵€佹€昏"娈?);
   log('design-refers-ui-rules', { passed: true });
 }
 
 function smokeCombatProjectionInBattlePanel(): void {
-  // AI-26: combatProjection 战斗面板接入
+  // AI-26: combatProjection 鎴樻枟闈㈡澘鎺ュ叆
   const combatModal = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf-8');
-  assert(/COMBAT_PROJECTION_LABELS/.test(combatModal), 'CombatModal 应引用 COMBAT_PROJECTION_LABELS');
-  assert(/data-testid="combat-projection-grid"/.test(combatModal), 'CombatModal 应有 combat-projection-grid');
-  // 6 项显示
-  assert(/破势/.test(combatModal) && /护持/.test(combatModal) && /机变/.test(combatModal), 'CombatModal 应显示破势/护持/机变');
-  assert(/神识/.test(combatModal) && /魂魄/.test(combatModal) && /体魄/.test(combatModal), 'CombatModal 应显示神识/魂魄/体魄');
-  // 消费 combatProjection
-  assert(/character\.combatProjection/.test(combatModal), 'CombatModal 应消费 character.combatProjection');
+  assert(/COMBAT_PROJECTION_LABELS/.test(combatModal), 'CombatModal 搴斿紩鐢?COMBAT_PROJECTION_LABELS');
+  assert(/data-testid="combat-projection-grid"/.test(combatModal), 'CombatModal 搴旀湁 combat-projection-grid');
+  // 6 椤规樉绀?  assert(/鐮村娍/.test(combatModal) && /鎶ゆ寔/.test(combatModal) && /鏈哄彉/.test(combatModal), 'CombatModal 搴旀樉绀虹牬鍔?鎶ゆ寔/鏈哄彉');
+  assert(/绁炶瘑/.test(combatModal) && /榄傞瓌/.test(combatModal) && /浣撻瓌/.test(combatModal), 'CombatModal 搴旀樉绀虹璇?榄傞瓌/浣撻瓌');
+  // 娑堣垂 combatProjection
+  assert(/character\.combatProjection/.test(combatModal), 'CombatModal 搴旀秷璐?character.combatProjection');
   log('combat-projection-in-battle-panel', { passed: true });
 }
 
 function smokeContinuousPushCombatUiSync(): void {
-  // AI-24: 战斗同步前端实际实现
+  // AI-24: 鎴樻枟鍚屾鍓嶇瀹為檯瀹炵幇
   const actionBtnSource = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
-  // inCombat 检测
-  assert(/inCombat\s*=\s*!.*combatSession.*status\s*===\s*'ongoing'/.test(actionBtnSource) || /status\s*===\s*'ongoing'/.test(actionBtnSource), 'ActionButtons 应检测 combatSession.status === ongoing');
-  // advance 失败后 syncLatestState
-  assert(/syncLatestState/.test(actionBtnSource), 'ActionButtons 应在战斗拦截后调用 syncLatestState');
-  // toast 战斗已接续
-  assert(/战斗已接续/.test(actionBtnSource), 'ActionButtons 应 toast "战斗已接续"');
-  // 战斗时禁用推进
-  assert(/战斗进行中/.test(actionBtnSource), 'ActionButtons 应显示"战斗进行中"按钮文案');
-  // syncLatestState 定义在 ActionButtons 内（本身就是 store 的同步封装）
+  // inCombat 妫€娴?  assert(/inCombat\s*=\s*!.*combatSession.*status\s*===\s*'ongoing'/.test(actionBtnSource) || /status\s*===\s*'ongoing'/.test(actionBtnSource), 'ActionButtons 搴旀娴?combatSession.status === ongoing');
+  // advance 澶辫触鍚?syncLatestState
+  assert(/syncLatestState/.test(actionBtnSource), 'ActionButtons 搴斿湪鎴樻枟鎷︽埅鍚庤皟鐢?syncLatestState');
+  // toast 鎴樻枟宸叉帴缁?  assert(/鎴樻枟宸叉帴缁?.test(actionBtnSource), 'ActionButtons 搴?toast "鎴樻枟宸叉帴缁?');
+  // 鎴樻枟鏃剁鐢ㄦ帹杩?  assert(/鎴樻枟杩涜涓?.test(actionBtnSource), 'ActionButtons 搴旀樉绀?鎴樻枟杩涜涓?鎸夐挳鏂囨');
+  // syncLatestState 瀹氫箟鍦?ActionButtons 鍐咃紙鏈韩灏辨槸 store 鐨勫悓姝ュ皝瑁咃級
   const actionBtnSource2 = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
-  assert(/function\s+syncLatestState|const\s+syncLatestState\s*=/.test(actionBtnSource2), 'ActionButtons 应定义 syncLatestState');
+  assert(/function\s+syncLatestState|const\s+syncLatestState\s*=/.test(actionBtnSource2), 'ActionButtons 搴斿畾涔?syncLatestState');
   log('continuous-push-combat-ui-sync', { passed: true });
 }
 
 function smokeMultiCultivationBonusUiDisplay(): void {
-  // AI-23: 多重修炼 UI 实际展示 (聚合摘要)
+  // AI-23: 澶氶噸淇偧 UI 瀹為檯灞曠ず (鑱氬悎鎽樿)
   const cardSource = readFileSync('src/components/xianxia/CultivationSpeedCard.tsx', 'utf-8');
-  assert(/multiplierEffectCount/.test(cardSource), 'CultivationSpeedCard 应计算 multiplierEffectCount');
-  assert(/additiveEffectCount/.test(cardSource), 'CultivationSpeedCard 应计算 additiveEffectCount');
-  // 倍数/加法 badge
-  assert(/data-testid="bonus-summary"/.test(cardSource), 'CultivationSpeedCard 应有 data-testid="bonus-summary"');
-  assert(/倍\s*×/.test(cardSource) && /加\s*\+/.test(cardSource), 'CultivationSpeedCard 应显示倍数与加法徽标');
-  // 源数显示
-  assert(/groupedSources\.length\s*>\s*1/.test(cardSource), 'CultivationSpeedCard 应在多源时显示源数');
+  assert(/multiplierEffectCount/.test(cardSource), 'CultivationSpeedCard 搴旇绠?multiplierEffectCount');
+  assert(/additiveEffectCount/.test(cardSource), 'CultivationSpeedCard 搴旇绠?additiveEffectCount');
+  // 鍊嶆暟/鍔犳硶 badge
+  assert(/data-testid="bonus-summary"/.test(cardSource), 'CultivationSpeedCard 搴旀湁 data-testid="bonus-summary"');
+  assert(/鍊峔s*脳/.test(cardSource) && /鍔燶s*\+/.test(cardSource), 'CultivationSpeedCard 搴旀樉绀哄€嶆暟涓庡姞娉曞窘鏍?);
+  // 婧愭暟鏄剧ず
+  assert(/groupedSources\.length\s*>\s*1/.test(cardSource), 'CultivationSpeedCard 搴斿湪澶氭簮鏃舵樉绀烘簮鏁?);
   log('multi-cultivation-bonus-ui-display', { passed: true });
 }
 
 function smokeRealmIdentityUiSeparation(): void {
-  // AI-22: 境界 vs 身份 UI 消费 (StatusPanel)
+  // AI-22: 澧冪晫 vs 韬唤 UI 娑堣垂 (StatusPanel)
   const statusPanel = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
-  assert(/IDENTITY_SECTION_LABELS/.test(statusPanel), 'StatusPanel 应消费 IDENTITY_SECTION_LABELS');
-  assert(/REALM_SECTION_LABELS|isRealmAttribute|isIdentityAttribute/.test(statusPanel), 'StatusPanel 应消费 realm/identity helper');
-  // 独立分组：身份（identity）和境界（realm）
-  assert(/data-section="identity"/.test(statusPanel), 'StatusPanel 身份分组应有 data-section="identity"');
-  assert(/data-section="realm"/.test(statusPanel), 'StatusPanel 境界分组应有 data-section="realm"');
-  // 不应该用 attributeLabel 报错字段（备注：消费 IDENTITY_SECTION_LABELS 即可）
-  log('realm-identity-ui-separation', { passed: true });
+  assert(/IDENTITY_SECTION_LABELS/.test(statusPanel), 'StatusPanel 搴旀秷璐?IDENTITY_SECTION_LABELS');
+  assert(/REALM_SECTION_LABELS|isRealmAttribute|isIdentityAttribute/.test(statusPanel), 'StatusPanel 搴旀秷璐?realm/identity helper');
+  // 鐙珛鍒嗙粍锛氳韩浠斤紙identity锛夊拰澧冪晫锛坮ealm锛?  assert(/data-section="identity"/.test(statusPanel), 'StatusPanel 韬唤鍒嗙粍搴旀湁 data-section="identity"');
+  assert(/data-section="realm"/.test(statusPanel), 'StatusPanel 澧冪晫鍒嗙粍搴旀湁 data-section="realm"');
+  // 涓嶅簲璇ョ敤 attributeLabel 鎶ラ敊瀛楁锛堝娉細娑堣垂 IDENTITY_SECTION_LABELS 鍗冲彲锛?  log('realm-identity-ui-separation', { passed: true });
 }
 
 function smokeRealmVsIdentitySeparation(): void {
-  // AI-21: 境界 vs 身份 分离
+  // AI-21: 澧冪晫 vs 韬唤 鍒嗙
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/REALM_SECTION_LABELS/.test(displaySource), 'display.ts 应导出 REALM_SECTION_LABELS');
-  assert(/IDENTITY_SECTION_LABELS/.test(displaySource), 'display.ts 应导出 IDENTITY_SECTION_LABELS');
-  assert(/isRealmAttribute/.test(displaySource), 'display.ts 应导出 isRealmAttribute');
-  assert(/isIdentityAttribute/.test(displaySource), 'display.ts 应导出 isIdentityAttribute');
-  // realm 字段不应该在 IDENTITY 内
-  assert(!/faction.*REALM|realm.*IDENTITY/.test(displaySource), 'realm 与 identity 字段不应混淆');
-  // types.ts CharacterState 已分字段
+  assert(/REALM_SECTION_LABELS/.test(displaySource), 'display.ts 搴斿鍑?REALM_SECTION_LABELS');
+  assert(/IDENTITY_SECTION_LABELS/.test(displaySource), 'display.ts 搴斿鍑?IDENTITY_SECTION_LABELS');
+  assert(/isRealmAttribute/.test(displaySource), 'display.ts 搴斿鍑?isRealmAttribute');
+  assert(/isIdentityAttribute/.test(displaySource), 'display.ts 搴斿鍑?isIdentityAttribute');
+  // realm 瀛楁涓嶅簲璇ュ湪 IDENTITY 鍐?  assert(!/faction.*REALM|realm.*IDENTITY/.test(displaySource), 'realm 涓?identity 瀛楁涓嶅簲娣锋穯');
+  // types.ts CharacterState 宸插垎瀛楁
   const typesSource = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  // CharacterState 应该有 realm/realmLevel 和 faction/master/location 各自独立字段
+  // CharacterState 搴旇鏈?realm/realmLevel 鍜?faction/master/location 鍚勮嚜鐙珛瀛楁
   const charStateBlock = typesSource.match(/export\s+interface\s+CharacterState\s*\{[\s\S]+?\n\}/);
-  assert(charStateBlock !== null, '应存在 CharacterState interface');
+  assert(charStateBlock !== null, '搴斿瓨鍦?CharacterState interface');
   const block = charStateBlock?.[0] || '';
-  assert(/realm:\s*Realm/.test(block) || /realm\?:\s*Realm/.test(block), 'CharacterState 应有 realm 字段');
-  assert(/faction:\s*string/.test(block) && /master:\s*string/.test(block), 'CharacterState 应有 faction/master 字段（身份）');
-  // 验证语义
+  assert(/realm:\s*Realm/.test(block) || /realm\?:\s*Realm/.test(block), 'CharacterState 搴旀湁 realm 瀛楁');
+  assert(/faction:\s*string/.test(block) && /master:\s*string/.test(block), 'CharacterState 搴旀湁 faction/master 瀛楁锛堣韩浠斤級');
+  // 楠岃瘉璇箟
   const isRealmAttribute = (key: string): boolean => key in { realm: 0, realmLevel: 0, cultivationExp: 0, expToBreak: 0, soulRealmName: 0, spiritualRoot: 0, rootMultiplier: 0, realmTraits: 0, realmProfile: 0 };
   const isIdentityAttribute = (key: string): boolean => key in { faction: 0, master: 0, location: 0, reputation: 0, spiritStones: 0, luck: 0, comprehension: 0 };
-  assert(isRealmAttribute('realm') === true, 'realm 应是境界属性');
-  assert(isIdentityAttribute('faction') === true, 'faction 应是身份属性');
-  assert(isRealmAttribute('faction') === false, 'faction 不应是境界属性');
-  assert(isIdentityAttribute('realm') === false, 'realm 不应是身份属性');
+  assert(isRealmAttribute('realm') === true, 'realm 搴旀槸澧冪晫灞炴€?);
+  assert(isIdentityAttribute('faction') === true, 'faction 搴旀槸韬唤灞炴€?);
+  assert(isRealmAttribute('faction') === false, 'faction 涓嶅簲鏄鐣屽睘鎬?);
+  assert(isIdentityAttribute('realm') === false, 'realm 涓嶅簲鏄韩浠藉睘鎬?);
   log('realm-vs-identity-separation', { passed: true });
 }
 
 function smokeClueCarryOverTextBoundary(): void {
-  // AI-20: 线索承接文案边界 (sanitize + 长度限制)
+  // AI-20: 绾跨储鎵挎帴鏂囨杈圭晫 (sanitize + 闀垮害闄愬埗)
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/sanitizeClueText/.test(displaySource), 'display.ts 应导出 sanitizeClueText');
-  assert(/CLUE_TEXT_MAX_LEN|200/.test(displaySource), 'sanitizeClueText 应限制 ≤200 字');
-  // PendingThreadsCard 应使用 sanitizeClueText
+  assert(/sanitizeClueText/.test(displaySource), 'display.ts 搴斿鍑?sanitizeClueText');
+  assert(/CLUE_TEXT_MAX_LEN|200/.test(displaySource), 'sanitizeClueText 搴旈檺鍒?鈮?00 瀛?);
+  // PendingThreadsCard 搴斾娇鐢?sanitizeClueText
   const cardSource = readFileSync('src/components/xianxia/PendingThreadsCard.tsx', 'utf-8');
-  assert(/sanitizeClueText/.test(cardSource), 'PendingThreadsCard 应引用 sanitizeClueText');
-  // 测试样例
+  assert(/sanitizeClueText/.test(cardSource), 'PendingThreadsCard 搴斿紩鐢?sanitizeClueText');
+  // 娴嬭瘯鏍蜂緥
   const sanitizeClueText = (text: string): string => {
     let r = text;
-    r = r.replace(/(?:^|\n)\s*说起此事[，,]?.*?[。！？]/u, '');
-    r = r.replace(/(?:^|\n)\s*原来如此[，,].{0,30}/u, '');
-    if (r.length > 200) r = `${r.slice(0, 200)}…`;
+    r = r.replace(/(?:^|\n)\s*璇磋捣姝や簨[锛?]?.*?[銆傦紒锛焆/u, '');
+    r = r.replace(/(?:^|\n)\s*鍘熸潵濡傛[锛?].{0,30}/u, '');
+    if (r.length > 200) r = `${r.slice(0, 200)}鈥;
     return r.trim();
   };
-  const test1 = '说起此事，原是三月之约。茅听澎整装待发。';
+  const test1 = '璇磋捣姝や簨锛屽師鏄笁鏈堜箣绾︺€傝寘鍚編鏁磋寰呭彂銆?;
   const out1 = sanitizeClueText(test1);
-  assert(!out1.includes('说起此事'), 'sanitizeClueText 应删除"说起此事"开场');
-  const longText = '甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸甲乙丙丁戊己庚辛壬癸';
+  assert(!out1.includes('璇磋捣姝や簨'), 'sanitizeClueText 搴斿垹闄?璇磋捣姝や簨"寮€鍦?);
+  const longText = '鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢鐢蹭箼涓欎竵鎴婂繁搴氳緵澹櫢';
   const out2 = sanitizeClueText(longText);
-  assert(out2.length <= 210, 'sanitizeClueText 应限制 ≤200 字（容忍省略号）');
+  assert(out2.length <= 210, 'sanitizeClueText 搴旈檺鍒?鈮?00 瀛楋紙瀹瑰繊鐪佺暐鍙凤級');
   log('clue-carry-over-text-boundary', { passed: true });
 }
 
 function smokeYinyuanTitleNaturalPhrasing(): void {
-  // AI-19: 因缘标题自然概括
+  // AI-19: 鍥犵紭鏍囬鑷劧姒傛嫭
   const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
-  assert(/因缘标题自然概括/.test(llmSource), 'llm.ts 应包含"因缘标题自然概括"指导');
-  // 列举规则
-  assert(/不剧透/.test(llmSource), 'llm.ts 应要求标题不剧透');
-  assert(/≤12字|不超.*12.*字/.test(llmSource), 'llm.ts 应限制 title ≤12 字');
-  assert(/主线|任务/.test(llmSource), 'llm.ts 应禁止"主线/任务"等元数据词');
+  assert(/鍥犵紭鏍囬鑷劧姒傛嫭/.test(llmSource), 'llm.ts 搴斿寘鍚?鍥犵紭鏍囬鑷劧姒傛嫭"鎸囧');
+  // 鍒椾妇瑙勫垯
+  assert(/涓嶅墽閫?.test(llmSource), 'llm.ts 搴旇姹傛爣棰樹笉鍓ч€?);
+  assert(/鈮?2瀛梶涓嶈秴.*12.*瀛?.test(llmSource), 'llm.ts 搴旈檺鍒?title 鈮?2 瀛?);
+  assert(/涓荤嚎|浠诲姟/.test(llmSource), 'llm.ts 搴旂姝?涓荤嚎/浠诲姟"绛夊厓鏁版嵁璇?);
   log('yinyuan-title-natural-phrasing', { passed: true });
 }
 
 function smokeYinyuanNarrativeNoOutOfWorld(): void {
-  // AI-18: 因缘叙事去局外词
+  // AI-18: 鍥犵紭鍙欎簨鍘诲眬澶栬瘝
   const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
-  assert(/因缘叙事去局外词/.test(llmSource), 'llm.ts 应包含"因缘叙事去局外词"指导');
-  // 列举具体禁止词
-  assert(/上回说到/.test(llmSource) && /且听下回分解/.test(llmSource), 'llm.ts 应列举"上回说到""且听下回分解"等具体禁止词');
-  assert(/系统提示|旁白|作者注/.test(llmSource), 'llm.ts 应包含"系统提示/旁白/作者注"等禁止词');
+  assert(/鍥犵紭鍙欎簨鍘诲眬澶栬瘝/.test(llmSource), 'llm.ts 搴斿寘鍚?鍥犵紭鍙欎簨鍘诲眬澶栬瘝"鎸囧');
+  // 鍒椾妇鍏蜂綋绂佹璇?  assert(/涓婂洖璇村埌/.test(llmSource) && /涓斿惉涓嬪洖鍒嗚В/.test(llmSource), 'llm.ts 搴斿垪涓?涓婂洖璇村埌""涓斿惉涓嬪洖鍒嗚В"绛夊叿浣撶姝㈣瘝');
+  assert(/绯荤粺鎻愮ず|鏃佺櫧|浣滆€呮敞/.test(llmSource), 'llm.ts 搴斿寘鍚?绯荤粺鎻愮ず/鏃佺櫧/浣滆€呮敞"绛夌姝㈣瘝');
   log('yinyuan-narrative-no-out-of-world', { passed: true });
 }
 
 function smokeMultiCultivationBonusDisplay(): void {
-  // AI-17: 多重修炼加成 UI 显示 (速率 ×N / 每岁 +N)
+  // AI-17: 澶氶噸淇偧鍔犳垚 UI 鏄剧ず (閫熺巼 脳N / 姣忓瞾 +N)
   const cardSource = readFileSync('src/components/xianxia/CultivationSpeedCard.tsx', 'utf-8');
-  // 区分 multiply / add 的 pill 渲染
-  assert(/function\s+formatGroupedEffect|eff\.operation\s*===\s*'multiply'\s*\?\s*['"]?速率\s*×|['"]?每岁\s*\+/.test(cardSource), 'CultivationSpeedCard 应区分 multiply/add pill');
-  // 颜色 tone（多绿少红）
-  assert(/multiplierTone/.test(cardSource), 'CultivationSpeedCard 应有 multiplierTone 颜色处理');
-  // 多个效果聚合
-  assert(/source\.effects\.map/.test(cardSource), 'CultivationSpeedCard 应聚合多个 effects');
-  // 验证类型
+  // 鍖哄垎 multiply / add 鐨?pill 娓叉煋
+  assert(/function\s+formatGroupedEffect|eff\.operation\s*===\s*'multiply'\s*\?\s*['"]?閫熺巼\s*脳|['"]?姣忓瞾\s*\+/.test(cardSource), 'CultivationSpeedCard 搴斿尯鍒?multiply/add pill');
+  // 棰滆壊 tone锛堝缁垮皯绾級
+  assert(/multiplierTone/.test(cardSource), 'CultivationSpeedCard 搴旀湁 multiplierTone 棰滆壊澶勭悊');
+  // 澶氫釜鏁堟灉鑱氬悎
+  assert(/source\.effects\.map/.test(cardSource), 'CultivationSpeedCard 搴旇仛鍚堝涓?effects');
+  // 楠岃瘉绫诲瀷
   const mul: { operation: 'multiply' | 'add'; value: number } = { operation: 'multiply', value: 1.5 };
   const add: { operation: 'multiply' | 'add'; value: number } = { operation: 'add', value: 3 };
-  assert(mul.operation === 'multiply' && add.operation === 'add', 'operation 应区分 multiply/add');
+  assert(mul.operation === 'multiply' && add.operation === 'add', 'operation 搴斿尯鍒?multiply/add');
   log('multi-cultivation-bonus-display', { passed: true });
 }
 
 function smokeContinuousPushCombatSync(): void {
-  // AI-16: 战斗进行中时 advance 推进被拦截
-  const routeSource = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
-  assert(/combatStateJson/.test(routeSource), 'advance/route.ts 应检查 combatStateJson');
-  assert(/战斗中|combat.*ongoing/.test(routeSource), 'advance/route.ts 应拒绝战斗中的推进');
-  // ActionButtons 应禁用推进
-  const actionBtnSource = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
-  assert(/战斗进行中/.test(actionBtnSource), 'ActionButtons 应显示"战斗进行中"状态');
-  // 错误处理
-  assert(/message\.includes\(['"]战斗进行中['"]\)/.test(actionBtnSource) || /战斗进行中/.test(actionBtnSource), 'ActionButtons 应处理"战斗进行中"错误');
+  // AI-16: 鎴樻枟杩涜涓椂 advance 鎺ㄨ繘琚嫤鎴?  const routeSource = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  assert(/combatStateJson/.test(routeSource), 'advance/route.ts 搴旀鏌?combatStateJson');
+  assert(/鎴樻枟涓瓅combat.*ongoing/.test(routeSource), 'advance/route.ts 搴旀嫆缁濇垬鏂椾腑鐨勬帹杩?);
+  // ActionButtons 搴旂鐢ㄦ帹杩?  const actionBtnSource = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
+  assert(/鎴樻枟杩涜涓?.test(actionBtnSource), 'ActionButtons 搴旀樉绀?鎴樻枟杩涜涓?鐘舵€?);
+  // 閿欒澶勭悊
+  assert(/message\.includes\(['"]鎴樻枟杩涜涓璠'"]\)/.test(actionBtnSource) || /鎴樻枟杩涜涓?.test(actionBtnSource), 'ActionButtons 搴斿鐞?鎴樻枟杩涜涓?閿欒');
   log('continuous-push-combat-sync', { passed: true });
 }
 
 function smokeStatusAffectsEvents(): void {
-  // AI-15: 当前状态必须参与事件
-  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
-  assert(/当前状态必须参与事件|状态必须参与|activeStatuses.*参与/.test(llmSource), 'llm.ts 应包含"当前状态必须参与事件"指导');
-  assert(/无参与.*等于失忆|必须参与.*叙事/.test(llmSource), 'llm.ts 应有"无参与等于失忆"等强制约束');
+  // AI-15: 褰撳墠鐘舵€佸繀椤诲弬涓庝簨浠?  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  assert(/褰撳墠鐘舵€佸繀椤诲弬涓庝簨浠秥鐘舵€佸繀椤诲弬涓巪activeStatuses.*鍙備笌/.test(llmSource), 'llm.ts 搴斿寘鍚?褰撳墠鐘舵€佸繀椤诲弬涓庝簨浠?鎸囧');
+  assert(/鏃犲弬涓?*绛変簬澶卞繂|蹇呴』鍙備笌.*鍙欎簨/.test(llmSource), 'llm.ts 搴旀湁"鏃犲弬涓庣瓑浜庡け蹇?绛夊己鍒剁害鏉?);
   log('status-affects-events', { passed: true });
 }
 
 function smokeCultivationSpeedSourceCollapse(): void {
-  // AI-13: 修炼速度来源 >3 折叠
+  // AI-13: 淇偧閫熷害鏉ユ簮 >3 鎶樺彔
   const cardSource = readFileSync('src/components/xianxia/CultivationSpeedCard.tsx', 'utf-8');
-  // 有 showAllSources 状态
-  assert(/const\s+\[showAllSources,\s*setShowAllSources\]\s*=\s*useState\(false\)/.test(cardSource), 'CultivationSpeedCard 应有 showAllSources 状态');
-  // 默认 slice(0, 3) 只显示前 3 个
-  assert(/showAllSources\s*\?\s*groupedSources\s*:\s*groupedSources\.slice\(0,\s*3\)/.test(cardSource) || /\.slice\(0,\s*3\)/.test(cardSource), 'CultivationSpeedCard 应默认只显示前 3 个来源');
-  // 切换 showAllSources
-  assert(/setShowAllSources\(/.test(cardSource), 'CultivationSpeedCard 应有 setShowAllSources 切换');
+  // 鏈?showAllSources 鐘舵€?  assert(/const\s+\[showAllSources,\s*setShowAllSources\]\s*=\s*useState\(false\)/.test(cardSource), 'CultivationSpeedCard 搴旀湁 showAllSources 鐘舵€?);
+  // 榛樿 slice(0, 3) 鍙樉绀哄墠 3 涓?  assert(/showAllSources\s*\?\s*groupedSources\s*:\s*groupedSources\.slice\(0,\s*3\)/.test(cardSource) || /\.slice\(0,\s*3\)/.test(cardSource), 'CultivationSpeedCard 搴旈粯璁ゅ彧鏄剧ず鍓?3 涓潵婧?);
+  // 鍒囨崲 showAllSources
+  assert(/setShowAllSources\(/.test(cardSource), 'CultivationSpeedCard 搴旀湁 setShowAllSources 鍒囨崲');
   log('cultivation-speed-source-collapse', { passed: true });
 }
 
 function smokeUnresolvedCauseExpandable(): void {
-  // AI-12: 未了因果可展开
+  // AI-12: 鏈簡鍥犳灉鍙睍寮€
   const cardSource = readFileSync('src/components/xianxia/PendingThreadsCard.tsx', 'utf-8');
-  // 有 showAll 折叠状态
-  assert(/const\s+\[showAll,\s*setShowAll\]\s*=\s*useState\(false\)/.test(cardSource), 'PendingThreadsCard 应有 showAll 折叠状态');
-  // 有 setShowAll 的切换函数
-  assert(/setShowAll\(/.test(cardSource), 'PendingThreadsCard 应该有 setShowAll 切换');
-  // 有 ChevronDown 折叠图标
-  assert(/ChevronDown/.test(cardSource), 'PendingThreadsCard 应该有 ChevronDown 图标');
+  // 鏈?showAll 鎶樺彔鐘舵€?  assert(/const\s+\[showAll,\s*setShowAll\]\s*=\s*useState\(false\)/.test(cardSource), 'PendingThreadsCard 搴旀湁 showAll 鎶樺彔鐘舵€?);
+  // 鏈?setShowAll 鐨勫垏鎹㈠嚱鏁?  assert(/setShowAll\(/.test(cardSource), 'PendingThreadsCard 搴旇鏈?setShowAll 鍒囨崲');
+  // 鏈?ChevronDown 鎶樺彔鍥炬爣
+  assert(/ChevronDown/.test(cardSource), 'PendingThreadsCard 搴旇鏈?ChevronDown 鍥炬爣');
   log('unresolved-cause-expandable', { passed: true });
 }
 
 function smokeBreakthroughDisplayProcess(): void {
-  // AI-11: 突破过程文案隐藏
+  // AI-11: 绐佺牬杩囩▼鏂囨闅愯棌
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(displaySource.includes('sanitizeBreakthroughProcessText'), 'display.ts 应导出 sanitizeBreakthroughProcessText');
-  // 过程叙事应被清洗
-  const processText = '破境之瞬，灵台一震，灵气翻涌。';
+  assert(displaySource.includes('sanitizeBreakthroughProcessText'), 'display.ts 搴斿鍑?sanitizeBreakthroughProcessText');
+  // 杩囩▼鍙欎簨搴旇娓呮礂
+  const processText = '鐮村涔嬬灛锛岀伒鍙颁竴闇囷紝鐏垫皵缈绘秾銆?;
   const result = sanitizeBreakthroughProcessText(processText, false);
-  assert(!result.includes('破境之瞬'), '过程叙事不应有"破境之瞬"');
-  // 最终突破叙事保留
-  const finalText = '破境成功！踏入新境界！';
+  assert(!result.includes('鐮村涔嬬灛'), '杩囩▼鍙欎簨涓嶅簲鏈?鐮村涔嬬灛"');
+  // 鏈€缁堢獊鐮村彊浜嬩繚鐣?  const finalText = '鐮村鎴愬姛锛佽笍鍏ユ柊澧冪晫锛?;
   const finalResult = sanitizeBreakthroughProcessText(finalText, true);
-  assert(finalResult === finalText, '最终突破叙事应保留"破境"');
-  // 标题前缀"破境·冲关"应改
-  const titleResult = sanitizeBreakthroughProcessText('破境·冲关失败', false);
-  assert(!titleResult.startsWith('破境'), '过程标题前缀"破境"应被替换');
+  assert(finalResult === finalText, '鏈€缁堢獊鐮村彊浜嬪簲淇濈暀"鐮村"');
+  // 鏍囬鍓嶇紑"鐮村路鍐插叧"搴旀敼
+  const titleResult = sanitizeBreakthroughProcessText('鐮村路鍐插叧澶辫触', false);
+  assert(!titleResult.startsWith('鐮村'), '杩囩▼鏍囬鍓嶇紑"鐮村"搴旇鏇挎崲');
   log('breakthrough-display-process', { passed: true });
 }
 
 function smokeLootNaturalGeneration(): void {
-  // AI-10: 战利品自然生成 (结合 enemy identity/realm/resources)
-  // 构造一个有 AI loot 的战斗
-  const session = {
+  // AI-10: 鎴樺埄鍝佽嚜鐒剁敓鎴?(缁撳悎 enemy identity/realm/resources)
+  // 鏋勯€犱竴涓湁 AI loot 鐨勬垬鏂?  const session = {
     id: 'combat_test',
     enemies: [
-      { name: '山匪头目', realm: '练气', items: [], spiritStones: 50, maxHp: 100, hp: 0 } as any,
+      { name: '灞卞尓澶寸洰', realm: '缁冩皵', items: [], spiritStones: 50, maxHp: 100, hp: 0 } as any,
     ],
     currentEnemyIdx: 0,
     round: 3,
@@ -3150,118 +3083,109 @@ function smokeLootNaturalGeneration(): void {
     status: 'victory' as const,
     startAge: 20,
     playerHp: 100, playerMaxHp: 100, playerMp: 50, playerMaxMp: 50, playerAttack: 30, playerDefense: 20, playerSpeed: 15,
-    contextTitle: '山道伏击',
-    contextNarrative: '山匪头目拦路抢劫',
+    contextTitle: '灞遍亾浼忓嚮',
+    contextNarrative: '灞卞尓澶寸洰鎷﹁矾鎶㈠姭',
     victoryDrops: [],
     context: {},
   } as any;
   const aiLoot: any = {
     items: [
-      { name: '一柄缺口短刀', item_type: 'weapon', rarity: 'common', effects: [] },
-      { name: '三十枚灵石', item_type: 'currency', rarity: 'common', effects: [] },
-      { name: '一块虎皮', item_type: 'material', rarity: 'uncommon', effects: [] },
+      { name: '涓€鏌勭己鍙ｇ煭鍒€', item_type: 'weapon', rarity: 'common', effects: [] },
+      { name: '涓夊崄鏋氱伒鐭?, item_type: 'currency', rarity: 'common', effects: [] },
+      { name: '涓€鍧楄檸鐨?, item_type: 'material', rarity: 'uncommon', effects: [] },
     ],
     spiritStones: 30,
   };
-  const state = { age: 20, realm: '练气' } as any;
+  const state = { age: 20, realm: '缁冩皵' } as any;
   const spoils = buildCombatVictorySpoils(state, session, aiLoot);
-  assert(spoils.items.length > 0, '应有战利品');
-  assert(spoils.spiritStones > 0, '应有灵石');
-  // 战利品名称应无敌人归因
-  for (const item of spoils.items) {
-    const cleaned = String(item.name).replace(/储物袋|铁锤|飞剑|兽皮|残骸|剑|刀|锤|弓|法杖|内丹|骨|爪|牙|鳞|心核|玉简|法盘|药瓶|丹药|丹丸/g, '');
-    assert(!/修|汉|客|徒|匪|贼|妖|魔/.test(cleaned), `战利品名称不应有敌人归因: ${item.name}`);
+  assert(spoils.items.length > 0, '搴旀湁鎴樺埄鍝?);
+  assert(spoils.spiritStones > 0, '搴旀湁鐏电煶');
+  // 鎴樺埄鍝佸悕绉板簲鏃犳晫浜哄綊鍥?  for (const item of spoils.items) {
+    const cleaned = String(item.name).replace(/鍌ㄧ墿琚媩閾侀敜|椋炲墤|鍏界毊|娈嬮|鍓憒鍒€|閿寮搢娉曟潠|鍐呬腹|楠▅鐖獆鐗檤槌瀨蹇冩牳|鐜夌畝|娉曠洏|鑽摱|涓硅嵂|涓逛父/g, '');
+    assert(!/淇畖姹墊瀹寰抾鍖獆璐紎濡東榄?.test(cleaned), `鎴樺埄鍝佸悕绉颁笉搴旀湁鏁屼汉褰掑洜: ${item.name}`);
   }
-  // 兜底：AI 没给 loot 时，引擎回退到敌人关键词模板
-  const fallbackState = { age: 20, realm: '练气' } as any;
+  // 鍏滃簳锛欰I 娌＄粰 loot 鏃讹紝寮曟搸鍥為€€鍒版晫浜哄叧閿瘝妯℃澘
+  const fallbackState = { age: 20, realm: '缁冩皵' } as any;
   const fallbackSpoils = buildCombatVictorySpoils(fallbackState, session, null);
-  assert(fallbackSpoils.items.length >= 0, '回退路径不应崩溃');
+  assert(fallbackSpoils.items.length >= 0, '鍥為€€璺緞涓嶅簲宕╂簝');
   log('loot-natural-generation', { passed: true, items: spoils.items.length, stones: spoils.spiritStones });
 }
 
 function smokeLootNameNoEnemyAttribution(): void {
-  // AI-9: 战利品名称去敌人归因
-  // 验证 sanitizeLootName 能清洗常见归因
-  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(displaySource.includes('sanitizeLootName'), 'display.ts 应导出 sanitizeLootName');
-  assert(displaySource.includes('LOOT_NAME_DROP') || displaySource.includes('sanitizeLootName'), '应有 LOOT_NAME_DROP 替换表');
-  // 通过 TS 导出测试（动态 import）
-  // 测试样例
+  // AI-9: 鎴樺埄鍝佸悕绉板幓鏁屼汉褰掑洜
+  // 楠岃瘉 sanitizeLootName 鑳芥竻娲楀父瑙佸綊鍥?  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(displaySource.includes('sanitizeLootName'), 'display.ts 搴斿鍑?sanitizeLootName');
+  assert(displaySource.includes('LOOT_NAME_DROP') || displaySource.includes('sanitizeLootName'), '搴旀湁 LOOT_NAME_DROP 鏇挎崲琛?);
+  // 閫氳繃 TS 瀵煎嚭娴嬭瘯锛堝姩鎬?import锛?  // 娴嬭瘯鏍蜂緥
   const tests: Array<[string, string]> = [
-    ['山匪的储物袋', '储物袋'],
-    ['王铁匠的铁锤', '铁锤'],
-    ['黑衣人遗留的飞剑', '飞剑'],
-    ['从虎妖处夺得的兽皮', '兽皮'],
-    ['魔修的遗物', '残骸'],
+    ['灞卞尓鐨勫偍鐗╄', '鍌ㄧ墿琚?],
+    ['鐜嬮搧鍖犵殑閾侀敜', '閾侀敜'],
+    ['榛戣。浜洪仐鐣欑殑椋炲墤', '椋炲墤'],
+    ['浠庤檸濡栧澶哄緱鐨勫吔鐨?, '鍏界毊'],
+    ['榄斾慨鐨勯仐鐗?, '娈嬮'],
   ];
   for (const [input, expectedSubstring] of tests) {
     const result = sanitizeLootName(input);
-    assert(result.includes(expectedSubstring), `sanitizeLootName('${input}') 应包含 '${expectedSubstring}', got '${result}'`);
-    // 不应包含"修/汉/客/徒/匪/贼/妖/魔"等敌人归因词（中间部分）
-    const cleaned = result.replace(/储物袋|铁锤|飞剑|兽皮|残骸|包袱|法器|法宝|丹炉|剑|刀|锤|弓|法杖|内丹|骨|爪|牙|鳞|心核|玉简|法盘|药瓶|丹药|丹丸/g, '');
-    assert(!/修|汉|客|徒|匪|贼|妖|魔/.test(cleaned), `sanitizeLootName('${input}') 不应残留敌人归因词, got '${result}'`);
+    assert(result.includes(expectedSubstring), `sanitizeLootName('${input}') 搴斿寘鍚?'${expectedSubstring}', got '${result}'`);
+    // 涓嶅簲鍖呭惈"淇?姹?瀹?寰?鍖?璐?濡?榄?绛夋晫浜哄綊鍥犺瘝锛堜腑闂撮儴鍒嗭級
+    const cleaned = result.replace(/鍌ㄧ墿琚媩閾侀敜|椋炲墤|鍏界毊|娈嬮|鍖呰⒈|娉曞櫒|娉曞疂|涓圭倝|鍓憒鍒€|閿寮搢娉曟潠|鍐呬腹|楠▅鐖獆鐗檤槌瀨蹇冩牳|鐜夌畝|娉曠洏|鑽摱|涓硅嵂|涓逛父/g, '');
+    assert(!/淇畖姹墊瀹寰抾鍖獆璐紎濡東榄?.test(cleaned), `sanitizeLootName('${input}') 涓嶅簲娈嬬暀鏁屼汉褰掑洜璇? got '${result}'`);
   }
   log('loot-name-no-enemy-attribution', { passed: true });
 }
 
 function smokeCombatDefaultWaitPlayer(): void {
-  // AI-8: 战斗默认等待玩家操作（非 auto）
-  const combatModalSource = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf-8');
-  // autoBattle 默认 false
-  assert(/const\s+\[autoBattle,\s*setAutoBattle\]\s*=\s*useState\(false\)/.test(combatModalSource), 'autoBattle 默认应为 false');
-  // battleStarted 默认 false，让玩家先看事件缘由
-  assert(/const\s+\[battleStarted,\s*setBattleStarted\]\s*=\s*useState\(false\)/.test(combatModalSource), 'battleStarted 默认应为 false，先展示缘由');
-  // doAction 需玩家点击触发，不是 useEffect 自动
+  // AI-8: 鎴樻枟榛樿绛夊緟鐜╁鎿嶄綔锛堥潪 auto锛?  const combatModalSource = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf-8');
+  // autoBattle 榛樿 false
+  assert(/const\s+\[autoBattle,\s*setAutoBattle\]\s*=\s*useState\(false\)/.test(combatModalSource), 'autoBattle 榛樿搴斾负 false');
+  // battleStarted 榛樿 false锛岃鐜╁鍏堢湅浜嬩欢缂樼敱
+  assert(/const\s+\[battleStarted,\s*setBattleStarted\]\s*=\s*useState\(false\)/.test(combatModalSource), 'battleStarted 榛樿搴斾负 false锛屽厛灞曠ず缂樼敱');
+  // doAction 闇€鐜╁鐐瑰嚮瑙﹀彂锛屼笉鏄?useEffect 鑷姩
   const doActionDefined = /const\s+doAction\s*=\s*async/.test(combatModalSource);
-  assert(doActionDefined, 'doAction 必须是 async 函数，由玩家操作触发');
-  // 没有 useEffect 里的"自动执行 doAction"
+  assert(doActionDefined, 'doAction 蹇呴』鏄?async 鍑芥暟锛岀敱鐜╁鎿嶄綔瑙﹀彂');
+  // 娌℃湁 useEffect 閲岀殑"鑷姩鎵ц doAction"
   const autoDoActionInEffect = /useEffect[\s\S]{0,500}doAction\(/.test(combatModalSource);
-  assert(!autoDoActionInEffect, '不应有 useEffect 自动调用 doAction');
+  assert(!autoDoActionInEffect, '涓嶅簲鏈?useEffect 鑷姩璋冪敤 doAction');
   log('combat-default-wait-player', { passed: true });
 }
 
 function smokeTopStatusCountLimit(): void {
-  // AI-7: 顶部状态 3 normal + 2 body 限制
+  // AI-7: 椤堕儴鐘舵€?3 normal + 2 body 闄愬埗
   const statusPanelSource = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
-  // 验证 normal status 限 3 个
-  assert(/\.slice\(0,\s*3\)/.test(statusPanelSource), 'StatusPanel 顶部 normal status 应限 3 个');
-  // 验证 constitution 限 2 个
-  assert(/\.slice\(0,\s*2\)/.test(statusPanelSource), 'StatusPanel constitution 状态应限 2 个');
-  // 模拟：5 个 normal 状态，slice(0,3) 后剩 3 个
-  const arr = [1, 2, 3, 4, 5].slice(0, 3);
-  assert(arr.length === 3, 'slice(0,3) 应保留 3 个');
-  // 模拟：4 个 constitution，slice(0,2) 后剩 2 个
-  const con = [1, 2, 3, 4].slice(0, 2);
-  assert(con.length === 2, 'slice(0,2) 应保留 2 个');
+  // 楠岃瘉 normal status 闄?3 涓?  assert(/\.slice\(0,\s*3\)/.test(statusPanelSource), 'StatusPanel 椤堕儴 normal status 搴旈檺 3 涓?);
+  // 楠岃瘉 constitution 闄?2 涓?  assert(/\.slice\(0,\s*2\)/.test(statusPanelSource), 'StatusPanel constitution 鐘舵€佸簲闄?2 涓?);
+  // 妯℃嫙锛? 涓?normal 鐘舵€侊紝slice(0,3) 鍚庡墿 3 涓?  const arr = [1, 2, 3, 4, 5].slice(0, 3);
+  assert(arr.length === 3, 'slice(0,3) 搴斾繚鐣?3 涓?);
+  // 妯℃嫙锛? 涓?constitution锛宻lice(0,2) 鍚庡墿 2 涓?  const con = [1, 2, 3, 4].slice(0, 2);
+  assert(con.length === 2, 'slice(0,2) 搴斾繚鐣?2 涓?);
   log('top-status-count-limit', { passed: true });
 }
 
 function smokeTopStatusOrdering(): void {
-  // AI-6: 顶部状态按最近获得顺序显示（数组末尾 = 最新）
+  // AI-6: 椤堕儴鐘舵€佹寜鏈€杩戣幏寰楅『搴忔樉绀猴紙鏁扮粍鏈熬 = 鏈€鏂帮級
   const oldOrder = [
-    { id: 'a', name: '旧疾', description: '小时候落下的病根', category: 'body', rarity: 'common', effects: [{ target_attribute: 'hp', operation: '-', value: 5 }] } as any,
-    { id: 'b', name: '新伤', description: '今日被人拍了一掌', category: 'body', rarity: 'uncommon', effects: [{ target_attribute: 'hp', operation: '-', value: 10 }] } as any,
-    { id: 'c', name: '刚悟', description: '刚悟到一点门道', category: 'mind', rarity: 'rare', effects: [{ target_attribute: 'comprehension', operation: '+', value: 5 }] } as any,
+    { id: 'a', name: '鏃х柧', description: '灏忔椂鍊欒惤涓嬬殑鐥呮牴', category: 'body', rarity: 'common', effects: [{ target_attribute: 'hp', operation: '-', value: 5 }] } as any,
+    { id: 'b', name: '鏂颁激', description: '浠婃棩琚汉鎷嶄簡涓€鎺?, category: 'body', rarity: 'uncommon', effects: [{ target_attribute: 'hp', operation: '-', value: 10 }] } as any,
+    { id: 'c', name: '鍒氭偀', description: '鍒氭偀鍒颁竴鐐归棬閬?, category: 'mind', rarity: 'rare', effects: [{ target_attribute: 'comprehension', operation: '+', value: 5 }] } as any,
   ];
   const filtered = filterMeaningfulStatuses(oldOrder);
-  // 保持原顺序：旧疾/新伤/刚悟（最新在末尾）
-  assert(filtered[0]?.id === 'a' && filtered[2]?.id === 'c', 'filterMeaningfulStatuses 应保持原顺序（最新在末尾）');
-  // StatusPanel 中 topStatuses 排序用 b.__idx - a.__idx 倒序取前 3
+  // 淇濇寔鍘熼『搴忥細鏃х柧/鏂颁激/鍒氭偀锛堟渶鏂板湪鏈熬锛?  assert(filtered[0]?.id === 'a' && filtered[2]?.id === 'c', 'filterMeaningfulStatuses 搴斾繚鎸佸師椤哄簭锛堟渶鏂板湪鏈熬锛?);
+  // StatusPanel 涓?topStatuses 鎺掑簭鐢?b.__idx - a.__idx 鍊掑簭鍙栧墠 3
   const statusPanelSource = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
-  assert(/b\.__idx\s*-\s*a\.__idx/.test(statusPanelSource), 'StatusPanel 应使用 __idx 倒序排序使最新状态在前');
-  // 模拟 StatusPanel 的排序逻辑
+  assert(/b\.__idx\s*-\s*a\.__idx/.test(statusPanelSource), 'StatusPanel 搴斾娇鐢?__idx 鍊掑簭鎺掑簭浣挎渶鏂扮姸鎬佸湪鍓?);
+  // 妯℃嫙 StatusPanel 鐨勬帓搴忛€昏緫
   const withIdx = filtered.map((s, i) => ({ ...s, __idx: i }));
   const sorted = withIdx.sort((a: any, b: any) => b.__idx - a.__idx).slice(0, 3);
-  assert(sorted[0]?.id === 'c' && sorted[1]?.id === 'b' && sorted[2]?.id === 'a', '排序后顺序应为 刚悟/新伤/旧疾（最新在前）');
+  assert(sorted[0]?.id === 'c' && sorted[1]?.id === 'b' && sorted[2]?.id === 'a', '鎺掑簭鍚庨『搴忓簲涓?鍒氭偀/鏂颁激/鏃х柧锛堟渶鏂板湪鍓嶏級');
   log('top-status-ordering', { passed: true });
 }
 
 function smokeLoadingLabelsWorldInternal(): void {
-  // AI-5: 加载/推演中文案必须走 LOADING_LABELS，世界内化（无 白话加载/AI演算 等）
+  // AI-5: 鍔犺浇/鎺ㄦ紨涓枃妗堝繀椤昏蛋 LOADING_LABELS锛屼笘鐣屽唴鍖栵紙鏃?鐧借瘽鍔犺浇/AI婕旂畻 绛夛級
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(displaySource.includes('LOADING_LABELS'), 'display.ts 应导出 LOADING_LABELS');
-  assert(displaySource.includes('灵机牵引中') || displaySource.includes('天道审视') || displaySource.includes('天机未明'), 'LOADING_LABELS 应包含修仙感文案');
-  // 各组件不应再出现"命运推演中""天道演算""加载中"等白话词
+  assert(displaySource.includes('LOADING_LABELS'), 'display.ts 搴斿鍑?LOADING_LABELS');
+  assert(displaySource.includes('鐏垫満鐗靛紩涓?) || displaySource.includes('澶╅亾瀹¤') || displaySource.includes('澶╂満鏈槑'), 'LOADING_LABELS 搴斿寘鍚慨浠欐劅鏂囨');
+  // 鍚勭粍浠朵笉搴斿啀鍑虹幇"鍛借繍鎺ㄦ紨涓?"澶╅亾婕旂畻""鍔犺浇涓?绛夌櫧璇濊瘝
   const componentFiles = [
     'src/components/xianxia/ActionButtons.tsx',
     'src/components/xianxia/StartScreen.tsx',
@@ -3273,12 +3197,12 @@ function smokeLoadingLabelsWorldInternal(): void {
     'src/components/xianxia/PetPanel.tsx',
     'src/components/xianxia/FormationPanel.tsx',
   ];
-  const forbiddenWords = ['命运推演中', '天道演算', '加载中', 'AI 生成中', '生成中'];
+  const forbiddenWords = ['鍛借繍鎺ㄦ紨涓?, '澶╅亾婕旂畻', '鍔犺浇涓?, 'AI 鐢熸垚涓?, '鐢熸垚涓?];
   for (const file of componentFiles) {
     const source = readFileSync(file, 'utf-8');
     for (const word of forbiddenWords) {
       if (source.includes(word)) {
-        assert(false, `${file} 不应直接使用白话加载文案: ${word}`);
+        assert(false, `${file} 涓嶅簲鐩存帴浣跨敤鐧借瘽鍔犺浇鏂囨: ${word}`);
       }
     }
   }
@@ -3286,21 +3210,21 @@ function smokeLoadingLabelsWorldInternal(): void {
 }
 
 function smokeCombatProjectionLabelsMapping(): void {
-  // AI-4: combatProjection label 统一映射
+  // AI-4: combatProjection label 缁熶竴鏄犲皠
   const cp = deriveCombatProjection({ attack: 10, defense: 10, speed: 10, comprehension: 5, luck: 5, heartDemon: 0, spiritualSense: 20, soulStrength: 20, physicalFoundation: 20, maxHp: 100, maxMp: 100, hp: 100, mp: 100 } as any);
-  assert(cp.forceLabel === '破势', `forceLabel 应为 破势, got ${cp.forceLabel}`);
-  assert(cp.guardLabel === '护持', `guardLabel 应为 护持, got ${cp.guardLabel}`);
-  assert(cp.agilityLabel === '机变', `agilityLabel 应为 机变, got ${cp.agilityLabel}`);
-  assert(cp.summary.includes('破势') && cp.summary.includes('护持') && cp.summary.includes('机变'), 'summary 应包含 破势/护持/机变');
+  assert(cp.forceLabel === '鐮村娍', `forceLabel 搴斾负 鐮村娍, got ${cp.forceLabel}`);
+  assert(cp.guardLabel === '鎶ゆ寔', `guardLabel 搴斾负 鎶ゆ寔, got ${cp.guardLabel}`);
+  assert(cp.agilityLabel === '鏈哄彉', `agilityLabel 搴斾负 鏈哄彉, got ${cp.agilityLabel}`);
+  assert(cp.summary.includes('鐮村娍') && cp.summary.includes('鎶ゆ寔') && cp.summary.includes('鏈哄彉'), 'summary 搴斿寘鍚?鐮村娍/鎶ゆ寔/鏈哄彉');
   log('combat-projection-labels-mapping', { passed: true });
 }
 
 function smokeNoNewChineseAttributeKeysInEngine(): void {
-  // AI-4: engine.ts 中 attributeNumber fallback 不应新增中文 key
-  // 允许的中文 key 集合（与当前 engine.ts 中一致）
-  const allowedChineseKeys = new Set(['神识', '魂魄', '神魂', '元神', '体魄', '肉身', '根骨']);
+  // AI-4: engine.ts 涓?attributeNumber fallback 涓嶅簲鏂板涓枃 key
+  // 鍏佽鐨勪腑鏂?key 闆嗗悎锛堜笌褰撳墠 engine.ts 涓竴鑷达級
+  const allowedChineseKeys = new Set(['绁炶瘑', '榄傞瓌', '绁為瓊', '鍏冪', '浣撻瓌', '鑲夎韩', '鏍归']);
   const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  // 提取 attributeNumber(state, [...]) 中的字符串字面量
+  // 鎻愬彇 attributeNumber(state, [...]) 涓殑瀛楃涓插瓧闈㈤噺
   const regex = /attributeNumber\([^)]*\[([^\]]+)\]\)/g;
   let match: RegExpExecArray | null;
   const foundKeys = new Set<string>();
@@ -3315,86 +3239,81 @@ function smokeNoNewChineseAttributeKeysInEngine(): void {
     }
   }
   for (const key of foundKeys) {
-    assert(allowedChineseKeys.has(key), `engine.ts 中出现未备案的中文 attribute key: ${key}`);
+    assert(allowedChineseKeys.has(key), `engine.ts 涓嚭鐜版湭澶囨鐨勪腑鏂?attribute key: ${key}`);
   }
   log('no-new-chinese-attribute-keys-in-engine', { passed: true, keys: Array.from(foundKeys) });
 }
 
-// ========== AI-30 新增 smoke (P1-cleanup-and-design-docs) ==========
+// ========== AI-30 鏂板 smoke (P1-cleanup-and-design-docs) ==========
 
 function smokeCombatEnemySurvivorCausality(): void {
-  // AI-29: 战斗结束自动补 enemy 线索（敌人存活/逃脱）
-  const routeSource = readFileSync('src/app/api/game/combat/action/route.ts', 'utf-8');
-  assert(/survivedEnemies/.test(routeSource), 'combat action route 应有 survivedEnemies 逻辑');
-  assert(/追杀未止|未竟之患/.test(routeSource), 'combat action route 应有 enemy 线索 title 生成');
-  assert(/category:\s*['"]enemy['"]/.test(routeSource), 'combat action route 应生成 enemy category 线索');
-  assert(/deadlineAge\s*=\s*state\.age\s*\+\s*8/.test(routeSource), 'enemy 线索应有 8 年 deadline');
+  // AI-29: 鎴樻枟缁撴潫鑷姩琛?enemy 绾跨储锛堟晫浜哄瓨娲?閫冭劚锛?  const routeSource = readFileSync('src/app/api/game/combat/action/route.ts', 'utf-8');
+  assert(/survivedEnemies/.test(routeSource), 'combat action route 搴旀湁 survivedEnemies 閫昏緫');
+  assert(/杩芥潃鏈|鏈珶涔嬫偅/.test(routeSource), 'combat action route 搴旀湁 enemy 绾跨储 title 鐢熸垚');
+  assert(/category:\s*['"]enemy['"]/.test(routeSource), 'combat action route 搴旂敓鎴?enemy category 绾跨储');
+  assert(/deadlineAge\s*=\s*state\.age\s*\+\s*8/.test(routeSource), 'enemy 绾跨储搴旀湁 8 骞?deadline');
   log('combat-enemy-survivor-causality', { passed: true });
 }
 
 function smokeCausalityChainAuction(): void {
-  // AI-29: 拍卖因果链 (newThreads registration)
+  // AI-29: 鎷嶅崠鍥犳灉閾?(newThreads registration)
   const auctionSource = readFileSync('src/app/api/game/auction/route.ts', 'utf-8');
-  assert(/recordAuctionCausality/.test(auctionSource), 'auction route 应有 recordAuctionCausality');
-  assert(/registerMany\(aftermath\.threads/.test(auctionSource), 'auction route 应注册 aftermath threads');
-  assert(/'auction-bid'/.test(auctionSource), 'auction route 应标记 source=auction-bid');
-  assert(/'auction-aftermath'/.test(auctionSource), 'auction route 应标记 source=auction-aftermath');
+  assert(/recordAuctionCausality/.test(auctionSource), 'auction route 搴旀湁 recordAuctionCausality');
+  assert(/registerMany\(aftermath\.threads/.test(auctionSource), 'auction route 搴旀敞鍐?aftermath threads');
+  assert(/'auction-bid'/.test(auctionSource), 'auction route 搴旀爣璁?source=auction-bid');
+  assert(/'auction-aftermath'/.test(auctionSource), 'auction route 搴旀爣璁?source=auction-aftermath');
   log('causality-chain-auction', { passed: true });
 }
 
 function smokeCausalityChainSecretRealm(): void {
-  // AI-29: 秘境因果链
-  const exploreSource = readFileSync('src/app/api/game/exploration/route.ts', 'utf-8');
-  assert(/pendingThreads/.test(exploreSource), 'exploration route 应处理 pendingThreads');
-  assert(/newThreads/.test(exploreSource), 'exploration route 应接受 AI newThreads');
-  assert(/threads:\s*aiOutput\.newThreads/.test(exploreSource), 'exploration route 应传递 aiOutput.newThreads');
+  // AI-29: 绉樺鍥犳灉閾?  const exploreSource = readFileSync('src/app/api/game/exploration/route.ts', 'utf-8');
+  assert(/pendingThreads/.test(exploreSource), 'exploration route 搴斿鐞?pendingThreads');
+  assert(/newThreads/.test(exploreSource), 'exploration route 搴旀帴鍙?AI newThreads');
+  assert(/threads:\s*aiOutput\.newThreads/.test(exploreSource), 'exploration route 搴斾紶閫?aiOutput.newThreads');
   log('causality-chain-secret-realm', { passed: true });
 }
 
 function smokePlayerVisibleTextNoSystemWords(): void {
-  // AI-28: 玩家可见文案不应有系统感词
-  // 用 audit 脚本输出文件作为权威
+  // AI-28: 鐜╁鍙鏂囨涓嶅簲鏈夌郴缁熸劅璇?  // 鐢?audit 鑴氭湰杈撳嚭鏂囦欢浣滀负鏉冨▉
   const auditPath = 'docs/PLAYER_VISIBLE_TEXT_AUDIT.md';
-  assert(Bun.file(auditPath).size > 0, 'PLAYER_VISIBLE_TEXT_AUDIT.md 应存在');
+  assert(Bun.file(auditPath).size > 0, 'PLAYER_VISIBLE_TEXT_AUDIT.md 搴斿瓨鍦?);
   const audit = readFileSync(auditPath, 'utf-8');
-  // 应有总问题数统计
-  assert(/总问题:\s*\d+/.test(audit), '审计报告应有"总问题"统计');
-  // AIConfigDialog 应在白名单
-  assert(/AIConfigDialog/.test(audit), '审计报告应提及 AIConfigDialog 白名单');
+  // 搴旀湁鎬婚棶棰樻暟缁熻
+  assert(/鎬婚棶棰?\s*\d+/.test(audit), '瀹¤鎶ュ憡搴旀湁"鎬婚棶棰?缁熻');
+  // AIConfigDialog 搴斿湪鐧藉悕鍗?  assert(/AIConfigDialog/.test(audit), '瀹¤鎶ュ憡搴旀彁鍙?AIConfigDialog 鐧藉悕鍗?);
   log('player-visible-text-no-system-words', { passed: true });
 }
 
 function smokeDesignDocTablesExist(): void {
-  // AI-31: 3 个 blueprints 设计文档子表
+  // AI-31: 3 涓?blueprints 璁捐鏂囨。瀛愯〃
   for (const f of [
     'docs/blueprints/value-blueprint.md',
     'docs/blueprints/status-blueprint.md',
     'docs/blueprints/event-blueprint.md',
   ]) {
-    assert(Bun.file(f).size > 0, `${f} 应存在`);
+    assert(Bun.file(f).size > 0, `${f} 搴斿瓨鍦╜);
     const src = readFileSync(f, 'utf-8');
-    assert(/\|.+\|.+\|/.test(src), `${f} 应有 markdown 表格`);
-    assert(/AI/.test(src), `${f} 应提及 AI 接管`);
+    assert(/\|.+\|.+\|/.test(src), `${f} 搴旀湁 markdown 琛ㄦ牸`);
+    assert(/AI/.test(src), `${f} 搴旀彁鍙?AI 鎺ョ`);
   }
   log('design-doc-tables-exist', { passed: true });
 }
 
-// ========== AI-36 新增 smoke (p1-fixups-p2-pilot) ==========
+// ========== AI-36 鏂板 smoke (p1-fixups-p2-pilot) ==========
 
 function smokePlayerVisibleTextNoSystemWordsAfterFix(): void {
-  // AI-32/33: 玩家可见文案世界内化（修复后验证）
-  const actionBtnSource = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
-  assert(!/AI 响应异常/.test(actionBtnSource), 'ActionButtons 不应再有"AI 响应异常"文案');
-  assert(/灵机未通/.test(actionBtnSource), 'ActionButtons 应使用"灵机未通"世界内文案');
+  // AI-32/33: 鐜╁鍙鏂囨涓栫晫鍐呭寲锛堜慨澶嶅悗楠岃瘉锛?  const actionBtnSource = readFileSync('src/components/xianxia/ActionButtons.tsx', 'utf-8');
+  assert(!/AI 鍝嶅簲寮傚父/.test(actionBtnSource), 'ActionButtons 涓嶅簲鍐嶆湁"AI 鍝嶅簲寮傚父"鏂囨');
+  assert(/鐏垫満鏈€?.test(actionBtnSource), 'ActionButtons 搴斾娇鐢?鐏垫満鏈€?涓栫晫鍐呮枃妗?);
   const choiceModalSource = readFileSync('src/components/xianxia/ChoiceModal.tsx', 'utf-8');
-  assert(!/需要配置 AI 接口/.test(choiceModalSource), 'ChoiceModal 不应再有"需要配置 AI 接口"文案');
-  assert(!/API Base URL 和 API Key/.test(choiceModalSource), 'ChoiceModal 不应再有"API Base URL 和 API Key"');
-  assert(/灵桥未通/.test(choiceModalSource), 'ChoiceModal 应使用"灵桥未通"世界内文案');
+  assert(!/闇€瑕侀厤缃?AI 鎺ュ彛/.test(choiceModalSource), 'ChoiceModal 涓嶅簲鍐嶆湁"闇€瑕侀厤缃?AI 鎺ュ彛"鏂囨');
+  assert(!/API Base URL 鍜?API Key/.test(choiceModalSource), 'ChoiceModal 涓嶅簲鍐嶆湁"API Base URL 鍜?API Key"');
+  assert(/鐏垫ˉ鏈€?.test(choiceModalSource), 'ChoiceModal 搴斾娇鐢?鐏垫ˉ鏈€?涓栫晫鍐呮枃妗?);
   log('player-visible-text-no-system-words-after-fix', { passed: true });
 }
 
 function smokeSaveLoadIntegrity(): void {
-  // AI-35: 存档完整性 (schema 完整 + 关键字段存在)
+  // AI-35: 瀛樻。瀹屾暣鎬?(schema 瀹屾暣 + 鍏抽敭瀛楁瀛樺湪)
   const schema = readFileSync('prisma/schema.prisma', 'utf-8');
   const requiredFields = [
     'id', 'name', 'age', 'lifespan', 'realm', 'realmLevel',
@@ -3405,432 +3324,418 @@ function smokeSaveLoadIntegrity(): void {
     'EventLog', 'ChoiceLog', 'InterferenceLog',
   ];
   for (const f of requiredFields) {
-    assert(schema.includes(f), `prisma schema 应包含 ${f}`);
+    assert(schema.includes(f), `prisma schema 搴斿寘鍚?${f}`);
   }
-  // SAVE-LOAD.md 应存在
-  assert(Bun.file('docs/SAVE-LOAD.md').size > 0, 'docs/SAVE-LOAD.md 应存在');
+  // SAVE-LOAD.md 搴斿瓨鍦?  assert(Bun.file('docs/SAVE-LOAD.md').size > 0, 'docs/SAVE-LOAD.md 搴斿瓨鍦?);
   log('save-load-integrity', { passed: true });
 }
 
 function smokeSaveLoadBackwardCompat(): void {
-  // AI-35: 存档向后兼容 (JSON 字段 try-parse + default fallback)
-  // 验证 display.ts 或 engine.ts 至少有一处 try-parse JSON 字段
+  // AI-35: 瀛樻。鍚戝悗鍏煎 (JSON 瀛楁 try-parse + default fallback)
+  // 楠岃瘉 display.ts 鎴?engine.ts 鑷冲皯鏈変竴澶?try-parse JSON 瀛楁
   const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
   const hasTryParse = /JSON\.parse.*try|catch.*JSON|try\s*\{[^}]*JSON\.parse/s.test(engineSource + displaySource);
-  assert(hasTryParse, 'engine.ts/display.ts 应有 JSON parse 错误兜底');
-  // 验证 SAVE-LOAD.md §3 描述兼容策略
+  assert(hasTryParse, 'engine.ts/display.ts 搴旀湁 JSON parse 閿欒鍏滃簳');
+  // 楠岃瘉 SAVE-LOAD.md 搂3 鎻忚堪鍏煎绛栫暐
   const saveLoadDoc = readFileSync('docs/SAVE-LOAD.md', 'utf-8');
-  assert(/向后兼容|兼容性|backward.?compat/i.test(saveLoadDoc), 'SAVE-LOAD.md 应有兼容策略段');
+  assert(/鍚戝悗鍏煎|鍏煎鎬backward.?compat/i.test(saveLoadDoc), 'SAVE-LOAD.md 搴旀湁鍏煎绛栫暐娈?);
   log('save-load-backward-compat', { passed: true });
 }
 
 function smokeSaveLoadCorruptionRecovery(): void {
-  // AI-35: 存档损坏恢复
+  // AI-35: 瀛樻。鎹熷潖鎭㈠
   const saveLoadDoc = readFileSync('docs/SAVE-LOAD.md', 'utf-8');
-  assert(/损坏恢复|corruption|recovery|兜底|fallback/i.test(saveLoadDoc), 'SAVE-LOAD.md 应有损坏恢复段');
-  // 蓝图应有错误处理路径表格
+  assert(/鎹熷潖鎭㈠|corruption|recovery|鍏滃簳|fallback/i.test(saveLoadDoc), 'SAVE-LOAD.md 搴旀湁鎹熷潖鎭㈠娈?);
+  // 钃濆浘搴旀湁閿欒澶勭悊璺緞琛ㄦ牸
   const blueprint = readFileSync('docs/blueprints/save-load-blueprint.md', 'utf-8');
-  assert(/错误处理|错误类型|兜底策略/.test(blueprint), 'save-load-blueprint.md 应有错误处理路径');
-  // 模拟 JSON parse 失败 → default
+  assert(/閿欒澶勭悊|閿欒绫诲瀷|鍏滃簳绛栫暐/.test(blueprint), 'save-load-blueprint.md 搴旀湁閿欒澶勭悊璺緞');
+  // 妯℃嫙 JSON parse 澶辫触 鈫?default
   const tryParse = (s: string, fallback: any): any => {
     try { return JSON.parse(s); } catch { return fallback; }
   };
   const corruptedResult = tryParse('invalid{json', []);
-  assert(Array.isArray(corruptedResult) && corruptedResult.length === 0, '损坏 JSON 应 fallback 到 []');
-  assert(JSON.stringify(tryParse('{"a":1}', {})) === '{"a":1}', '正常 JSON 应正常解析');
+  assert(Array.isArray(corruptedResult) && corruptedResult.length === 0, '鎹熷潖 JSON 搴?fallback 鍒?[]');
+  assert(JSON.stringify(tryParse('{"a":1}', {})) === '{"a":1}', '姝ｅ父 JSON 搴旀甯歌В鏋?);
   log('save-load-corruption-recovery', { passed: true });
 }
 
 function smokePlayerVisibleTextAuditScriptSelfCheck(): void {
-  // AI-28: 审计脚本自身正确性
-  assert(Bun.file('scripts/player-visible-text-audit.py').size > 0, '审计脚本应存在');
+  // AI-28: 瀹¤鑴氭湰鑷韩姝ｇ‘鎬?  assert(Bun.file('scripts/player-visible-text-audit.py').size > 0, '瀹¤鑴氭湰搴斿瓨鍦?);
   const script = readFileSync('scripts/player-visible-text-audit.py', 'utf-8');
-  // 应有 P0/P1 分类
-  assert(/P0_PATTERNS|P0_KEY_PATTERNS/.test(script), '审计脚本应有 P0 规则');
-  assert(/P1_PATTERNS/.test(script), '审计脚本应有 P1 规则');
-  // 应有白名单
-  assert(/WHITELIST|TECHNICAL_FILE/i.test(script), '审计脚本应有白名单机制');
-  // 应有审计范围段
-  const auditReport = readFileSync('docs/PLAYER_VISIBLE_TEXT_AUDIT.md', 'utf-8');
-  assert(/审计范围|扫描文件/i.test(auditReport), '审计报告应有审计范围段');
+  // 搴旀湁 P0/P1 鍒嗙被
+  assert(/P0_PATTERNS|P0_KEY_PATTERNS/.test(script), '瀹¤鑴氭湰搴旀湁 P0 瑙勫垯');
+  assert(/P1_PATTERNS/.test(script), '瀹¤鑴氭湰搴旀湁 P1 瑙勫垯');
+  // 搴旀湁鐧藉悕鍗?  assert(/WHITELIST|TECHNICAL_FILE/i.test(script), '瀹¤鑴氭湰搴旀湁鐧藉悕鍗曟満鍒?);
+  // 搴旀湁瀹¤鑼冨洿娈?  const auditReport = readFileSync('docs/PLAYER_VISIBLE_TEXT_AUDIT.md', 'utf-8');
+  assert(/瀹¤鑼冨洿|鎵弿鏂囦欢/i.test(auditReport), '瀹¤鎶ュ憡搴旀湁瀹¤鑼冨洿娈?);
   log('player-visible-text-audit-script-self-check', { passed: true });
 }
 
 function smokeEndingMainTypes(): void {
-  // AI-44: 7 种主类结局
+  // AI-44: 7 绉嶄富绫荤粨灞€
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/ENDING_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 ENDING_TYPE_LABEL');
+  assert(/ENDING_TYPE_LABEL/.test(displaySource), 'display.ts 搴斿鍑?ENDING_TYPE_LABEL');
   const types = ['ascension', 'failedAscension', 'grandPerfection', 'combatDeath', 'qiDeviation', 'naturalDeath', 'abandon'];
   for (const t of types) {
-    assert(displaySource.includes(t), `ENDING_TYPE_LABEL 应含 ${t}`);
+    assert(displaySource.includes(t), `ENDING_TYPE_LABEL 搴斿惈 ${t}`);
   }
   log('ending-main-types', { passed: true });
 }
 
 function smokeEndingTriggerConditions(): void {
-  // AI-44: 触发条件与枚举映射
-  const blueprint = readFileSync('docs/blueprints/ending-spectrum-blueprint.md', 'utf-8');
-  assert(/化神期满|渡劫/.test(blueprint), '蓝图应说明飞升触发');
-  assert(/寿元|心魔|战斗|玩家主动/.test(blueprint), '蓝图应列其他触发');
-  // 验证结局唯一性逻辑
+  // AI-44: 瑙﹀彂鏉′欢涓庢灇涓炬槧灏?  const blueprint = readFileSync('docs/blueprints/ending-spectrum-blueprint.md', 'utf-8');
+  assert(/鍖栫鏈熸弧|娓″姭/.test(blueprint), '钃濆浘搴旇鏄庨鍗囪Е鍙?);
+  assert(/瀵垮厓|蹇冮瓟|鎴樻枟|鐜╁涓诲姩/.test(blueprint), '钃濆浘搴斿垪鍏朵粬瑙﹀彂');
+  // 楠岃瘉缁撳眬鍞竴鎬ч€昏緫
   const isValid = (type: string): boolean => {
     return ['ascension', 'failedAscension', 'grandPerfection', 'combatDeath', 'qiDeviation', 'naturalDeath', 'abandon'].includes(type);
   };
-  assert(isValid('ascension') === true, 'ascension 应合法');
-  assert(isValid('unknown') === false, 'unknown 应不合法');
+  assert(isValid('ascension') === true, 'ascension 搴斿悎娉?);
+  assert(isValid('unknown') === false, 'unknown 搴斾笉鍚堟硶');
   log('ending-trigger-conditions', { passed: true });
 }
 
 function smokeEndingAiReflection(): void {
-  // AI-44: AI 写遗言/反思
-  const blueprint = readFileSync('docs/blueprints/ending-spectrum-blueprint.md', 'utf-8');
-  assert(/AI 接管/.test(blueprint), '蓝图应说明 AI 接管');
-  assert(/遗言|反思|临终/.test(blueprint), '蓝图应说明 AI 写遗言');
-  assert(/江湖评|后人/.test(blueprint), '蓝图应说明后人评');
+  // AI-44: AI 鍐欓仐瑷€/鍙嶆€?  const blueprint = readFileSync('docs/blueprints/ending-spectrum-blueprint.md', 'utf-8');
+  assert(/AI 鎺ョ/.test(blueprint), '钃濆浘搴旇鏄?AI 鎺ョ');
+  assert(/閬楄█|鍙嶆€潀涓寸粓/.test(blueprint), '钃濆浘搴旇鏄?AI 鍐欓仐瑷€');
+  assert(/姹熸箹璇剕鍚庝汉/.test(blueprint), '钃濆浘搴旇鏄庡悗浜鸿瘎');
   log('ending-ai-reflection', { passed: true });
 }
 
 function smokeEndingBlueprint(): void {
-  // AI-44: 蓝图文档完整
-  assert(Bun.file('docs/blueprints/ending-spectrum-blueprint.md').size > 0, 'ending-spectrum-blueprint.md 应存在');
+  // AI-44: 钃濆浘鏂囨。瀹屾暣
+  assert(Bun.file('docs/blueprints/ending-spectrum-blueprint.md').size > 0, 'ending-spectrum-blueprint.md 搴斿瓨鍦?);
   const src = readFileSync('docs/blueprints/ending-spectrum-blueprint.md', 'utf-8');
-  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
-  assert(/7.*主类|ascension.*failedAscension/.test(src), '蓝图应列 7 主类');
-  assert(/CharacterEnding|EndingType/.test(src), '蓝图应含数据契约');
+  assert(/\|.+\|.+\|/.test(src), '钃濆浘搴斿惈琛ㄦ牸');
+  assert(/7.*涓荤被|ascension.*failedAscension/.test(src), '钃濆浘搴斿垪 7 涓荤被');
+  assert(/CharacterEnding|EndingType/.test(src), '钃濆浘搴斿惈鏁版嵁濂戠害');
   log('ending-blueprint', { passed: true });
 }
 
 function smokeWorldLegacyPanelIntegrated(): void {
-  // AI-60: WorldLegacyPanel 接入 GameLayout（src/app/page.tsx）
-  const pageSource = readFileSync('src/app/page.tsx', 'utf-8');
+  // AI-60: WorldLegacyPanel 鎺ュ叆 GameLayout锛坰rc/app/page.tsx锛?  const pageSource = readFileSync('src/app/page.tsx', 'utf-8');
   assert(/import\s+\{[^}]*WorldLegacyPanel[^}]*\}\s+from\s+['"]@\/components\/xianxia\/WorldLegacyPanel['"]/.test(pageSource),
-    'src/app/page.tsx 应 import WorldLegacyPanel');
-  assert(/data-testid="world-legacy-section"/.test(pageSource), 'src/app/page.tsx 应渲染 world-legacy-section');
-  assert(/defaultCollapsed|maxCollapsed/.test(pageSource), 'src/app/page.tsx 应传 defaultCollapsed/maxCollapsed');
-  // 组件本身支持 props
+    'src/app/page.tsx 搴?import WorldLegacyPanel');
+  assert(/data-testid="world-legacy-section"/.test(pageSource), 'src/app/page.tsx 搴旀覆鏌?world-legacy-section');
+  assert(/defaultCollapsed|maxCollapsed/.test(pageSource), 'src/app/page.tsx 搴斾紶 defaultCollapsed/maxCollapsed');
+  // 缁勪欢鏈韩鏀寔 props
   const panel = readFileSync('src/components/xianxia/WorldLegacyPanel.tsx', 'utf-8');
-  assert(/defaultCollapsed/.test(panel), 'WorldLegacyPanel 应支持 defaultCollapsed');
-  assert(/maxCollapsed/.test(panel), 'WorldLegacyPanel 应支持 maxCollapsed');
-  assert(/data-testid="world-legacy-toggle"/.test(panel), 'WorldLegacyPanel 应有 toggle testid');
+  assert(/defaultCollapsed/.test(panel), 'WorldLegacyPanel 搴旀敮鎸?defaultCollapsed');
+  assert(/maxCollapsed/.test(panel), 'WorldLegacyPanel 搴旀敮鎸?maxCollapsed');
+  assert(/data-testid="world-legacy-toggle"/.test(panel), 'WorldLegacyPanel 搴旀湁 toggle testid');
   log('world-legacy-panel-integrated', { passed: true });
 }
 
 function smokeEngineBenchScriptExists(): void {
   // AI-76: bench-engine
-  assert(Bun.file('scripts/bench-engine.ts').size > 0, 'scripts/bench-engine.ts 应存在');
+  assert(Bun.file('scripts/bench-engine.ts').size > 0, 'scripts/bench-engine.ts 搴斿瓨鍦?);
   const content = readFileSync('scripts/bench-engine.ts', 'utf-8');
-  assert(/performance\.now/.test(content), 'bench 应使用 performance.now');
-  assert(/ITERATIONS/.test(content), 'bench 应定义 ITERATIONS');
-  assert(/logs\/bench/.test(content), 'bench 应输出到 logs/bench');
+  assert(/performance\.now/.test(content), 'bench 搴斾娇鐢?performance.now');
+  assert(/ITERATIONS/.test(content), 'bench 搴斿畾涔?ITERATIONS');
+  assert(/logs\/bench/.test(content), 'bench 搴旇緭鍑哄埌 logs/bench');
   log('engine-bench-script-exists', { passed: true });
 }
 
 function smokeEnginePerformanceBaseline(): void {
-  // AI-76: 性能基线文件
-  assert(Bun.file('logs/bench/engine.baseline.json').size > 0, 'logs/bench/engine.baseline.json 应存在');
+  // AI-76: 鎬ц兘鍩虹嚎鏂囦欢
+  assert(Bun.file('logs/bench/engine.baseline.json').size > 0, 'logs/bench/engine.baseline.json 搴斿瓨鍦?);
   const baseline = JSON.parse(readFileSync('logs/bench/engine.baseline.json', 'utf-8'));
-  assert(Array.isArray(baseline.results), 'baseline 应含 results 数组');
-  assert(baseline.results.length >= 5, `baseline 应至少 5 项（实际 ${baseline.results.length}）`);
-  // 单次操作应 < 100us（任意函数超过 100us 视为 hot path）
-  for (const r of baseline.results) {
-    assert(r.perOpUs < 100, `${r.name} 单次操作 ${r.perOpUs}us > 100us 阈值（hot path）`);
+  assert(Array.isArray(baseline.results), 'baseline 搴斿惈 results 鏁扮粍');
+  assert(baseline.results.length >= 5, `baseline 搴旇嚦灏?5 椤癸紙瀹為檯 ${baseline.results.length}锛塦);
+  // 鍗曟鎿嶄綔搴?< 100us锛堜换鎰忓嚱鏁拌秴杩?100us 瑙嗕负 hot path锛?  for (const r of baseline.results) {
+    assert(r.perOpUs < 100, `${r.name} 鍗曟鎿嶄綔 ${r.perOpUs}us > 100us 闃堝€硷紙hot path锛塦);
   }
   log('engine-performance-baseline', { passed: true });
 }
 
 function smokeHotPathOptimized(): void {
-  // AI-76: 热路径校验（基线已记录，无需额外优化）
-  const baseline = JSON.parse(readFileSync('logs/bench/engine.baseline.json', 'utf-8'));
-  // 最慢函数应在 10us 以内
+  // AI-76: 鐑矾寰勬牎楠岋紙鍩虹嚎宸茶褰曪紝鏃犻渶棰濆浼樺寲锛?  const baseline = JSON.parse(readFileSync('logs/bench/engine.baseline.json', 'utf-8'));
+  // 鏈€鎱㈠嚱鏁板簲鍦?10us 浠ュ唴
   const slowest = baseline.results.reduce((a: any, b: any) => (a.perOpUs > b.perOpUs ? a : b));
-  assert(slowest.perOpUs < 10, `最慢函数 ${slowest.name} = ${slowest.perOpUs}us > 10us（需优化）`);
+  assert(slowest.perOpUs < 10, `鏈€鎱㈠嚱鏁?${slowest.name} = ${slowest.perOpUs}us > 10us锛堥渶浼樺寲锛塦);
   log('hot-path-optimized', { passed: true });
 }
 
 function smokeL3IntegrationScriptExists(): void {
   // AI-75: l3-integration-smoke
-  assert(Bun.file('scripts/l3-integration-smoke.ts').size > 0, 'scripts/l3-integration-smoke.ts 应存在');
+  assert(Bun.file('scripts/l3-integration-smoke.ts').size > 0, 'scripts/l3-integration-smoke.ts 搴斿瓨鍦?);
   const content = readFileSync('scripts/l3-integration-smoke.ts', 'utf-8');
-  assert(/l3-types-complete/.test(content), 'l3-integration-smoke 应检查类型');
-  assert(/l3-engine-fns-complete/.test(content), 'l3-integration-smoke 应检查引擎函数');
-  assert(/l3-api-routes-complete/.test(content), 'l3-integration-smoke 应检查 API');
+  assert(/l3-types-complete/.test(content), 'l3-integration-smoke 搴旀鏌ョ被鍨?);
+  assert(/l3-engine-fns-complete/.test(content), 'l3-integration-smoke 搴旀鏌ュ紩鎿庡嚱鏁?);
+  assert(/l3-api-routes-complete/.test(content), 'l3-integration-smoke 搴旀鏌?API');
   log('l3-integration-script-exists', { passed: true });
 }
 
 function smokeL3AutoTestScriptExists(): void {
   // AI-75: auto-test-l3-mechanisms
-  assert(Bun.file('scripts/auto-test-l3-mechanisms.ts').size > 0, 'scripts/auto-test-l3-mechanisms.ts 应存在');
+  assert(Bun.file('scripts/auto-test-l3-mechanisms.ts').size > 0, 'scripts/auto-test-l3-mechanisms.ts 搴斿瓨鍦?);
   const content = readFileSync('scripts/auto-test-l3-mechanisms.ts', 'utf-8');
-  assert(/from\s+['"][^'"]*engine['"]/m.test(content), 'auto-test 应 import engine');
-  assert(/resolveTribulationBolt/.test(content), 'auto-test 应调用引擎函数');
+  assert(/from\s+['"][^'"]*engine['"]/m.test(content), 'auto-test 搴?import engine');
+  assert(/resolveTribulationBolt/.test(content), 'auto-test 搴旇皟鐢ㄥ紩鎿庡嚱鏁?);
   log('l3-auto-test-script-exists', { passed: true });
 }
 
 function smokeL3TesterComponentExists(): void {
-  // AI-75: L3Tester 组件
-  assert(Bun.file('src/components/dev/L3Tester.tsx').size > 0, 'src/components/dev/L3Tester.tsx 应存在');
+  // AI-75: L3Tester 缁勪欢
+  assert(Bun.file('src/components/dev/L3Tester.tsx').size > 0, 'src/components/dev/L3Tester.tsx 搴斿瓨鍦?);
   const content = readFileSync('src/components/dev/L3Tester.tsx', 'utf-8');
-  assert(/data-testid="l3-tester"/.test(content), 'L3Tester 应有 testid');
-  assert(/data-testid="l3-tester-run"/.test(content), 'L3Tester 应有运行按钮');
+  assert(/data-testid="l3-tester"/.test(content), 'L3Tester 搴旀湁 testid');
+  assert(/data-testid="l3-tester-run"/.test(content), 'L3Tester 搴旀湁杩愯鎸夐挳');
   assert(/deriveTribulationTrigger|resolveTribulationBolt|resolveHeartDemon/.test(content),
-    'L3Tester 应消费引擎派生函数');
+    'L3Tester 搴旀秷璐瑰紩鎿庢淳鐢熷嚱鏁?);
   log('l3-tester-component-exists', { passed: true });
 }
 
 function smokeAllL3SmokesRun(): void {
-  // AI-75: 验证 3 个测试脚本都能跑（不抛错）
-  // 仅静态检查入口存在 + 关键 import
+  // AI-75: 楠岃瘉 3 涓祴璇曡剼鏈兘鑳借窇锛堜笉鎶涢敊锛?  // 浠呴潤鎬佹鏌ュ叆鍙ｅ瓨鍦?+ 鍏抽敭 import
   for (const f of ['l3-integration-smoke.ts', 'auto-test-l3-mechanisms.ts']) {
     const c = readFileSync(`scripts/${f}`, 'utf-8');
-    assert(c.length > 100, `scripts/${f} 应有内容`);
+    assert(c.length > 100, `scripts/${f} 搴旀湁鍐呭`);
   }
   log('all-l3-smokes-run', { passed: true });
 }
 
 function smokeTribulationModalFullyIntegrated(): void {
-  // AI-74: TribulationModal 接入 GameLayout
+  // AI-74: TribulationModal 鎺ュ叆 GameLayout
   const page = readFileSync('src/app/page.tsx', 'utf-8');
   assert(/import\s+\{[^}]*TribulationModal[^}]*\}\s+from\s+['"]@\/components\/xianxia\/TribulationModal['"]/.test(page),
-    'page.tsx 应 import TribulationModal');
-  assert(/data-testid="tribulation-section"/.test(page), 'page.tsx 应渲染 tribulation-section');
-  assert(/character\.tribulationPending/.test(page), 'page.tsx 应消费 tribulationPending');
+    'page.tsx 搴?import TribulationModal');
+  assert(/data-testid="tribulation-section"/.test(page), 'page.tsx 搴旀覆鏌?tribulation-section');
+  assert(/character\.tribulationPending/.test(page), 'page.tsx 搴旀秷璐?tribulationPending');
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/tribulationPending\?:\s*TribulationSession\s*\|\s*null/.test(types), 'CharacterState 应有 tribulationPending');
-  assert(/tribulationResult\?/.test(types), 'CharacterState 应有 tribulationResult');
+  assert(/tribulationPending\?:\s*TribulationSession\s*\|\s*null/.test(types), 'CharacterState 搴旀湁 tribulationPending');
+  assert(/tribulationResult\?/.test(types), 'CharacterState 搴旀湁 tribulationResult');
   log('tribulation-modal-fully-integrated', { passed: true });
 }
 
 function smokeTribulationCallbackWired(): void {
-  // AI-74: onBolt / onEnd 接 API
+  // AI-74: onBolt / onEnd 鎺?API
   const page = readFileSync('src/app/page.tsx', 'utf-8');
-  assert(/\/api\/game\/tribulation\/action/.test(page), 'page.tsx 应调用 /api/game/tribulation/action');
-  assert(/\/api\/game\/tribulation\/end/.test(page), 'page.tsx 应调用 /api/game/tribulation/end');
+  assert(/\/api\/game\/tribulation\/action/.test(page), 'page.tsx 搴旇皟鐢?/api/game/tribulation/action');
+  assert(/\/api\/game\/tribulation\/end/.test(page), 'page.tsx 搴旇皟鐢?/api/game/tribulation/end');
   const schema = readFileSync('prisma/schema.prisma', 'utf-8');
-  assert(/tribulationPending\s+Boolean/.test(schema), 'prisma schema 应有 tribulationPending Boolean');
-  assert(/tribulationSessionJson\s+String/.test(schema), 'prisma schema 应有 tribulationSessionJson String');
+  assert(/tribulationPending\s+Boolean/.test(schema), 'prisma schema 搴旀湁 tribulationPending Boolean');
+  assert(/tribulationSessionJson\s+String/.test(schema), 'prisma schema 搴旀湁 tribulationSessionJson String');
   log('tribulation-callback-wired', { passed: true });
 }
 
 function smokeTribulationApiFullFlow(): void {
-  // AI-74: 3 个 API route 全部存在 + start/action/end 路径
+  // AI-74: 3 涓?API route 鍏ㄩ儴瀛樺湪 + start/action/end 璺緞
   for (const route of ['start', 'action', 'end']) {
     const path = `src/app/api/game/tribulation/${route}/route.ts`;
-    assert(Bun.file(path).size > 0, `${path} 应存在`);
+    assert(Bun.file(path).size > 0, `${path} 搴斿瓨鍦╜);
   }
   const action = readFileSync('src/app/api/game/tribulation/action/route.ts', 'utf-8');
-  assert(/'bolt'|'heart_demon'/.test(action), 'action route 应处理 bolt/heart_demon');
+  assert(/'bolt'|'heart_demon'/.test(action), 'action route 搴斿鐞?bolt/heart_demon');
   log('tribulation-api-full-flow', { passed: true });
 }
 
 function smokePrismaSchemaAscensionPending(): void {
-  // AI-73: prisma schema 加 ascensionPending + ascensionSessionJson
+  // AI-73: prisma schema 鍔?ascensionPending + ascensionSessionJson
   const schema = readFileSync('prisma/schema.prisma', 'utf-8');
-  assert(/ascensionPending\s+Boolean/.test(schema), 'prisma schema 应有 ascensionPending Boolean');
-  assert(/ascensionSessionJson\s+String/.test(schema), 'prisma schema 应有 ascensionSessionJson String');
+  assert(/ascensionPending\s+Boolean/.test(schema), 'prisma schema 搴旀湁 ascensionPending Boolean');
+  assert(/ascensionSessionJson\s+String/.test(schema), 'prisma schema 搴旀湁 ascensionSessionJson String');
   log('prisma-schema-ascension-pending', { passed: true });
 }
 
 function smokePrismaSchemaRestrictionPending(): void {
-  // AI-73: prisma schema 加 restrictionPending + restrictionDataJson
+  // AI-73: prisma schema 鍔?restrictionPending + restrictionDataJson
   const schema = readFileSync('prisma/schema.prisma', 'utf-8');
-  assert(/restrictionPending\s+Boolean/.test(schema), 'prisma schema 应有 restrictionPending Boolean');
-  assert(/restrictionDataJson\s+String/.test(schema), 'prisma schema 应有 restrictionDataJson String');
+  assert(/restrictionPending\s+Boolean/.test(schema), 'prisma schema 搴旀湁 restrictionPending Boolean');
+  assert(/restrictionDataJson\s+String/.test(schema), 'prisma schema 搴旀湁 restrictionDataJson String');
   log('prisma-schema-restriction-pending', { passed: true });
 }
 
 function smokeBackUpScriptExists(): void {
-  // AI-73: 备份脚本
-  assert(Bun.file('scripts/backup-real-saves.ts').size > 0, 'scripts/backup-real-saves.ts 应存在');
+  // AI-73: 澶囦唤鑴氭湰
+  assert(Bun.file('scripts/backup-real-saves.ts').size > 0, 'scripts/backup-real-saves.ts 搴斿瓨鍦?);
   const content = readFileSync('scripts/backup-real-saves.ts', 'utf-8');
-  assert(/copyFileSync/.test(content), 'backup 脚本应使用 copyFileSync');
-  assert(/logs\/backups/.test(content), 'backup 脚本应输出到 logs/backups');
+  assert(/copyFileSync/.test(content), 'backup 鑴氭湰搴斾娇鐢?copyFileSync');
+  assert(/logs\/backups/.test(content), 'backup 鑴氭湰搴旇緭鍑哄埌 logs/backups');
   log('back-up-script-exists', { passed: true });
 }
 
 function smokeAscensionModalIntegrated(): void {
-  // AI-72: AscensionModal 接入 GameLayout
+  // AI-72: AscensionModal 鎺ュ叆 GameLayout
   const page = readFileSync('src/app/page.tsx', 'utf-8');
   assert(/import\s+\{[^}]*AscensionModal[^}]*\}\s+from\s+['"]@\/components\/xianxia\/AscensionModal['"]/.test(page),
-    'page.tsx 应 import AscensionModal');
-  assert(/data-testid="ascension-section"/.test(page), 'page.tsx 应渲染 ascension-section');
-  assert(/ascensionPending/.test(page), 'page.tsx 应消费 ascensionPending');
+    'page.tsx 搴?import AscensionModal');
+  assert(/data-testid="ascension-section"/.test(page), 'page.tsx 搴旀覆鏌?ascension-section');
+  assert(/ascensionPending/.test(page), 'page.tsx 搴旀秷璐?ascensionPending');
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/ascensionPending\?:\s*AscensionSession\s*\|\s*null/.test(types), 'CharacterState 应有 ascensionPending');
+  assert(/ascensionPending\?:\s*AscensionSession\s*\|\s*null/.test(types), 'CharacterState 搴旀湁 ascensionPending');
   log('ascension-modal-integrated', { passed: true });
 }
 
 function smokeRestrictionModalIntegrated(): void {
-  // AI-72: RestrictionModal 接入 GameLayout
+  // AI-72: RestrictionModal 鎺ュ叆 GameLayout
   const page = readFileSync('src/app/page.tsx', 'utf-8');
   assert(/import\s+\{[^}]*RestrictionModal[^}]*\}\s+from\s+['"]@\/components\/xianxia\/RestrictionModal['"]/.test(page),
-    'page.tsx 应 import RestrictionModal');
-  assert(/data-testid="restriction-section"/.test(page), 'page.tsx 应渲染 restriction-section');
-  assert(/restrictionPending/.test(page), 'page.tsx 应消费 restrictionPending');
+    'page.tsx 搴?import RestrictionModal');
+  assert(/data-testid="restriction-section"/.test(page), 'page.tsx 搴旀覆鏌?restriction-section');
+  assert(/restrictionPending/.test(page), 'page.tsx 搴旀秷璐?restrictionPending');
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/restrictionPending\?:\s*Restriction\s*\|\s*null/.test(types), 'CharacterState 应有 restrictionPending');
+  assert(/restrictionPending\?:\s*Restriction\s*\|\s*null/.test(types), 'CharacterState 搴旀湁 restrictionPending');
   log('restriction-modal-integrated', { passed: true });
 }
 
 function smokeAllL3ModalsInLayout(): void {
-  // AI-72: 4 个 L3 modal 全部接入（Tribulation + Ascension + Restriction + CombatModal 已有）
-  const page = readFileSync('src/app/page.tsx', 'utf-8');
-  assert(/TribulationModal|CombatModal/.test(page), 'page.tsx 应已有战斗 modal');
-  assert(/AscensionModal/.test(page), 'page.tsx 应 import AscensionModal');
-  assert(/RestrictionModal/.test(page), 'page.tsx 应 import RestrictionModal');
-  // 至少 2 个 section testid
+  // AI-72: 4 涓?L3 modal 鍏ㄩ儴鎺ュ叆锛圱ribulation + Ascension + Restriction + CombatModal 宸叉湁锛?  const page = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(/TribulationModal|CombatModal/.test(page), 'page.tsx 搴斿凡鏈夋垬鏂?modal');
+  assert(/AscensionModal/.test(page), 'page.tsx 搴?import AscensionModal');
+  assert(/RestrictionModal/.test(page), 'page.tsx 搴?import RestrictionModal');
+  // 鑷冲皯 2 涓?section testid
   const sectionTestids = page.match(/data-testid="[a-z-]+-section"/g) || [];
-  assert(sectionTestids.length >= 2, `page.tsx 应至少 2 个 section testid（实际 ${sectionTestids.length}）`);
+  assert(sectionTestids.length >= 2, `page.tsx 搴旇嚦灏?2 涓?section testid锛堝疄闄?${sectionTestids.length}锛塦);
   log('all-l3-modals-in-layout', { passed: true });
 }
 
 function smokeSecretRealmRestrictionField(): void {
   // AI-71: realm.restrictions + requiredRestrictionsPassed
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/restrictions\?:\s*Restriction\[\]/.test(types), 'SecretRealm 应有 restrictions?: Restriction[]');
-  assert(/requiredRestrictionsPassed\?:\s*string\[\]/.test(types), 'SecretRealm 应有 requiredRestrictionsPassed?: string[]');
+  assert(/restrictions\?:\s*Restriction\[\]/.test(types), 'SecretRealm 搴旀湁 restrictions?: Restriction[]');
+  assert(/requiredRestrictionsPassed\?:\s*string\[\]/.test(types), 'SecretRealm 搴旀湁 requiredRestrictionsPassed?: string[]');
   log('secret-realm-restriction-field', { passed: true });
 }
 
 function smokeRealmEnterCheckDerivation(): void {
   // AI-71: deriveRealmRestrictionCheck
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function deriveRealmRestrictionCheck/.test(engine), 'engine.ts 应导出 deriveRealmRestrictionCheck');
-  assert(/missingRestrictions/.test(engine), 'deriveRealmRestrictionCheck 应返回 missingRestrictions');
-  // 边界：全部通过 → canEnter
+  assert(/export function deriveRealmRestrictionCheck/.test(engine), 'engine.ts 搴斿鍑?deriveRealmRestrictionCheck');
+  assert(/missingRestrictions/.test(engine), 'deriveRealmRestrictionCheck 搴旇繑鍥?missingRestrictions');
+  // 杈圭晫锛氬叏閮ㄩ€氳繃 鈫?canEnter
   const logic = (required: string[], passed: string[]): boolean =>
     required.every((r) => passed.includes(r));
-  assert(logic(['r1', 'r2'], ['r1', 'r2']) === true, '全部通过应可进入');
-  assert(logic(['r1', 'r2'], ['r1']) === false, '缺少禁制不可进入');
+  assert(logic(['r1', 'r2'], ['r1', 'r2']) === true, '鍏ㄩ儴閫氳繃搴斿彲杩涘叆');
+  assert(logic(['r1', 'r2'], ['r1']) === false, '缂哄皯绂佸埗涓嶅彲杩涘叆');
   log('realm-enter-check-derivation', { passed: true });
 }
 
 function smokeRestrictionTypesExist(): void {
   // AI-70: RestrictionType + RestrictionAccessMethod
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/type RestrictionType\s*=/.test(types), 'types.ts 应定义 RestrictionType');
+  assert(/type RestrictionType\s*=/.test(types), 'types.ts 搴斿畾涔?RestrictionType');
   for (const t of ['door', 'trap', 'transport', 'seal', 'ward', 'barrier']) {
-    assert(types.includes(`'${t}'`), `RestrictionType 应含 ${t}`);
+    assert(types.includes(`'${t}'`), `RestrictionType 搴斿惈 ${t}`);
   }
-  assert(/type RestrictionAccessMethod\s*=/.test(types), 'types.ts 应定义 RestrictionAccessMethod');
+  assert(/type RestrictionAccessMethod\s*=/.test(types), 'types.ts 搴斿畾涔?RestrictionAccessMethod');
   for (const m of ['token', 'password', 'identity', 'key', 'timing', 'combat']) {
-    assert(types.includes(`'${m}'`), `RestrictionAccessMethod 应含 ${m}`);
+    assert(types.includes(`'${m}'`), `RestrictionAccessMethod 搴斿惈 ${m}`);
   }
-  assert(/interface Restriction/.test(types), 'types.ts 应有 Restriction interface');
+  assert(/interface Restriction/.test(types), 'types.ts 搴旀湁 Restriction interface');
   log('restriction-types-exist', { passed: true });
 }
 
 function smokeRestrictionAccessCheck(): void {
   // AI-70: checkRestrictionAccess
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function checkRestrictionAccess/.test(engine), 'engine.ts 应导出 checkRestrictionAccess');
-  assert(/accessMethod/.test(engine), 'checkRestrictionAccess 应处理 accessMethod');
-  assert(/requiredItemId/.test(engine), 'checkRestrictionAccess 应处理 token/key');
-  assert(/providedPassword/.test(engine), 'checkRestrictionAccess 应处理 password');
+  assert(/export function checkRestrictionAccess/.test(engine), 'engine.ts 搴斿鍑?checkRestrictionAccess');
+  assert(/accessMethod/.test(engine), 'checkRestrictionAccess 搴斿鐞?accessMethod');
+  assert(/requiredItemId/.test(engine), 'checkRestrictionAccess 搴斿鐞?token/key');
+  assert(/providedPassword/.test(engine), 'checkRestrictionAccess 搴斿鐞?password');
   log('restriction-access-check', { passed: true });
 }
 
 function smokeRestrictionTriggerDerivation(): void {
   // AI-70: deriveRestrictionTrigger + resolveRestrictionInteraction
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function deriveRestrictionTrigger/.test(engine), 'engine.ts 应导出 deriveRestrictionTrigger');
-  assert(/export function resolveRestrictionInteraction/.test(engine), 'engine.ts 应导出 resolveRestrictionInteraction');
-  assert(/'attempt'|'retreat'|'combat'/.test(engine), 'resolveRestrictionInteraction 应接受 3 种 choice');
+  assert(/export function deriveRestrictionTrigger/.test(engine), 'engine.ts 搴斿鍑?deriveRestrictionTrigger');
+  assert(/export function resolveRestrictionInteraction/.test(engine), 'engine.ts 搴斿鍑?resolveRestrictionInteraction');
+  assert(/'attempt'|'retreat'|'combat'/.test(engine), 'resolveRestrictionInteraction 搴旀帴鍙?3 绉?choice');
   log('restriction-trigger-derivation', { passed: true });
 }
 
 function smokeRestrictionApiExists(): void {
-  // AI-70: 2 API route + 1 文档
+  // AI-70: 2 API route + 1 鏂囨。
   for (const route of ['check', 'interact']) {
     const path = `src/app/api/game/restriction/${route}/route.ts`;
-    assert(Bun.file(path).size > 0, `${path} 应存在`);
+    assert(Bun.file(path).size > 0, `${path} 搴斿瓨鍦╜);
   }
   const check = readFileSync('src/app/api/game/restriction/check/route.ts', 'utf-8');
-  assert(/checkRestrictionAccess/.test(check), 'check route 应调用 checkRestrictionAccess');
+  assert(/checkRestrictionAccess/.test(check), 'check route 搴旇皟鐢?checkRestrictionAccess');
   const interact = readFileSync('src/app/api/game/restriction/interact/route.ts', 'utf-8');
-  assert(/resolveRestrictionInteraction/.test(interact), 'interact route 应调用 resolveRestrictionInteraction');
-  assert(Bun.file('docs/world/restrictions-detail.md').size > 0, 'docs/world/restrictions-detail.md 应存在');
+  assert(/resolveRestrictionInteraction/.test(interact), 'interact route 搴旇皟鐢?resolveRestrictionInteraction');
+  assert(Bun.file('docs/world/restrictions-detail.md').size > 0, 'docs/world/restrictions-detail.md 搴斿瓨鍦?);
   log('restriction-api-exists', { passed: true });
 }
 
 function smokeRestrictionModalExists(): void {
   // AI-70: RestrictionModal UI
   const ui = readFileSync('src/components/xianxia/RestrictionModal.tsx', 'utf-8');
-  assert(/data-testid="restriction-modal"/.test(ui), 'RestrictionModal 应有 modal testid');
-  assert(/data-testid="restriction-method"/.test(ui), 'RestrictionModal 应显示开启方式');
-  assert(/data-testid="restriction-action-attempt"/.test(ui), 'RestrictionModal 应有 尝试按钮');
-  assert(/data-testid="restriction-action-combat"/.test(ui), 'RestrictionModal 应有 战斗按钮');
-  assert(/Restriction|RestrictionType/.test(ui), 'RestrictionModal 应消费 types');
+  assert(/data-testid="restriction-modal"/.test(ui), 'RestrictionModal 搴旀湁 modal testid');
+  assert(/data-testid="restriction-method"/.test(ui), 'RestrictionModal 搴旀樉绀哄紑鍚柟寮?);
+  assert(/data-testid="restriction-action-attempt"/.test(ui), 'RestrictionModal 搴旀湁 灏濊瘯鎸夐挳');
+  assert(/data-testid="restriction-action-combat"/.test(ui), 'RestrictionModal 搴旀湁 鎴樻枟鎸夐挳');
+  assert(/Restriction|RestrictionType/.test(ui), 'RestrictionModal 搴旀秷璐?types');
   log('restriction-modal-exists', { passed: true });
 }
 
 function smokeNpcWorldTierField(): void {
   // AI-69: npc.worldTier + crossRealmAccess
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/worldTier\?:\s*WorldTier/.test(types), 'WorldNpc 应有 worldTier?: WorldTier');
-  assert(/crossRealmAccess\?:\s*boolean/.test(types), 'WorldNpc 应有 crossRealmAccess?: boolean');
+  assert(/worldTier\?:\s*WorldTier/.test(types), 'WorldNpc 搴旀湁 worldTier?: WorldTier');
+  assert(/crossRealmAccess\?:\s*boolean/.test(types), 'WorldNpc 搴旀湁 crossRealmAccess?: boolean');
   log('npc-world-tier-field', { passed: true });
 }
 
 function smokeCrossRealmPathsDerivation(): void {
   // AI-69: deriveCrossRealmPaths
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function deriveCrossRealmPaths/.test(engine), 'engine.ts 应导出 deriveCrossRealmPaths');
-  assert(/interface CrossRealmPath/.test(engine), 'engine.ts 应有 CrossRealmPath interface');
-  assert(/'ascension'|'starSky'|'token'|'forbidden'/.test(engine), '应有 4 种通道类型');
-  // 凡间起步应包含飞升路径
-  const logic = (tier: string): { from: string; to: string }[] => {
+  assert(/export function deriveCrossRealmPaths/.test(engine), 'engine.ts 搴斿鍑?deriveCrossRealmPaths');
+  assert(/interface CrossRealmPath/.test(engine), 'engine.ts 搴旀湁 CrossRealmPath interface');
+  assert(/'ascension'|'starSky'|'token'|'forbidden'/.test(engine), '搴旀湁 4 绉嶉€氶亾绫诲瀷');
+  // 鍑￠棿璧锋搴斿寘鍚鍗囪矾寰?  const logic = (tier: string): { from: string; to: string }[] => {
     if (tier === 'humanWorld') return [{ from: 'humanWorld', to: 'spiritWorld' }];
     return [];
   };
   const paths = logic('humanWorld');
-  assert(paths.length === 1, '凡间起步应至少有 1 条飞升路径');
+  assert(paths.length === 1, '鍑￠棿璧锋搴旇嚦灏戞湁 1 鏉￠鍗囪矾寰?);
   log('cross-realm-paths-derivation', { passed: true });
 }
 
 function smokeCrossRealmDocsExist(): void {
-  // AI-69: 2 文档
-  assert(Bun.file('docs/world/cross-realm-npcs.md').size > 0, 'docs/world/cross-realm-npcs.md 应存在');
-  assert(Bun.file('docs/world/starry-sky-paths.md').size > 0, 'docs/world/starry-sky-paths.md 应存在');
+  // AI-69: 2 鏂囨。
+  assert(Bun.file('docs/world/cross-realm-npcs.md').size > 0, 'docs/world/cross-realm-npcs.md 搴斿瓨鍦?);
+  assert(Bun.file('docs/world/starry-sky-paths.md').size > 0, 'docs/world/starry-sky-paths.md 搴斿瓨鍦?);
   const npcs = readFileSync('docs/world/cross-realm-npcs.md', 'utf-8');
-  assert(/凡间|灵界|仙界/.test(npcs), 'cross-realm-npcs.md 应描述三界');
+  assert(/鍑￠棿|鐏电晫|浠欑晫/.test(npcs), 'cross-realm-npcs.md 搴旀弿杩颁笁鐣?);
   const paths = readFileSync('docs/world/starry-sky-paths.md', 'utf-8');
-  assert(/飞升|星空|仙令/.test(paths), 'starry-sky-paths.md 应描述通道类型');
+  assert(/椋炲崌|鏄熺┖|浠欎护/.test(paths), 'starry-sky-paths.md 搴旀弿杩伴€氶亾绫诲瀷');
   log('cross-realm-docs-exist', { passed: true });
 }
 
 function smokeAscensionRequirementsExist(): void {
   // AI-68: WorldTier + AscensionRequirement
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/type WorldTier\s*=/.test(types), 'types.ts 应定义 WorldTier');
+  assert(/type WorldTier\s*=/.test(types), 'types.ts 搴斿畾涔?WorldTier');
   for (const t of ['humanWorld', 'spiritWorld', 'immortalWorld']) {
-    assert(types.includes(`'${t}'`), `WorldTier 应含 ${t}`);
+    assert(types.includes(`'${t}'`), `WorldTier 搴斿惈 ${t}`);
   }
-  assert(/interface AscensionRequirement/.test(types), 'types.ts 应有 AscensionRequirement interface');
-  assert(/interface AscensionSession/.test(types), 'types.ts 应有 AscensionSession interface');
+  assert(/interface AscensionRequirement/.test(types), 'types.ts 搴旀湁 AscensionRequirement interface');
+  assert(/interface AscensionSession/.test(types), 'types.ts 搴旀湁 AscensionSession interface');
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function deriveAscensionRequirements/.test(engine), 'engine.ts 应导出 deriveAscensionRequirements');
+  assert(/export function deriveAscensionRequirements/.test(engine), 'engine.ts 搴斿鍑?deriveAscensionRequirements');
   log('ascension-requirements-exist', { passed: true });
 }
 
 function smokeAscensionEligibilityCheck(): void {
   // AI-68: checkAscensionEligibility
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function checkAscensionEligibility/.test(engine), 'engine.ts 应导出 checkAscensionEligibility');
-  assert(/missing/.test(engine), 'checkAscensionEligibility 应返回 missing 列表');
-  assert(/lifespanMin|reputationMin|cultivationExpMin|daoHeartMin/.test(engine), 'checkAscensionEligibility 应校验 4 项数值');
+  assert(/export function checkAscensionEligibility/.test(engine), 'engine.ts 搴斿鍑?checkAscensionEligibility');
+  assert(/missing/.test(engine), 'checkAscensionEligibility 搴旇繑鍥?missing 鍒楄〃');
+  assert(/lifespanMin|reputationMin|cultivationExpMin|daoHeartMin/.test(engine), 'checkAscensionEligibility 搴旀牎楠?4 椤规暟鍊?);
   log('ascension-eligibility-check', { passed: true });
 }
 
 function smokeAscensionTriggerDerivation(): void {
   // AI-68: deriveAscensionTrigger + resolveAscensionOutcome
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function deriveAscensionTrigger/.test(engine), 'engine.ts 应导出 deriveAscensionTrigger');
-  assert(/export function resolveAscensionOutcome/.test(engine), 'engine.ts 应导出 resolveAscensionOutcome');
-  // 大乘期 500 岁触发
-  assert(/mahayana/.test(engine) && /500/.test(engine), '应有大乘期 500 岁触发条件');
-  // 渡劫期 2000 岁触发
-  assert(/ascension/.test(engine) && /2000/.test(engine), '应有渡劫期 2000 岁触发条件');
+  assert(/export function deriveAscensionTrigger/.test(engine), 'engine.ts 搴斿鍑?deriveAscensionTrigger');
+  assert(/export function resolveAscensionOutcome/.test(engine), 'engine.ts 搴斿鍑?resolveAscensionOutcome');
+  // 澶т箻鏈?500 宀佽Е鍙?  assert(/mahayana/.test(engine) && /500/.test(engine), '搴旀湁澶т箻鏈?500 宀佽Е鍙戞潯浠?);
+  // 娓″姭鏈?2000 宀佽Е鍙?  assert(/ascension/.test(engine) && /2000/.test(engine), '搴旀湁娓″姭鏈?2000 宀佽Е鍙戞潯浠?);
   log('ascension-trigger-derivation', { passed: true });
 }
 
@@ -3838,118 +3743,117 @@ function smokeAscensionApiExists(): void {
   // AI-68: 3 API route
   for (const route of ['check', 'start', 'end']) {
     const path = `src/app/api/game/ascension/${route}/route.ts`;
-    assert(Bun.file(path).size > 0, `${path} 应存在`);
+    assert(Bun.file(path).size > 0, `${path} 搴斿瓨鍦╜);
   }
   const check = readFileSync('src/app/api/game/ascension/check/route.ts', 'utf-8');
-  assert(/checkAscensionEligibility/.test(check), 'check route 应调用 checkAscensionEligibility');
+  assert(/checkAscensionEligibility/.test(check), 'check route 搴旇皟鐢?checkAscensionEligibility');
   const start = readFileSync('src/app/api/game/ascension/start/route.ts', 'utf-8');
-  assert(/deriveAscensionTrigger/.test(start), 'start route 应调用 deriveAscensionTrigger');
+  assert(/deriveAscensionTrigger/.test(start), 'start route 搴旇皟鐢?deriveAscensionTrigger');
   const end = readFileSync('src/app/api/game/ascension/end/route.ts', 'utf-8');
-  assert(/resolveAscensionOutcome/.test(end), 'end route 应调用 resolveAscensionOutcome');
-  // 文档
-  assert(Bun.file('docs/world/ascension-flow.md').size > 0, 'docs/world/ascension-flow.md 应存在');
-  assert(Bun.file('docs/world/three-realms-detail.md').size > 0, 'docs/world/three-realms-detail.md 应存在');
+  assert(/resolveAscensionOutcome/.test(end), 'end route 搴旇皟鐢?resolveAscensionOutcome');
+  // 鏂囨。
+  assert(Bun.file('docs/world/ascension-flow.md').size > 0, 'docs/world/ascension-flow.md 搴斿瓨鍦?);
+  assert(Bun.file('docs/world/three-realms-detail.md').size > 0, 'docs/world/three-realms-detail.md 搴斿瓨鍦?);
   log('ascension-api-exists', { passed: true });
 }
 
 function smokeAscensionModalExists(): void {
   // AI-68: AscensionModal UI
   const ui = readFileSync('src/components/xianxia/AscensionModal.tsx', 'utf-8');
-  assert(/data-testid="ascension-modal"/.test(ui), 'AscensionModal 应有 modal testid');
-  assert(/data-testid="ascension-requirements"/.test(ui), 'AscensionModal 应显示要求');
-  assert(/data-testid="ascension-action-roll"/.test(ui), 'AscensionModal 应有 飞升按钮');
-  assert(/AscensionSession|WorldTier/.test(ui), 'AscensionModal 应消费 types');
+  assert(/data-testid="ascension-modal"/.test(ui), 'AscensionModal 搴旀湁 modal testid');
+  assert(/data-testid="ascension-requirements"/.test(ui), 'AscensionModal 搴旀樉绀鸿姹?);
+  assert(/data-testid="ascension-action-roll"/.test(ui), 'AscensionModal 搴旀湁 椋炲崌鎸夐挳');
+  assert(/AscensionSession|WorldTier/.test(ui), 'AscensionModal 搴旀秷璐?types');
   log('ascension-modal-exists', { passed: true });
 }
 
 function smokeTribulationTriggerExists(): void {
   // AI-67: deriveTribulationTrigger
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function deriveTribulationTrigger/.test(engine), 'engine.ts 应导出 deriveTribulationTrigger');
-  assert(/'deity_transformation'/.test(engine), '天劫境界应含化神');
-  // 逻辑
+  assert(/export function deriveTribulationTrigger/.test(engine), 'engine.ts 搴斿鍑?deriveTribulationTrigger');
+  assert(/'deity_transformation'/.test(engine), '澶╁姭澧冪晫搴斿惈鍖栫');
+  // 閫昏緫
   const triggered = true;
-  assert(triggered === true, '触发标志应可读取');
+  assert(triggered === true, '瑙﹀彂鏍囧織搴斿彲璇诲彇');
   log('tribulation-trigger-exists', { passed: true });
 }
 
 function smokeTribulationBoltResolution(): void {
   // AI-67: resolveTribulationBolt
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function resolveTribulationBolt/.test(engine), 'engine.ts 应导出 resolveTribulationBolt');
-  assert(/boltNumber/.test(engine), 'resolveTribulationBolt 应接受 boltNumber');
-  assert(/heartDemonPenalty/.test(engine), 'resolveTribulationBolt 应有 心魔惩罚逻辑');
-  // 本命法宝共鸣加成
-  assert(/bondedArtifactResonance/.test(engine), 'resolveTribulationBolt 应考虑本命法宝共鸣');
+  assert(/export function resolveTribulationBolt/.test(engine), 'engine.ts 搴斿鍑?resolveTribulationBolt');
+  assert(/boltNumber/.test(engine), 'resolveTribulationBolt 搴旀帴鍙?boltNumber');
+  assert(/heartDemonPenalty/.test(engine), 'resolveTribulationBolt 搴旀湁 蹇冮瓟鎯╃綒閫昏緫');
+  // 鏈懡娉曞疂鍏遍福鍔犳垚
+  assert(/bondedArtifactResonance/.test(engine), 'resolveTribulationBolt 搴旇€冭檻鏈懡娉曞疂鍏遍福');
   log('tribulation-bolt-resolution', { passed: true });
 }
 
 function smokeHeartDemonTypes(): void {
-  // AI-67: 5 种心魔
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/type HeartDemonType\s*=/.test(types), 'types.ts 应定义 HeartDemonType');
+  // AI-67: 5 绉嶅績榄?  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/type HeartDemonType\s*=/.test(types), 'types.ts 搴斿畾涔?HeartDemonType');
   for (const t of ['obsession', 'hatred', 'love', 'fear', 'regret']) {
-    assert(types.includes(`'${t}'`), `HeartDemonType 应含 ${t}`);
+    assert(types.includes(`'${t}'`), `HeartDemonType 搴斿惈 ${t}`);
   }
   const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
-  assert(/export function resolveHeartDemon/.test(engine), 'engine.ts 应导出 resolveHeartDemon');
+  assert(/export function resolveHeartDemon/.test(engine), 'engine.ts 搴斿鍑?resolveHeartDemon');
   const ui = readFileSync('src/components/xianxia/TribulationModal.tsx', 'utf-8');
-  assert(/执念|恨意|情爱|恐惧|悔意/.test(ui), 'TribulationModal 应显示 5 种心魔中文 label');
+  assert(/鎵у康|鎭ㄦ剰|鎯呯埍|鎭愭儳|鎮旀剰/.test(ui), 'TribulationModal 搴旀樉绀?5 绉嶅績榄斾腑鏂?label');
   log('heart-demon-types', { passed: true });
 }
 
 function smokeTribulationApiExists(): void {
-  // AI-67: 3 个 API route
+  // AI-67: 3 涓?API route
   for (const route of ['start', 'action', 'end']) {
     const path = `src/app/api/game/tribulation/${route}/route.ts`;
-    assert(Bun.file(path).size > 0, `${path} 应存在`);
+    assert(Bun.file(path).size > 0, `${path} 搴斿瓨鍦╜);
   }
   const start = readFileSync('src/app/api/game/tribulation/start/route.ts', 'utf-8');
-  assert(/deriveTribulationTrigger/.test(start), 'start route 应调用 deriveTribulationTrigger');
+  assert(/deriveTribulationTrigger/.test(start), 'start route 搴旇皟鐢?deriveTribulationTrigger');
   const action = readFileSync('src/app/api/game/tribulation/action/route.ts', 'utf-8');
-  assert(/resolveTribulationBolt|resolveHeartDemon/.test(action), 'action route 应调用 resolveTribulationBolt/resolveHeartDemon');
+  assert(/resolveTribulationBolt|resolveHeartDemon/.test(action), 'action route 搴旇皟鐢?resolveTribulationBolt/resolveHeartDemon');
   const end = readFileSync('src/app/api/game/tribulation/end/route.ts', 'utf-8');
-  assert(/outcome/.test(end), 'end route 应处理 outcome');
+  assert(/outcome/.test(end), 'end route 搴斿鐞?outcome');
   log('tribulation-api-exists', { passed: true });
 }
 
 function smokeTribulationModalExists(): void {
   // AI-67: TribulationModal UI
   const ui = readFileSync('src/components/xianxia/TribulationModal.tsx', 'utf-8');
-  assert(/data-testid="tribulation-modal"/.test(ui), 'TribulationModal 应有 modal testid');
-  assert(/data-testid="tribulation-bolts"/.test(ui), 'TribulationModal 应显示 9 道雷进度');
-  assert(/data-testid={\s*`tribulation-bolt-\$\{n\}`/.test(ui), 'TribulationModal 应动态生成 bolt-1 ~ bolt-9 testid');
-  assert(/data-testid="tribulation-action-bolt"/.test(ui), 'TribulationModal 应有 渡雷按钮');
-  assert(/TribulationSession|HeartDemonType/.test(ui), 'TribulationModal 应消费 types');
+  assert(/data-testid="tribulation-modal"/.test(ui), 'TribulationModal 搴旀湁 modal testid');
+  assert(/data-testid="tribulation-bolts"/.test(ui), 'TribulationModal 搴旀樉绀?9 閬撻浄杩涘害');
+  assert(/data-testid={\s*`tribulation-bolt-\$\{n\}`/.test(ui), 'TribulationModal 搴斿姩鎬佺敓鎴?bolt-1 ~ bolt-9 testid');
+  assert(/data-testid="tribulation-action-bolt"/.test(ui), 'TribulationModal 搴旀湁 娓￠浄鎸夐挳');
+  assert(/TribulationSession|HeartDemonType/.test(ui), 'TribulationModal 搴旀秷璐?types');
   log('tribulation-modal-exists', { passed: true });
 }
 
 function smokeCharacterSectHistoryField(): void {
   // AI-66: character.sectHistory
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/sectHistory\?:\s*SectHistoryEntry\[\]/.test(types), 'CharacterState 应有 sectHistory?: SectHistoryEntry[]');
-  assert(/interface SectHistoryEntry/.test(types), 'types.ts 应定义 SectHistoryEntry interface');
-  assert(/reason:\s*['"]joined['"]/.test(types), 'SectHistoryEntry 应有 reason enum');
+  assert(/sectHistory\?:\s*SectHistoryEntry\[\]/.test(types), 'CharacterState 搴旀湁 sectHistory?: SectHistoryEntry[]');
+  assert(/interface SectHistoryEntry/.test(types), 'types.ts 搴斿畾涔?SectHistoryEntry interface');
+  assert(/reason:\s*['"]joined['"]/.test(types), 'SectHistoryEntry 搴旀湁 reason enum');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/SECT_HISTORY_REASON_LABEL/.test(display), 'display.ts 应导出 SECT_HISTORY_REASON_LABEL');
-  assert(/入门|逐出|飞升|殉道|退隐/.test(display), 'SECT_HISTORY_REASON_LABEL 应含 6 原因');
+  assert(/SECT_HISTORY_REASON_LABEL/.test(display), 'display.ts 搴斿鍑?SECT_HISTORY_REASON_LABEL');
+  assert(/鍏ラ棬|閫愬嚭|椋炲崌|娈夐亾|閫€闅?.test(display), 'SECT_HISTORY_REASON_LABEL 搴斿惈 6 鍘熷洜');
   log('character-sect-history-field', { passed: true });
 }
 
 function smokeCharacterTeacherRefField(): void {
   // AI-66: character.teacherRef
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/teacherRef\?:\s*NpcRef\s*\|\s*null/.test(types), 'CharacterState 应有 teacherRef?: NpcRef | null');
+  assert(/teacherRef\?:\s*NpcRef\s*\|\s*null/.test(types), 'CharacterState 搴旀湁 teacherRef?: NpcRef | null');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/RELATION_MENTOR_LABEL/.test(display), 'display.ts 应导出 RELATION_MENTOR_LABEL');
-  assert(/师|徒|同门/.test(display), 'RELATION_MENTOR_LABEL 应含 3 关系');
+  assert(/RELATION_MENTOR_LABEL/.test(display), 'display.ts 搴斿鍑?RELATION_MENTOR_LABEL');
+  assert(/甯坾寰抾鍚岄棬/.test(display), 'RELATION_MENTOR_LABEL 搴斿惈 3 鍏崇郴');
   log('character-teacher-ref-field', { passed: true });
 }
 
 function smokeCharacterApprenticesField(): void {
   // AI-66: character.apprentices
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/apprentices\?:\s*NpcRef\[\]/.test(types), 'CharacterState 应有 apprentices?: NpcRef[]');
+  assert(/apprentices\?:\s*NpcRef\[\]/.test(types), 'CharacterState 搴旀湁 apprentices?: NpcRef[]');
   log('character-apprentices-field', { passed: true });
 }
 
@@ -3957,19 +3861,19 @@ function smokePetTypeField(): void {
   // AI-65: pet.type
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
   assert(/type\?:\s*['"]pet['"]\s*\|\s*['"]insect['"]\s*\|\s*['"]swarm['"]\s*\|\s*['"]beast['"]/.test(types),
-    'Pet 应有 type?: pet|insect|swarm|beast');
+    'Pet 搴旀湁 type?: pet|insect|swarm|beast');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/PET_TYPE_LABEL/.test(display), 'display.ts 应导出 PET_TYPE_LABEL');
-  assert(/灵宠|灵虫|虫群|灵兽/.test(display), 'PET_TYPE_LABEL 应含 4 类型');
+  assert(/PET_TYPE_LABEL/.test(display), 'display.ts 搴斿鍑?PET_TYPE_LABEL');
+  assert(/鐏靛疇|鐏佃櫕|铏兢|鐏靛吔/.test(display), 'PET_TYPE_LABEL 搴斿惈 4 绫诲瀷');
   log('pet-type-field', { passed: true });
 }
 
 function smokePetSwarmCountField(): void {
   // AI-65: pet.swarmCount
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/swarmCount\?:\s*number/.test(types), 'Pet 应有 swarmCount?: number');
-  assert(swarmCountLogic(100) === 100, 'swarmCount 应正常');
-  assert(swarmCountLogic(0) === 0, 'swarmCount 0 应正常');
+  assert(/swarmCount\?:\s*number/.test(types), 'Pet 搴旀湁 swarmCount?: number');
+  assert(swarmCountLogic(100) === 100, 'swarmCount 搴旀甯?);
+  assert(swarmCountLogic(0) === 0, 'swarmCount 0 搴旀甯?);
   function swarmCountLogic(v: number): number { return Math.max(0, v); }
   log('pet-swarm-count-field', { passed: true });
 }
@@ -3977,241 +3881,236 @@ function smokePetSwarmCountField(): void {
 function smokePetCombatSkillIds(): void {
   // AI-65: pet.combatSkillIds
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/combatSkillIds\?:\s*string\[\]/.test(types), 'Pet 应有 combatSkillIds?: string[]');
+  assert(/combatSkillIds\?:\s*string\[\]/.test(types), 'Pet 搴旀湁 combatSkillIds?: string[]');
   log('pet-combat-skill-ids', { passed: true });
 }
 
 function smokeCharacterSpouseField(): void {
   // AI-64: character.spouse (NpcRef | null)
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/spouse\?:\s*NpcRef\s*\|\s*null/.test(types), 'CharacterState 应有 spouse?: NpcRef | null');
-  assert(/interface NpcRef/.test(types), 'types.ts 应定义 NpcRef interface');
-  assert(/intimacy:\s*number/.test(types), 'NpcRef 应有 intimacy: number');
+  assert(/spouse\?:\s*NpcRef\s*\|\s*null/.test(types), 'CharacterState 搴旀湁 spouse?: NpcRef | null');
+  assert(/interface NpcRef/.test(types), 'types.ts 搴斿畾涔?NpcRef interface');
+  assert(/intimacy:\s*number/.test(types), 'NpcRef 搴旀湁 intimacy: number');
   log('character-spouse-field', { passed: true });
 }
 
 function smokeCharacterCultivationHarmonyBonus(): void {
   // AI-64: character.cultivationHarmonyBonus 0-50
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/cultivationHarmonyBonus\?:\s*number/.test(types), 'CharacterState 应有 cultivationHarmonyBonus?: number');
+  assert(/cultivationHarmonyBonus\?:\s*number/.test(types), 'CharacterState 搴旀湁 cultivationHarmonyBonus?: number');
   const clamp = (v: number) => Math.max(0, Math.min(50, v));
-  assert(clamp(60) === 50, 'cultivationHarmonyBonus > 50 应 clamp');
-  assert(clamp(-10) === 0, 'cultivationHarmonyBonus < 0 应 clamp');
+  assert(clamp(60) === 50, 'cultivationHarmonyBonus > 50 搴?clamp');
+  assert(clamp(-10) === 0, 'cultivationHarmonyBonus < 0 搴?clamp');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/DUAL_CULTIVATION_LABEL/.test(display), 'display.ts 应导出 DUAL_CULTIVATION_LABEL');
-  assert(/初窥|和合|共振|合一/.test(display), 'DUAL_CULTIVATION_LABEL 应含 4 档');
+  assert(/DUAL_CULTIVATION_LABEL/.test(display), 'display.ts 搴斿鍑?DUAL_CULTIVATION_LABEL');
+  assert(/鍒濈|鍜屽悎|鍏辨尟|鍚堜竴/.test(display), 'DUAL_CULTIVATION_LABEL 搴斿惈 4 妗?);
   log('character-cultivation-harmony-bonus', { passed: true });
 }
 
 function smokeNpcSpouseOfField(): void {
   // AI-64: npc.spouseOf
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/spouseOf\?:\s*string\s*\|\s*null/.test(types), 'WorldNpc 应有 spouseOf?: string | null');
-  assert(/dualCultivationProgress\?:\s*number/.test(types), 'WorldNpc 应有 dualCultivationProgress?: number');
+  assert(/spouseOf\?:\s*string\s*\|\s*null/.test(types), 'WorldNpc 搴旀湁 spouseOf?: string | null');
+  assert(/dualCultivationProgress\?:\s*number/.test(types), 'WorldNpc 搴旀湁 dualCultivationProgress?: number');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/DAO_LU_LABEL/.test(display), 'display.ts 应导出 DAO_LU_LABEL');
-  assert(/道侣|缘尽|未定之缘/.test(display), 'DAO_LU_LABEL 应含中文 label');
+  assert(/DAO_LU_LABEL/.test(display), 'display.ts 搴斿鍑?DAO_LU_LABEL');
+  assert(/閬撲荆|缂樺敖|鏈畾涔嬬紭/.test(display), 'DAO_LU_LABEL 搴斿惈涓枃 label');
   log('npc-spouse-of-field', { passed: true });
 }
 
 function smokeArtifactBondedField(): void {
   // AI-63: artifact.bonded
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/bonded\?:\s*boolean/.test(types), 'types.ts ItemEntry 应有 bonded?: boolean');
+  assert(/bonded\?:\s*boolean/.test(types), 'types.ts ItemEntry 搴旀湁 bonded?: boolean');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/BONDED_ARTIFACT_LABEL/.test(display), 'display.ts 应导出 BONDED_ARTIFACT_LABEL');
-  assert(/本命|外用/.test(display), 'BONDED_ARTIFACT_LABEL 应含 本命/外用');
+  assert(/BONDED_ARTIFACT_LABEL/.test(display), 'display.ts 搴斿鍑?BONDED_ARTIFACT_LABEL');
+  assert(/鏈懡|澶栫敤/.test(display), 'BONDED_ARTIFACT_LABEL 搴斿惈 鏈懡/澶栫敤');
   log('artifact-bonded-field', { passed: true });
 }
 
 function smokeArtifactSoulLinkField(): void {
   // AI-63: artifact.soulLink 0-100
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/soulLink\?:\s*number/.test(types), 'types.ts ItemEntry 应有 soulLink?: number');
-  // 边界
+  assert(/soulLink\?:\s*number/.test(types), 'types.ts ItemEntry 搴旀湁 soulLink?: number');
+  // 杈圭晫
   const clamp = (v: number) => Math.max(0, Math.min(100, v));
-  assert(clamp(150) === 100, 'soulLink > 100 应 clamp');
-  assert(clamp(-50) === 0, 'soulLink < 0 应 clamp');
+  assert(clamp(150) === 100, 'soulLink > 100 搴?clamp');
+  assert(clamp(-50) === 0, 'soulLink < 0 搴?clamp');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/SOUL_LINK_LEVEL_LABEL/.test(display), 'display.ts 应导出 SOUL_LINK_LEVEL_LABEL');
-  assert(/陌路|初识|共鸣|合一/.test(display), 'SOUL_LINK_LEVEL_LABEL 应含 4 档');
+  assert(/SOUL_LINK_LEVEL_LABEL/.test(display), 'display.ts 搴斿鍑?SOUL_LINK_LEVEL_LABEL');
+  assert(/闄岃矾|鍒濊瘑|鍏遍福|鍚堜竴/.test(display), 'SOUL_LINK_LEVEL_LABEL 搴斿惈 4 妗?);
   log('artifact-soul-link-field', { passed: true });
 }
 
 function smokeArtifactSpiritField(): void {
   // AI-63: artifact.spirit / gestationDays
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/spirit\?:\s*string\s*\|\s*null/.test(types), 'types.ts ItemEntry 应有 spirit?: string | null');
-  assert(/gestationDays\?:\s*number/.test(types), 'types.ts ItemEntry 应有 gestationDays?: number');
+  assert(/spirit\?:\s*string\s*\|\s*null/.test(types), 'types.ts ItemEntry 搴旀湁 spirit?: string | null');
+  assert(/gestationDays\?:\s*number/.test(types), 'types.ts ItemEntry 搴旀湁 gestationDays?: number');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/ARTIFACT_SPIRIT_LABEL/.test(display), 'display.ts 应导出 ARTIFACT_SPIRIT_LABEL');
-  assert(/未醒|初醒|觉醒/.test(display), 'ARTIFACT_SPIRIT_LABEL 应含 3 档');
+  assert(/ARTIFACT_SPIRIT_LABEL/.test(display), 'display.ts 搴斿鍑?ARTIFACT_SPIRIT_LABEL');
+  assert(/鏈啋|鍒濋啋|瑙夐啋/.test(display), 'ARTIFACT_SPIRIT_LABEL 搴斿惈 3 妗?);
   log('artifact-spirit-field', { passed: true });
 }
 
 function smokeAlchemyHeatEnumExists(): void {
   // AI-62: AlchemyHeatLevel enum
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/export type AlchemyHeatLevel\s*=/.test(types), 'types.ts 应定义 AlchemyHeatLevel enum');
+  assert(/export type AlchemyHeatLevel\s*=/.test(types), 'types.ts 搴斿畾涔?AlchemyHeatLevel enum');
   for (const v of ['micro', 'weak', 'moderate', 'strong', 'extreme']) {
-    assert(types.includes(`'${v}'`), `AlchemyHeatLevel 应含 ${v}`);
+    assert(types.includes(`'${v}'`), `AlchemyHeatLevel 搴斿惈 ${v}`);
   }
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/ALCHEMY_HEAT_LABEL/.test(display), 'display.ts 应导出 ALCHEMY_HEAT_LABEL');
-  assert(/微火|弱火|中火|强火|极火/.test(display), 'ALCHEMY_HEAT_LABEL 应含 5 级 label');
+  assert(/ALCHEMY_HEAT_LABEL/.test(display), 'display.ts 搴斿鍑?ALCHEMY_HEAT_LABEL');
+  assert(/寰伀|寮辩伀|涓伀|寮虹伀|鏋佺伀/.test(display), 'ALCHEMY_HEAT_LABEL 搴斿惈 5 绾?label');
   log('alchemy-heat-enum-exists', { passed: true });
 }
 
 function smokeFormationTypeEnumExists(): void {
   // AI-62: FormationCategory enum
   const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/export type FormationCategory\s*=/.test(types), 'types.ts 应定义 FormationCategory enum');
+  assert(/export type FormationCategory\s*=/.test(types), 'types.ts 搴斿畾涔?FormationCategory enum');
   for (const v of ['binding', 'slaughter', 'illusion', 'defense', 'support', 'trap']) {
-    assert(types.includes(`'${v}'`), `FormationCategory 应含 ${v}`);
+    assert(types.includes(`'${v}'`), `FormationCategory 搴斿惈 ${v}`);
   }
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/FORMATION_CATEGORY_LABEL/.test(display), 'display.ts 应导出 FORMATION_CATEGORY_LABEL');
-  assert(/困阵|杀阵|幻阵|防阵|辅阵|陷阵/.test(display), 'FORMATION_CATEGORY_LABEL 应含 6 类 label');
+  assert(/FORMATION_CATEGORY_LABEL/.test(display), 'display.ts 搴斿鍑?FORMATION_CATEGORY_LABEL');
+  assert(/鍥伴樀|鏉€闃祙骞婚樀|闃查樀|杈呴樀|闄烽樀/.test(display), 'FORMATION_CATEGORY_LABEL 搴斿惈 6 绫?label');
   log('formation-category-enum-exists', { passed: true });
 }
 
 function smokeL1WorldDocsPromptInjection(): void {
-  // AI-61: 8 个 L1 文档注入 llm.ts prompt
+  // AI-61: 8 涓?L1 鏂囨。娉ㄥ叆 llm.ts prompt
   const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
-  assert(/WORLD_DOCS\s*=\s*\[/.test(llmSource), 'llm.ts 应定义 WORLD_DOCS 数组');
+  assert(/WORLD_DOCS\s*=\s*\[/.test(llmSource), 'llm.ts 搴斿畾涔?WORLD_DOCS 鏁扮粍');
   const expectedDocs = [
     'spirit-roots.md', 'three-realms.md', 'tribulation-heart-demon.md',
     'spirit-insects-beasts.md', 'alchemy-handfeel.md', 'formations-restrictions.md',
     'cross-realm-paths.md', 'complicated-relations.md',
   ];
   for (const d of expectedDocs) {
-    assert(llmSource.includes(d), `WORLD_DOCS 应含 ${d}`);
-    assert(Bun.file(`docs/world/${d}`).size > 0, `docs/world/${d} 应存在`);
+    assert(llmSource.includes(d), `WORLD_DOCS 搴斿惈 ${d}`);
+    assert(Bun.file(`docs/world/${d}`).size > 0, `docs/world/${d} 搴斿瓨鍦╜);
   }
-  assert(/loadWorldKnowledge/.test(llmSource), 'llm.ts 应有 loadWorldKnowledge 函数');
-  assert(/worldKnowledge/.test(llmSource), 'llm.ts 应使用 worldKnowledge 变量');
-  // 应在 generateAgeEvent / generateBirthEvent 等入口注入
-  assert(/await loadWorldKnowledge/.test(llmSource), '应在 async 入口 await loadWorldKnowledge');
-  // sync 入口用 getWorldKnowledgeSync fallback
-  assert(/getWorldKnowledgeSync/.test(llmSource), '应导出 getWorldKnowledgeSync');
+  assert(/loadWorldKnowledge/.test(llmSource), 'llm.ts 搴旀湁 loadWorldKnowledge 鍑芥暟');
+  assert(/worldKnowledge/.test(llmSource), 'llm.ts 搴斾娇鐢?worldKnowledge 鍙橀噺');
+  // 搴斿湪 generateAgeEvent / generateBirthEvent 绛夊叆鍙ｆ敞鍏?  assert(/await loadWorldKnowledge/.test(llmSource), '搴斿湪 async 鍏ュ彛 await loadWorldKnowledge');
+  // sync 鍏ュ彛鐢?getWorldKnowledgeSync fallback
+  assert(/getWorldKnowledgeSync/.test(llmSource), '搴斿鍑?getWorldKnowledgeSync');
   log('l1-world-docs-prompt-injection', { passed: true });
 }
 
 function smokeTopTagsConsumesDisplayRegistry(): void {
-  // AI-46: StatusPanel 消费 topTags slot
+  // AI-46: StatusPanel 娑堣垂 topTags slot
   const panel = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
-  assert(/entriesForSlot\(allDisplayEntries, 'topTags'/.test(panel), 'StatusPanel 应消费 topTags slot');
-  assert(/topTagEntries|topTagToneClass|data-testid="status-top-tags"/.test(panel), 'StatusPanel 应有 topTagEntries + toneClass + testid');
+  assert(/entriesForSlot\(allDisplayEntries, 'topTags'/.test(panel), 'StatusPanel 搴旀秷璐?topTags slot');
+  assert(/topTagEntries|topTagToneClass|data-testid="status-top-tags"/.test(panel), 'StatusPanel 搴旀湁 topTagEntries + toneClass + testid');
   log('top-tags-consumes-display-registry', { passed: true });
 }
 
 function smokeThreadPageConsumesDisplayRegistry(): void {
-  // AI-47: PendingThreadsCard 消费 threadPage slot
+  // AI-47: PendingThreadsCard 娑堣垂 threadPage slot
   const card = readFileSync('src/components/xianxia/PendingThreadsCard.tsx', 'utf-8');
-  assert(/entriesForSlot\(allDisplayEntries, 'threadPage'/.test(card), 'PendingThreadsCard 应消费 threadPage slot');
-  assert(/threadPageEntries|data-testid="thread-page-slot"/.test(card), 'PendingThreadsCard 应有 threadPageEntries + testid');
+  assert(/entriesForSlot\(allDisplayEntries, 'threadPage'/.test(card), 'PendingThreadsCard 搴旀秷璐?threadPage slot');
+  assert(/threadPageEntries|data-testid="thread-page-slot"/.test(card), 'PendingThreadsCard 搴旀湁 threadPageEntries + testid');
   log('thread-page-consumes-display-registry', { passed: true });
 }
 
 function smokeCombatPanelConsumesDisplayRegistry(): void {
-  // AI-48: CombatModal 消费 combatPanel slot
+  // AI-48: CombatModal 娑堣垂 combatPanel slot
   const modal = readFileSync('src/components/xianxia/CombatModal.tsx', 'utf-8');
-  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'combatPanel'/.test(modal), 'CombatModal 应消费 combatPanel slot');
-  assert(/data-testid="combat-panel-slot"/.test(modal), 'CombatModal 应有 testid');
+  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'combatPanel'/.test(modal), 'CombatModal 搴旀秷璐?combatPanel slot');
+  assert(/data-testid="combat-panel-slot"/.test(modal), 'CombatModal 搴旀湁 testid');
   log('combat-panel-consumes-display-registry', { passed: true });
 }
 
 function smokeInventoryPanelConsumesDisplayRegistry(): void {
-  // AI-49: InventoryPanel 消费 inventoryPanel slot
+  // AI-49: InventoryPanel 娑堣垂 inventoryPanel slot
   const panel = readFileSync('src/components/xianxia/InventoryPanel.tsx', 'utf-8');
-  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'inventoryPanel'/.test(panel), 'InventoryPanel 应消费 inventoryPanel slot');
-  assert(/inventoryPanelEntries|data-testid="inventory-panel-slot"/.test(panel), 'InventoryPanel 应有 inventoryPanelEntries + testid');
+  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'inventoryPanel'/.test(panel), 'InventoryPanel 搴旀秷璐?inventoryPanel slot');
+  assert(/inventoryPanelEntries|data-testid="inventory-panel-slot"/.test(panel), 'InventoryPanel 搴旀湁 inventoryPanelEntries + testid');
   log('inventory-panel-consumes-display-registry', { passed: true });
 }
 
 function smokeWorldLegacyConsumesDisplayRegistry(): void {
-  // AI-50: WorldLegacyPanel 消费 worldLegacy slot
+  // AI-50: WorldLegacyPanel 娑堣垂 worldLegacy slot
   const panel = readFileSync('src/components/xianxia/WorldLegacyPanel.tsx', 'utf-8');
-  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'worldLegacy'/.test(panel), 'WorldLegacyPanel 应消费 worldLegacy slot');
-  assert(/worldLegacyEntries|allEntries/.test(panel), 'WorldLegacyPanel 应有 worldLegacyEntries 或 allEntries');
+  assert(/entriesForSlot\(characterDisplayEntries\(character\), 'worldLegacy'/.test(panel), 'WorldLegacyPanel 搴旀秷璐?worldLegacy slot');
+  assert(/worldLegacyEntries|allEntries/.test(panel), 'WorldLegacyPanel 搴旀湁 worldLegacyEntries 鎴?allEntries');
   log('world-legacy-consumes-display-registry', { passed: true });
 }
 
 function smokeWorldLegacyPanelExists(): void {
-  // AI-50: WorldLegacyPanel 文件存在
-  assert(Bun.file('src/components/xianxia/WorldLegacyPanel.tsx').size > 0, 'WorldLegacyPanel.tsx 应存在');
+  // AI-50: WorldLegacyPanel 鏂囦欢瀛樺湪
+  assert(Bun.file('src/components/xianxia/WorldLegacyPanel.tsx').size > 0, 'WorldLegacyPanel.tsx 搴斿瓨鍦?);
   const src = readFileSync('src/components/xianxia/WorldLegacyPanel.tsx', 'utf-8');
-  assert(/export function WorldLegacyPanel/.test(src), 'WorldLegacyPanel.tsx 应导出组件');
-  assert(/data-testid="world-legacy-panel"/.test(src), 'WorldLegacyPanel 应有 testid');
-  // 7 个 slot 全覆盖（除 characterDetail/statusPage 原本就消费的外）
+  assert(/export function WorldLegacyPanel/.test(src), 'WorldLegacyPanel.tsx 搴斿鍑虹粍浠?);
+  assert(/data-testid="world-legacy-panel"/.test(src), 'WorldLegacyPanel 搴旀湁 testid');
+  // 7 涓?slot 鍏ㄨ鐩栵紙闄?characterDetail/statusPage 鍘熸湰灏辨秷璐圭殑澶栵級
   const registry = readFileSync('src/lib/xianxia/display-registry.ts', 'utf-8');
   for (const slot of ['topTags', 'threadPage', 'combatPanel', 'inventoryPanel', 'worldLegacy']) {
-    assert(registry.includes(slot), `display-registry.ts 应定义 ${slot} slot`);
+    assert(registry.includes(slot), `display-registry.ts 搴斿畾涔?${slot} slot`);
   }
   log('world-legacy-panel-exists', { passed: true });
 }
 
 function smokeCausalityNetNodeTypes(): void {
-  // AI-43: 7 种节点类型
-  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/NODE_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 NODE_TYPE_LABEL');
+  // AI-43: 7 绉嶈妭鐐圭被鍨?  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/NODE_TYPE_LABEL/.test(displaySource), 'display.ts 搴斿鍑?NODE_TYPE_LABEL');
   const types = ['person', 'place', 'item', 'thread', 'event', 'faction', 'concept'];
   for (const t of types) {
-    assert(displaySource.includes(t), `NODE_TYPE_LABEL 应含 ${t}`);
+    assert(displaySource.includes(t), `NODE_TYPE_LABEL 搴斿惈 ${t}`);
   }
   log('causality-net-node-types', { passed: true });
 }
 
 function smokeCausalityNetEdgeTypes(): void {
-  // AI-43: 7 种边类型
+  // AI-43: 7 绉嶈竟绫诲瀷
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/EDGE_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 EDGE_TYPE_LABEL');
+  assert(/EDGE_TYPE_LABEL/.test(displaySource), 'display.ts 搴斿鍑?EDGE_TYPE_LABEL');
   const types = ['cause', 'effect', 'related', 'oppose', 'belongs', 'created', 'destroyed'];
   for (const t of types) {
-    assert(displaySource.includes(t), `EDGE_TYPE_LABEL 应含 ${t}`);
+    assert(displaySource.includes(t), `EDGE_TYPE_LABEL 搴斿惈 ${t}`);
   }
   log('causality-net-edge-types', { passed: true });
 }
 
 function smokeCausalityNetStrengthClamp(): void {
-  // AI-43: 强度边界 + 衰减
+  // AI-43: 寮哄害杈圭晫 + 琛板噺
   const clamp = (v: number) => Math.max(0, Math.min(100, v));
-  assert(clamp(150) === 100, 'strength > 100 应 clamp');
-  assert(clamp(-50) === 0, 'strength < 0 应 clamp 到 0');
-  // 衰减 5%/10年
-  const decay = (v: number, years: number): number => {
+  assert(clamp(150) === 100, 'strength > 100 搴?clamp');
+  assert(clamp(-50) === 0, 'strength < 0 搴?clamp 鍒?0');
+  // 琛板噺 5%/10骞?  const decay = (v: number, years: number): number => {
     const k = Math.floor(years / 10);
     for (let i = 0; i < k; i++) v *= 0.95;
     return Math.round(v);
   };
-  assert(decay(100, 10) === 95, '100 经 10 年应衰减到 95');
-  assert(decay(100, 100) < 100, '高强度长期衰减应降低');
+  assert(decay(100, 10) === 95, '100 缁?10 骞村簲琛板噺鍒?95');
+  assert(decay(100, 100) < 100, '楂樺己搴﹂暱鏈熻“鍑忓簲闄嶄綆');
   log('causality-net-strength-clamp', { passed: true });
 }
 
 function smokeCausalityNetBlueprint(): void {
-  // AI-43: 蓝图文档完整性
-  assert(Bun.file('docs/blueprints/causality-net-blueprint.md').size > 0, 'causality-net-blueprint.md 应存在');
+  // AI-43: 钃濆浘鏂囨。瀹屾暣鎬?  assert(Bun.file('docs/blueprints/causality-net-blueprint.md').size > 0, 'causality-net-blueprint.md 搴斿瓨鍦?);
   const src = readFileSync('docs/blueprints/causality-net-blueprint.md', 'utf-8');
-  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
-  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
-  assert(/7.*节点|7.*边|person.*place.*item/.test(src), '蓝图应列 7 节点 7 边');
+  assert(/\|.+\|.+\|/.test(src), '钃濆浘搴斿惈琛ㄦ牸');
+  assert(/AI 鎺ョ/.test(src), '钃濆浘搴旇鏄?AI 鎺ョ');
+  assert(/7.*鑺傜偣|7.*杈箌person.*place.*item/.test(src), '钃濆浘搴斿垪 7 鑺傜偣 7 杈?);
   log('causality-net-blueprint', { passed: true });
 }
 
 function smokeClanSectStatusEnum(): void {
-  // AI-42: 9 种宗门状态枚举
-  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/SECT_STATUS_LABEL/.test(displaySource), 'display.ts 应导出 SECT_STATUS_LABEL');
+  // AI-42: 9 绉嶅畻闂ㄧ姸鎬佹灇涓?  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/SECT_STATUS_LABEL/.test(displaySource), 'display.ts 搴斿鍑?SECT_STATUS_LABEL');
   const states = ['founding', 'rising', 'flourishing', 'stable', 'unrest', 'underSiege', 'declining', 'revival', 'extinct'];
   for (const s of states) {
-    assert(displaySource.includes(s), `SECT_STATUS_LABEL 应含 ${s}`);
+    assert(displaySource.includes(s), `SECT_STATUS_LABEL 搴斿惈 ${s}`);
   }
   log('clan-sect-status-enum', { passed: true });
 }
 
 function smokeClanSectLifecyclePath(): void {
-  // AI-42: 生命周期路径合法（不可越级）
+  // AI-42: 鐢熷懡鍛ㄦ湡璺緞鍚堟硶锛堜笉鍙秺绾э級
   const validNext: Record<string, string[]> = {
     founding: ['rising'],
     rising: ['flourishing', 'unrest'],
@@ -4221,176 +4120,168 @@ function smokeClanSectLifecyclePath(): void {
     underSiege: ['declining', 'stable'],
     declining: ['extinct', 'revival'],
     revival: ['flourishing', 'stable'],
-    extinct: [],  // 终点
+    extinct: [],  // 缁堢偣
   };
   const canTransition = (from: string, to: string): boolean => validNext[from]?.includes(to) ?? false;
-  assert(canTransition('founding', 'rising') === true, 'founding → rising 应合法');
-  assert(canTransition('founding', 'flourishing') === false, 'founding → flourishing 应不合法');
-  assert(canTransition('extinct', 'revival') === false, 'extinct → revival 应不合法（不可逆）');
-  assert(canTransition('declining', 'revival') === true, 'declining → revival 应合法');
+  assert(canTransition('founding', 'rising') === true, 'founding 鈫?rising 搴斿悎娉?);
+  assert(canTransition('founding', 'flourishing') === false, 'founding 鈫?flourishing 搴斾笉鍚堟硶');
+  assert(canTransition('extinct', 'revival') === false, 'extinct 鈫?revival 搴斾笉鍚堟硶锛堜笉鍙€嗭級');
+  assert(canTransition('declining', 'revival') === true, 'declining 鈫?revival 搴斿悎娉?);
   log('clan-sect-lifecycle-path', { passed: true });
 }
 
 function smokeClanSectBlueprint(): void {
-  // AI-42: 蓝图文档完整性
-  assert(Bun.file('docs/blueprints/clan-sect-rise-fall-blueprint.md').size > 0, 'clan-sect-rise-fall-blueprint.md 应存在');
+  // AI-42: 钃濆浘鏂囨。瀹屾暣鎬?  assert(Bun.file('docs/blueprints/clan-sect-rise-fall-blueprint.md').size > 0, 'clan-sect-rise-fall-blueprint.md 搴斿瓨鍦?);
   const src = readFileSync('docs/blueprints/clan-sect-rise-fall-blueprint.md', 'utf-8');
-  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
-  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
-  assert(/9.*状态|founding.*rising.*flourishing/.test(src), '蓝图应列 9 状态');
+  assert(/\|.+\|.+\|/.test(src), '钃濆浘搴斿惈琛ㄦ牸');
+  assert(/AI 鎺ョ/.test(src), '钃濆浘搴旇鏄?AI 鎺ョ');
+  assert(/9.*鐘舵€亅founding.*rising.*flourishing/.test(src), '钃濆浘搴斿垪 9 鐘舵€?);
   log('clan-sect-blueprint', { passed: true });
 }
 
 function smokeInheritanceChoiceExactlyOne(): void {
-  // AI-41: 必须且只能选 1 项传承
-  const validSelections = [0, 1]; // 0=未选, 1=选了一项
-  const validate = (n: number): boolean => validSelections.includes(n);
-  assert(validate(0) && validate(1), '选择数应为 0 或 1');
-  assert(!validate(2), '选择 2 项应报错');
+  // AI-41: 蹇呴』涓斿彧鑳介€?1 椤逛紶鎵?  const validSelections = [0, 1]; // 0=鏈€? 1=閫変簡涓€椤?  const validate = (n: number): boolean => validSelections.includes(n);
+  assert(validate(0) && validate(1), '閫夋嫨鏁板簲涓?0 鎴?1');
+  assert(!validate(2), '閫夋嫨 2 椤瑰簲鎶ラ敊');
   const src = readFileSync('docs/blueprints/inheritance-blueprint.md', 'utf-8');
-  assert(/必须选且只能选|选且只能/.test(src), '蓝图应强制要求"选 1 项"');
+  assert(/蹇呴』閫変笖鍙兘閫墊閫変笖鍙兘/.test(src), '钃濆浘搴斿己鍒惰姹?閫?1 椤?');
   log('inheritance-choice-exactly-one', { passed: true });
 }
 
 function smokeInheritanceTypesExist(): void {
-  // AI-41: 6 种传承类型
-  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/INHERITANCE_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 INHERITANCE_TYPE_LABEL');
+  // AI-41: 6 绉嶄紶鎵跨被鍨?  const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
+  assert(/INHERITANCE_TYPE_LABEL/.test(displaySource), 'display.ts 搴斿鍑?INHERITANCE_TYPE_LABEL');
   const types = ['spiritualRoot', 'technique', 'memory', 'soulFragment', 'oldFriend', 'token'];
   for (const t of types) {
-    assert(displaySource.includes(t), `INHERITANCE_TYPE_LABEL 应含 ${t}`);
+    assert(displaySource.includes(t), `INHERITANCE_TYPE_LABEL 搴斿惈 ${t}`);
   }
   log('inheritance-types-exist', { passed: true });
 }
 
 function smokeInheritanceAiNarrative(): void {
-  // AI-41: AI 写传承叙事
-  const blueprint = readFileSync('docs/blueprints/inheritance-blueprint.md', 'utf-8');
-  assert(/AI 接管/.test(blueprint) && /传承叙事/.test(blueprint), '蓝图应说明 AI 写传承叙事');
-  assert(/未了因果/.test(blueprint), '蓝图应说明未了因果传给新角色');
+  // AI-41: AI 鍐欎紶鎵垮彊浜?  const blueprint = readFileSync('docs/blueprints/inheritance-blueprint.md', 'utf-8');
+  assert(/AI 鎺ョ/.test(blueprint) && /浼犳壙鍙欎簨/.test(blueprint), '钃濆浘搴旇鏄?AI 鍐欎紶鎵垮彊浜?);
+  assert(/鏈簡鍥犳灉/.test(blueprint), '钃濆浘搴旇鏄庢湭浜嗗洜鏋滀紶缁欐柊瑙掕壊');
   log('inheritance-ai-narrative', { passed: true });
 }
 
 function smokeInheritanceBlueprint(): void {
-  // AI-41: 蓝图文档完整性
-  assert(Bun.file('docs/blueprints/inheritance-blueprint.md').size > 0, 'inheritance-blueprint.md 应存在');
+  // AI-41: 钃濆浘鏂囨。瀹屾暣鎬?  assert(Bun.file('docs/blueprints/inheritance-blueprint.md').size > 0, 'inheritance-blueprint.md 搴斿瓨鍦?);
   const src = readFileSync('docs/blueprints/inheritance-blueprint.md', 'utf-8');
-  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
-  assert(/6.*种传承|6.*类型|spiritualRoot.*technique.*memory/.test(src), '蓝图应列出 6 种传承');
-  assert(/SettlementResult|InheritanceChoice/.test(src), '蓝图应含数据契约字段');
+  assert(/\|.+\|.+\|/.test(src), '钃濆浘搴斿惈琛ㄦ牸');
+  assert(/6.*绉嶄紶鎵縷6.*绫诲瀷|spiritualRoot.*technique.*memory/.test(src), '钃濆浘搴斿垪鍑?6 绉嶄紶鎵?);
+  assert(/SettlementResult|InheritanceChoice/.test(src), '钃濆浘搴斿惈鏁版嵁濂戠害瀛楁');
   log('inheritance-blueprint', { passed: true });
 }
 
 function smokeCraftingRecipeSchema(): void {
-  // AI-40: 配方数据契约
-  assert(Bun.file('docs/blueprints/crafting-blueprint.md').size > 0, 'crafting-blueprint.md 应存在');
+  // AI-40: 閰嶆柟鏁版嵁濂戠害
+  assert(Bun.file('docs/blueprints/crafting-blueprint.md').size > 0, 'crafting-blueprint.md 搴斿瓨鍦?);
   const src = readFileSync('docs/blueprints/crafting-blueprint.md', 'utf-8');
-  assert(/inputs/.test(src) && /output/.test(src), '蓝图应含 inputs/output 字段');
-  assert(/requiredRealm/.test(src), '蓝图应含境界门槛');
+  assert(/inputs/.test(src) && /output/.test(src), '钃濆浘搴斿惈 inputs/output 瀛楁');
+  assert(/requiredRealm/.test(src), '钃濆浘搴斿惈澧冪晫闂ㄦ');
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/CRAFTING_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 CRAFTING_TYPE_LABEL');
+  assert(/CRAFTING_TYPE_LABEL/.test(displaySource), 'display.ts 搴斿鍑?CRAFTING_TYPE_LABEL');
   log('crafting-recipe-schema', { passed: true });
 }
 
 function smokeCraftingQualityTierDistribution(): void {
-  // AI-40: 品质概率分布
+  // AI-40: 鍝佽川姒傜巼鍒嗗竷
   const sample = (luck: number): string => {
     const r = Math.random();
-    if (luck > 70 && r < 0.03) return '绝品';
-    if (r < 0.04) return '极品';
-    if (r < 0.15) return '上品';
-    if (r < 0.4) return '良品';
-    return '凡品';
+    if (luck > 70 && r < 0.03) return '缁濆搧';
+    if (r < 0.04) return '鏋佸搧';
+    if (r < 0.15) return '涓婂搧';
+    if (r < 0.4) return '鑹搧';
+    return '鍑″搧';
   };
   const distribution = new Map<string, number>();
   for (let i = 0; i < 1000; i++) {
     const q = sample(50);
     distribution.set(q, (distribution.get(q) || 0) + 1);
   }
-  assert(distribution.has('凡品') && distribution.has('良品'), '品质分布应含凡品和良品');
+  assert(distribution.has('鍑″搧') && distribution.has('鑹搧'), '鍝佽川鍒嗗竷搴斿惈鍑″搧鍜岃壇鍝?);
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/QUALITY_TIER_LABEL/.test(displaySource), 'display.ts 应导出 QUALITY_TIER_LABEL');
-  assert(/凡品|良品|上品|极品|绝品/.test(displaySource), 'QUALITY_TIER_LABEL 应含 5 级');
+  assert(/QUALITY_TIER_LABEL/.test(displaySource), 'display.ts 搴斿鍑?QUALITY_TIER_LABEL');
+  assert(/鍑″搧|鑹搧|涓婂搧|鏋佸搧|缁濆搧/.test(displaySource), 'QUALITY_TIER_LABEL 搴斿惈 5 绾?);
   log('crafting-quality-tier-distribution', { passed: true });
 }
 
 function smokeCraftingFailureConsequence(): void {
-  // AI-40: 失败处理（连续 3 次失败强制成功）
+  // AI-40: 澶辫触澶勭悊锛堣繛缁?3 娆″け璐ュ己鍒舵垚鍔燂級
   let failCount = 0;
   const craft = (): boolean => {
-    if (failCount >= 2) { failCount = 0; return true; } // 强制成功
+    if (failCount >= 2) { failCount = 0; return true; } // 寮哄埗鎴愬姛
     const success = Math.random() < 0.5;
     if (success) failCount = 0;
     else failCount++;
     return success;
   };
-  // 模拟连败
+  // 妯℃嫙杩炶触
   failCount = 0;
   let totalSuccess = 0;
   for (let i = 0; i < 100; i++) if (craft()) totalSuccess++;
-  assert(totalSuccess > 30, '连续失败保护机制应保证成功率 > 30%');
+  assert(totalSuccess > 30, '杩炵画澶辫触淇濇姢鏈哄埗搴斾繚璇佹垚鍔熺巼 > 30%');
   const src = readFileSync('docs/blueprints/crafting-blueprint.md', 'utf-8');
-  assert(/失败.*不能卡死|连续.*强制成功/.test(src), '蓝图应说明失败兜底');
+  assert(/澶辫触.*涓嶈兘鍗℃|杩炵画.*寮哄埗鎴愬姛/.test(src), '钃濆浘搴旇鏄庡け璐ュ厹搴?);
   log('crafting-failure-consequence', { passed: true });
 }
 
 function smokeCraftingBlueprint(): void {
-  // AI-40: 蓝图文档完整
+  // AI-40: 钃濆浘鏂囨。瀹屾暣
   const src = readFileSync('docs/blueprints/crafting-blueprint.md', 'utf-8');
-  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
-  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
-  assert(/5.*子系统|crafting.*alchemy.*formation/.test(src), '蓝图应列出 5 个子系统');
+  assert(/\|.+\|.+\|/.test(src), '钃濆浘搴斿惈琛ㄦ牸');
+  assert(/AI 鎺ョ/.test(src), '钃濆浘搴旇鏄?AI 鎺ョ');
+  assert(/5.*瀛愮郴缁焲crafting.*alchemy.*formation/.test(src), '钃濆浘搴斿垪鍑?5 涓瓙绯荤粺');
   log('crafting-blueprint', { passed: true });
 }
 
 function smokeWorldMapRegionsData(): void {
-  // AI-39: 地图数据字段完整
-  assert(Bun.file('docs/blueprints/world-map-blueprint.md').size > 0, 'world-map-blueprint.md 应存在');
+  // AI-39: 鍦板浘鏁版嵁瀛楁瀹屾暣
+  assert(Bun.file('docs/blueprints/world-map-blueprint.md').size > 0, 'world-map-blueprint.md 搴斿瓨鍦?);
   const src = readFileSync('docs/blueprints/world-map-blueprint.md', 'utf-8');
-  assert(/regions/.test(src), '蓝图应含 regions 字段');
-  assert(/dangerLevel|discoveryAge|visitedCount/.test(src), '蓝图应含地图状态字段');
+  assert(/regions/.test(src), '钃濆浘搴斿惈 regions 瀛楁');
+  assert(/dangerLevel|discoveryAge|visitedCount/.test(src), '钃濆浘搴斿惈鍦板浘鐘舵€佸瓧娈?);
   // display.ts LOCATION_TYPE_LABEL
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/LOCATION_TYPE_LABEL/.test(displaySource), 'display.ts 应导出 LOCATION_TYPE_LABEL');
+  assert(/LOCATION_TYPE_LABEL/.test(displaySource), 'display.ts 搴斿鍑?LOCATION_TYPE_LABEL');
   log('world-map-regions-data', { passed: true });
 }
 
 function smokeWorldMapDiscoveryVisibility(): void {
-  // AI-39: 可见性规则
-  const isVisible = (state: 'undiscovered' | 'discovered' | 'visited'): string => {
+  // AI-39: 鍙鎬ц鍒?  const isVisible = (state: 'undiscovered' | 'discovered' | 'visited'): string => {
     switch (state) {
-      case 'undiscovered': return '传闻';
-      case 'discovered': return '已显';
-      case 'visited': return '已至';
+      case 'undiscovered': return '浼犻椈';
+      case 'discovered': return '宸叉樉';
+      case 'visited': return '宸茶嚦';
     }
   };
-  assert(isVisible('undiscovered') === '传闻', '未发现应显示"传闻"');
-  assert(isVisible('discovered') === '已显', '已发现应显示"已显"');
-  assert(isVisible('visited') === '已至', '已访问应显示"已至"');
+  assert(isVisible('undiscovered') === '浼犻椈', '鏈彂鐜板簲鏄剧ず"浼犻椈"');
+  assert(isVisible('discovered') === '宸叉樉', '宸插彂鐜板簲鏄剧ず"宸叉樉"');
+  assert(isVisible('visited') === '宸茶嚦', '宸茶闂簲鏄剧ず"宸茶嚦"');
   log('world-map-discovery-visibility', { passed: true });
 }
 
 function smokeWorldMapBlueprint(): void {
-  // AI-39: 蓝图文档完整性
-  const src = readFileSync('docs/blueprints/world-map-blueprint.md', 'utf-8');
-  assert(/\|.+\|.+\|/.test(src), '蓝图应含表格');
-  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
-  assert(/反重复/.test(src), '蓝图应说明反重复');
+  // AI-39: 钃濆浘鏂囨。瀹屾暣鎬?  const src = readFileSync('docs/blueprints/world-map-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '钃濆浘搴斿惈琛ㄦ牸');
+  assert(/AI 鎺ョ/.test(src), '钃濆浘搴旇鏄?AI 鎺ョ');
+  assert(/鍙嶉噸澶?.test(src), '钃濆浘搴旇鏄庡弽閲嶅');
   log('world-map-blueprint', { passed: true });
 }
 
 function smokeNpcMemoryFieldsExist(): void {
-  // AI-38: NPC 记忆字段完整
-  assert(Bun.file('docs/blueprints/npc-memory-blueprint.md').size > 0, 'npc-memory-blueprint.md 应存在');
+  // AI-38: NPC 璁板繂瀛楁瀹屾暣
+  assert(Bun.file('docs/blueprints/npc-memory-blueprint.md').size > 0, 'npc-memory-blueprint.md 搴斿瓨鍦?);
   const src = readFileSync('docs/blueprints/npc-memory-blueprint.md', 'utf-8');
-  assert(/recentInteractions/.test(src), '蓝图应含 recentInteractions 字段');
-  assert(/relationshipChanges/.test(src), '蓝图应含 relationshipChanges 字段');
-  assert(/currentDisposition/.test(src), '蓝图应含 currentDisposition 字段');
+  assert(/recentInteractions/.test(src), '钃濆浘搴斿惈 recentInteractions 瀛楁');
+  assert(/relationshipChanges/.test(src), '钃濆浘搴斿惈 relationshipChanges 瀛楁');
+  assert(/currentDisposition/.test(src), '钃濆浘搴斿惈 currentDisposition 瀛楁');
   log('npc-memory-fields-exist', { passed: true });
 }
 
 function smokeNpcMemoryDecayLogic(): void {
-  // AI-38: 衰减规则正确（朝 0 收敛 10%/5年）
+  // AI-38: 琛板噺瑙勫垯姝ｇ‘锛堟湞 0 鏀舵暃 10%/5骞达級
   const decay = (v: number, years: number): number => {
     const k = Math.floor(years / 5);
     for (let i = 0; i < k; i++) {
@@ -4399,62 +4290,59 @@ function smokeNpcMemoryDecayLogic(): void {
     }
     return Math.round(v);
   };
-  assert(decay(50, 5) === 45, '50 经 5 年应衰减到 45');
-  assert(decay(50, 10) === 41, '50 经 10 年应衰减到 41 (近似)');
-  assert(decay(100, 100) < 100, '高强度长期衰减应明显降低');
+  assert(decay(50, 5) === 45, '50 缁?5 骞村簲琛板噺鍒?45');
+  assert(decay(50, 10) === 41, '50 缁?10 骞村簲琛板噺鍒?41 (杩戜技)');
+  assert(decay(100, 100) < 100, '楂樺己搴﹂暱鏈熻“鍑忓簲鏄庢樉闄嶄綆');
   log('npc-memory-decay-logic', { passed: true });
 }
 
 function smokeNpcMemoryBlueprint(): void {
-  // AI-38: 蓝图文档完整性
-  const src = readFileSync('docs/blueprints/npc-memory-blueprint.md', 'utf-8');
-  assert(/\|.+\|.+\|/.test(src), '蓝图应含 markdown 表格');
-  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管');
-  assert(/衰减/.test(src), '蓝图应说明衰减规则');
+  // AI-38: 钃濆浘鏂囨。瀹屾暣鎬?  const src = readFileSync('docs/blueprints/npc-memory-blueprint.md', 'utf-8');
+  assert(/\|.+\|.+\|/.test(src), '钃濆浘搴斿惈 markdown 琛ㄦ牸');
+  assert(/AI 鎺ョ/.test(src), '钃濆浘搴旇鏄?AI 鎺ョ');
+  assert(/琛板噺/.test(src), '钃濆浘搴旇鏄庤“鍑忚鍒?);
   log('npc-memory-blueprint', { passed: true });
 }
 
 function smokeSectRelationLabelsMapping(): void {
-  // AI-37: 宗门关系 label 映射
+  // AI-37: 瀹楅棬鍏崇郴 label 鏄犲皠
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
-  assert(/SECT_RELATION_LABEL/.test(displaySource), 'display.ts 应导出 SECT_RELATION_LABEL');
-  assert(/敌对|不睦|中立|友善|同盟/.test(displaySource), 'SECT_RELATION_LABEL 应含 5 项中文 label');
+  assert(/SECT_RELATION_LABEL/.test(displaySource), 'display.ts 搴斿鍑?SECT_RELATION_LABEL');
+  assert(/鏁屽|涓嶇潶|涓珛|鍙嬪杽|鍚岀洘/.test(displaySource), 'SECT_RELATION_LABEL 搴斿惈 5 椤逛腑鏂?label');
   log('sect-relation-labels-mapping', { passed: true });
 }
 
 function smokeSectRelationIntensityRange(): void {
-  // AI-37: 关系强度边界 [-100, 100]
+  // AI-37: 鍏崇郴寮哄害杈圭晫 [-100, 100]
   const clamp = (v: number) => Math.max(-100, Math.min(100, v));
-  assert(clamp(150) === 100, 'intensity > 100 应 clamp 到 100');
-  assert(clamp(-150) === -100, 'intensity < -100 应 clamp 到 -100');
-  assert(clamp(50) === 50, 'intensity 在范围内应保留');
-  // 蓝图文档应有边界约束
+  assert(clamp(150) === 100, 'intensity > 100 搴?clamp 鍒?100');
+  assert(clamp(-150) === -100, 'intensity < -100 搴?clamp 鍒?-100');
+  assert(clamp(50) === 50, 'intensity 鍦ㄨ寖鍥村唴搴斾繚鐣?);
+  // 钃濆浘鏂囨。搴旀湁杈圭晫绾︽潫
   const blueprint = readFileSync('docs/blueprints/sect-relation-blueprint.md', 'utf-8');
-  assert(/-100.*100|\[\s*-100\s*,\s*100\s*\]/.test(blueprint), 'sect-relation-blueprint 应说明 intensity 边界');
+  assert(/-100.*100|\[\s*-100\s*,\s*100\s*\]/.test(blueprint), 'sect-relation-blueprint 搴旇鏄?intensity 杈圭晫');
   log('sect-relation-intensity-range', { passed: true });
 }
 
 function smokeSectRelationBlueprint(): void {
-  // AI-37: 蓝图文档完整性
-  assert(Bun.file('docs/blueprints/sect-relation-blueprint.md').size > 0, 'sect-relation-blueprint.md 应存在');
+  // AI-37: 钃濆浘鏂囨。瀹屾暣鎬?  assert(Bun.file('docs/blueprints/sect-relation-blueprint.md').size > 0, 'sect-relation-blueprint.md 搴斿瓨鍦?);
   const src = readFileSync('docs/blueprints/sect-relation-blueprint.md', 'utf-8');
-  assert(/\|.+\|.+\|/.test(src), '蓝图应含 markdown 表格');
-  assert(/AI 接管/.test(src), '蓝图应说明 AI 接管策略');
+  assert(/\|.+\|.+\|/.test(src), '钃濆浘搴斿惈 markdown 琛ㄦ牸');
+  assert(/AI 鎺ョ/.test(src), '钃濆浘搴旇鏄?AI 鎺ョ绛栫暐');
   log('sect-relation-blueprint', { passed: true });
 }
 
 function smokeBlueprintDocsCoverage(): void {
-  // AI-31 + AI-35: 蓝图文档覆盖度
-  const blueprints = [
+  // AI-31 + AI-35: 钃濆浘鏂囨。瑕嗙洊搴?  const blueprints = [
     'docs/blueprints/value-blueprint.md',
     'docs/blueprints/status-blueprint.md',
     'docs/blueprints/event-blueprint.md',
     'docs/blueprints/save-load-blueprint.md',
   ];
   for (const f of blueprints) {
-    assert(Bun.file(f).size > 0, `${f} 应存在`);
+    assert(Bun.file(f).size > 0, `${f} 搴斿瓨鍦╜);
     const src = readFileSync(f, 'utf-8');
-    assert(/\|.+\|.+\|/.test(src), `${f} 应有 markdown 表格`);
+    assert(/\|.+\|.+\|/.test(src), `${f} 搴旀湁 markdown 琛ㄦ牸`);
   }
   log('blueprint-docs-coverage', { passed: true });
 }
@@ -4468,17 +4356,17 @@ main().catch(error => {
 
 
 function smokeTribulationStoreExports(): void {
-  // AI-77: store.ts 应导出 TribulationCeremony 接口 + startTribulation/endTribulation action
+  // AI-77: store.ts 搴斿鍑?TribulationCeremony 鎺ュ彛 + startTribulation/endTribulation action
   const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
-  assert(/export interface TribulationCeremony\b/.test(src), 'store.ts 应导出 TribulationCeremony');
-  assert(/startTribulation:\s*\(/.test(src), 'store.ts 应定义 startTribulation action');
-  assert(/endTribulation:\s*\(/.test(src), 'store.ts 应定义 endTribulation action');
-  assert(/setTribulationCeremony:\s*\(/.test(src), 'store.ts 应定义 setTribulationCeremony setter');
+  assert(/export interface TribulationCeremony\b/.test(src), 'store.ts 搴斿鍑?TribulationCeremony');
+  assert(/startTribulation:\s*\(/.test(src), 'store.ts 搴斿畾涔?startTribulation action');
+  assert(/endTribulation:\s*\(/.test(src), 'store.ts 搴斿畾涔?endTribulation action');
+  assert(/setTribulationCeremony:\s*\(/.test(src), 'store.ts 搴斿畾涔?setTribulationCeremony setter');
   log('tribulation-store-exports', { passed: true });
 }
 
 function smokeTribulationActionsPersistCeremony(): void {
-  // AI-77: startTribulation 应设置 tribulationCeremony 并清空旧 result
+  // AI-77: startTribulation 搴旇缃?tribulationCeremony 骞舵竻绌烘棫 result
   const { useGameStore } = require('../src/lib/xianxia/store') as typeof import('../src/lib/xianxia/store');
   const session: any = {
     id: 'tb-1', characterId: 'c-1', startedAge: 100, fromRealm: 'great_vehicle', toRealm: 'tribulation',
@@ -4487,17 +4375,17 @@ function smokeTribulationActionsPersistCeremony(): void {
   };
   useGameStore.getState().startTribulation(session, 'sky darkens');
   let cur = useGameStore.getState().tribulationCeremony;
-  assert(cur && cur.session.id === 'tb-1' && cur.narrative === 'sky darkens', 'startTribulation 应写入 ceremony');
-  assert(useGameStore.getState().tribulationResult === null, 'startTribulation 应清空旧 result');
+  assert(cur && cur.session.id === 'tb-1' && cur.narrative === 'sky darkens', 'startTribulation 搴斿啓鍏?ceremony');
+  assert(useGameStore.getState().tribulationResult === null, 'startTribulation 搴旀竻绌烘棫 result');
   useGameStore.getState().endTribulation();
-  assert(useGameStore.getState().tribulationCeremony === null, 'endTribulation 应清空 ceremony');
+  assert(useGameStore.getState().tribulationCeremony === null, 'endTribulation 搴旀竻绌?ceremony');
   const result = useGameStore.getState().tribulationResult;
-  assert(result && result.boltsCompleted === 0 && result.passed === false, 'endTribulation 应写出 result');
+  assert(result && result.boltsCompleted === 0 && result.passed === false, 'endTribulation 搴斿啓鍑?result');
   log('tribulation-actions-persist-ceremony', { passed: true });
 }
 
 function smokeTribulationBoltAndHeartDemon(): void {
-  // AI-77: recordTribulationBolt + resolveTribulationHeartDemon 应更新 session
+  // AI-77: recordTribulationBolt + resolveTribulationHeartDemon 搴旀洿鏂?session
   const { useGameStore } = require('../src/lib/xianxia/store') as typeof import('../src/lib/xianxia/store');
   useGameStore.setState({
     tribulationCeremony: null, tribulationResult: null, ascensionCeremony: null, restrictionChallenge: null,
@@ -4510,30 +4398,30 @@ function smokeTribulationBoltAndHeartDemon(): void {
   useGameStore.getState().startTribulation(session, '');
   useGameStore.getState().recordTribulationBolt(3);
   let cur = useGameStore.getState().tribulationCeremony;
-  assert(cur && cur.session.boltsCompleted === 3, 'recordTribulationBolt(3) 应推进 boltsCompleted');
+  assert(cur && cur.session.boltsCompleted === 3, 'recordTribulationBolt(3) 搴旀帹杩?boltsCompleted');
   useGameStore.getState().recordTribulationBolt(20);
   cur = useGameStore.getState().tribulationCeremony;
-  assert(cur && cur.session.boltsCompleted === 9 && cur.session.currentStage === 'passed', '9 雷后应设为 passed');
+  assert(cur && cur.session.boltsCompleted === 9 && cur.session.currentStage === 'passed', '9 闆峰悗搴旇涓?passed');
   useGameStore.getState().resolveTribulationHeartDemon('regret');
   cur = useGameStore.getState().tribulationCeremony;
-  assert(cur && cur.session.heartDemonResolved === true, 'resolveTribulationHeartDemon 应标记已破');
+  assert(cur && cur.session.heartDemonResolved === true, 'resolveTribulationHeartDemon 搴旀爣璁板凡鐮?);
   log('tribulation-bolt-and-heart-demon', { passed: true });
 }
 
 function smokeAscensionStoreExports(): void {
-  // AI-78: store.ts 应导出 AscensionCeremony/RestrictionChallenge 接口 + start/end/fight action
+  // AI-78: store.ts 搴斿鍑?AscensionCeremony/RestrictionChallenge 鎺ュ彛 + start/end/fight action
   const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
-  assert(/export interface AscensionCeremony\b/.test(src), 'store.ts 应导出 AscensionCeremony');
-  assert(/export interface RestrictionChallenge\b/.test(src), 'store.ts 应导出 RestrictionChallenge');
-  assert(/startAscension:\s*\(/.test(src), 'store.ts 应定义 startAscension action');
-  assert(/endAscension:\s*\(/.test(src), 'store.ts 应定义 endAscension action');
-  assert(/tryRestrictionAccess:\s*\(/.test(src), 'store.ts 应定义 tryRestrictionAccess action');
-  assert(/fightRestriction:\s*\(/.test(src), 'store.ts 应定义 fightRestriction action');
+  assert(/export interface AscensionCeremony\b/.test(src), 'store.ts 搴斿鍑?AscensionCeremony');
+  assert(/export interface RestrictionChallenge\b/.test(src), 'store.ts 搴斿鍑?RestrictionChallenge');
+  assert(/startAscension:\s*\(/.test(src), 'store.ts 搴斿畾涔?startAscension action');
+  assert(/endAscension:\s*\(/.test(src), 'store.ts 搴斿畾涔?endAscension action');
+  assert(/tryRestrictionAccess:\s*\(/.test(src), 'store.ts 搴斿畾涔?tryRestrictionAccess action');
+  assert(/fightRestriction:\s*\(/.test(src), 'store.ts 搴斿畾涔?fightRestriction action');
   log('ascension-store-exports', { passed: true });
 }
 
 function smokeAscensionRollOutcomeDerivation(): void {
-  // AI-78: resolveAscensionRoll 应根据 characterRoll + tribulationPassed 推导 passed/outcome
+  // AI-78: resolveAscensionRoll 搴旀牴鎹?characterRoll + tribulationPassed 鎺ㄥ passed/outcome
   const { useGameStore } = require('../src/lib/xianxia/store') as typeof import('../src/lib/xianxia/store');
   useGameStore.setState({
     tribulationCeremony: null, tribulationResult: null, ascensionCeremony: null, restrictionChallenge: null,
@@ -4547,20 +4435,20 @@ function smokeAscensionRollOutcomeDerivation(): void {
   useGameStore.getState().startAscension(passedTrib, '');
   useGameStore.getState().resolveAscensionRoll(0.9);
   let cur = useGameStore.getState().ascensionCeremony;
-  assert(cur && cur.session.outcome === 'ascended' && cur.session.passed === true, '高 roll + tribulation passed -> ascended');
+  assert(cur && cur.session.outcome === 'ascended' && cur.session.passed === true, '楂?roll + tribulation passed -> ascended');
   useGameStore.getState().startAscension(passedTrib, '');
   useGameStore.getState().resolveAscensionRoll(0.1);
   cur = useGameStore.getState().ascensionCeremony;
-  assert(cur && cur.session.outcome === 'failed', '低 roll 应 -> failed');
+  assert(cur && cur.session.outcome === 'failed', '浣?roll 搴?-> failed');
   useGameStore.getState().startAscension(failedTrib, '');
   useGameStore.getState().resolveAscensionRoll(0.99);
   cur = useGameStore.getState().ascensionCeremony;
-  assert(cur && cur.session.outcome === 'failed', '未渡劫 -> failed');
+  assert(cur && cur.session.outcome === 'failed', '鏈浮鍔?-> failed');
   log('ascension-roll-outcome-derivation', { passed: true });
 }
 
 function smokeRestrictionAccessAndCombatActions(): void {
-  // AI-78: tryRestrictionAccess / fightRestriction 应写 restrictionChallenge.narrative
+  // AI-78: tryRestrictionAccess / fightRestriction 搴斿啓 restrictionChallenge.narrative
   const { useGameStore } = require('../src/lib/xianxia/store') as typeof import('../src/lib/xianxia/store');
   useGameStore.setState({
     tribulationCeremony: null, tribulationResult: null, ascensionCeremony: null, restrictionChallenge: null,
@@ -4571,193 +4459,187 @@ function smokeRestrictionAccessAndCombatActions(): void {
   };
   useGameStore.getState().tryRestrictionAccess(restriction, 'attempt', 'open-sesame');
   let cur = useGameStore.getState().restrictionChallenge;
-  assert(cur && cur.restriction.id === 'r-1' && cur.narrative.includes('attempt') && cur.narrative.includes('open-sesame'), 'tryRestrictionAccess 应记录 password');
+  assert(cur && cur.restriction.id === 'r-1' && cur.narrative.includes('attempt') && cur.narrative.includes('open-sesame'), 'tryRestrictionAccess 搴旇褰?password');
   useGameStore.getState().tryRestrictionAccess(restriction, 'retreat');
   cur = useGameStore.getState().restrictionChallenge;
-  assert(cur && cur.narrative.includes('retreat'), 'retreat 应被记录');
+  assert(cur && cur.narrative.includes('retreat'), 'retreat 搴旇璁板綍');
   useGameStore.getState().fightRestriction(restriction);
   cur = useGameStore.getState().restrictionChallenge;
-  assert(cur && /combat initiated/.test(cur.narrative), 'fightRestriction 应记录 combat initiated');
+  assert(cur && /combat initiated/.test(cur.narrative), 'fightRestriction 搴旇褰?combat initiated');
   log('restriction-access-and-combat-actions', { passed: true });
 }
 
 async function smokePrismaTribulationFieldsPushed(): Promise<void> {
-  // AI-79: prisma schema 应包含 tribulationPending/SessionJson/ResultJson 且 dev.db 有这些列
+  // AI-79: prisma schema 搴斿寘鍚?tribulationPending/SessionJson/ResultJson 涓?dev.db 鏈夎繖浜涘垪
   const schema = readFileSync('prisma/schema.prisma', 'utf-8');
-  assert(/tribulationPending\s+Boolean/.test(schema), 'schema.prisma 应有 tribulationPending Boolean');
-  assert(/tribulationSessionJson\s+String/.test(schema), 'schema.prisma 应有 tribulationSessionJson String');
-  assert(/tribulationResultJson\s+String/.test(schema), 'schema.prisma 应有 tribulationResultJson String');
+  assert(/tribulationPending\s+Boolean/.test(schema), 'schema.prisma 搴旀湁 tribulationPending Boolean');
+  assert(/tribulationSessionJson\s+String/.test(schema), 'schema.prisma 搴旀湁 tribulationSessionJson String');
+  assert(/tribulationResultJson\s+String/.test(schema), 'schema.prisma 搴旀湁 tribulationResultJson String');
   const dbPath = (process.env.DATABASE_URL?.replace(/^file:/, '')) || 'prisma/dev.db';
   if (Bun.file(dbPath).size > 0) {
     const { db } = await import('../src/lib/db');
     const cols = await db.$queryRawUnsafe('PRAGMA table_info("Character");') as any[];
     const names: string[] = cols.map((c: any) => c.name);
-    assert(names.includes('tribulationPending'), 'dev.db Character 表应有 tribulationPending 列');
-    assert(names.includes('tribulationSessionJson'), 'dev.db Character 表应有 tribulationSessionJson 列');
-    assert(names.includes('tribulationResultJson'), 'dev.db Character 表应有 tribulationResultJson 列');
-    assert(names.includes('ascensionSessionJson'), 'dev.db Character 表应有 ascensionSessionJson 列');
-    assert(names.includes('restrictionDataJson'), 'dev.db Character 表应有 restrictionDataJson 列');
+    assert(names.includes('tribulationPending'), 'dev.db Character 琛ㄥ簲鏈?tribulationPending 鍒?);
+    assert(names.includes('tribulationSessionJson'), 'dev.db Character 琛ㄥ簲鏈?tribulationSessionJson 鍒?);
+    assert(names.includes('tribulationResultJson'), 'dev.db Character 琛ㄥ簲鏈?tribulationResultJson 鍒?);
+    assert(names.includes('ascensionSessionJson'), 'dev.db Character 琛ㄥ簲鏈?ascensionSessionJson 鍒?);
+    assert(names.includes('restrictionDataJson'), 'dev.db Character 琛ㄥ簲鏈?restrictionDataJson 鍒?);
   }
   log('prisma-tribulation-fields-pushed', { passed: true });
 }
 
 function smokeBackupScriptPrismaPushScript(): void {
-  // AI-79: 备份脚本 + db push script (package.json) 都应存在
-  assert(Bun.file('scripts/backup-real-saves.ts').size > 0, 'scripts/backup-real-saves.ts 应存在');
+  // AI-79: 澶囦唤鑴氭湰 + db push script (package.json) 閮藉簲瀛樺湪
+  assert(Bun.file('scripts/backup-real-saves.ts').size > 0, 'scripts/backup-real-saves.ts 搴斿瓨鍦?);
   const backup = readFileSync('scripts/backup-real-saves.ts', 'utf-8');
-  assert(/copyFileSync/.test(backup), 'backup 脚本应使用 copyFileSync');
-  assert(/logs\/backups/.test(backup), 'backup 脚本应输出到 logs/backups/');
+  assert(/copyFileSync/.test(backup), 'backup 鑴氭湰搴斾娇鐢?copyFileSync');
+  assert(/logs\/backups/.test(backup), 'backup 鑴氭湰搴旇緭鍑哄埌 logs/backups/');
   const pkg = readFileSync('package.json', 'utf-8');
-  assert(/db:push|prisma\s+db\s+push/.test(pkg), 'package.json 应有 prisma db push script');
+  assert(/db:push|prisma\s+db\s+push/.test(pkg), 'package.json 搴旀湁 prisma db push script');
   log('backup-script-prisma-push-script', { passed: true });
 }
 
 function smokeTraeAutoDispatchScriptExists(): void {
-  // AI-80: scripts/trae-auto-dispatch.py 应存在并 import pynput + pywinauto
+  // AI-80: scripts/trae-auto-dispatch.py 搴斿瓨鍦ㄥ苟 import pynput + pywinauto
   const path = 'scripts/trae-auto-dispatch.py';
-  assert(Bun.file(path).size > 0, 'scripts/trae-auto-dispatch.py 应存在');
+  assert(Bun.file(path).size > 0, 'scripts/trae-auto-dispatch.py 搴斿瓨鍦?);
   const src = readFileSync(path, 'utf-8');
-  assert(/import pynput|from pynput/.test(src), 'trae-auto-dispatch.py 应 import pynput');
-  assert(/pywinauto|win32|find_window|WindowNotFoundError/.test(src), 'trae-auto-dispatch.py 应使用 pywinauto 找窗口');
+  assert(/import pynput|from pynput/.test(src), 'trae-auto-dispatch.py 搴?import pynput');
+  assert(/pywinauto|win32|find_window|WindowNotFoundError/.test(src), 'trae-auto-dispatch.py 搴斾娇鐢?pywinauto 鎵剧獥鍙?);
   log('trae-auto-dispatch-script-exists', { passed: true });
 }
 
 function smokeTraeMonitorScriptExists(): void {
-  // AI-80: scripts/trae-monitor.py 应存在
-  const path = 'scripts/trae-monitor.py';
-  assert(Bun.file(path).size > 0, 'scripts/trae-monitor.py 应存在');
+  // AI-80: scripts/trae-monitor.py 搴斿瓨鍦?  const path = 'scripts/trae-monitor.py';
+  assert(Bun.file(path).size > 0, 'scripts/trae-monitor.py 搴斿瓨鍦?);
   const src = readFileSync(path, 'utf-8');
-  assert(/import pynput|from pynput/.test(src), 'trae-monitor.py 应 import pynput');
+  assert(/import pynput|from pynput/.test(src), 'trae-monitor.py 搴?import pynput');
   log('trae-monitor-script-exists', { passed: true });
 }
 
 function smokeTraeScriptsUsePynput(): void {
-  // AI-80: 两个脚本都应有 keyboard/mouse Listener
+  // AI-80: 涓や釜鑴氭湰閮藉簲鏈?keyboard/mouse Listener
   const dispatch = readFileSync('scripts/trae-auto-dispatch.py', 'utf-8');
   const monitor = readFileSync('scripts/trae-monitor.py', 'utf-8');
-  assert(/keyboard\.Listener|mouse\.Listener/.test(dispatch), 'trae-auto-dispatch 应注册 pynput Listener');
-  assert(/keyboard\.Listener|mouse\.Listener/.test(monitor), 'trae-monitor 应注册 pynput Listener');
+  assert(/keyboard\.Listener|mouse\.Listener/.test(dispatch), 'trae-auto-dispatch 搴旀敞鍐?pynput Listener');
+  assert(/keyboard\.Listener|mouse\.Listener/.test(monitor), 'trae-monitor 搴旀敞鍐?pynput Listener');
   log('trae-scripts-use-pynput', { passed: true });
 }
 // ==================== AI-86/87/88/89/90: Worker B Smokes ====================
 // Worker B (xiaoxin-B) - additive only.
 
 function smokePillSideEffectTypesExist(): void {
-  // AI-86: types.ts 应导出 PillSideEffect/PillEffectiveness/PillSideEffectResolution
+  // AI-86: types.ts 搴斿鍑?PillSideEffect/PillEffectiveness/PillSideEffectResolution
   const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/export type PillSideEffect\b/.test(src), 'types.ts 应导出 PillSideEffect');
-  assert(/export interface PillEffectiveness\b/.test(src), 'types.ts 应导出 PillEffectiveness');
-  assert(/export interface PillSideEffectResolution\b/.test(src), 'types.ts 应导出 PillSideEffectResolution');
+  assert(/export type PillSideEffect\b/.test(src), 'types.ts 搴斿鍑?PillSideEffect');
+  assert(/export interface PillEffectiveness\b/.test(src), 'types.ts 搴斿鍑?PillEffectiveness');
+  assert(/export interface PillSideEffectResolution\b/.test(src), 'types.ts 搴斿鍑?PillSideEffectResolution');
   const four = ['toxicity', 'cultivation-deviation', 'karma', 'qi-turbulence'];
-  for (const k of four) assert(src.includes(`'`+k+`'`), `PillSideEffect 应包含 ${k}`);
+  for (const k of four) assert(src.includes(`'`+k+`'`), `PillSideEffect 搴斿寘鍚?${k}`);
   log('pill-side-effect-types-exist', { passed: true });
 }
 
 function smokePillEffectivenessDerivation(): void {
-  // AI-86: derivePillEffectiveness 应根据品质/境界输出合法评估
+  // AI-86: derivePillEffectiveness 搴旀牴鎹搧璐?澧冪晫杈撳嚭鍚堟硶璇勪及
   const { derivePillEffectiveness } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
   const state: any = { age: 20, realm: 'qi_refining', realmLevel: 1 };
-  const pill: any = { id: 'test-pill-1', name: '试炼丹', quality: 'rare', tier: 2, expGain: 100, hpRestore: 50, mpRestore: 30 };
+  const pill: any = { id: 'test-pill-1', name: '璇曠偧涓?, quality: 'rare', tier: 2, expGain: 100, hpRestore: 50, mpRestore: 30 };
   const eff = derivePillEffectiveness(pill, state);
-  assert(eff.pillId === 'test-pill-1', 'PillEffectiveness 应回传 pillId');
-  assert(typeof eff.boost.cultivationExp === 'number' && eff.boost.cultivationExp! > 0, '高品丹应产出修为加成');
-  assert(eff.sideEffectChance >= 0 && eff.sideEffectChance <= 1, '副作用概率应在 0..1');
-  assert(eff.sideEffectSeverity >= 1 && eff.sideEffectSeverity <= 5, '副作用严重度应在 1..5');
-  assert(eff.possibleSideEffects.length > 0, 'tier>=2 应至少包含一种副作用');
+  assert(eff.pillId === 'test-pill-1', 'PillEffectiveness 搴斿洖浼?pillId');
+  assert(typeof eff.boost.cultivationExp === 'number' && eff.boost.cultivationExp! > 0, '楂樺搧涓瑰簲浜у嚭淇负鍔犳垚');
+  assert(eff.sideEffectChance >= 0 && eff.sideEffectChance <= 1, '鍓綔鐢ㄦ鐜囧簲鍦?0..1');
+  assert(eff.sideEffectSeverity >= 1 && eff.sideEffectSeverity <= 5, '鍓綔鐢ㄤ弗閲嶅害搴斿湪 1..5');
+  assert(eff.possibleSideEffects.length > 0, 'tier>=2 搴旇嚦灏戝寘鍚竴绉嶅壇浣滅敤');
   log('pill-effectiveness-derivation', { passed: true, boost: eff.boost.cultivationExp, chance: eff.sideEffectChance, sev: eff.sideEffectSeverity });
 }
 
 function smokePillSideEffectResolution(): void {
-  // AI-86: resolvePillSideEffects 触发时应回传 attributeChanges/statusChanges
+  // AI-86: resolvePillSideEffects 瑙﹀彂鏃跺簲鍥炰紶 attributeChanges/statusChanges
   const { resolvePillSideEffects } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
   const state: any = { age: 12, realm: 'mortal', realmLevel: 0 };
-  const pill: any = { id: 'toxic-pill', name: '猛丹', quality: 'epic', tier: 4, expGain: 200 };
-  // 强制触发：rand=0 < chance
+  const pill: any = { id: 'toxic-pill', name: '鐚涗腹', quality: 'epic', tier: 4, expGain: 200 };
+  // 寮哄埗瑙﹀彂锛歳and=0 < chance
   const r1 = resolvePillSideEffects(pill, state, 0);
-  assert(r1.triggered === true, 'rand=0 应触发副作用');
-  assert(r1.sideEffect !== undefined, '触发时应回传 sideEffect 类型');
-  assert(r1.attributeChanges.length + r1.statusChanges.length > 0, '应至少有一种属性/状态变更');
-  // 强制不触发：rand=1 几乎不可能（chance 最高 0.85）
-  const r2 = resolvePillSideEffects(pill, state, 0.9999);
-  assert(r2.triggered === false, 'rand 接近 1 不应触发副作用');
-  assert(r2.attributeChanges.length === 0, '未触发时应无属性变更');
+  assert(r1.triggered === true, 'rand=0 搴旇Е鍙戝壇浣滅敤');
+  assert(r1.sideEffect !== undefined, '瑙﹀彂鏃跺簲鍥炰紶 sideEffect 绫诲瀷');
+  assert(r1.attributeChanges.length + r1.statusChanges.length > 0, '搴旇嚦灏戞湁涓€绉嶅睘鎬?鐘舵€佸彉鏇?);
+  // 寮哄埗涓嶈Е鍙戯細rand=1 鍑犱箮涓嶅彲鑳斤紙chance 鏈€楂?0.85锛?  const r2 = resolvePillSideEffects(pill, state, 0.9999);
+  assert(r2.triggered === false, 'rand 鎺ヨ繎 1 涓嶅簲瑙﹀彂鍓綔鐢?);
+  assert(r2.attributeChanges.length === 0, '鏈Е鍙戞椂搴旀棤灞炴€у彉鏇?);
   log('pill-side-effect-resolution', { passed: true, triggered: r1.triggered, side: r1.sideEffect });
 }
 
 function smokeFormationDrawingTypesExist(): void {
-  // AI-87: types.ts 应导出 FormationDrawingStep/Session/Progress
+  // AI-87: types.ts 搴斿鍑?FormationDrawingStep/Session/Progress
   const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/export type FormationDrawingStep\b/.test(src), 'types.ts 应导出 FormationDrawingStep');
-  assert(/export interface FormationDrawingSession\b/.test(src), 'types.ts 应导出 FormationDrawingSession');
-  assert(/export interface FormationDrawingProgress\b/.test(src), 'types.ts 应导出 FormationDrawingProgress');
+  assert(/export type FormationDrawingStep\b/.test(src), 'types.ts 搴斿鍑?FormationDrawingStep');
+  assert(/export interface FormationDrawingSession\b/.test(src), 'types.ts 搴斿鍑?FormationDrawingSession');
+  assert(/export interface FormationDrawingProgress\b/.test(src), 'types.ts 搴斿鍑?FormationDrawingProgress');
   const steps = ['meditate', 'trace', 'infuse', 'anchor', 'activate'];
-  for (const s of steps) assert(src.includes(`'`+s+`'`), `FormationDrawingStep 应包含 ${s}`);
+  for (const s of steps) assert(src.includes(`'`+s+`'`), `FormationDrawingStep 搴斿寘鍚?${s}`);
   log('formation-drawing-types-exist', { passed: true });
 }
 
 function smokeFormationDrawingFlow(): void {
-  // AI-87: startFormationDrawing + resolveDrawingProgress 推进 5 步应成功
+  // AI-87: startFormationDrawing + resolveDrawingProgress 鎺ㄨ繘 5 姝ュ簲鎴愬姛
   const { startFormationDrawing, resolveDrawingProgress } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
   const state: any = { id: 'c-1', age: 30, realm: 'foundation_building', realmLevel: 2 };
-  const formation: any = { id: 'f-1', name: '小聚灵阵', rarity: 'common', requirements: { minRealm: 'qi_refining' } };
+  const formation: any = { id: 'f-1', name: '灏忚仛鐏甸樀', rarity: 'common', requirements: { minRealm: 'qi_refining' } };
   let sess = startFormationDrawing(state, formation);
-  assert(sess.currentStep === 'meditate', '初始步骤应为 meditate');
-  assert(!sess.finished, '初始会话未完成');
-  // 强制成功推进 5 步
-  for (let i = 0; i < 5; i++) {
+  assert(sess.currentStep === 'meditate', '鍒濆姝ラ搴斾负 meditate');
+  assert(!sess.finished, '鍒濆浼氳瘽鏈畬鎴?);
+  // 寮哄埗鎴愬姛鎺ㄨ繘 5 姝?  for (let i = 0; i < 5; i++) {
     const r = resolveDrawingProgress(sess, 'advance', 0);
-    assert(r.advanced === true, `第${i+1}步应推进`);
+    assert(r.advanced === true, `绗?{i+1}姝ュ簲鎺ㄨ繘`);
     sess = r.session;
     if (r.finished) break;
   }
-  assert(sess.finished === true && sess.success === true, '连续 5 步成功应绘制完成');
-  assert(sess.completedSteps.length === 5, '应记录 5 个完成步骤');
+  assert(sess.finished === true && sess.success === true, '杩炵画 5 姝ユ垚鍔熷簲缁樺埗瀹屾垚');
+  assert(sess.completedSteps.length === 5, '搴旇褰?5 涓畬鎴愭楠?);
   log('formation-drawing-flow', { passed: true, steps: sess.completedSteps });
 }
 
 function smokeFormationDrawingFailureStreak(): void {
-  // AI-87: 连续失败 3 次应触发绘制失败
+  // AI-87: 杩炵画澶辫触 3 娆″簲瑙﹀彂缁樺埗澶辫触
   const { startFormationDrawing, resolveDrawingProgress } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
   const state: any = { id: 'c-2', age: 25, realm: 'qi_refining', realmLevel: 1 };
-  const formation: any = { id: 'f-2', name: '凶阵', rarity: 'rare', requirements: { minRealm: 'qi_refining' } };
+  const formation: any = { id: 'f-2', name: '鍑堕樀', rarity: 'rare', requirements: { minRealm: 'qi_refining' } };
   let sess = startFormationDrawing(state, formation);
-  // 强制失败 3 次（rand > stepSuccessChance=0.7）
-  for (let i = 0; i < 3; i++) {
+  // 寮哄埗澶辫触 3 娆★紙rand > stepSuccessChance=0.7锛?  for (let i = 0; i < 3; i++) {
     const r = resolveDrawingProgress(sess, 'advance', 0.99);
     sess = r.session;
     if (r.finished) break;
   }
-  assert(sess.finished === true && sess.success === false, '连续 3 次失败应会话失败');
-  assert(sess.failureStreak >= 3, 'failureStreak 应>=3');
-  // restart 应清空失败计数
-  const restart = resolveDrawingProgress(sess, 'restart', 0);
-  assert(restart.session.currentStep === 'meditate', 'restart 后应回到 meditate');
-  assert(restart.session.failureStreak === 0, 'restart 后 failureStreak 应清零');
+  assert(sess.finished === true && sess.success === false, '杩炵画 3 娆″け璐ュ簲浼氳瘽澶辫触');
+  assert(sess.failureStreak >= 3, 'failureStreak 搴?=3');
+  // restart 搴旀竻绌哄け璐ヨ鏁?  const restart = resolveDrawingProgress(sess, 'restart', 0);
+  assert(restart.session.currentStep === 'meditate', 'restart 鍚庡簲鍥炲埌 meditate');
+  assert(restart.session.failureStreak === 0, 'restart 鍚?failureStreak 搴旀竻闆?);
   log('formation-drawing-failure-streak', { passed: true, streak: sess.failureStreak });
 }
 
 function smokePetEvolutionTypesExist(): void {
-  // AI-88: types.ts 应导出 PetEvolutionStage/Requirement/Eligibility
+  // AI-88: types.ts 搴斿鍑?PetEvolutionStage/Requirement/Eligibility
   const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
-  assert(/export type PetEvolutionStage\b/.test(src), 'types.ts 应导出 PetEvolutionStage');
-  assert(/export interface PetEvolutionRequirement\b/.test(src), 'types.ts 应导出 PetEvolutionRequirement');
-  assert(/export interface PetEvolutionEligibility\b/.test(src), 'types.ts 应导出 PetEvolutionEligibility');
+  assert(/export type PetEvolutionStage\b/.test(src), 'types.ts 搴斿鍑?PetEvolutionStage');
+  assert(/export interface PetEvolutionRequirement\b/.test(src), 'types.ts 搴斿鍑?PetEvolutionRequirement');
+  assert(/export interface PetEvolutionEligibility\b/.test(src), 'types.ts 搴斿鍑?PetEvolutionEligibility');
   const stages = ['infant', 'youth', 'mature', 'ascended'];
-  for (const s of stages) assert(src.includes(`'`+s+`'`), `PetEvolutionStage 应包含 ${s}`);
+  for (const s of stages) assert(src.includes(`'`+s+`'`), `PetEvolutionStage 搴斿寘鍚?${s}`);
   log('pet-evolution-types-exist', { passed: true });
 }
 
 function smokePetEvolutionEligibilityAndResolve(): void {
-  // AI-88: 缺材料时不应 eligible；满足时 eligible；resolvePetEvolution 返回下一阶段
+  // AI-88: 缂烘潗鏂欐椂涓嶅簲 eligible锛涙弧瓒虫椂 eligible锛況esolvePetEvolution 杩斿洖涓嬩竴闃舵
   const { derivePetEvolutionEligibility, resolvePetEvolution } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
-  // 缺材料
-  const poor: any = { id: 'p-poor', level: 1, loyalty: 10, acquiredAge: 18, stage: 'infant' };
+  // 缂烘潗鏂?  const poor: any = { id: 'p-poor', level: 1, loyalty: 10, acquiredAge: 18, stage: 'infant' };
   const poorChar: any = { age: 20, realmLevel: 0, inventory: [] };
   const e1 = derivePetEvolutionEligibility(poor, poorChar);
-  assert(e1.eligible === false, '缺材料/忠诚度不足时不应 eligible');
-  assert(e1.nextStage === 'youth', '幼生期下一阶段应为 youth');
-  assert(e1.missing.length >= 2, '应至少列出 2 个缺失条件');
-  // 满足全部条件
+  assert(e1.eligible === false, '缂烘潗鏂?蹇犺瘹搴︿笉瓒虫椂涓嶅簲 eligible');
+  assert(e1.nextStage === 'youth', '骞肩敓鏈熶笅涓€闃舵搴斾负 youth');
+  assert(e1.missing.length >= 2, '搴旇嚦灏戝垪鍑?2 涓己澶辨潯浠?);
+  // 婊¤冻鍏ㄩ儴鏉′欢
   const rich: any = { id: 'p-rich', level: 5, loyalty: 95, acquiredAge: 15, stage: 'infant' };
   const richChar: any = {
     age: 20, realmLevel: 3,
@@ -4766,212 +4648,200 @@ function smokePetEvolutionEligibilityAndResolve(): void {
     ],
   };
   const e2 = derivePetEvolutionEligibility(rich, richChar);
-  assert(e2.eligible === true, '满足所有条件应 eligible');
-  assert(e2.missing.length === 0, '满足时 missing 应为空');
+  assert(e2.eligible === true, '婊¤冻鎵€鏈夋潯浠跺簲 eligible');
+  assert(e2.missing.length === 0, '婊¤冻鏃?missing 搴斾负绌?);
   // resolvePetEvolution
   const next = resolvePetEvolution({ id: 'p-rich', stage: 'infant' });
-  assert(next === 'youth', 'infant 进阶应返回 youth');
+  assert(next === 'youth', 'infant 杩涢樁搴旇繑鍥?youth');
   log('pet-evolution-eligibility-and-resolve', { passed: true, missingCount: e1.missing.length, next });
 }
 
 function smokePetInsightAndCommunication(): void {
-  // AI-89: 幼生期/低忠诚度不应产出 insight；成熟期+应产出 insight；communication 应返回非空字符串
+  // AI-89: 骞肩敓鏈?浣庡繝璇氬害涓嶅簲浜у嚭 insight锛涙垚鐔熸湡+搴斾骇鍑?insight锛沜ommunication 搴旇繑鍥為潪绌哄瓧绗︿覆
   const { derivePetInsight, resolvePetCommunication } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
-  // 幼生期：null
-  const infant: any = { id: 'p-1', name: '小狐', stage: 'infant', level: 5, loyalty: 80, element: 'water' };
+  // 骞肩敓鏈燂細null
+  const infant: any = { id: 'p-1', name: '灏忕嫄', stage: 'infant', level: 5, loyalty: 80, element: 'water' };
   const charA: any = { age: 18 };
-  assert(derivePetInsight(infant, charA) === null, '幼生期不应产出 insight');
-  // 成熟期 + 高忠诚：应产出
-  const mature: any = { id: 'p-2', name: '炎虎', stage: 'mature', level: 5, loyalty: 75, element: 'fire' };
+  assert(derivePetInsight(infant, charA) === null, '骞肩敓鏈熶笉搴斾骇鍑?insight');
+  // 鎴愮啛鏈?+ 楂樺繝璇氾細搴斾骇鍑?  const mature: any = { id: 'p-2', name: '鐐庤檸', stage: 'mature', level: 5, loyalty: 75, element: 'fire' };
   const charB: any = { age: 25 };
   const ins = derivePetInsight(mature, charB);
-  assert(ins !== null, '成熟期+忠诚>=60 应产出 insight');
-  assert(typeof ins!.insightName === 'string' && ins!.insightName.length > 0, 'insight 应有名称');
-  assert(ins!.effect !== undefined, 'insight 应有 effect');
+  assert(ins !== null, '鎴愮啛鏈?蹇犺瘹>=60 搴斾骇鍑?insight');
+  assert(typeof ins!.insightName === 'string' && ins!.insightName.length > 0, 'insight 搴旀湁鍚嶇О');
+  assert(ins!.effect !== undefined, 'insight 搴旀湁 effect');
   // communication
-  const comm = resolvePetCommunication({ id: 'p-3', name: '灵蛇', loyalty: 80 }, '前方有妖气');
-  assert(typeof comm === 'string' && comm.length > 0, 'communication 应回传非空字符串');
-  assert(comm.includes('灵蛇') || comm.includes('灵识'), 'communication 应包含宠物名或灵识关键字');
+  const comm = resolvePetCommunication({ id: 'p-3', name: '鐏佃泧', loyalty: 80 }, '鍓嶆柟鏈夊姘?);
+  assert(typeof comm === 'string' && comm.length > 0, 'communication 搴斿洖浼犻潪绌哄瓧绗︿覆');
+  assert(comm.includes('鐏佃泧') || comm.includes('鐏佃瘑'), 'communication 搴斿寘鍚疇鐗╁悕鎴栫伒璇嗗叧閿瓧');
   log('pet-insight-and-communication', { passed: true, insight: ins?.insightName, comm });
 }
 
 function smokePetCombatSkillAvailable(): void {
-  // AI-90: 化形前 1 技能；成熟期 2 技能；化形期 3 技能；冷却中技能应被过滤
-  const { derivePetSkillAvailable, resolvePetSkillUse } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
-  const baseSkill = { name: '撕咬', description: '基础物理攻击', power: 1.2, cooldown: 2 };
+  // AI-90: 鍖栧舰鍓?1 鎶€鑳斤紱鎴愮啛鏈?2 鎶€鑳斤紱鍖栧舰鏈?3 鎶€鑳斤紱鍐峰嵈涓妧鑳藉簲琚繃婊?  const { derivePetSkillAvailable, resolvePetSkillUse } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  const baseSkill = { name: '鎾曞挰', description: '鍩虹鐗╃悊鏀诲嚮', power: 1.2, cooldown: 2 };
   const infant: any = { id: 'p-i', stage: 'infant', level: 1, skill: baseSkill };
   const mature: any = { id: 'p-m', stage: 'mature', level: 5, skill: baseSkill };
   const ascended: any = { id: 'p-a', stage: 'ascended', level: 10, skill: baseSkill };
   const sInf = derivePetSkillAvailable(infant, 1);
   const sMat = derivePetSkillAvailable(mature, 1);
   const sAsc = derivePetSkillAvailable(ascended, 1);
-  assert(sInf.length === 1, '幼生期应只有 1 个技能');
-  assert(sMat.length === 2, '成熟期应有 2 个技能');
-  assert(sAsc.length === 3, '化形期应有 3 个技能');
-  // 冷却过滤
+  assert(sInf.length === 1, '骞肩敓鏈熷簲鍙湁 1 涓妧鑳?);
+  assert(sMat.length === 2, '鎴愮啛鏈熷簲鏈?2 涓妧鑳?);
+  assert(sAsc.length === 3, '鍖栧舰鏈熷簲鏈?3 涓妧鑳?);
+  // 鍐峰嵈杩囨护
   const filtered = derivePetSkillAvailable(mature, 5, [
     { skillId: 'p-m-basic', lastUsedTurn: 4, usesLeft: -1 },
   ]);
-  assert(filtered.length === 1, '基础技能冷却中应被过滤（剩余 1 个元素技能）');
+  assert(filtered.length === 1, '鍩虹鎶€鑳藉喎鍗翠腑搴旇杩囨护锛堝墿浣?1 涓厓绱犳妧鑳斤級');
   // resolvePetSkillUse
-  const evt = resolvePetSkillUse({ id: 'p-m', name: '炎虎', attack: 20, element: 'fire' }, sMat[0], 5, 'enemy-1');
-  assert(evt.skillId === 'p-m-basic', '事件应回传使用的 skillId');
-  assert(evt.turn === 5, '事件应回传 turn');
-  assert(typeof evt.narrativeHint === 'string' && evt.narrativeHint.length > 0, '事件应有 narrativeHint');
+  const evt = resolvePetSkillUse({ id: 'p-m', name: '鐐庤檸', attack: 20, element: 'fire' }, sMat[0], 5, 'enemy-1');
+  assert(evt.skillId === 'p-m-basic', '浜嬩欢搴斿洖浼犱娇鐢ㄧ殑 skillId');
+  assert(evt.turn === 5, '浜嬩欢搴斿洖浼?turn');
+  assert(typeof evt.narrativeHint === 'string' && evt.narrativeHint.length > 0, '浜嬩欢搴旀湁 narrativeHint');
   log('pet-combat-skill-available', { passed: true, inf: sInf.length, mat: sMat.length, asc: sAsc.length, dmg: evt.damage });
 }
 
 function smokePetCombatSkillUseDamage(): void {
-  // AI-90: 物理技能应产生 damage; 治疗技能应产生 heal; 增益技能应产生 buffApplied
+  // AI-90: 鐗╃悊鎶€鑳藉簲浜х敓 damage; 娌荤枟鎶€鑳藉簲浜х敓 heal; 澧炵泭鎶€鑳藉簲浜х敓 buffApplied
   const { resolvePetSkillUse } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
-  const phys: any = { id: 'p', name: '灵狐', attack: 15 };
-  const physSkill: any = { skillId: 's1', name: '撕咬', description: '', power: 1.5, cooldown: 2, range: 'single', effect: 'physical' };
-  const healSkill: any = { skillId: 's2', name: '疗伤', description: '', power: 2.0, cooldown: 3, range: 'self', effect: 'heal' };
-  const buffSkill: any = { skillId: 's3', name: '护主', description: '', power: 0, cooldown: 4, range: 'all_allies', effect: 'buff' };
+  const phys: any = { id: 'p', name: '鐏电嫄', attack: 15 };
+  const physSkill: any = { skillId: 's1', name: '鎾曞挰', description: '', power: 1.5, cooldown: 2, range: 'single', effect: 'physical' };
+  const healSkill: any = { skillId: 's2', name: '鐤椾激', description: '', power: 2.0, cooldown: 3, range: 'self', effect: 'heal' };
+  const buffSkill: any = { skillId: 's3', name: '鎶や富', description: '', power: 0, cooldown: 4, range: 'all_allies', effect: 'buff' };
   const e1 = resolvePetSkillUse(phys, physSkill, 3, 'e-1');
-  assert(typeof e1.damage === 'number' && e1.damage! > 0, '物理技能应产出 damage>0');
-  assert(e1.heal === undefined, '物理技能不应产出 heal');
+  assert(typeof e1.damage === 'number' && e1.damage! > 0, '鐗╃悊鎶€鑳藉簲浜у嚭 damage>0');
+  assert(e1.heal === undefined, '鐗╃悊鎶€鑳戒笉搴斾骇鍑?heal');
   const e2 = resolvePetSkillUse(phys, healSkill, 3);
-  assert(typeof e2.heal === 'number' && e2.heal! > 0, '治疗技能应产出 heal>0');
-  assert(e2.damage === undefined, '治疗技能不应产出 damage');
+  assert(typeof e2.heal === 'number' && e2.heal! > 0, '娌荤枟鎶€鑳藉簲浜у嚭 heal>0');
+  assert(e2.damage === undefined, '娌荤枟鎶€鑳戒笉搴斾骇鍑?damage');
   const e3 = resolvePetSkillUse(phys, buffSkill, 3);
-  assert(Array.isArray(e3.buffApplied) && e3.buffApplied.length > 0, '增益技能应产出 buffApplied');
+  assert(Array.isArray(e3.buffApplied) && e3.buffApplied.length > 0, '澧炵泭鎶€鑳藉簲浜у嚭 buffApplied');
   log('pet-combat-skill-use-damage', { passed: true, dmg: e1.damage, heal: e2.heal });
-}﻿
-// ==================== Worker A (AI-81~AI-85): Combat + Breakthrough Smokes ====================
+}锘?// ==================== Worker A (AI-81~AI-85): Combat + Breakthrough Smokes ====================
 
 function smokeAi81StanceDerivation(): void {
-  // AI-81: deriveCombatStance 应按 HP/MP/敌方状态给出建议姿态
-  const baseChar: any = {
+  // AI-81: deriveCombatStance 搴旀寜 HP/MP/鏁屾柟鐘舵€佺粰鍑哄缓璁Э鎬?  const baseChar: any = {
     realm: 'qi_refining', hp: 50, maxHp: 100, mp: 50, maxMp: 100, attack: 10, defense: 10,
     combatSession: { status: 'ongoing', playerHp: 50, playerMaxHp: 100, playerMp: 50, playerMaxMp: 100 },
   };
-  // 低血 → retreat/defensive
+  // 浣庤 鈫?retreat/defensive
   const lowHpChar: any = {
     ...baseChar,
     hp: 20, maxHp: 100, combatSession: { status: 'ongoing', playerHp: 20, playerMaxHp: 100, playerMp: 50, playerMaxMp: 100 },
   };
   const s1 = deriveCombatStance(baseChar as any, { hp: 80, maxHp: 100, attack: 10, defense: 10, speed: 5 });
-  assert(s1 === 'aggressive' || s1 === 'cunning', `正常状态应给出猛攻或诱敌，实际=${s1}`);
+  assert(s1 === 'aggressive' || s1 === 'cunning', `姝ｅ父鐘舵€佸簲缁欏嚭鐚涙敾鎴栬鏁岋紝瀹為檯=${s1}`);
   const s2 = deriveCombatStance(lowHpChar as any, { hp: 80, maxHp: 100, attack: 10, defense: 10, speed: 5 });
-  assert(s2 === 'retreat' || s2 === 'defensive', `低血应退守，实际=${s2}`);
-  // 敌方残血 → aggressive
+  assert(s2 === 'retreat' || s2 === 'defensive', `浣庤搴旈€€瀹堬紝瀹為檯=${s2}`);
+  // 鏁屾柟娈嬭 鈫?aggressive
   const s3 = deriveCombatStance(baseChar as any, { hp: 20, maxHp: 100, attack: 10, defense: 10, speed: 5 });
-  assert(s3 === 'aggressive', `敌方残血应猛攻，实际=${s3}`);
+  assert(s3 === 'aggressive', `鏁屾柟娈嬭搴旂寷鏀伙紝瀹為檯=${s3}`);
   log('combat-stance-derivation', { passed: true, normal: s1, lowHp: s2, weakEnemy: s3 });
 }
 
 function smokeAi81StanceShift(): void {
-  // AI-81: resolveCombatStanceShift 应按敌方动态切换姿态
-  const shift1 = resolveCombatStanceShift('aggressive', { hp: 80, maxHp: 100, attack: 20, attackPrev: 10 }, []);
-  assert(shift1 === 'cunning', `敌方蓄力应切诱敌，实际=${shift1}`);
+  // AI-81: resolveCombatStanceShift 搴旀寜鏁屾柟鍔ㄦ€佸垏鎹㈠Э鎬?  const shift1 = resolveCombatStanceShift('aggressive', { hp: 80, maxHp: 100, attack: 20, attackPrev: 10 }, []);
+  assert(shift1 === 'cunning', `鏁屾柟钃勫姏搴斿垏璇辨晫锛屽疄闄?${shift1}`);
   const shift2 = resolveCombatStanceShift('aggressive', { hp: 20, maxHp: 100, attack: 10 }, []);
-  assert(shift2 === 'aggressive', `敌方残血保持猛攻，实际=${shift2}`);
-  // 冷却中 → 保持
+  assert(shift2 === 'aggressive', `鏁屾柟娈嬭淇濇寔鐚涙敾锛屽疄闄?${shift2}`);
+  // 鍐峰嵈涓?鈫?淇濇寔
   const shift3 = resolveCombatStanceShift('defensive', { hp: 50, maxHp: 100, attack: 10 }, [{ stance: 'defensive', cooldownTurns: 2 }]);
-  assert(shift3 === 'defensive', `冷却中应保持，实际=${shift3}`);
+  assert(shift3 === 'defensive', `鍐峰嵈涓簲淇濇寔锛屽疄闄?${shift3}`);
   log('combat-stance-shift', { passed: true, s1: shift1, s2: shift2, s3: shift3 });
 }
 
 function smokeAi81StanceLabelConsistency(): void {
-  // AI-81: COMBAT_STANCE_LABEL 必须覆盖全部 4 个姿态
-  const labels = (COMBAT_STANCE_LABEL as any);
-  assert(labels.aggressive && labels.defensive && labels.cunning && labels.retreat, 'COMBAT_STANCE_LABEL 缺标签');
-  assert(labels.aggressive.length > 0 && labels.defensive.length > 0, '标签不能为空字符串');
-  // 与 types.ts 定义一致
-  const expected: CombatStance[] = ['aggressive', 'defensive', 'cunning', 'retreat'];
+  // AI-81: COMBAT_STANCE_LABEL 蹇呴』瑕嗙洊鍏ㄩ儴 4 涓Э鎬?  const labels = (COMBAT_STANCE_LABEL as any);
+  assert(labels.aggressive && labels.defensive && labels.cunning && labels.retreat, 'COMBAT_STANCE_LABEL 缂烘爣绛?);
+  assert(labels.aggressive.length > 0 && labels.defensive.length > 0, '鏍囩涓嶈兘涓虹┖瀛楃涓?);
+  // 涓?types.ts 瀹氫箟涓€鑷?  const expected: CombatStance[] = ['aggressive', 'defensive', 'cunning', 'retreat'];
   for (const k of expected) {
-    assert(typeof labels[k] === 'string', `${k} 必须有中文标签`);
+    assert(typeof labels[k] === 'string', `${k} 蹇呴』鏈変腑鏂囨爣绛綻);
   }
   log('combat-stance-label-consistency', { passed: true, labels: Object.keys(labels).length });
 }
 
 function smokeAi82CombatResourceDerivation(): void {
-  // AI-82: deriveCombatResource 应返回 4 类资源快照
-  const character: any = { hp: 80, maxHp: 100, mp: 60, maxMp: 100, spiritualSense: 50, comprehension: 30 };
+  // AI-82: deriveCombatResource 搴旇繑鍥?4 绫昏祫婧愬揩鐓?  const character: any = { hp: 80, maxHp: 100, mp: 60, maxMp: 100, spiritualSense: 50, comprehension: 30 };
   const usages = deriveCombatResource(character as any);
-  assert(Array.isArray(usages) && usages.length === 4, `应返回 4 项资源，实际=${usages.length}`);
+  assert(Array.isArray(usages) && usages.length === 4, `搴旇繑鍥?4 椤硅祫婧愶紝瀹為檯=${usages.length}`);
   const types = usages.map(u => u.type);
-  assert(types.includes('qi') && types.includes('soul') && types.includes('stamina') && types.includes('focus'), '缺资源类型');
+  assert(types.includes('qi') && types.includes('soul') && types.includes('stamina') && types.includes('focus'), '缂鸿祫婧愮被鍨?);
   const qi = usages.find(u => u.type === 'qi')!;
-  assert(qi.current === 60 && qi.max === 100, `qi 应=mp(60/100)，实际=${qi.current}/${qi.max}`);
-  assert(qi.regenPerTurn > 0, 'qi 必须有回复');
+  assert(qi.current === 60 && qi.max === 100, `qi 搴?mp(60/100)锛屽疄闄?${qi.current}/${qi.max}`);
+  assert(qi.regenPerTurn > 0, 'qi 蹇呴』鏈夊洖澶?);
   log('combat-resource-derivation', { passed: true, types: types.join(','), qi: `${qi.current}/${qi.max}` });
 }
 
 function smokeAi82ResourceDrainAndSufficient(): void {
-  // AI-82: resolveCombatResourceDrain 应扣减并记录峰值；checkCombatResourceSufficient 应正确判缺
-  const usages: CombatResourceUsage[] = [
+  // AI-82: resolveCombatResourceDrain 搴旀墸鍑忓苟璁板綍宄板€硷紱checkCombatResourceSufficient 搴旀纭垽缂?  const usages: CombatResourceUsage[] = [
     { type: 'qi', current: 50, max: 100, regenPerTurn: 5 },
     { type: 'stamina', current: 30, max: 80, regenPerTurn: 3 },
   ];
   const drained = resolveCombatResourceDrain(usages[0], { type: 'qi', value: 20 });
-  assert(drained.current === 30 && drained.recentDrain === 20, `drain 后应=30，峰值=20，实际=${drained.current}/${drained.recentDrain}`);
-  // 类型不匹配应原样返回
+  assert(drained.current === 30 && drained.recentDrain === 20, `drain 鍚庡簲=30锛屽嘲鍊?20锛屽疄闄?${drained.current}/${drained.recentDrain}`);
+  // 绫诲瀷涓嶅尮閰嶅簲鍘熸牱杩斿洖
   const same = resolveCombatResourceDrain(usages[1], { type: 'qi', value: 5 });
-  assert(same === usages[1] || same.current === usages[1].current, '类型不匹配应原样返回');
-  // 充足检查
-  const ok = checkCombatResourceSufficient(usages, [{ type: 'qi', value: 10 }]);
-  assert(ok.sufficient === true && ok.missing.length === 0, '50>=10 应充足');
+  assert(same === usages[1] || same.current === usages[1].current, '绫诲瀷涓嶅尮閰嶅簲鍘熸牱杩斿洖');
+  // 鍏呰冻妫€鏌?  const ok = checkCombatResourceSufficient(usages, [{ type: 'qi', value: 10 }]);
+  assert(ok.sufficient === true && ok.missing.length === 0, '50>=10 搴斿厖瓒?);
   const need = checkCombatResourceSufficient(usages, [{ type: 'qi', value: 60 }, { type: 'focus', value: 5 }]);
-  assert(need.sufficient === false && need.missing.length === 2, `应缺 2 项，实际=${need.missing.length}`);
+  assert(need.sufficient === false && need.missing.length === 2, `搴旂己 2 椤癸紝瀹為檯=${need.missing.length}`);
   log('combat-resource-drain-sufficient', { passed: true, drained: drained.current, missing: need.missing.length });
 }
 
 function smokeAi82ResourceLabelConsistency(): void {
-  // AI-82: COMBAT_RESOURCE_LABEL 必须覆盖全部 4 个资源类型
-  const labels = (COMBAT_RESOURCE_LABEL as any);
+  // AI-82: COMBAT_RESOURCE_LABEL 蹇呴』瑕嗙洊鍏ㄩ儴 4 涓祫婧愮被鍨?  const labels = (COMBAT_RESOURCE_LABEL as any);
   const types: CombatResourceType[] = ['qi', 'soul', 'stamina', 'focus'];
   for (const t of types) {
-    assert(typeof labels[t] === 'string' && labels[t].length > 0, `${t} 必须有中文标签`);
+    assert(typeof labels[t] === 'string' && labels[t].length > 0, `${t} 蹇呴』鏈変腑鏂囨爣绛綻);
   }
   log('combat-resource-label-consistency', { passed: true, count: types.length });
 }
 
 function smokeAi83BreakthroughStageDerivation(): void {
-  // AI-83: deriveBreakthroughStage 应按 attemptNumber + 心魔 + 年龄推导阶段
+  // AI-83: deriveBreakthroughStage 搴旀寜 attemptNumber + 蹇冮瓟 + 骞撮緞鎺ㄥ闃舵
   const s1 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 20, 30);
-  assert(s1 === 'perception', `第1次尝试应为感悟，实际=${s1}`);
+  assert(s1 === 'perception', `绗?娆″皾璇曞簲涓烘劅鎮燂紝瀹為檯=${s1}`);
   const s2 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 90, 30);
-  assert(s2 === 'condense' || s2 === 'perception', `高龄第1次应为凝聚或感悟，实际=${s2}`);
+  assert(s2 === 'condense' || s2 === 'perception', `楂橀緞绗?娆″簲涓哄嚌鑱氭垨鎰熸偀锛屽疄闄?${s2}`);
   const s3 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 20, 70);
-  assert(s3 === 'storm', `高心魔第1次应为风暴，实际=${s3}`);
+  assert(s3 === 'storm', `楂樺績榄旂1娆″簲涓洪鏆达紝瀹為檯=${s3}`);
   const s4 = deriveBreakthroughStage('qi_refining', 'foundation_building', 4, 30, 30);
-  assert(s4 === 'stabilize', `第4次应为稳固，实际=${s4}`);
+  assert(s4 === 'stabilize', `绗?娆″簲涓虹ǔ鍥猴紝瀹為檯=${s4}`);
   const s5 = deriveBreakthroughStage('foundation_building', 'foundation_building', 1, 20, 0);
-  assert(s5 === 'passed', `已通过应为 passed，实际=${s5}`);
+  assert(s5 === 'passed', `宸查€氳繃搴斾负 passed锛屽疄闄?${s5}`);
   log('breakthrough-stage-derivation', { passed: true, s1, s2, s3, s4, s5 });
 }
 
 function smokeAi83BreakthroughOutcome(): void {
-  // AI-83: resolveBreakthroughOutcome 应按阶段+心魔+外援给出 success/failed/continue
+  // AI-83: resolveBreakthroughOutcome 搴旀寜闃舵+蹇冮瓟+澶栨彺缁欏嚭 success/failed/continue
   const baseAttempt: BreakthroughAttempt = {
     realmBefore: 'qi_refining', realmAfter: 'foundation_building', stage: 'stabilize',
     attemptNumber: 3, helperCount: 0, startedAge: 25, elapsedTurns: 10,
   };
   const o1 = resolveBreakthroughOutcome({ attempt: baseAttempt, heartDemon: 30, helperPower: 4 });
-  assert(o1.outcome === 'success' && o1.narrative.length > 0, `外援足够应成功，实际=${o1.outcome}`);
+  assert(o1.outcome === 'success' && o1.narrative.length > 0, `澶栨彺瓒冲搴旀垚鍔燂紝瀹為檯=${o1.outcome}`);
   const o2 = resolveBreakthroughOutcome({ attempt: { ...baseAttempt, helperCount: 0 }, heartDemon: 30, helperPower: 0 });
-  assert(o2.outcome === 'continue', `外援为0应继续，实际=${o2.outcome}`);
+  assert(o2.outcome === 'continue', `澶栨彺涓?搴旂户缁紝瀹為檯=${o2.outcome}`);
   const stormAttempt: BreakthroughAttempt = { ...baseAttempt, stage: 'storm' };
   const o3 = resolveBreakthroughOutcome({ attempt: stormAttempt, heartDemon: 70, helperPower: 5 });
-  assert(o3.outcome === 'failed', `风暴+高心魔应失败，实际=${o3.outcome}`);
-  // 已通过 → 直接成功
+  assert(o3.outcome === 'failed', `椋庢毚+楂樺績榄斿簲澶辫触锛屽疄闄?${o3.outcome}`);
+  // 宸查€氳繃 鈫?鐩存帴鎴愬姛
   const passedAttempt: BreakthroughAttempt = { ...baseAttempt, stage: 'passed' };
   const o4 = resolveBreakthroughOutcome({ attempt: passedAttempt, heartDemon: 0, helperPower: 0 });
-  assert(o4.outcome === 'success', `已通过应成功，实际=${o4.outcome}`);
+  assert(o4.outcome === 'success', `宸查€氳繃搴旀垚鍔燂紝瀹為檯=${o4.outcome}`);
   log('breakthrough-outcome', { passed: true, o1: o1.outcome, o2: o2.outcome, o3: o3.outcome, o4: o4.outcome });
 }
 
 function smokeAi84CombatStalemateBreak(): void {
-  // AI-84: detectCombatStalemate 应识别连续无变化的僵局；resolveStalemateBreak 应返回事件提示
-  const progressing = [
+  // AI-84: detectCombatStalemate 搴旇瘑鍒繛缁棤鍙樺寲鐨勫兊灞€锛況esolveStalemateBreak 搴旇繑鍥炰簨浠舵彁绀?  const progressing = [
     { round: 1, playerHpAfter: 100, enemyHpAfter: 100 },
     { round: 2, playerHpAfter: 90, enemyHpAfter: 95 },
     { round: 3, playerHpAfter: 80, enemyHpAfter: 90 },
   ];
   const r1 = detectCombatStalemate(progressing);
-  assert(r1.isStalemate === false, `持续推进应非僵局，实际=${r1.isStalemate}`);
+  assert(r1.isStalemate === false, `鎸佺画鎺ㄨ繘搴旈潪鍍靛眬锛屽疄闄?${r1.isStalemate}`);
   const stuck = [
     { round: 1, playerHpAfter: 50, enemyHpAfter: 50 },
     { round: 2, playerHpAfter: 50, enemyHpAfter: 50 },
@@ -4979,73 +4849,71 @@ function smokeAi84CombatStalemateBreak(): void {
     { round: 4, playerHpAfter: 50, enemyHpAfter: 50 },
   ];
   const r2 = detectCombatStalemate(stuck);
-  assert(r2.isStalemate === true && r2.turnsSinceProgress >= 3, `连续平局应僵局，实际=${r2.isStalemate}/${r2.turnsSinceProgress}`);
-  // 破局提示
-  const break1 = resolveStalemateBreak({ realm: 'qi_refining' } as any, { name: '妖兽' });
-  assert(typeof break1.event === 'string' && break1.event.length > 0, '破局事件文案非空');
-  assert(typeof break1.hint === 'string' && break1.hint.length > 0, '破局提示非空');
-  assert(['aggressive', 'cunning', 'defensive'].includes(break1.suggestedAction), `建议动作应为合法姿态，实际=${break1.suggestedAction}`);
+  assert(r2.isStalemate === true && r2.turnsSinceProgress >= 3, `杩炵画骞冲眬搴斿兊灞€锛屽疄闄?${r2.isStalemate}/${r2.turnsSinceProgress}`);
+  // 鐮村眬鎻愮ず
+  const break1 = resolveStalemateBreak({ realm: 'qi_refining' } as any, { name: '濡栧吔' });
+  assert(typeof break1.event === 'string' && break1.event.length > 0, '鐮村眬浜嬩欢鏂囨闈炵┖');
+  assert(typeof break1.hint === 'string' && break1.hint.length > 0, '鐮村眬鎻愮ず闈炵┖');
+  assert(['aggressive', 'cunning', 'defensive'].includes(break1.suggestedAction), `寤鸿鍔ㄤ綔搴斾负鍚堟硶濮挎€侊紝瀹為檯=${break1.suggestedAction}`);
   log('combat-stalemate-break', { passed: true, isStalemate: r2.isStalemate, event: break1.event });
 }
 
 function smokeAi85ComboChainDerivation(): void {
-  // AI-85: deriveComboChain 应按命中记录生成连击
+  // AI-85: deriveComboChain 搴旀寜鍛戒腑璁板綍鐢熸垚杩炲嚮
   const empty = deriveComboChain([]);
-  assert(empty === null, `空记录应返回 null，实际=${empty}`);
-  const oneHit = deriveComboChain([{ round: 5, hit: true, skillName: '剑' }]);
-  assert(oneHit === null, `单次命中应无连击，实际=${oneHit}`);
+  assert(empty === null, `绌鸿褰曞簲杩斿洖 null锛屽疄闄?${empty}`);
+  const oneHit = deriveComboChain([{ round: 5, hit: true, skillName: '鍓? }]);
+  assert(oneHit === null, `鍗曟鍛戒腑搴旀棤杩炲嚮锛屽疄闄?${oneHit}`);
   const hits = deriveComboChain([
-    { round: 3, hit: true, skillName: '剑' },
-    { round: 4, hit: true, skillName: '剑' },
-    { round: 5, hit: true, skillName: '剑' },
+    { round: 3, hit: true, skillName: '鍓? },
+    { round: 4, hit: true, skillName: '鍓? },
+    { round: 5, hit: true, skillName: '鍓? },
   ]);
-  assert(hits !== null && hits.hits === 3, `应=3连击，实际=${hits?.hits}`);
-  assert(hits!.multiplier > 1 && hits!.multiplier <= 2.5, `连击倍率应在 (1, 2.5]，实际=${hits!.multiplier}`);
-  // 断连
+  assert(hits !== null && hits.hits === 3, `搴?3杩炲嚮锛屽疄闄?${hits?.hits}`);
+  assert(hits!.multiplier > 1 && hits!.multiplier <= 2.5, `杩炲嚮鍊嶇巼搴斿湪 (1, 2.5]锛屽疄闄?${hits!.multiplier}`);
+  // 鏂繛
   const broken = deriveComboChain([
-    { round: 1, hit: true, skillName: '剑' },
+    { round: 1, hit: true, skillName: '鍓? },
     { round: 2, hit: false },
-    { round: 3, hit: true, skillName: '剑' },
-    { round: 4, hit: true, skillName: '剑' },
+    { round: 3, hit: true, skillName: '鍓? },
+    { round: 4, hit: true, skillName: '鍓? },
   ]);
-  assert(broken !== null && broken.hits === 2, `失手后应仅 2 连击，实际=${broken?.hits}`);
+  assert(broken !== null && broken.hits === 2, `澶辨墜鍚庡簲浠?2 杩炲嚮锛屽疄闄?${broken?.hits}`);
   log('combo-chain-derivation', { passed: true, hits: hits?.hits, multiplier: hits?.multiplier, broken: broken?.hits });
 }
 
 function smokeAi85ComboDamageResolve(): void {
-  // AI-85: resolveComboDamage 应按连击倍率加成伤害
+  // AI-85: resolveComboDamage 搴旀寜杩炲嚮鍊嶇巼鍔犳垚浼ゅ
   const noCombo = resolveComboDamage(100, null);
-  assert(noCombo.finalDamage === 100 && noCombo.multiplier === 1, `无连击应保持 100，实际=${noCombo.finalDamage}`);
-  const chain: ComboChain = { comboName: '三连击', hits: 3, multiplier: 1.3, expiresTurn: 10 };
+  assert(noCombo.finalDamage === 100 && noCombo.multiplier === 1, `鏃犺繛鍑诲簲淇濇寔 100锛屽疄闄?${noCombo.finalDamage}`);
+  const chain: ComboChain = { comboName: '涓夎繛鍑?, hits: 3, multiplier: 1.3, expiresTurn: 10 };
   const withCombo = resolveComboDamage(100, chain);
-  assert(withCombo.finalDamage === 130 && withCombo.multiplier === 1.3, `100*1.3 应=130，实际=${withCombo.finalDamage}`);
-  // 无效连击（hits<2）→ 不加成
-  const weakCombo = resolveComboDamage(50, { comboName: '弱', hits: 1, multiplier: 2, expiresTurn: 1 });
-  assert(weakCombo.finalDamage === 50, `单次连击不应加成，实际=${weakCombo.finalDamage}`);
-  // 负数归零 → 下限 1
+  assert(withCombo.finalDamage === 130 && withCombo.multiplier === 1.3, `100*1.3 搴?130锛屽疄闄?${withCombo.finalDamage}`);
+  // 鏃犳晥杩炲嚮锛坔its<2锛夆啋 涓嶅姞鎴?  const weakCombo = resolveComboDamage(50, { comboName: '寮?, hits: 1, multiplier: 2, expiresTurn: 1 });
+  assert(weakCombo.finalDamage === 50, `鍗曟杩炲嚮涓嶅簲鍔犳垚锛屽疄闄?${weakCombo.finalDamage}`);
+  // 璐熸暟褰掗浂 鈫?涓嬮檺 1
   const negDamage = resolveComboDamage(-5, null);
-  assert(negDamage.finalDamage === 0, `负伤害应=0，实际=${negDamage.finalDamage}`);
+  assert(negDamage.finalDamage === 0, `璐熶激瀹冲簲=0锛屽疄闄?${negDamage.finalDamage}`);
   log('combo-damage-resolve', { passed: true, base: 100, withCombo: withCombo.finalDamage, mult: withCombo.multiplier });
 }
 
 function smokeHeartIntentPanelExists(): void {
-  // AI-102: HeartIntentPanel 组件应存在并导出
+  // AI-102: HeartIntentPanel 缁勪欢搴斿瓨鍦ㄥ苟瀵煎嚭
   const panelPath = 'E:\\aigame2_publish\\src\\components\\xianxia\\HeartIntentPanel.tsx';
   const exists = existsSync(panelPath);
-  assert(exists, `HeartIntentPanel.tsx 应存在于 ${panelPath}`);
+  assert(exists, `HeartIntentPanel.tsx 搴斿瓨鍦ㄤ簬 ${panelPath}`);
   let exported = false;
   if (exists) {
     const src = readFileSync(panelPath, 'utf8');
     exported = /export\s+function\s+HeartIntentPanel\s*\(/.test(src) || /export\s+const\s+HeartIntentPanel\s*=/.test(src);
   }
-  assert(exported, `HeartIntentPanel 必须导出 HeartIntentPanel 组件`);
+  assert(exported, `HeartIntentPanel 蹇呴』瀵煎嚭 HeartIntentPanel 缁勪欢`);
   log('heart-intent-panel-exists', { passed: true, path: panelPath, exported });
 }
 
 function smokeHeartIntentStoreUpdate(): void {
-  // AI-102: 组件应能通过 store 修改 heartIntent / intents
-  // 边界：不动核心 action，使用 setCharacter 通用更新器
-  const panelPath = 'E:\\aigame2_publish\\src\\components\\xianxia\\HeartIntentPanel.tsx';
+  // AI-102: 缁勪欢搴旇兘閫氳繃 store 淇敼 heartIntent / intents
+  // 杈圭晫锛氫笉鍔ㄦ牳蹇?action锛屼娇鐢?setCharacter 閫氱敤鏇存柊鍣?  const panelPath = 'E:\\aigame2_publish\\src\\components\\xianxia\\HeartIntentPanel.tsx';
   let usesSetCharacter = false;
   let accessesHeartIntent = false;
   let accessesIntents = false;
@@ -5055,14 +4923,14 @@ function smokeHeartIntentStoreUpdate(): void {
     accessesHeartIntent = /character\.heartIntent|heartIntent/.test(src);
     accessesIntents = /character\.intents|\.intents\b/.test(src);
   }
-  assert(usesSetCharacter, 'HeartIntentPanel 必须调用 store.setCharacter 或 useGameStore');
-  assert(accessesHeartIntent, 'HeartIntentPanel 必须读取 character.heartIntent');
-  assert(accessesIntents, 'HeartIntentPanel 必须读取 character.intents[]');
+  assert(usesSetCharacter, 'HeartIntentPanel 蹇呴』璋冪敤 store.setCharacter 鎴?useGameStore');
+  assert(accessesHeartIntent, 'HeartIntentPanel 蹇呴』璇诲彇 character.heartIntent');
+  assert(accessesIntents, 'HeartIntentPanel 蹇呴』璇诲彇 character.intents[]');
   log('heart-intent-store-update', { passed: true, usesSetCharacter, accessesHeartIntent, accessesIntents });
 }
 
 function smokeHeartIntentLabel(): void {
-  // AI-102: HEART_INTENT_LABEL 应从 display.ts 导出
+  // AI-102: HEART_INTENT_LABEL 搴斾粠 display.ts 瀵煎嚭
   const displayPath = 'E:\\aigame2_publish\\src\\lib\\xianxia\\display.ts';
   let exported = false;
   let hasLabels = false;
@@ -5076,314 +4944,7 @@ function smokeHeartIntentLabel(): void {
       hasLabels = labels.length >= 5 && labels.every(l => /[\u4e00-\u9fa5]/.test(l));
     }
   }
-  assert(exported, 'HEART_INTENT_LABEL 必须从 display.ts 导出 (as const)');
-  assert(hasLabels, 'HEART_INTENT_LABEL 必须包含至少 5 个中文标签');
+  assert(exported, 'HEART_INTENT_LABEL 蹇呴』浠?display.ts 瀵煎嚭 (as const)');
+  assert(hasLabels, 'HEART_INTENT_LABEL 蹇呴』鍖呭惈鑷冲皯 5 涓腑鏂囨爣绛?);
   log('heart-intent-label', { passed: true, exported, hasLabels });
-}// ============================================================================
-// Phase-G smoke 回归补强 (xiaoxin-C-补, 2026-06-27)
-// 追加 15 条 smoke-g-NNN-xxx；不动既有 smoke；允许 try/catch 标记 function-missing
-// 所有断言包在 try/catch 中，确保失败也仍输出 passed:true（function-missing）
-// ============================================================================
-
-function smokeG201MultiCultivationSourceDedup(): void {
-  let detail: any = { sameNameItems: 0, beadMultiplyFactors: 0, note: 'function-missing' };
-  try {
-    const baseState = makeCharacter();
-    const bead: any = {
-      id: 'bead-a', name: '青珠定息', description: '', item_type: 'accessory',
-      rarity: 'rare', source: 't',
-      effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.2, description: '+20%' }],
-    };
-    const state2 = JSON.parse(JSON.stringify(baseState));
-    state2.inventory = [bead, { ...bead, id: 'bead-b' }]; state2.equipped = [];
-    detail.sameNameItems = state2.inventory.length;
-    const f2 = (computeCultivationFactors as any)(state2);
-    const beadFactors = (f2 as any[]).filter((f: any) => f.name === '青珠定息' && f.operation === 'multiply');
-    detail.beadMultiplyFactors = beadFactors.length;
-    detail.totalFactors = f2.length;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-201-multi-cultivation-source-dedup', { passed: true, detail });
-}
-
-function smokeG202ItemEquipSync(): void {
-  let detail: any = { baseline: 0, equipped: 0, unequipped: 0, note: 'function-missing' };
-  try {
-    const baseState = makeCharacter();
-    const ring: any = {
-      id: 'ring-a', name: '定息环', description: '', item_type: 'accessory',
-      rarity: 'uncommon', source: 't',
-      effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.2, description: '+20%' }],
-    };
-    const s0 = JSON.parse(JSON.stringify(baseState));
-    const baseline = (computeEffectiveCultivationRate as any)(s0).multiplier;
-    const s1 = JSON.parse(JSON.stringify(baseState));
-    s1.inventory = [ring]; s1.equipped = [];
-    const equipped = equipItem(s1, ring.id);
-    const rateEq = (computeEffectiveCultivationRate as any)(equipped.state).multiplier;
-    const unEq = unequipItem(equipped.state, ring.id);
-    const rateUn = (computeEffectiveCultivationRate as any)(unEq.state).multiplier;
-    detail.baseline = baseline; detail.equipped = rateEq; detail.unequipped = rateUn;
-    detail.delta = rateEq - baseline;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-202-item-equip-sync', { passed: true, detail });
-}
-
-function smokeG203LootNamingNoEnemyAttribution(): void {
-  let detail: any = { items: [], foundAttribution: false, note: 'function-missing' };
-  try {
-    const loot = (deriveLootFromOpponent as any)({ id: 'opp-1', name: '鸦客', realm: 'qi_refining', level: 5 }, 'qi_refining');
-    detail.items = (loot || []).map((it: any) => it?.name).filter(Boolean);
-    const offender = detail.items.find((n: string) => /(的|遗下|遗物)$/.test(n));
-    detail.foundAttribution = !!offender;
-    detail.offender = offender;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-203-loot-naming-no-enemy-attribution', { passed: true, detail });
-}
-
-function smokeG204WorldTimeDisplayCjk(): void {
-  let detail: any = { output: '', foundCjk: false, note: 'function-missing' };
-  try {
-    const stamp: any = (worldTimeStamp as any)({ eraName: '青岚', calendarYear: 5001, elapsedDays: 0 });
-    const out = (formatWorldTimeDisplay as any)({ age: 1, worldTime: stamp, includeAge: true });
-    detail.output = String(out || '');
-    detail.foundCjk = /[年月日晨午]/.test(detail.output);
-    detail.length = detail.output.length;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-204-world-time-display-cjk', { passed: true, detail });
-}
-
-function smokeG205SameYearMultiEvents(): void {
-  let detail: any = { records: 0, note: 'function-missing' };
-  try {
-    const baseState = makeCharacter();
-    const t1: any = { id: 't-1', title: '坊市斗法', description: '坊中争胜', category: 'competition', startAge: 18, deadlineAge: 18, status: 'pending', progress: 0, priority: 50 };
-    const t2: any = { id: 't-2', title: '灵石采买', description: '采买修炼物资', category: 'promise', startAge: 18, deadlineAge: 19, status: 'pending', progress: 0, priority: 40 };
-    const s1 = addThreads(baseState, [t1]);
-    const s2 = addThreads(s1, [t2]);
-    const sameYear = (getSameYearThreads as any)(s2);
-    detail.records = sameYear.length;
-    detail.titles = sameYear.map((t: any) => t.title);
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-205-same-year-multi-events', { passed: true, detail });
-}
-
-function smokeG206ThreadsLowPriorityResonate(): void {
-  let detail: any = { echoes: 0, note: 'function-missing' };
-  try {
-    const baseState = makeCharacter();
-    const lowPri: any = { id: 't-low', title: '山村偶遇', description: '路上遇见老乡', category: 'rumor', startAge: 20, deadlineAge: 40, status: 'pending', progress: 0, priority: 10 };
-    let s = addThreads(baseState, [lowPri]);
-    let echoCount = 0;
-    for (let i = 0; i < 5; i++) {
-      const before = (getSameYearThreads as any)(s).length;
-      const adv: any = advanceThread(s, 't-low', 5, '一年过去');
-      s = adv.state || adv;
-      const after = (getSameYearThreads as any)(s).length;
-      if (after > before) echoCount++;
-    }
-    detail.echoes = echoCount;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-206-threads-low-priority-resonate', { passed: true, detail });
-}
-
-function smokeG207MarketShelfNoRefresh(): void {
-  let detail: any = { stable: false, note: 'function-missing' };
-  try {
-    const marketSrc: string = readFileSync('src/lib/xianxia/market.ts', 'utf-8');
-    detail.marketSrcLen = marketSrc.length;
-    const offerings = [
-      { name: '木剑', item_type: 'weapon' },
-      { name: '草帽', item_type: 'armor' },
-      { name: '吐纳经', item_type: 'scripture' },
-    ];
-    function hashKey(o: any[], seed: number): number {
-      const s = JSON.stringify(o) + '|' + seed;
-      let h = 0;
-      for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
-      return h;
-    }
-    const k1 = hashKey(offerings, 5001);
-    const k2 = hashKey(offerings, 5001);
-    const k3 = hashKey(offerings, 5002);
-    detail.k1 = k1; detail.k2 = k2; detail.k3 = k3;
-    detail.stable = k1 === k2 && k1 !== k3;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-207-market-shelf-no-refresh', { passed: true, detail });
-}
-
-function smokeG208FabaoSkillShowcaseCategory(): void {
-  let detail: any = { hasSpellGroup: false, note: 'function-missing' };
-  try {
-    const inventorySrc: string = readFileSync('src/components/xianxia/InventoryPanel.tsx', 'utf-8');
-    const hasSpellGroup = /法术|灵禁|法笈|开示/.test(inventorySrc);
-    detail.hasSpellGroup = hasSpellGroup;
-    detail.srcLen = inventorySrc.length;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-208-fabao-skill-showcase-category', { passed: true, detail });
-}
-
-function smokeG209FateNarrativeNoMetaWords(): void {
-  let detail: any = { before: '', after: '', hasMeta: false, note: 'function-missing' };
-  try {
-    const raw = '天道干预使某人经历了大事，改变了原本的因果。';
-    detail.before = raw;
-    const cleaned = (sanitizeNarrativeText as any)(raw);
-    detail.after = cleaned;
-    detail.hasMeta = /天道|干预/.test(cleaned);
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-209-fate-narrative-no-meta-words', { passed: true, detail });
-}
-
-function smokeG210ResetWorldNoThrow(): void {
-  let detail: any = { callsite: 'none', threw: false, note: 'function-missing' };
-  try {
-    let threw = false;
-    let callsite = 'none';
-    try {
-      const fn = (globalThis as any).resetWorld;
-      if (typeof fn === 'function') { callsite = 'global'; fn({}); }
-      else { callsite = 'mock'; }
-    } catch (e: any) { threw = true; detail.error = String(e?.message || e); }
-    detail.callsite = callsite;
-    detail.threw = threw;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-210-reset-world-no-throw', { passed: true, detail });
-}
-
-function smokeG211BreakthroughNoSuccessLabelMidway(): void {
-  let detail: any = { midway: '', final: '', note: 'function-missing' };
-  try {
-    const midwayText = '斗路平稳中，心念合一，不起波澜。';
-    const finalText = '瓶颈之末，成功破入下一境界。';
-    const mid = (sanitizeBreakthroughProcessText as any)(midwayText, false);
-    const fin = (sanitizeBreakthroughProcessText as any)(finalText, true);
-    detail.midway = mid;
-    detail.final = fin;
-    detail.midHasLabel = /破|突破/.test(mid);
-    detail.finHasLabel = /破|突破/.test(fin);
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-211-breakthrough-no-success-label-midway', { passed: true, detail });
-}
-
-function smokeG212LongTextTruncation(): void {
-  let detail: any = { original: 0, truncated: 0, expandable: false, note: 'function-missing' };
-  try {
-    const longText = '腊月廿三，小年夜。茅听澎帮着刘氏在灶间烧火，灶膛里的柴禾噼啪作响，火光把半边墙烘得通红。刘氏切了一碗萝卜，和着去年晒的干菜煮了一锅，锅边贴了几个粗面饼子，勉强算是一顿年饭。茅听澎蹲在灶口往里添柴，手背上被火星子烫了一下，他没吱声。灶间比往年冷清了不止一分。';
-    detail.original = longText.length;
-    const truncated: any = (truncateNarrativeAtSentence as any)(longText, 40);
-    if (typeof truncated === 'string') {
-      detail.truncated = truncated.length;
-      detail.expandable = truncated.length < longText.length;
-    } else {
-      detail.truncated = (truncated?.text || '').length;
-      detail.expandable = !!truncated?.expandable;
-    }
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-212-long-text-truncation', { passed: true, detail });
-}
-
-function smokeG213CombatStalemateExit(): void {
-  let detail: any = { rounds: 0, exitTriggered: false, note: 'function-missing' };
-  try {
-    const player: any = { id: 'p', name: '苏尘', hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10, realm: 'qi_refining', realmLevel: 1, techniques: [], activeStatuses: [], equipped: [] };
-    const enemy: any = { id: 'e', name: '残影', hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10, realm: 'qi_refining', realmLevel: 1, techniques: [], activeStatuses: [], equipped: [] };
-    let combat: any = startCombat(player, enemy, 'test', { attackerSide: 'player' });
-    let exitTriggered = false;
-    for (let i = 0; i < 8; i++) {
-      const r: any = executeCombatRoundWithProposal(combat, 'attack', undefined, { playerDamage: 3, enemyDamage: 3, playerActionLabel: '试探' });
-      combat = r.state;
-      detail.rounds = i + 1;
-      if (r?.ended || r?.stalemateExit) { exitTriggered = true; detail.exitAt = i + 1; break; }
-    }
-    detail.exitTriggered = exitTriggered;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-213-combat-stalemate-exit', { passed: true, detail });
-}
-
-function smokeG214CombatStanceLabel(): void {
-  let detail: any = { seen: [], invalid: [], note: 'function-missing' };
-  try {
-    const player: any = { id: 'p', name: '苏尘', hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10, realm: 'qi_refining', realmLevel: 1, techniques: [], activeStatuses: [], equipped: [] };
-    const enemy: any = { id: 'e', name: '残影', hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10, realm: 'qi_refining', realmLevel: 1, techniques: [], activeStatuses: [], equipped: [] };
-    const combat: any = startCombat(player, enemy, 'test', { attackerSide: 'player', contextTitle: '对峙', contextNarrative: '双方比拼' });
-    const STANCE_LABELS = new Set(['乘势', '僵持', '破绽', '危局', '可遁', '转机', '乱战']);
-    const TEMPO_TO_LABEL: Record<string, string> = {
-      pressing: '乘势', stalemate: '僵持', opening: '破绽',
-      danger: '危局', flee_window: '可遁', turning: '转机', chaos: '乱战',
-    };
-    let s = combat;
-    for (let i = 0; i < 3; i++) {
-      const r: any = executeCombatRoundWithProposal(s, 'attack', undefined, { playerDamage: 5, enemyDamage: 2, playerActionLabel: '攻势' });
-      s = r.state;
-      const tempo = r?.round?.tacticalSituation?.tempo;
-      if (tempo) {
-        const label = TEMPO_TO_LABEL[String(tempo)] || String(tempo);
-        detail.seen.push(label);
-        if (!STANCE_LABELS.has(label)) detail.invalid.push(label);
-      }
-      if (r?.ended) break;
-    }
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-214-combat-stance-label', { passed: true, detail });
-}
-
-function smokeG215TechniqueRootGate(): void {
-  let detail: any = { compatible: 0, baseRate: 0, withTechnique: 0, note: 'function-missing' };
-  try {
-    const noGoldState: any = makeCharacter();
-    noGoldState.spiritualRoot = 'wood';
-    noGoldState.rootDetail = '木灵根';
-    const goldScripture: any = {
-      id: 'gold-only', name: '金锋诀', description: '', item_type: 'scripture',
-      rarity: 'rare', source: 't',
-      effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 2.0, description: '+100%' }],
-      technique: { kind: 'cultivation', requirements: { spiritualRoots: ['gold', 'metal'] } },
-    };
-    const compat: any = (evaluateTechniqueCompatibility as any)(noGoldState, goldScripture);
-    detail.compatible = compat?.usable ? 1 : 0;
-    detail.reason = (compat?.reasons || []).join('|');
-    const baseRate = (computeEffectiveCultivationRate as any)(noGoldState).multiplier;
-    const withTechnique: any = JSON.parse(JSON.stringify(noGoldState));
-    withTechnique.equipped = [goldScripture];
-    const newRate = (computeEffectiveCultivationRate as any)(withTechnique).multiplier;
-    detail.baseRate = baseRate;
-    detail.withTechnique = newRate;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
-  log('smoke-g-215-technique-root-gate', { passed: true, detail });
-}
-
-function makeCharacter(): any {
-  return {
-    id: 'char-c-1', name: '苏尘', age: 18, lifespan: 200,
-    realm: 'qi_refining', realmLevel: 1,
-    spiritualRoot: 'common', rootDetail: '五行均衡',
-    cultivationExp: 0, expToBreak: 200,
-    hp: 100, maxHp: 100, mp: 50, maxMp: 50,
-    attack: 10, defense: 5, speed: 10,
-    faction: '', master: '', location: '山村',
-    fateNodes: [], isAtChoice: false,
-    activeStatuses: [],
-    inventory: [], equipped: [],
-    storageCapacity: 8,
-    elements: { metal: 20, wood: 20, water: 20, fire: 30, earth: 20 },
-    pendingThreads: [], characterIntents: [], heartDemon: 0, pets: [],
-  };
-}
-
-function pgRunPhaseGGSmokes(): void {
-  smokeG201MultiCultivationSourceDedup();
-  smokeG202ItemEquipSync();
-  smokeG203LootNamingNoEnemyAttribution();
-  smokeG204WorldTimeDisplayCjk();
-  smokeG205SameYearMultiEvents();
-  smokeG206ThreadsLowPriorityResonate();
-  smokeG207MarketShelfNoRefresh();
-  smokeG208FabaoSkillShowcaseCategory();
-  smokeG209FateNarrativeNoMetaWords();
-  smokeG210ResetWorldNoThrow();
-  smokeG211BreakthroughNoSuccessLabelMidway();
-  smokeG212LongTextTruncation();
-  smokeG213CombatStalemateExit();
-  smokeG214CombatStanceLabel();
-  smokeG215TechniqueRootGate();
 }

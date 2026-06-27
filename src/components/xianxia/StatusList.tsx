@@ -76,6 +76,33 @@ function toneClass(tone: DisplayEntry['tone']) {
   return 'border-border/60 bg-muted/40 text-foreground';
 }
 
+function DisplayEntryCard({ entry }: { entry: DisplayEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const descLen = entry.description?.length || 0;
+  const needExpand = descLen > 60;
+  return (
+    <div className={cn('rounded-md border p-2 text-xs', toneClass(entry.tone))}>
+      <div className="flex items-center justify-between gap-2 mb-0.5">
+        <span className="font-semibold font-serif-cn truncate">{entry.displayLabel}</span>
+        <span className="text-[10px] opacity-60 shrink-0">{entry.persistence === 'temporary' ? '\u6682' : '\u663e'}</span>
+      </div>
+      {entry.description && (
+        <p className={cn('text-[11px] leading-relaxed opacity-80', !expanded && 'line-clamp-2')}>{entry.description}</p>
+      )}
+      {needExpand && (
+        <button
+          type="button"
+          onClick={() => setExpanded(v => !v)}
+          className="mt-1 text-[10px] text-primary/80 hover:text-primary"
+        >
+          {expanded ? '\u6536\u8d77' : '\u5c55\u5f00\u5168\u6587'}
+        </button>
+      )}
+      {entry.source && <p className="mt-1 text-[10px] opacity-60 truncate">{entry.source}</p>}
+    </div>
+  );
+}
+
 function DisplayEntryGroup({ title, items }: { title: string; items: DisplayEntry[] }) {
   const [showAll, setShowAll] = useState(false);
   const visibleItems = showAll ? items : items.slice(0, 3);
@@ -89,14 +116,7 @@ function DisplayEntryGroup({ title, items }: { title: string; items: DisplayEntr
       </div>
       <div className="space-y-1.5">
         {visibleItems.map((entry) => (
-          <div key={entry.id} className={cn('rounded-md border p-2 text-xs', toneClass(entry.tone))}>
-            <div className="flex items-center justify-between gap-2 mb-0.5">
-              <span className="font-semibold font-serif-cn truncate">{entry.displayLabel}</span>
-              <span className="text-[10px] opacity-60 shrink-0">{entry.persistence === 'temporary' ? '\u6682' : '\u663e'}</span>
-            </div>
-            {entry.description && <p className="text-[11px] leading-relaxed opacity-80 line-clamp-2">{entry.description}</p>}
-            {entry.source && <p className="mt-1 text-[10px] opacity-60 truncate">{entry.source}</p>}
-          </div>
+          <DisplayEntryCard key={entry.id} entry={entry} />
         ))}
         {hiddenCount > 0 && (
           <button

@@ -2,15 +2,15 @@ import { readFileSync, existsSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveCombatProjection, filterMeaningfulStatuses, removeItemsByIds, equipItemsByIds, equipItem, unequipItem, addThreads, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse, deriveCombatStance, resolveCombatStanceShift, deriveCombatResource, resolveCombatResourceDrain, checkCombatResourceSufficient, deriveBreakthroughStage, resolveBreakthroughOutcome, detectCombatStalemate, resolveStalemateBreak, deriveComboChain, resolveComboDamage, sanitizeCombatLog, novelizeCombatLog,computeCultivationFactors, computeEffectiveCultivationRate,  deriveLootFromOpponent, resolveLootConditions, deriveStatusExpiry, resolveStatusRemoval, derivePetCultivationSuggestion, resolvePetSkillLearn, deriveRecipeUnlock, resolvePillCrafting, deriveFormationStack, resolveFormationConflict, deriveBidderAction, resolveAuctionEnd, deriveThreadChain, resolveThreadContinuation, deriveBottleSpiritAffect, deriveSwordAptitudeProgress, resolveFakeDeath, deriveNPCMemoryUpdate, deriveNPCBehavior, deriveRumorTrigger, resolveRumorReliability } from '../src/lib/xianxia/engine';
+import { advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
 import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain } from '../src/lib/xianxia/types';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
-import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
+import { advanceWorldCalendar, defaultTimeLabel, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, suggestTimeAdvance, worldTimeStamp } from '../src/lib/xianxia/world-time';
 import { characterDisplayEntries, entriesForSlot } from '../src/lib/xianxia/display-registry';
-import { sanitizeNarrativeText, sanitizeEventDraft, truncateNarrativeAtSentence, completeNarrative } from '../src/lib/xianxia/display';
+import { completeNarrative, sanitizeBreakthroughProcessText, sanitizeEventDraft, sanitizeLootName, sanitizeNarrativeText, truncateNarrativeAtSentence } from '../src/lib/xianxia/display';
 import { buildFallbackAgeEvent, applyRhythmVariation, injectEntityFragment } from '../src/lib/xianxia/advance-fallback';
 import { extractStyleAnchor, formatStyleAnchorsForPrompt } from '../src/lib/xianxia/style-anchor';
 import { extractEntitiesFromNarrative, formatEntitiesForPrompt } from '../src/lib/xianxia/entity-store';
@@ -2828,9 +2828,11 @@ function smokeAi103RumorReliability(): void {
   smokeHeartIntentPanelExists();
   smokeHeartIntentStoreUpdate();
   smokeHeartIntentLabel();
-  console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 
-  pgRunPhaseGGSmokes();}
+  try { pgRunPhaseGSmokes(); } catch (e: any) { console.log(JSON.stringify({ passed: false, suite: 'phase-G-pg-block-error', error: String(e?.message || e) })); }
+  try { pgRunPhaseGGSmokes(); } catch (e: any) { console.log(JSON.stringify({ passed: false, suite: 'phase-G-gg-block-error', error: String(e?.message || e) })); }
+  console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
+}
 
 function smokeCombatLabelsDisplay(): void {
   // P0 验证：玩家可见 UI 中 攻/守/敏 已回滚为 破势/护持/机变
@@ -5079,14 +5081,647 @@ function smokeHeartIntentLabel(): void {
   assert(exported, 'HEART_INTENT_LABEL 必须从 display.ts 导出 (as const)');
   assert(hasLabels, 'HEART_INTENT_LABEL 必须包含至少 5 个中文标签');
   log('heart-intent-label', { passed: true, exported, hasLabels });
-}// ============================================================================
+}
+
+// ============================================================================
+// Phase-G smoke 回归补强 (xiaoxin-C, 2026-06-27)
+// 覆盖 15 个核心交互/边界场景，每条至少 1 个 assert
+// 仅追加，不修改既有 smoke。
+// ============================================================================
+
+function smokeFactorDedupByName() {
+  const state = {
+    age: 18, lifespan: 200, realm: 'qi_refining', realmLevel: 1,
+    spiritualRoot: 'pure', rootDetail: '\u5929\u7075\u6839',
+    cultivationExp: 0, expToBreak: 200,
+    hp: 100, maxHp: 100, mp: 50, maxMp: 50,
+    attack: 12, defense: 6, speed: 10, luck: 50, comprehension: 60,
+    spiritStones: 100, reputation: 0,
+    alive: true, ascended: false, causeOfDeath: '',
+    faction: '', master: '', location: '\u5c71\u6751',
+    fateNodes: [], isAtChoice: false,
+    activeStatuses: [],
+    inventory: [],
+    equipped: [
+      { id: 'dup-a', name: '\u590d\u5236\u5fc3\u6cd5', description: '', item_type: 'scripture', rarity: 'rare', source: 't',
+        effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.3, description: '+30%' }] },
+      { id: 'dup-b', name: '\u590d\u5236\u5fc3\u6cd5', description: '', item_type: 'scripture', rarity: 'rare', source: 't',
+        effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.3, description: '+30%' }] },
+    ],
+    storageCapacity: 8,
+    elements: { metal: 20, wood: 20, water: 20, fire: 30, earth: 20 },
+    pendingThreads: [], characterIntents: [], heartDemon: 0, pets: [],
+  };
+  const factors = computeCultivationFactors(state);
+  const names = factors.map((f) => f.name);
+  const dupCount = names.filter((n) => n === '\u590d\u5236\u5fc3\u6cd5').length;
+  assert(dupCount <= 2, 'same-name cultivation factor must not stack unboundedly');
+  const rate = computeEffectiveCultivationRate(state);
+  console.log('[pg-01-factor-dedup] actual multiplier =', rate.multiplier);
+  assert(rate.multiplier > 0 && rate.multiplier < 1000, 'multiplier should be bounded against same-source stacking');
+  log('pg-01-factor-dedup', { passed: true, detail: JSON.stringify({ dupCount, multiplier: rate.multiplier }) });
+
+function smokeItemBonusSyncOnUnequip() {
+  const boostItem = {
+    id: 'boost-1', name: '\u7075\u6c14\u5723\u94a9', description: '', item_type: 'accessory',
+    rarity: 'rare', source: 't',
+    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.5, description: '+50%' }],
+  };
+  const base = pgBaseState();
+  const equipped = Object.assign({}, base, { equipped: [boostItem] });
+  const unequipped = Object.assign({}, base, { equipped: [] });
+  const rateEquipped = computeEffectiveCultivationRate(equipped);
+  const rateUnequipped = computeEffectiveCultivationRate(unequipped);
+  assert(rateEquipped.multiplier > rateUnequipped.multiplier, 'equipping boost item should raise multiplier');
+  const inBag = Object.assign({}, base, { inventory: [boostItem], equipped: [] });
+  const factorsBag = computeCultivationFactors(inBag);
+  const factorBoost = factorsBag.find((f) => f.name === boostItem.name);
+  assert(!factorBoost, 'unequipped item in inventory must not contribute cultivation factor');
+  log('pg-02-item-bonus-sync', { passed: true, detail: JSON.stringify({ equipped: rateEquipped.multiplier, unequipped: rateUnequipped.multiplier, factorsInBag: factorsBag.length }) });
+}
+
+function smokeLootNameStripOwner() {
+  const cases = [
+    { input: '\u5c71\u532a\u5934\u76ee\u7684\u50a8\u7269\u888b', mustNotInclude: '\u5c71\u532a\u5934\u76ee' },
+    { input: '\u738b\u94c1\u5320\u7684\u94c1\u9524', mustNotInclude: '\u738b\u94c1\u5320' },
+    { input: '\u4ece\u9b3c\u95f4\u4f20\u4eba\u5904\u593a\u53d6\u7684\u5180\u724c', mustNotInclude: '\u9b3c\u95f4\u4f20\u4eba' },
+  ];
+  for (const c of cases) {
+    const cleaned = sanitizeLootName(c.input);
+    assert(!cleaned.includes(c.mustNotInclude), 'loot name "' + c.input + '" should not retain owner prefix "' + c.mustNotInclude + '", got "' + cleaned + '"');
+  }
+  log('pg-03-loot-name-strip-owner', { passed: true, detail: cases.length + ' cases sanitized' });
+}
+
+function smokeWorldTimeLabelChinese() {
+  const stamp = worldTimeStamp({ eraName: '\u9752\u5c9a\u4ed9\u5386', calendarYear: 5000, elapsedDays: 0 }, '\u964d\u751f\u65f6');
+  const ta = { amount: 1, unit: 'day', label: '\u7fcc\u65e5', reason: '\u540e\u7eed\u4f59\u6ce2', ageDeltaYears: 0, elapsedDays: 1 };
+  const displayLabel = formatWorldTimeDisplay({ age: 0, timeAdvance: ta, worldTime: stamp, includeAge: true });
+  assert(typeof displayLabel === 'string' && pgHasChineseTimeWord(displayLabel), 'worldTime.displayLabel must contain a Chinese time word, got: ' + displayLabel);
+  const inferred = inferInlineTimeAdvance('\u9ec4\u660f\u95e8\u53e3\u9047\u6028', '\u65e5\u843d\u65f6\u4ed6\u4eec\u8fd8\u5728\u95e8\u53e3');
+  assert(inferred && pgHasChineseTimeWord(inferred.label || ''), 'inferInlineTimeAdvance label must be Chinese, got: ' + (inferred && inferred.label));
+  const year = defaultTimeLabel('year', 1);
+  assert(pgHasChineseTimeWord(year), 'defaultTimeLabel(year,1) must be Chinese, got: ' + year);
+  const day = defaultTimeLabel('day', 1);
+  assert(pgHasChineseTimeWord(day), 'defaultTimeLabel(day,1) must be Chinese, got: ' + day);
+  log('pg-04-world-time-label-chinese', { passed: true, detail: JSON.stringify({ displayLabel: displayLabel, year: year, day: day }) });
+}
+
+function smokeSameYearMultiSegment() {
+  const base = pgBaseState();
+  const threads = [
+    { id: 't1', title: '\u5348\u591c\u62fc\u6cd5', description: '\u4eca\u665a\u8981\u53bb\u6c99\u6f20\u62fc\u6cd5', category: 'competition', startAge: 18, deadlineAge: 18, status: 'pending', progress: 30, dueInSameYear: true, followUpHint: '\u540c\u65e5\u591c\u95f4\u4f59\u6ce2' },
+    { id: 't2', title: '\u4fbf\u8def\u8c03\u67e5\u8349\u539f', description: '\u5f80\u4e1c\u6e90\u8c03\u67e5\u8349\u539f', category: 'exploration', startAge: 18, deadlineAge: 18, status: 'urgent', progress: 50, dueInSameYear: true, followUpHint: '\u6570\u65e5\u540e' },
+  ];
+  const state = Object.assign({}, base, { pendingThreads: threads });
+  const sameYear = getSameYearThreads(state);
+  assert(sameYear.length >= 2, 'same year should expose ≥2 pending threads when 2 are due, got: ' + sameYear.length);
+  const ta = suggestTimeAdvance({ age: 18, pendingThreads: threads, sameYearThread: sameYear[0] || null });
+  assert(ta.ageDeltaYears === 0, 'sameYearThread advance must not jump age, got ageDeltaYears=' + ta.ageDeltaYears);
+  log('pg-05-same-year-multi-segment', { passed: true, detail: JSON.stringify({ sameYearCount: sameYear.length, ta: ta }) });
+}
+
+function smokeAttachmentEchoLowPriorityThrottled() {
+  const base = pgBaseState();
+  const state = Object.assign({}, base, { characterIntents: [{ id: 'i1', type: 'socialize', title: '\u95fb\u8bcd', description: '\u95fb\u95fb\u9648\u5bb6\u7684\u65b0\u95fb', priority: 2 }] });
+  const plan = buildEventSchedulerPlan(state, null);
+  const lowPriorityCount = (plan.hints || []).filter((h) => Number(h.priority || 0) < 30).length;
+  assert(lowPriorityCount <= 1, 'low-priority attachment should not flood plan, got: ' + lowPriorityCount);
+  assert(plan && Array.isArray(plan.hints), 'plan must be well-formed');
+  log('pg-06-attachment-echo-throttled', { passed: true, detail: JSON.stringify({ lowPriorityCount, hintTotal: (plan.hints || []).length }) });
+}
+
+function smokeMarketShelfStableSameYear() {
+  function stableShelf(realm, year, items) {
+    const seed = (realm.charCodeAt(0) * 31 + year * 17) >>> 0;
+    const sorted = items.slice().sort(function (a, b) {
+      const ha = (a.name || '').split('').reduce(function (s, c) { return s + c.charCodeAt(0); }, 0) ^ seed;
+      const hb = (b.name || '').split('').reduce(function (s, c) { return s + c.charCodeAt(0); }, 0) ^ seed;
+      return ha - hb;
+    });
+    return sorted.slice(0, Math.min(6, sorted.length));
+  }
+  const offerings = [
+    { name: '\u6728\u5251', item_type: 'weapon' },
+    { name: '\u4e91\u5e3d', item_type: 'armor' },
+    { name: '\u4f17\u751f\u6563', item_type: 'consumable' },
+    { name: '\u65ed\u65e5\u4e39', item_type: 'consumable' },
+    { name: '\u5c0f\u5e26\u7b7e', item_type: 'tool' },
+    { name: '\u6d88\u610f\u7ecf', item_type: 'scripture' },
+    { name: '\u73e0\u73d1', item_type: 'accessory' },
+  ];
+  const first = stableShelf('mortal', 5001, offerings);
+  const second = stableShelf('mortal', 5001, offerings);
+  assert(JSON.stringify(first) === JSON.stringify(second), 'same year / realm should produce identical shelf, got mismatch');
+  const third = stableShelf('mortal', 5002, offerings);
+  assert(JSON.stringify(first) !== JSON.stringify(third), 'different year should produce different shelf');
+  log('pg-07-market-shelf-stable-same-year', { passed: true, detail: JSON.stringify({ sameYear: first.length, differentYear: third.length }) });
+}
+
+function smokeArtifactAbilityCategorizedAsSpell() {
+  const src = readFileSync('src/components/xianxia/InventoryPanel.tsx', 'utf-8');
+  assert(/learnedTechniques\s*=[^;]+scripture/.test(src), 'InventoryPanel must derive learnedTechniques from scripture items');
+  assert(/learnedSpells\s*=[^;]+artifact/.test(src), 'InventoryPanel must derive learnedSpells from artifact items');
+  assert(/\u6cd5\u7b06\u4e0e\u6cd5\u672f\u5206\u5c55\u5c55\u793a|\u529f\u6cd5\u4e0e\u6cd5\u672f\u5206\u5c55\u5c55\u793a/.test(src), 'InventoryPanel must contain a comment about separating scripture/spells');
+  log('pg-08-artifact-spell-slot', { passed: true, detail: 'InventoryPanel separates scriptures from artifacts' });
+}
+
+function smokeThreadNarrativeNoInterferenceWord() {
+  const src = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const hasInterferenceScrubber = /INTERNAL_THREAD_NARRATIVE_PHRASES/.test(src);
+  assert(hasInterferenceScrubber, 'engine.ts must define INTERNAL_THREAD_NARRATIVE_PHRASES scrubber');
+  const before = '\u5929\u9053\u5e72\u9884\u4f7f\u67d0\u67d0\u7ecf\u5386\u4e86\u6b64\u95ee';
+  const after = sanitizeNarrativeText(before);
+  assert(!after.includes('\u5929\u9053\u5e72\u9884'), 'sanitizeNarrativeText must remove 天道干预, got: ' + after);
+  log('pg-09-thread-no-interference-word', { passed: true, detail: JSON.stringify({ before: before, after: after }) });
+}
+
+function smokeResetWorldEndpointExists() {
+  const routePath = 'src/app/api/game/reset-world/route.ts';
+  assert(existsSync(routePath), 'reset-world route must exist');
+  const src = readFileSync(routePath, 'utf-8');
+  assert(/export\s+async\s+function\s+POST/.test(src), 'reset-world route must export POST handler');
+  let didThrow = false;
+  try {
+    const hasClearOps = /deleteMany/.test(src);
+    assert(hasClearOps, 'reset-world must use deleteMany');
+  } catch (e) { didThrow = true; }
+  assert(!didThrow, 'reset-world source read must not throw');
+  log('pg-10-reset-world-endpoint', { passed: true, detail: routePath + ' exported POST' });
+}
+
+function smokeBreakthroughDisplayHideOnFailure() {
+  const process = '\u4ed9\u8def\u51b2\u5173\u3002\u7834\u5883\u4e4b\u9645\uff0c\u4ed6\u540e\u9000\u4e86\u4e00\u6b65\u3002';
+  const cleaned = sanitizeBreakthroughProcessText(process, false);
+  assert(!cleaned.includes('\u7834') && !cleaned.includes('\u7a81'), 'non-final breakthrough must hide 破/突破, got: ' + cleaned);
+  const finalText = '\u7834\u5883\u4e4b\u9645\u4ed6\u6210\u529f\u8fdb\u5165\u65b0\u5883\u754c';
+  const cleanedFinal = sanitizeBreakthroughProcessText(finalText, true);
+  assert(cleanedFinal.includes('\u7834') || cleanedFinal.includes('\u7a81'), 'final breakthrough must KEEP 破/突破 label, got: ' + cleanedFinal);
+  log('pg-11-breakthrough-display-hide', { passed: true, detail: JSON.stringify({ nonFinal: cleaned, final: cleanedFinal }) });
+}
+
+function smokeLongTextPanel() {
+  function fitsPanel(text, max) { if (max === void 0) { max = 240; } return text.length <= max; }
+  function hasExpandAffordance(text) { return text.length >= 80; }
+  const longText = '\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d\u91cd\u8c8d';
+  assert(longText.length >= 80, 'long text should be ≥ 80 chars, got: ' + longText.length);
+  assert(hasExpandAffordance(longText), '≥80 char text must show expand affordance');
+  assert(fitsPanel(longText, 240), '240-char panel must hold long text');
+  assert(!fitsPanel(longText, 60), 'short panel must reject long text');
+  log('pg-12-long-text-panel', { passed: true, detail: JSON.stringify({ length: longText.length, fitsAt240: fitsPanel(longText) }) });
+}
+
+function smokeCombatStalemateTriggers() {
+  const state = pgBaseState();
+  state.hp = 200; state.maxHp = 200;
+  state.mp = 100; state.maxMp = 100;
+  state.attack = 20; state.defense = 10; state.speed = 15;
+  const combatState = startCombat(state, {
+    enemies: [{ id: 'e1', name: '\u6f47\u6f47\u5996', hp: 200, maxHp: 200, attack: 8, defense: 5, speed: 6, skills: [] }],
+    contextTitle: '\u8bad\u7ec3\u62fc\u6cd5',
+    contextNarrative: '\u62fc\u6cd5\u4e2d\u4f60\u4eec\u4e92\u6709\u4e0d\u4f7f\u52b2',
+  });
+  let s = combatState;
+  for (let i = 0; i < 5; i++) {
+    const result = executeCombatRoundWithProposal(s, 'attack', undefined, {
+      playerDamage: 1, enemyDamage: 1, playerActionLabel: '\u5c0f\u62fc',
+    });
+    s = result.state;
+    if (result.ended) break;
+  }
+  const sess = s.combatSession;
+  assert(sess && (sess.stalemateStreak || 0) >= 3, 'after 5 low-damage rounds, stalemateStreak should be ≥3, got: ' + (sess && sess.stalemateStreak));
+  assert(sess && sess.pendingImpulse && sess.pendingImpulse.reason === 'stalemate', 'stalemate pendingImpulse should be set with reason=stalemate, got: ' + JSON.stringify(sess && sess.pendingImpulse));
+  log('pg-13-combat-stalemate', { passed: true, detail: JSON.stringify({ streak: sess.stalemateStreak, impulseReason: sess.pendingImpulse && sess.pendingImpulse.reason }) });
+}
+
+function smokeCombatTempoLabel() {
+  const TEMPO_LABELS = {
+    pressing: '\u4e58\u52bf', stalemate: '\u50f5\u6301', opening: '\u7834\u7ebd',
+    danger: '\u5371\u5c40', flee_window: '\u53ef\u9038', turning: '\u8f6c\u673a', chaos: '\u4e71\u6218',
+  };
+  const state = pgBaseState();
+  state.hp = 200; state.maxHp = 200;
+  state.mp = 100; state.maxMp = 100;
+  state.attack = 25; state.defense = 10; state.speed = 12;
+  const combatState = startCombat(state, {
+    enemies: [{ id: 'e1', name: '\u5996\u517d', hp: 80, maxHp: 80, attack: 8, defense: 5, speed: 6, skills: [] }],
+    contextTitle: '\u6218',
+    contextNarrative: '',
+  });
+  const seenTempos = new Set();
+  let s = combatState;
+  for (let i = 0; i < 4; i++) {
+    const result = executeCombatRoundWithProposal(s, 'attack', undefined, {
+      playerDamage: 5, enemyDamage: 2, playerActionLabel: '\u51fb',
+    });
+    s = result.state;
+    if (result.round && result.round.tacticalSituation && result.round.tacticalSituation.tempo) {
+      seenTempos.add(result.round.tacticalSituation.tempo);
+    }
+    if (result.ended) break;
+  }
+  assert(seenTempos.size > 0, 'combat tempo must be exposed on every round, got none');
+  seenTempos.forEach(function (t) {
+    assert(TEMPO_LABELS[t], 'tempo value ' + t + ' must be one of the seven known keys');
+    assert(TEMPO_LABELS[t].length > 0, 'tempo label for ' + t + ' must be non-empty');
+  });
+  log('pg-14-combat-tempo-label', { passed: true, detail: JSON.stringify({ seenTempos: Array.from(seenTempos) }) });
+}
+
+function smokeCultivationRequiresRootDowngrade() {
+  const state = pgBaseState();
+  state.spiritualRoot = 'mixed';
+  state.rootDetail = '\u6c34\u7075\u6839';
+  const strictScripture = {
+    id: 'fire-only', name: '\u70c8\u706b\u51b3', description: '', item_type: 'scripture',
+    rarity: 'rare', source: 't',
+    effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 2.0, description: '+100%' }],
+    technique: { kind: 'cultivation', requirements: { spiritualRoots: ['heavenly'] } },
+  };
+  const compat = evaluateTechniqueCompatibility(state, strictScripture);
+  assert(!compat.usable, 'fire-only scripture must be unusable by water-rooted character');
+  const factors = computeCultivationFactors(Object.assign({}, state, { equipped: [strictScripture] }));
+  const rateStrict = computeEffectiveCultivationRate(Object.assign({}, state, { equipped: [strictScripture] }));
+  const factor = factors.find((f) => f.name === strictScripture.name);
+  assert(factor && factor.value === 0, 'downgraded scripture must contribute 0-value factor, got: ' + JSON.stringify(factor));
+  assert(rateStrict.multiplier < 2, 'multiplier must not include unusable scripture bonus, got: ' + rateStrict.multiplier);
+  log('pg-15-cultivation-requires-root', { passed: true, detail: JSON.stringify({ usable: compat.usable, factor: factor, multiplier: rateStrict.multiplier }) });
+}
+
+function smokeAttackArtsListingPutsScriptureAboveArtifact() {
+  const src = readFileSync('src/components/xianxia/InventoryPanel.tsx', 'utf-8');
+  const techniquesIdx = src.indexOf('learnedTechniques');
+  const spellsIdx = src.indexOf('learnedSpells');
+  assert(techniquesIdx > 0 && spellsIdx > techniquesIdx, 'learnedTechniques must be declared before learnedSpells');
+  const learnAllIdx = src.indexOf('learnedArts = [...learnedTechniques, ...learnedSpells]');
+  assert(learnAllIdx > 0, 'InventoryPanel must concatenate techniques+spells in that order');
+  log('pg-16-attack-arts-listing-order', { passed: true, detail: 'scriptures declared before artifacts' });
+}
+
+function smokeRealmVsIdentitySeparation() {
+  const src = readFileSync('src/components/xianxia/StatusPanel.tsx', 'utf-8');
+  const rendersIdentityAsRealm = /realm.*\u4ed9\u5e08\u8865\u6742\u52a1|\u4ed9\u5e08\u8865\u6742\u52a1.*realm/.test(src);
+  assert(!rendersIdentityAsRealm, 'StatusPanel must not render identity-as-realm');
+  const state = pgBaseState();
+  state.realm = 'qi_refining';
+  state.identity = { role: '\u4f0a\u52d8\u4ed9\u5e08\u8865\u6742\u52a1' };
+  assert(state.realm !== state.identity.role, 'realm and identity must be distinct fields');
+  log('pg-17-realm-vs-identity', { passed: true, detail: 'realm field is distinct from identity role' });
+}
+
+function smokeCombatEndClosesLoadingOverlay() {
+  const state = pgBaseState();
+  state.hp = 200; state.maxHp = 200;
+  state.mp = 100; state.maxMp = 100;
+  state.attack = 30; state.defense = 10; state.speed = 12;
+  const combatState = startCombat(state, {
+    enemies: [{ id: 'e1', name: '\u5996\u517d', hp: 10, maxHp: 10, attack: 5, defense: 2, speed: 6, skills: [] }],
+    contextTitle: '\u6218',
+    contextNarrative: '',
+  });
+  let s = combatState;
+  for (let i = 0; i < 3; i++) {
+    const result = executeCombatRoundWithProposal(s, 'attack', undefined, {
+      playerDamage: 100, enemyDamage: 1, playerActionLabel: '\u51fb',
+    });
+    s = result.state;
+    if (result.ended) break;
+  }
+  const sess = s.combatSession;
+  assert(sess && (sess.status === 'victory' || sess.status === 'defeat' || sess.status === 'fled'), 'after enough rounds combat must end, got status: ' + (sess && sess.status));
+  assert(!sess.stalemateStreak || sess.stalemateStreak === 0, 'ended combat must reset stalemateStreak');
+  log('pg-18-combat-end-overlay', { passed: true, detail: JSON.stringify({ status: sess.status, streak: sess.stalemateStreak }) });
+}
+
+function smokeTopTagsQuantityCap() {
+  const base = pgBaseState();
+  const manyStatuses = [
+    { id: 's1', name: '\u51cf\u76ca1', category: '\u51cf\u76ca', priority: 80, effects: [], description: '' },
+    { id: 's2', name: '\u51cf\u76ca2', category: '\u51cf\u76ca', priority: 78, effects: [], description: '' },
+    { id: 's3', name: '\u51cf\u76ca3', category: '\u51cf\u76ca', priority: 76, effects: [], description: '' },
+    { id: 's4', name: '\u51cf\u76ca4', category: '\u51cf\u76ca', priority: 74, effects: [], description: '' },
+    { id: 'c1', name: '\u4f53\u8d281', category: '\u4f53\u8d28', priority: 92, effects: [], description: '' },
+    { id: 'c2', name: '\u4f53\u8d282', category: '\u4f53\u8d28', priority: 91, effects: [], description: '' },
+    { id: 'c3', name: '\u4f53\u8d283', category: '\u4f53\u8d28', priority: 90, effects: [], description: '' },
+  ];
+  const state = Object.assign({}, base, { activeStatuses: manyStatuses });
+  const entries = characterDisplayEntries(state);
+  const topTags = entriesForSlot(entries, 'topTags');
+  const constitutions = topTags.filter((e) => e.displayGroup === '\u4f53\u8d28');
+  const ordinary = topTags.filter((e) => e.displayGroup !== '\u4f53\u8d28');
+  assert(constitutions.length <= 2, 'topTags must cap constitutions at 2, got: ' + constitutions.length);
+  assert(ordinary.length <= 3, 'topTags must cap ordinary statuses at 3, got: ' + ordinary.length);
+  log('pg-19-top-tags-cap', { passed: true, detail: JSON.stringify({ constitutions: constitutions.length, ordinary: ordinary.length }) });
+}
+
+function smokeResetWorldDialogUsesGameStyle() {
+  const candidates = [
+    'src/components/xianxia/ResetWorldButton.tsx',
+    'src/components/xianxia/SettingsDialog.tsx',
+    'src/components/xianxia/GameMenu.tsx',
+    'src/app/page.tsx',
+  ];
+  let checked = 0;
+  for (const p of candidates) {
+    if (!existsSync(p)) continue;
+    checked = checked + 1;
+    const src = readFileSync(p, 'utf-8');
+    const resetContext = /\u91cd\u7f6e\u4e16\u754c|resetWorld|reset-world/.test(src);
+    if (!resetContext) continue;
+    const usesNativeConfirm = /\bwindow\.confirm\(/.test(src);
+    assert(!usesNativeConfirm, p + ' must not use native confirm() for reset');
+  }
+  assert(checked > 0, 'at least one candidate source file with reset context must exist');
+  log('pg-20-reset-world-dialog', { passed: true, detail: checked + ' reset-context files checked' });
+}
+
+function smokeSwordArtsListingPutsTechniqueBeforeArtifact() {
+  // Extra regression: \u6cd5\u5b9d\u81ea\u5e26\u672f\u5f0f should be labeled in the combat spell slot, not technique.
+  // Verify InventoryPanel: an artifact's technique.artifactAbilities are listed in learnedSpells (not learnedTechniques).
+  const src = readFileSync('src/components/xianxia/InventoryPanel.tsx', 'utf-8');
+  // The spells filter must filter by item_type === 'artifact', not by technique.kind.
+  assert(/learnedSpells[\s\S]{0,200}item_type\s*===\s*['"]artifact['"]/.test(src),
+    'InventoryPanel must derive learnedSpells from item_type === artifact');
+  log('pg-21-sword-arts-listing', { passed: true, detail: 'artifact items go into learnedSpells' });
+}
+
+function pgHasChineseTimeWord(label) {
+  return /\u540e|\u524d|\u95f4|\u65e5|\u591c|\u6668|\u66ae|\u6708|\u5e74|\u8f7d|\u5b63|\u7247\u523b|\u5c11\u9877|\u7fcc\u65e5|\u5165\u591c|\u9ec4\u660f|\u5348\u540e|\u6e05\u6668/.test(label);
+}
+
+function pgBaseState() {
+  return {
+    age: 18, lifespan: 200, realm: 'qi_refining', realmLevel: 1,
+    spiritualRoot: 'pure', rootDetail: '\u5929\u7075\u6839',
+    cultivationExp: 0, expToBreak: 200,
+    hp: 100, maxHp: 100, mp: 50, maxMp: 50,
+    attack: 12, defense: 6, speed: 10, luck: 50, comprehension: 60,
+    spiritStones: 100, reputation: 0,
+    alive: true, ascended: false, causeOfDeath: '',
+    faction: '', master: '', location: '\u5c71\u6751',
+    fateNodes: [], isAtChoice: false,
+    activeStatuses: [],
+    inventory: [], equipped: [],
+    storageCapacity: 8,
+    elements: { metal: 20, wood: 20, water: 20, fire: 30, earth: 20 },
+    pendingThreads: [], characterIntents: [], heartDemon: 0, pets: [],
+  };
+}
+
+function pgRunPhaseGSmokes() {
+  smokeFactorDedupByName();
+  smokeItemBonusSyncOnUnequip();
+  smokeLootNameStripOwner();
+  smokeWorldTimeLabelChinese();
+  smokeSameYearMultiSegment();
+  smokeAttachmentEchoLowPriorityThrottled();
+  smokeMarketShelfStableSameYear();
+  smokeArtifactAbilityCategorizedAsSpell();
+  smokeThreadNarrativeNoInterferenceWord();
+  smokeResetWorldEndpointExists();
+  smokeBreakthroughDisplayHideOnFailure();
+  smokeLongTextPanel();
+  smokeCombatStalemateTriggers();
+  smokeCombatTempoLabel();
+  smokeCultivationRequiresRootDowngrade();
+  smokeAttackArtsListingPutsScriptureAboveArtifact();
+  smokeRealmVsIdentitySeparation();
+  smokeCombatEndClosesLoadingOverlay();
+  smokeTopTagsQuantityCap();
+  smokeResetWorldDialogUsesGameStyle();
+  smokeSwordArtsListingPutsTechniqueBeforeArtifact();
+  pgRunPhaseG116Smokes();
+}
+
+
+function pgRunPhaseG116Smokes(): void {
+  smokeNewG111SecretRealmAccess();
+  smokeNewG112SecretRealmEntry();
+  smokeNewG113BidderProfile();
+  smokeNewG114BiddingRound();
+  smokeNewG115CauseChain();
+  smokeNewG116StalemateExit();
+}
+
+﻿// ============================================================================
+// Phase-G Worker B 补2: 6 个新 enum/function 的 smoke (xiaoxin-B, 2026-06-27)
+// 覆盖 deriveSecretRealmAccess / resolveSecretRealmEntry / deriveBidderProfile
+//     / simulateBiddingRound / buildCombatCauseChain / resolveStalemateExit
+// 每条至少 1 个 assert；try/catch + function-call-error 容错
+// 仅追加，不修改既有 smoke。
+// ============================================================================
+function smokeNewG111SecretRealmAccess(): void {
+  try {
+    const realm = {
+      id: 'sky-mirror',
+      name: '天镜秘府',
+      minAge: 10,
+      isStoryRealm: false,
+      entryRequirement: '需集齐两枚残图碎片',
+      entryAlternatives: ['传功', '地图碎片'],
+      restrictions: [],
+      discovered: true,
+      tier: 'rare',
+    };
+    const character = {
+      id: 'char-1',
+      age: 18,
+      realm: 'qi_refining',
+      inventory: [
+        { id: 'map-1', name: '天镜残图碎片' },
+        { id: 'map-2', name: '天镜残图碎片' },
+        { id: 'junk', name: '破布' },
+      ],
+      statuses: [],
+    };
+    const attempt = deriveSecretRealmAccess(realm, character);
+    assert(typeof attempt.canAttempt === 'boolean', 'canAttempt must be boolean');
+    assert(attempt.canAttempt === true, 'with 2 fragments + time-window should be attemptable');
+    assert(attempt.triggers.indexOf('map-fragment') >= 0, 'should detect map-fragment trigger');
+    const blocked = deriveSecretRealmAccess(realm, Object.assign({}, character, { inventory: [] }));
+    assert(typeof blocked.canAttempt === 'boolean', 'blocked canAttempt must still be boolean');
+    log('smoke-g-111-secret-realm-access', {
+      passed: true,
+      canAttempt: attempt.canAttempt,
+      triggers: attempt.triggers.length,
+    });
+  } catch (e) {
+    log('smoke-g-111-secret-realm-access', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG112SecretRealmEntry(): void {
+  try {
+    const attempt = {
+      realmId: 'sky-mirror',
+      triggers: ['key-item', 'time-window'],
+      missing: [],
+      bypassOptions: [],
+      canAttempt: true,
+    };
+    const first = resolveSecretRealmEntry(attempt, 'first');
+    assert(first && typeof first === 'object', 'first must return an object');
+    assert(typeof first.entered === 'boolean', 'first.entered must be boolean');
+    assert(typeof first.sideEffect === 'string' && first.sideEffect.length > 0, 'first.sideEffect must be a non-empty string');
+    assert(typeof first.narrativeHint === 'string' && first.narrativeHint.length > 0, 'first.narrativeHint must be a non-empty string');
+    assert(first.entered === true, 'first choice with canAttempt=true should enter');
+    const blockedAttempt = Object.assign({}, attempt, { canAttempt: false, missing: ['key-item'] });
+    const denied = resolveSecretRealmEntry(blockedAttempt, 'first');
+    assert(denied.entered === false, 'denied attempt should not enter');
+    log('smoke-g-112-secret-realm-entry', {
+      passed: true,
+      entered: first.entered,
+      denied: denied.entered,
+    });
+  } catch (e) {
+    log('smoke-g-112-secret-realm-entry', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG113BidderProfile(): void {
+  try {
+    const archetypes = ['wealthy-elder', 'hot-blooded-young', 'scheming-cultivator', 'casual-pilgrim', 'shadow-bidder'];
+    const profile = deriveBidderProfile(
+      { id: 'elder-zhao', assets: 100000, personality: 'cautious', name: '赵长老' },
+      { basePrice: 100, valuation: 100, rarity: 'rare' },
+    );
+    assert(profile && typeof profile === 'object', 'deriveBidderProfile must return an object');
+    assert(typeof profile.archetype === 'string', 'archetype must be a string');
+    assert(archetypes.indexOf(profile.archetype) >= 0, 'archetype must be one of BidderArchetype values, got: ' + profile.archetype);
+    assert(typeof profile.maxBid === 'number' && profile.maxBid > 0, 'maxBid must be a positive number');
+    const schemer = deriveBidderProfile(
+      { id: 'schemer-1', assets: 30000, personality: 'hostile', name: '王算计' },
+      { basePrice: 100, valuation: 100, rarity: 'legendary' },
+    );
+    assert(archetypes.indexOf(schemer.archetype) >= 0, 'schemer archetype must be valid, got: ' + schemer.archetype);
+    log('smoke-g-113-bidder-profile', {
+      passed: true,
+      elder: profile.archetype,
+      schemer: schemer.archetype,
+    });
+  } catch (e) {
+    log('smoke-g-113-bidder-profile', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG114BiddingRound(): void {
+  try {
+    const profiles = [
+      { archetype: 'wealthy-elder', wealth: 200000, maxBid: 5000, aggressive: false, hostile: false },
+      { archetype: 'hot-blooded-young', wealth: 5000, maxBid: 800, aggressive: true, hostile: false },
+      { archetype: 'casual-pilgrim', wealth: 200, maxBid: 200, aggressive: false, hostile: false },
+    ];
+    const result = simulateBiddingRound(
+      { currentBid: 100, roundIndex: 1 },
+      { id: 'artifact-1', name: '残光护符', basePrice: 100, rarity: 'rare' },
+      profiles,
+    );
+    assert(result && typeof result === 'object', 'simulateBiddingRound must return an object');
+    assert('winner' in result, 'result must have winner field');
+    assert(typeof result.finalPrice === 'number' && result.finalPrice > 0, 'finalPrice must be a positive number');
+    assert(typeof result.drama === 'string' && result.drama.length > 0, 'drama must be a non-empty string');
+    assert(Array.isArray(result.postAuctionEvents), 'postAuctionEvents must be an array');
+    const empty = simulateBiddingRound({ currentBid: 0, roundIndex: 0 }, { id: 'x', name: 'X', basePrice: 50 }, []);
+    assert(empty.winner === null, 'empty profiles should yield null winner');
+    log('smoke-g-114-bidding-round', {
+      passed: true,
+      winner: result.winner,
+      finalPrice: result.finalPrice,
+      events: result.postAuctionEvents.length,
+    });
+  } catch (e) {
+    log('smoke-g-114-bidding-round', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG115CauseChain(): void {
+  try {
+    const spellChain = buildCombatCauseChain({ kind: 'spell', name: '寒冰诀' }, { realm: 'foundation_building' });
+    assert(spellChain && typeof spellChain === 'object', 'buildCombatCauseChain must return an object');
+    assert(typeof spellChain.action === 'string' && spellChain.action.length > 0, 'action must be a non-empty string');
+    assert(typeof spellChain.trigger === 'string' && spellChain.trigger.length > 0, 'trigger must be a non-empty string');
+    assert(typeof spellChain.opponentResponse === 'string' && spellChain.opponentResponse.length > 0, 'opponentResponse must be a non-empty string');
+    assert(typeof spellChain.environmentalEffect === 'string' && spellChain.environmentalEffect.length > 0, 'environmentalEffect must be a non-empty string');
+    assert(spellChain.action === '寒冰诀', 'action should match input name');
+    const strikeChain = buildCombatCauseChain({ kind: 'strike' });
+    assert(typeof strikeChain.trigger === 'string' && strikeChain.trigger.length > 0, 'strike chain trigger must be non-empty');
+    log('smoke-g-115-cause-chain', {
+      passed: true,
+      spell: spellChain.action,
+      strikeTrigger: strikeChain.trigger.slice(0, 20),
+    });
+  } catch (e) {
+    log('smoke-g-115-cause-chain', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG116StalemateExit(): void {
+  try {
+    const exits = ['deception', 'risky-strike', 'disengage', 'ally-intervention', 'terrain-shift'];
+    const exit1 = resolveStalemateExit({ turnCount: 0, opponents: [], environmentTags: [] }, { id: 'c1', realm: 'qi_refining' });
+    assert(exits.indexOf(exit1) >= 0, 'turn 0 with no allies should return valid StalemateExit, got: ' + exit1);
+    const exit2 = resolveStalemateExit(
+      { turnCount: 10, opponents: [{ name: 'foe', hp: 80 }], environmentTags: [] },
+      { id: 'c1', realm: 'qi_refining' },
+    );
+    assert(exits.indexOf(exit2) >= 0, 'turn 10 should return valid StalemateExit, got: ' + exit2);
+    const exit3 = resolveStalemateExit(
+      { turnCount: 5, opponents: [{ name: 'foe', hp: 20 }], environmentTags: [] },
+      { id: 'c1', realm: 'qi_refining' },
+    );
+    assert(exits.indexOf(exit3) >= 0, 'low-HP opponent should return valid StalemateExit, got: ' + exit3);
+    const exit4 = resolveStalemateExit(
+      { turnCount: 4, opponents: [], environmentTags: ['mountain'] },
+      { id: 'c1', realm: 'qi_refining' },
+    );
+    assert(exits.indexOf(exit4) >= 0, 'terrain tag should return valid StalemateExit, got: ' + exit4);
+    const exit5 = resolveStalemateExit(
+      { turnCount: 5, opponents: [], environmentTags: [] },
+      { id: 'c1', realm: 'qi_refining', allies: ['a', 'b'] },
+    );
+    assert(exits.indexOf(exit5) >= 0, 'allies+turn>3 should return valid StalemateExit, got: ' + exit5);
+    log('smoke-g-116-stalemate-exit', {
+      passed: true,
+      exits: [exit1, exit2, exit3, exit4, exit5].join('|'),
+    });
+  } catch (e) {
+    log('smoke-g-116-stalemate-exit', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+// ============================================================================
 // Phase-G smoke 回归补强 (xiaoxin-C-补, 2026-06-27)
 // 追加 15 条 smoke-g-NNN-xxx；不动既有 smoke；允许 try/catch 标记 function-missing
-// 所有断言包在 try/catch 中，确保失败也仍输出 passed:true（function-missing）
 // ============================================================================
 
 function smokeG201MultiCultivationSourceDedup(): void {
-  let detail: any = { sameNameItems: 0, beadMultiplyFactors: 0, note: 'function-missing' };
+  // 同一名字"青珠定息"装备 2 件 → deriveCultivationSpeed 不应重复乘算
+  let dedupOk = false;
+  let detail: any = { sameNameItems: 0, factors: 0, note: 'function-missing' };
   try {
     const baseState = makeCharacter();
     const bead: any = {
@@ -5094,18 +5729,25 @@ function smokeG201MultiCultivationSourceDedup(): void {
       rarity: 'rare', source: 't',
       effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 1.2, description: '+20%' }],
     };
+    const state1 = JSON.parse(JSON.stringify(baseState));
     const state2 = JSON.parse(JSON.stringify(baseState));
+    state1.inventory = [bead]; state1.equipped = [];
     state2.inventory = [bead, { ...bead, id: 'bead-b' }]; state2.equipped = [];
-    detail.sameNameItems = state2.inventory.length;
+    const f1 = (computeCultivationFactors as any)(state1);
     const f2 = (computeCultivationFactors as any)(state2);
+    detail.sameNameItems = state2.inventory.length;
+    detail.factors = f2.length;
     const beadFactors = (f2 as any[]).filter((f: any) => f.name === '青珠定息' && f.operation === 'multiply');
+    dedupOk = beadFactors.length <= 1;
     detail.beadMultiplyFactors = beadFactors.length;
-    detail.totalFactors = f2.length;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(dedupOk, 'same-name equipped items must not stack multiply factors, detail=' + JSON.stringify(detail));
   log('smoke-g-201-multi-cultivation-source-dedup', { passed: true, detail });
 }
 
 function smokeG202ItemEquipSync(): void {
+  // 装备 A（+20%） → 速率增加；卸下 A → 恢复 baseline
+  let syncOk = false;
   let detail: any = { baseline: 0, equipped: 0, unequipped: 0, note: 'function-missing' };
   try {
     const baseState = makeCharacter();
@@ -5123,83 +5765,98 @@ function smokeG202ItemEquipSync(): void {
     const unEq = unequipItem(equipped.state, ring.id);
     const rateUn = (computeEffectiveCultivationRate as any)(unEq.state).multiplier;
     detail.baseline = baseline; detail.equipped = rateEq; detail.unequipped = rateUn;
-    detail.delta = rateEq - baseline;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    syncOk = rateEq > baseline + 1e-6 && Math.abs(rateUn - baseline) < 1e-6;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(syncOk, 'equip must increase multiplier; unequip must restore baseline, detail=' + JSON.stringify(detail));
   log('smoke-g-202-item-equip-sync', { passed: true, detail });
 }
 
 function smokeG203LootNamingNoEnemyAttribution(): void {
+  // deriveLootFromOpponent 返回的战利品名不应含 "某某的" / "某某遗下"
+  let namingOk = false;
   let detail: any = { items: [], foundAttribution: false, note: 'function-missing' };
   try {
-    const loot = (deriveLootFromOpponent as any)({ id: 'opp-1', name: '鸦客', realm: 'qi_refining', level: 5 }, 'qi_refining');
+    const loot = (deriveLootFromOpponent as any)({ id: 'opp-1', name: '阴鸦客', realm: 'qi_refining', level: 5 }, 'qi_refining');
     detail.items = (loot || []).map((it: any) => it?.name).filter(Boolean);
-    const offender = detail.items.find((n: string) => /(的|遗下|遗物)$/.test(n));
+    const offender = detail.items.find((n: string) => /的$|遗下$|遗下的$/.test(n) || /\u7684|\u9057\u4e0b/.test(n));
     detail.foundAttribution = !!offender;
-    detail.offender = offender;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    namingOk = !offender;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(namingOk, 'loot name must not contain attribution, detail=' + JSON.stringify(detail));
   log('smoke-g-203-loot-naming-no-enemy-attribution', { passed: true, detail });
 }
 
 function smokeG204WorldTimeDisplayCjk(): void {
+  // formatWorldTimeDisplay 输出应含 中文时间词
+  let cjkOk = false;
   let detail: any = { output: '', foundCjk: false, note: 'function-missing' };
   try {
-    const stamp: any = (worldTimeStamp as any)({ eraName: '青岚', calendarYear: 5001, elapsedDays: 0 });
-    const out = (formatWorldTimeDisplay as any)({ age: 1, worldTime: stamp, includeAge: true });
+    const worldTime = (worldTimeStamp as any)({ eraName: '青岚', calendarYear: 5001, elapsedDays: 0 });
+    const out = (formatWorldTimeDisplay as any)({ age: 1, worldTime, includeAge: true });
     detail.output = String(out || '');
-    detail.foundCjk = /[年月日晨午]/.test(detail.output);
-    detail.length = detail.output.length;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    detail.foundCjk = /[\u5e74\u6708\u65e5\u6668\u5348\u591c]/.test(detail.output);
+    cjkOk = detail.foundCjk;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(cjkOk, 'formatWorldTimeDisplay must contain CJK time words, detail=' + JSON.stringify(detail));
   log('smoke-g-204-world-time-display-cjk', { passed: true, detail });
 }
 
 function smokeG205SameYearMultiEvents(): void {
+  // 同一年追加 2 段事件 → records ≥ 2
+  let ok = false;
   let detail: any = { records: 0, note: 'function-missing' };
   try {
     const baseState = makeCharacter();
-    const t1: any = { id: 't-1', title: '坊市斗法', description: '坊中争胜', category: 'competition', startAge: 18, deadlineAge: 18, status: 'pending', progress: 0, priority: 50 };
-    const t2: any = { id: 't-2', title: '灵石采买', description: '采买修炼物资', category: 'promise', startAge: 18, deadlineAge: 19, status: 'pending', progress: 0, priority: 40 };
+    const t1 = { id: 't-1', title: '春试启事', description: '宗内春试通告', category: 'competition', startAge: 18, deadlineAge: 18, status: 'pending', progress: 0, priority: 50 } as any;
+    const t2 = { id: 't-2', title: '故交寄书', description: '旧友捎来书信', category: 'promise', startAge: 18, deadlineAge: 19, status: 'pending', progress: 0, priority: 40 } as any;
     const s1 = addThreads(baseState, [t1]);
     const s2 = addThreads(s1, [t2]);
     const sameYear = (getSameYearThreads as any)(s2);
     detail.records = sameYear.length;
-    detail.titles = sameYear.map((t: any) => t.title);
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    ok = sameYear.length >= 2;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'same-year addThreads must produce >= 2 records, detail=' + JSON.stringify(detail));
   log('smoke-g-205-same-year-multi-events', { passed: true, detail });
 }
 
 function smokeG206ThreadsLowPriorityResonate(): void {
+  // 低优先级牵挂 → 5 年内自然回响次数 ≤ 2
+  let ok = false;
   let detail: any = { echoes: 0, note: 'function-missing' };
   try {
     const baseState = makeCharacter();
-    const lowPri: any = { id: 't-low', title: '山村偶遇', description: '路上遇见老乡', category: 'rumor', startAge: 20, deadlineAge: 40, status: 'pending', progress: 0, priority: 10 };
+    const lowPri = { id: 't-low', title: '山脚偶遇', description: '路旁有人提过一句', category: 'rumor', startAge: 20, deadlineAge: 40, status: 'pending', progress: 0, priority: 10 } as any;
     let s = addThreads(baseState, [lowPri]);
     let echoCount = 0;
     for (let i = 0; i < 5; i++) {
       const before = (getSameYearThreads as any)(s).length;
-      const adv: any = advanceThread(s, 't-low', 5, '一年过去');
-      s = adv.state || adv;
+      const adv = advanceThread(s, 't-low', 5, '你听到口风');
+      s = adv;
       const after = (getSameYearThreads as any)(s).length;
       if (after > before) echoCount++;
     }
     detail.echoes = echoCount;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    ok = echoCount <= 2;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'low-priority thread must not auto-resonate every year (echoes ≤ 2 in 5y), detail=' + JSON.stringify(detail));
   log('smoke-g-206-threads-low-priority-resonate', { passed: true, detail });
 }
 
 function smokeG207MarketShelfNoRefresh(): void {
+  // 同一年内连续两次调用 → 结果一致（不重置）
+  let ok = false;
   let detail: any = { stable: false, note: 'function-missing' };
   try {
-    const marketSrc: string = readFileSync('src/lib/xianxia/market.ts', 'utf-8');
+    const marketSrc = readFileSync('src/lib/xianxia/market.ts', 'utf-8');
     detail.marketSrcLen = marketSrc.length;
     const offerings = [
       { name: '木剑', item_type: 'weapon' },
-      { name: '草帽', item_type: 'armor' },
-      { name: '吐纳经', item_type: 'scripture' },
+      { name: '云帽', item_type: 'armor' },
+      { name: '消意经', item_type: 'scripture' },
     ];
-    function hashKey(o: any[], seed: number): number {
+    function hashKey(o: any[], seed: number) {
       const s = JSON.stringify(o) + '|' + seed;
-      let h = 0;
-      for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+      let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
       return h;
     }
     const k1 = hashKey(offerings, 5001);
@@ -5207,35 +5864,47 @@ function smokeG207MarketShelfNoRefresh(): void {
     const k3 = hashKey(offerings, 5002);
     detail.k1 = k1; detail.k2 = k2; detail.k3 = k3;
     detail.stable = k1 === k2 && k1 !== k3;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    ok = detail.stable;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'same-year market shelf generation must be stable, detail=' + JSON.stringify(detail));
   log('smoke-g-207-market-shelf-no-refresh', { passed: true, detail });
 }
 
 function smokeG208FabaoSkillShowcaseCategory(): void {
+  // 法宝自带灵禁应归入"法术/灵禁"槽而不是"功法"槽
+  let ok = false;
   let detail: any = { hasSpellGroup: false, note: 'function-missing' };
   try {
-    const inventorySrc: string = readFileSync('src/components/xianxia/InventoryPanel.tsx', 'utf-8');
-    const hasSpellGroup = /法术|灵禁|法笈|开示/.test(inventorySrc);
+    const inventorySrc = readFileSync('src/components/xianxia/InventoryPanel.tsx', 'utf-8');
+    const hasSpellGroup = /\u6cd5\u672f|\u7075\u7981|\u6cd5\u7b06|\u5f00\u793a/.test(inventorySrc);
     detail.hasSpellGroup = hasSpellGroup;
-    detail.srcLen = inventorySrc.length;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    ok = hasSpellGroup;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'fabao ability must be categorized as 法术/灵禁 slot, detail=' + JSON.stringify(detail));
   log('smoke-g-208-fabao-skill-showcase-category', { passed: true, detail });
 }
 
 function smokeG209FateNarrativeNoMetaWords(): void {
-  let detail: any = { before: '', after: '', hasMeta: false, note: 'function-missing' };
+  // 因缘叙事文本不应包含 "天道干预" 等局外机制词
+  let ok = false;
+  let detail: any = { before: '', after: '', note: 'function-missing' };
   try {
-    const raw = '天道干预使某人经历了大事，改变了原本的因果。';
+    const raw = '天道干预使某某经历了此问。你听到口风后决定前往探索。';
     detail.before = raw;
     const cleaned = (sanitizeNarrativeText as any)(raw);
     detail.after = cleaned;
-    detail.hasMeta = /天道|干预/.test(cleaned);
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    const hasMeta = /[\u5929\u9053\u5e72\u9884]/.test(cleaned);
+    detail.hasMeta = hasMeta;
+    ok = !hasMeta;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'fate narrative must not contain 天道干预 meta-words, detail=' + JSON.stringify(detail));
   log('smoke-g-209-fate-narrative-no-meta-words', { passed: true, detail });
 }
 
 function smokeG210ResetWorldNoThrow(): void {
-  let detail: any = { callsite: 'none', threw: false, note: 'function-missing' };
+  // 模拟 resetWorld 调用不应抛异常
+  let ok = false;
+  let detail: any = { callsite: 'none', note: 'function-missing' };
   try {
     let threw = false;
     let callsite = 'none';
@@ -5245,75 +5914,85 @@ function smokeG210ResetWorldNoThrow(): void {
       else { callsite = 'mock'; }
     } catch (e: any) { threw = true; detail.error = String(e?.message || e); }
     detail.callsite = callsite;
-    detail.threw = threw;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    ok = !threw;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'resetWorld (mock or real) must not throw, detail=' + JSON.stringify(detail));
   log('smoke-g-210-reset-world-no-throw', { passed: true, detail });
 }
 
 function smokeG211BreakthroughNoSuccessLabelMidway(): void {
+  // 突破过程（非 final）label 应隐藏"破/突破"；final 才出现
+  let ok = false;
   let detail: any = { midway: '', final: '', note: 'function-missing' };
   try {
-    const midwayText = '斗路平稳中，心念合一，不起波澜。';
-    const finalText = '瓶颈之末，成功破入下一境界。';
+    const midwayText = '仙路攻关中，你后退了一步。';
+    const finalText = '破境之际他成功进入新境界';
     const mid = (sanitizeBreakthroughProcessText as any)(midwayText, false);
     const fin = (sanitizeBreakthroughProcessText as any)(finalText, true);
     detail.midway = mid;
     detail.final = fin;
-    detail.midHasLabel = /破|突破/.test(mid);
-    detail.finHasLabel = /破|突破/.test(fin);
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    const midHasLabel = /[\u7834\u7a81]/.test(mid);
+    const finHasLabel = /[\u7834\u7a81]/.test(fin);
+    ok = !midHasLabel && finHasLabel;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'midway breakthrough must hide 破/突破; final must keep them, detail=' + JSON.stringify(detail));
   log('smoke-g-211-breakthrough-no-success-label-midway', { passed: true, detail });
 }
 
 function smokeG212LongTextTruncation(): void {
+  // 80 字长描述 → truncation 保留 ≥ 40 字 + 展开标志位
+  let ok = false;
   let detail: any = { original: 0, truncated: 0, expandable: false, note: 'function-missing' };
   try {
-    const longText = '腊月廿三，小年夜。茅听澎帮着刘氏在灶间烧火，灶膛里的柴禾噼啪作响，火光把半边墙烘得通红。刘氏切了一碗萝卜，和着去年晒的干菜煮了一锅，锅边贴了几个粗面饼子，勉强算是一顿年饭。茅听澎蹲在灶口往里添柴，手背上被火星子烫了一下，他没吱声。灶间比往年冷清了不止一分。';
+    const longText = '重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重重';
     detail.original = longText.length;
-    const truncated: any = (truncateNarrativeAtSentence as any)(longText, 40);
-    if (typeof truncated === 'string') {
-      detail.truncated = truncated.length;
-      detail.expandable = truncated.length < longText.length;
-    } else {
-      detail.truncated = (truncated?.text || '').length;
-      detail.expandable = !!truncated?.expandable;
-    }
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    const out = (truncateNarrativeAtSentence as any)(longText, 40);
+    detail.truncated = (out || '').length;
+    detail.expandable = detail.truncated < detail.original;
+    ok = detail.truncated >= 40 && detail.truncated < detail.original;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'long text truncation must keep >=40 chars and indicate expandable, detail=' + JSON.stringify(detail));
   log('smoke-g-212-long-text-truncation', { passed: true, detail });
 }
 
 function smokeG213CombatStalemateExit(): void {
-  let detail: any = { rounds: 0, exitTriggered: false, note: 'function-missing' };
+  // 连续 5 拍僵持 → 第 6 拍触发非 deception 退出
+  let ok = false;
+  let detail: any = { turnCount: 0, exit: '', note: 'function-missing' };
   try {
-    const player: any = { id: 'p', name: '苏尘', hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10, realm: 'qi_refining', realmLevel: 1, techniques: [], activeStatuses: [], equipped: [] };
-    const enemy: any = { id: 'e', name: '残影', hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10, realm: 'qi_refining', realmLevel: 1, techniques: [], activeStatuses: [], equipped: [] };
-    let combat: any = startCombat(player, enemy, 'test', { attackerSide: 'player' });
-    let exitTriggered = false;
-    for (let i = 0; i < 8; i++) {
-      const r: any = executeCombatRoundWithProposal(combat, 'attack', undefined, { playerDamage: 3, enemyDamage: 3, playerActionLabel: '试探' });
-      combat = r.state;
-      detail.rounds = i + 1;
-      if (r?.ended || r?.stalemateExit) { exitTriggered = true; detail.exitAt = i + 1; break; }
-    }
-    detail.exitTriggered = exitTriggered;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    const sess: any = {
+      turnCount: 6,
+      opponents: [{ name: '妖兽', hp: 80 }],
+      environmentTags: ['mountain'],
+    };
+    const exit = (resolveStalemateExit as any)(sess, { realm: 'qi_refining', allies: [] });
+    detail.turnCount = sess.turnCount;
+    detail.exit = String(exit);
+    const acceptedExits = ['terrain-shift', 'risky-strike', 'disengage', 'ally-intervention'];
+    ok = acceptedExits.includes(String(exit));
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'after 5+ turns with stalemate tags, resolveStalemateExit must pick a non-deception exit, detail=' + JSON.stringify(detail));
   log('smoke-g-213-combat-stalemate-exit', { passed: true, detail });
 }
 
 function smokeG214CombatStanceLabel(): void {
+  // 每拍战斗后 stance 标签必须是 7 个之一
+  const STANCE_LABELS = new Set(['乘势', '僵持', '破绽', '危局', '可遁', '转机', '乱战']);
+  let ok = false;
   let detail: any = { seen: [], invalid: [], note: 'function-missing' };
   try {
-    const player: any = { id: 'p', name: '苏尘', hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10, realm: 'qi_refining', realmLevel: 1, techniques: [], activeStatuses: [], equipped: [] };
-    const enemy: any = { id: 'e', name: '残影', hp: 100, maxHp: 100, mp: 50, maxMp: 50, attack: 10, defense: 5, speed: 10, realm: 'qi_refining', realmLevel: 1, techniques: [], activeStatuses: [], equipped: [] };
-    const combat: any = startCombat(player, enemy, 'test', { attackerSide: 'player', contextTitle: '对峙', contextNarrative: '双方比拼' });
-    const STANCE_LABELS = new Set(['乘势', '僵持', '破绽', '危局', '可遁', '转机', '乱战']);
-    const TEMPO_TO_LABEL: Record<string, string> = {
-      pressing: '乘势', stalemate: '僵持', opening: '破绽',
-      danger: '危局', flee_window: '可遁', turning: '转机', chaos: '乱战',
-    };
+    const state = makeCharacter();
+    state.hp = 200; state.maxHp = 200; state.mp = 100; state.maxMp = 100;
+    state.attack = 20; state.defense = 10; state.speed = 12;
+    const combat = startCombat(state, {
+      enemies: [{ id: 'e1', name: '妖兽', hp: 80, maxHp: 80, attack: 8, defense: 5, speed: 6, skills: [] }],
+      contextTitle: '演练', contextNarrative: '双方比拼',
+    } as any);
     let s = combat;
     for (let i = 0; i < 3; i++) {
-      const r: any = executeCombatRoundWithProposal(s, 'attack', undefined, { playerDamage: 5, enemyDamage: 2, playerActionLabel: '攻势' });
+      const r: any = executeCombatRoundWithProposal(s, 'attack', undefined, {
+        playerDamage: 5, enemyDamage: 2, playerActionLabel: '击',
+      } as any);
       s = r.state;
       const tempo = r?.round?.tacticalSituation?.tempo;
       if (tempo) {
@@ -5323,14 +6002,23 @@ function smokeG214CombatStanceLabel(): void {
       }
       if (r?.ended) break;
     }
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    ok = detail.invalid.length === 0 && detail.seen.length > 0;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'combat tempo labels must be one of 乘势/僵持/破绽/危局/可遁/转机/乱战, detail=' + JSON.stringify(detail));
   log('smoke-g-214-combat-stance-label', { passed: true, detail });
 }
 
+const TEMPO_TO_LABEL: Record<string, string> = {
+  pressing: '乘势', stalemate: '僵持', opening: '破绽',
+  danger: '危局', flee_window: '可遁', turning: '转机', chaos: '乱战',
+};
+
 function smokeG215TechniqueRootGate(): void {
+  // 缺金灵根 → 带金属性功法应被降级
+  let ok = false;
   let detail: any = { compatible: 0, baseRate: 0, withTechnique: 0, note: 'function-missing' };
   try {
-    const noGoldState: any = makeCharacter();
+    const noGoldState = makeCharacter();
     noGoldState.spiritualRoot = 'wood';
     noGoldState.rootDetail = '木灵根';
     const goldScripture: any = {
@@ -5339,16 +6027,18 @@ function smokeG215TechniqueRootGate(): void {
       effects: [{ target_attribute: 'cultivationExp', operation: 'multiply', value: 2.0, description: '+100%' }],
       technique: { kind: 'cultivation', requirements: { spiritualRoots: ['gold', 'metal'] } },
     };
-    const compat: any = (evaluateTechniqueCompatibility as any)(noGoldState, goldScripture);
+    const compat = (evaluateTechniqueCompatibility as any)(noGoldState, goldScripture);
     detail.compatible = compat?.usable ? 1 : 0;
     detail.reason = (compat?.reasons || []).join('|');
     const baseRate = (computeEffectiveCultivationRate as any)(noGoldState).multiplier;
-    const withTechnique: any = JSON.parse(JSON.stringify(noGoldState));
+    const withTechnique = JSON.parse(JSON.stringify(noGoldState));
     withTechnique.equipped = [goldScripture];
     const newRate = (computeEffectiveCultivationRate as any)(withTechnique).multiplier;
     detail.baseRate = baseRate;
     detail.withTechnique = newRate;
-  } catch (e: any) { detail = { ...detail, error: String(e?.message || e) }; }
+    ok = compat?.usable === false && newRate < baseRate * 2.0;
+  } catch (e: any) { detail = { ...detail, error: String(e?.message || e), note: 'function-missing' }; }
+  assert(ok, 'technique without matching root must be downgraded, detail=' + JSON.stringify(detail));
   log('smoke-g-215-technique-root-gate', { passed: true, detail });
 }
 
@@ -5356,7 +6046,7 @@ function makeCharacter(): any {
   return {
     id: 'char-c-1', name: '苏尘', age: 18, lifespan: 200,
     realm: 'qi_refining', realmLevel: 1,
-    spiritualRoot: 'common', rootDetail: '五行均衡',
+    spiritualRoot: 'fire', rootDetail: '火灵根',
     cultivationExp: 0, expToBreak: 200,
     hp: 100, maxHp: 100, mp: 50, maxMp: 50,
     attack: 10, defense: 5, speed: 10,

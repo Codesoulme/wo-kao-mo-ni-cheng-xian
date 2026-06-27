@@ -172,7 +172,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '测试连接失败');
-      toast.success('连接测试成功', { description: `模型 ${data.model || editModel} 可用，耗时 ${data.elapsedMs ?? '?'}ms` });
+      toast.success('连接测试成功', { description: `模型 ${data.model || editModel} 可用，耗时 ${data.elapsedMs ?? '—'}ms` });
     } catch (err: any) {
       toast.error('连接测试失败', { description: err.message });
     } finally {
@@ -191,7 +191,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '测试失败');
       const profile = status.profiles.find(p => p.id === profileId);
-      toast.success(`「${profile?.name || ''}」连接成功`, { description: `耗时 ${data.elapsedMs ?? '?'}ms` });
+      toast.success(`「${profile?.name || ''}」连接成功`, { description: `耗时 ${data.elapsedMs ?? '—'}ms` });
     } catch (err: any) {
       toast.error('测试失败', { description: err.message });
     }

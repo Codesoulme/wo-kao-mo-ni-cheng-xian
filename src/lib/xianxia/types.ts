@@ -2319,3 +2319,74 @@ export interface WorldRumor {
   regionScope?: string;
   truthHint?: string;
 }
+// ==================== Phase-G Worker B: Causal Reinforcement ====================
+// AI-G1xx: Secret Realm entry triggers, bidder archetype profiling,
+// combat cause chains, and stalemate exit resolution.
+
+/**
+ * AI-G111: 进入秘境所需的触发条件类型。
+ * 引擎依据角色物品/地图碎片/气潮/传承信物/时间窗等判定是否满足。
+ */
+export type SecretRealmTriggerCondition =
+  | 'key-item'        // 关键物品（如钥匙/令牌/残章）
+  | 'map-fragment'    // 地图碎片（多块拼合后可尝试）
+  | 'qi-tide'         // 气潮（天地灵气潮汐窗口）
+  | 'inheritance-token' // 传承信物（前任主人遗留的印信）
+  | 'time-window';    // 时窗（特定季节/时辰才可入）
+
+/**
+ * AI-G111: 角色尝试进入某秘境的可行性评估结果。
+ * triggers: 已满足的触发条件；missing: 尚未满足的；bypassOptions: 可绕开某些条件的特殊手段。
+ */
+export interface SecretRealmEntryAttempt {
+  realmId: string;
+  triggers: SecretRealmTriggerCondition[];
+  missing: SecretRealmTriggerCondition[];
+  bypassOptions: string[];
+  canAttempt: boolean;
+}
+
+/**
+ * AI-G113: 竞拍出价者的人格原型，用于决定竞价模式、最大出价与敌意倾向。
+ * - wealthy-elder: 财雄势大的长老
+ * - hot-blooded-young: 热血青年
+ * - scheming-cultivator: 算计深沉的同阶修士
+ * - casual-pilgrim: 随性游历者
+ * - shadow-bidder: 暗中出价的影子买家
+ */
+export type BidderArchetype =
+  | 'wealthy-elder'
+  | 'hot-blooded-young'
+  | 'scheming-cultivator'
+  | 'casual-pilgrim'
+  | 'shadow-bidder';
+
+export interface BidderBehaviorProfile {
+  archetype: BidderArchetype;
+  wealth: number;        // 现有灵石
+  maxBid: number;        // 本轮最大可承受出价
+  aggressive: boolean;   // 是否主动加价
+  hostile: boolean;      // 是否对角色有敌意
+}
+
+/**
+ * AI-G115: 战斗因果链。一拍战斗由「动作 → 触发 → 对手反应 → 环境效果」组成。
+ * engine 用其校准 AI 出招的内在因果是否合理。
+ */
+export interface CombatCauseChain {
+  action: string;             // 玩家/AI 当前动作描述
+  trigger: string;            // 触发该动作的原因
+  opponentResponse: string;   // 对手可能的回应
+  environmentalEffect: string; // 环境/天地灵气等产生的次生效果
+}
+
+/**
+ * AI-G116: 战斗陷入僵局时的破局选项。
+ * engine 在 detectCombatStalemate=true 时根据角色与局势选其一作为下一步引导。
+ */
+export type StalemateExit =
+  | 'deception'         // 诈退诱敌
+  | 'risky-strike'      // 行险一击
+  | 'disengage'         // 抽身脱离
+  | 'ally-intervention' // 同门/盟友介入
+  | 'terrain-shift';    // 地利变化（地形/灵气潮）

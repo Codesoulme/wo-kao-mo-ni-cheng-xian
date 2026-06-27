@@ -41,7 +41,7 @@ export function MilestonesLog() {
   // 境界突破
   const breakthroughs = events.filter(e => e.eventType === 'breakthrough');
 
-  // 命节点抉择（从 choices 记录）
+  // 因缘转折抉择（从 choices 记录）
   const fateChoices = choices;
 
   // 干扰回响
@@ -119,7 +119,7 @@ export function MilestonesLog() {
         )}
       </MilestoneSection>
 
-      {/* 命节点抉择 */}
+      {/* 因缘转折抉择 */}
       <MilestoneSection
         icon={<Mountain className="w-4 h-4" />}
         title="命途抉择"
@@ -129,7 +129,7 @@ export function MilestonesLog() {
         onToggle={() => toggle('fate')}
       >
         {fateChoices.length === 0 ? (
-          <Empty text="尚未触发命节点" />
+          <Empty text="尚未触发因缘转折" />
         ) : (
           fateChoices.map((c, i) => (
             <ChoiceMilestoneItem key={c.id || i} choice={c} />

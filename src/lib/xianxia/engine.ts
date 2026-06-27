@@ -7683,3 +7683,360 @@ export function resolveRumorReliability(rumor: WorldRumor, timePassed: number): 
   const next = base * Math.pow(0.95, years);
   return Math.max(0.05, Math.min(1, Math.round(next * 1000) / 1000));
 }
+// Phase-G Worker B: engine.ts additions (UTF-8 no BOM, raw bytes)
+
+// ==================== Phase-G Worker B: Causal Reinforcement (AI-G111~G116) ====================
+// Additive only. Imports use the new types appended to types.ts.
+
+import type {
+  SecretRealmTriggerCondition,
+  SecretRealmEntryAttempt,
+  BidderArchetype,
+  BidderBehaviorProfile,
+  CombatCauseChain,
+  StalemateExit,
+} from './types';
+
+type _PhaseGReexport =
+  | SecretRealmTriggerCondition
+  | SecretRealmEntryAttempt
+  | BidderArchetype
+  | BidderBehaviorProfile
+  | CombatCauseChain
+  | StalemateExit;
+const _phaseGAnchor: _PhaseGReexport | null = null;
+void _phaseGAnchor;
+
+/**
+ * AI-G111: Evaluate whether character can attempt to enter a SecretRealm.
+ * Reads realm.entryRequirement + entryAlternatives; scans character.inventory + statuses.
+ * Returns triggers[], missing[], bypassOptions[], and canAttempt flag.
+ */
+export function deriveSecretRealmAccess(
+  realm: SecretRealm,
+  character: {
+    id?: string;
+    age?: number;
+    realm?: string;
+    inventory?: Array<{ id?: string; name?: string; item_type?: string; description?: string }>;
+    statuses?: Array<{ id?: string; name?: string; category?: string }>;
+  },
+): SecretRealmEntryAttempt {
+  const triggers: SecretRealmTriggerCondition[] = [];
+  const missing: SecretRealmTriggerCondition[] = [];
+  const bypassOptions: string[] = [];
+  if (!realm || !character) {
+    return {
+      realmId: realm?.id ?? '',
+      triggers,
+      missing: ['key-item', 'map-fragment', 'qi-tide', 'inheritance-token', 'time-window'],
+      bypassOptions,
+      canAttempt: false,
+    };
+  }
+  const inventory = Array.isArray(character.inventory) ? character.inventory : [];
+  const statuses = Array.isArray(character.statuses) ? character.statuses : [];
+  const realmName = realm.name ?? '';
+  const req = realm.entryRequirement ?? '';
+  const alt = Array.isArray(realm.entryAlternatives) ? realm.entryAlternatives.join(' ') : '';
+  const nameBlob = `${req} ${alt}`;
+  const wantsKeyItem = /钥匙|令牌|残章|信物|key|token/i.test(nameBlob);
+  const wantsMapFragment = /碎片|map|残图|地图碎片/i.test(nameBlob);
+  const wantsInheritance = /传承|衣钵|inheritance|前任主人|遗物/i.test(nameBlob);
+
+  // key-item
+  if (wantsKeyItem) {
+    const hasKey = inventory.some(
+      (it) =>
+        it &&
+        (/钥匙|令牌|残章/.test(it.name ?? '') || /钥匙|令牌|残章/.test(it.description ?? '')),
+    );
+    if (hasKey) triggers.push('key-item');
+    else missing.push('key-item');
+  }
+  // map-fragment
+  if (wantsMapFragment) {
+    const fragments = inventory.filter((it) => it && /碎片|残图/.test(it.name ?? ''));
+    if (fragments.length >= 2) triggers.push('map-fragment');
+    else missing.push('map-fragment');
+  }
+  // qi-tide
+  const qiTideOpen = statuses.some(
+    (s) => s && (s.id === 'qi_tide_open' || /气潮|灵气潮/.test(s.name ?? '')),
+  );
+  if (qiTideOpen) triggers.push('qi-tide');
+  else if (!wantsKeyItem && !wantsMapFragment && !wantsInheritance) missing.push('qi-tide');
+  // inheritance-token
+  if (wantsInheritance) {
+    const hasToken = inventory.some(
+      (it) =>
+        it &&
+        (/传承|衣钵|信物/.test(it.name ?? '') || /传承|衣钵|信物/.test(it.description ?? '')),
+    );
+    if (hasToken) triggers.push('inheritance-token');
+    else missing.push('inheritance-token');
+  }
+  // time-window
+  if (!realm.isStoryRealm) {
+    const age = typeof character.age === 'number' ? character.age : 0;
+    if (age >= realm.minAge) triggers.push('time-window');
+    else missing.push('time-window');
+  }
+
+  // bypass: alternatives whose first 2 chars overlap with an inventory item name
+  if (Array.isArray(realm.entryAlternatives)) {
+    for (const a of realm.entryAlternatives) {
+      const altLower = a.toLowerCase();
+      const matched = inventory.some(
+        (it) => it && it.name && altLower.includes(it.name.toLowerCase().slice(0, 2)),
+      );
+      if (matched) bypassOptions.push(a);
+    }
+  }
+
+  const canAttempt = missing.length === 0 || bypassOptions.length > 0;
+  return { realmId: realm.id, triggers, missing, bypassOptions, canAttempt };
+}
+
+/**
+ * AI-G112: Resolve a SecretRealm entry attempt given player choice.
+ * choice: 'first' (use first trigger), 'best' (highest-priority trigger),
+ *         'bypass' (use a bypass option if available).
+ */
+export function resolveSecretRealmEntry(
+  attempt: SecretRealmEntryAttempt,
+  choice: 'first' | 'best' | 'bypass',
+): { entered: boolean; sideEffect: string; narrativeHint: string } {
+  if (!attempt)
+    return { entered: false, sideEffect: 'attempt 缺失', narrativeHint: '秘境尝试无效' };
+  if (!attempt.canAttempt) {
+    return {
+      entered: false,
+      sideEffect: `缺少触发条件：${attempt.missing.join(' / ')}`,
+      narrativeHint: `你尚未备齐进入秘境所需之物：${attempt.missing.join('、')}；可尝试寻找${attempt.bypassOptions.join('、') || '其他通路'}。`,
+    };
+  }
+  const triggers = attempt.triggers.length > 0 ? attempt.triggers : (['key-item'] as SecretRealmTriggerCondition[]);
+  let chosen: SecretRealmTriggerCondition = triggers[0];
+  if (choice === 'best') {
+    const priority: SecretRealmTriggerCondition[] = [
+      'inheritance-token',
+      'map-fragment',
+      'key-item',
+      'qi-tide',
+      'time-window',
+    ];
+    chosen = priority.find((t) => triggers.includes(t)) ?? triggers[0];
+  } else if (choice === 'bypass') {
+    if (attempt.bypassOptions.length === 0) {
+      return { entered: false, sideEffect: '无可绕开通路', narrativeHint: '此秘境并无备用通路。' };
+    }
+    return {
+      entered: true,
+      sideEffect: '旁门捷径消耗部分灵力',
+      narrativeHint: `你借${attempt.bypassOptions[0]}绕开主禁制，悄悄入内。`,
+    };
+  }
+
+  const sideEffects: Record<SecretRealmTriggerCondition, string> = {
+    'key-item': '令牌微微发热，未见异状',
+    'map-fragment': '地图碎片共鸣，指明前路',
+    'qi-tide': '气潮涌入经脉，略有鼓胀',
+    'inheritance-token': '前人遗韵一缕，识海微震',
+    'time-window': '时辰契合，门户轻启',
+  };
+  const narrativeHints: Record<SecretRealmTriggerCondition, string> = {
+    'key-item': `你持${chosen}扣响秘境之门，禁制应声而开。`,
+    'map-fragment': `碎片拼合后显现光纹，你循光步入${attempt.realmId}。`,
+    'qi-tide': '恰逢气潮涌动，你借灵气潮汐推门而入。',
+    'inheritance-token': '传承信物泛起柔和光泽，秘境仿佛认出了来人。',
+    'time-window': '正是时辰之窗，秘境禁制暂歇。',
+  };
+  return {
+    entered: true,
+    sideEffect: sideEffects[chosen],
+    narrativeHint: narrativeHints[chosen],
+  };
+}
+
+/**
+ * AI-G113: Derive a richer BidderBehaviorProfile from a bidder + item context.
+ * Expands the 4-type BidderPersonality into 5 BidderArchetypes with wealth & hostility.
+ */
+export function deriveBidderProfile(
+  bidder: { id: string; assets?: number; personality?: string; valuation?: number; name?: string },
+  item: { basePrice?: number; valuation?: number; rarity?: string },
+): BidderBehaviorProfile {
+  const assets = typeof bidder?.assets === 'number' ? bidder.assets : 1000;
+  const itemVal = item?.valuation ?? item?.basePrice ?? 100;
+  const rarity = item?.rarity ?? 'common';
+  const idLower = (bidder?.id ?? '').toLowerCase();
+  const nameLower = (bidder?.name ?? '').toLowerCase();
+  const personality = bidder?.personality ?? 'cautious';
+
+  let archetype: BidderArchetype;
+  let aggressive = false;
+  let hostile = false;
+  if (/elder|长老|前辈|old/.test(idLower + nameLower)) {
+    archetype = 'wealthy-elder';
+    aggressive = assets > itemVal * 2;
+    hostile = personality === 'hostile';
+  } else if (/young|少年|热血|hot|junior/.test(idLower + nameLower) || personality === 'aggressive') {
+    archetype = 'hot-blooded-young';
+    aggressive = true;
+    hostile = false;
+  } else if (/scheme|算计|深沉|cunning/.test(idLower + nameLower)) {
+    archetype = 'scheming-cultivator';
+    aggressive = personality === 'aggressive';
+    hostile = personality === 'hostile';
+  } else if (/shadow|影|暗|hidden/.test(idLower + nameLower)) {
+    archetype = 'shadow-bidder';
+    aggressive = false;
+    hostile = true;
+  } else {
+    archetype = 'casual-pilgrim';
+    aggressive = false;
+    hostile = false;
+  }
+
+  const wealthFactor: Record<BidderArchetype, number> = {
+    'wealthy-elder': 1.8,
+    'hot-blooded-young': 1.3,
+    'scheming-cultivator': 1.4,
+    'casual-pilgrim': 0.8,
+    'shadow-bidder': 1.0,
+  };
+  const wealth = Math.round(assets * wealthFactor[archetype]);
+  const rarityBoost =
+    rarity === 'legendary' || rarity === 'mythic'
+      ? 1.5
+      : rarity === 'epic'
+        ? 1.25
+        : 1;
+  const maxBid = Math.round(
+    itemVal * (personality === 'hostile' ? 2 : 1.1) * rarityBoost,
+  );
+  return { archetype, wealth, maxBid, aggressive, hostile };
+}
+
+/**
+ * AI-G114: Simulate one auction round given multiple bidder profiles.
+ * Returns winner (archetype or null), finalPrice, drama line, postAuctionEvents[].
+ */
+export function simulateBiddingRound(
+  round: { currentBid: number; roundIndex: number },
+  item: { id: string; name: string; basePrice: number; rarity?: string },
+  profiles: BidderBehaviorProfile[],
+): { winner: BidderArchetype | null; finalPrice: number; drama: string; postAuctionEvents: string[] } {
+  if (!Array.isArray(profiles) || profiles.length === 0) {
+    return {
+      winner: null,
+      finalPrice: round?.currentBid ?? 0,
+      drama: '无人应价',
+      postAuctionEvents: ['no_bidder'],
+    };
+  }
+  const startBid = Math.max(round?.currentBid ?? 0, item.basePrice ?? 0);
+  let current = startBid;
+  let winner: BidderArchetype | null = null;
+  const events: string[] = [];
+  for (const p of profiles) {
+    if (current >= p.maxBid) {
+      events.push(`${p.archetype}_cap`);
+      continue;
+    }
+    const step = p.hostile
+      ? Math.round(p.maxBid * 0.4)
+      : p.aggressive
+        ? Math.round(current * 0.18)
+        : Math.round(current * 0.06);
+    const next = current + step;
+    if (next <= p.maxBid) {
+      current = next;
+      winner = p.archetype;
+      events.push(`${p.archetype}_bid`);
+    } else {
+      events.push(`${p.archetype}_pass`);
+    }
+  }
+  const drama = winner
+    ? `最终由【${winner}】以 ${current} 灵石拍下「${item.name}」。`
+    : `「${item.name}」最终流拍。`;
+  if (profiles.some((p) => p.hostile)) events.push('hostile_outbid');
+  if (profiles.some((p) => p.archetype === 'shadow-bidder' && p.maxBid > current))
+    events.push('shadow_escape');
+  if (profiles.some((p) => p.archetype === 'casual-pilgrim')) events.push('casual_withdraw');
+  return { winner, finalPrice: current, drama, postAuctionEvents: events };
+}
+
+/**
+ * AI-G115: Build a CombatCauseChain describing why an action happens, how the
+ * opponent is expected to react, and what environmental side-effects follow.
+ * Used by engine to validate AI-proposed combat actions.
+ */
+export function buildCombatCauseChain(
+  action: { kind: string; name?: string; resource?: string; cost?: number },
+  character?: { realm?: string; realmLevel?: number; element?: string },
+): CombatCauseChain {
+  const kind = action?.kind ?? 'strike';
+  const name = action?.name ?? '基础出招';
+  const trigger = `${character?.realm ?? 'qi_refining'}修士催动「${name}」，灵力贯于指尖。`;
+  let opponentResponse = '对手被迫后退半步，勉强稳住身形。';
+  let environmentalEffect = '周围气流被牵动，沙石簌簌作响。';
+  switch (kind) {
+    case 'spell':
+      opponentResponse = '对手识得此术法来源，急运护身灵气相抗。';
+      environmentalEffect = '天地灵气被抽引，向此处汇聚。';
+      break;
+    case 'formation':
+      opponentResponse = '对手发现脚下灵气纹路，欲抽身已是不及。';
+      environmentalEffect = '地脉灵纹亮起，方圆十丈内灵气被锁。';
+      break;
+    case 'flee':
+      opponentResponse = '对手见你退意，冷笑一声，并不追击。';
+      environmentalEffect = '风压顿减，远方隐约传来兽鸣。';
+      break;
+    case 'deception':
+      opponentResponse = '对手被假动作所惑，重心前倾。';
+      environmentalEffect = '足下尘土扬起，掩去真身。';
+      break;
+    case 'ally':
+      opponentResponse = '对手环顾左右，神色骤变。';
+      environmentalEffect = '远处同门气息骤然逼近。';
+      break;
+    case 'artifact':
+      opponentResponse = '法宝灵光一照，对手气血翻涌。';
+      environmentalEffect = '灵器共振，震荡四方。';
+      break;
+    default:
+      opponentResponse = '对手抬手硬接一招，指尖发麻。';
+      environmentalEffect = '脚下石板龟裂，碎屑纷飞。';
+  }
+  return { action: name, trigger, opponentResponse, environmentalEffect };
+}
+
+/**
+ * AI-G116: Resolve a combat stalemate exit strategy.
+ * Considers allies, terrain tags, opponent HP, and turn count.
+ */
+export function resolveStalemateExit(
+  session: {
+    turnCount: number;
+    opponents?: Array<{ name?: string; hp?: number }>;
+    environmentTags?: string[];
+  } | null | undefined,
+  character: { id?: string; realm?: string; realmLevel?: number; faction?: string; allies?: string[] } | null | undefined,
+): StalemateExit {
+  const turn = session?.turnCount ?? 0;
+  const allies = Array.isArray(character?.allies) ? character.allies : [];
+  const tags = Array.isArray(session?.environmentTags) ? session.environmentTags : [];
+  const oppHpLow =
+    Array.isArray(session?.opponents) &&
+    session.opponents.some((o) => typeof o.hp === 'number' && o.hp < 30);
+  if (allies.length > 0 && turn > 3) return 'ally-intervention';
+  if (tags.includes('mountain') || tags.includes('forest') || tags.includes('river'))
+    return 'terrain-shift';
+  if (oppHpLow) return 'risky-strike';
+  if (turn >= 8) return 'disengage';
+  return 'deception';
+}

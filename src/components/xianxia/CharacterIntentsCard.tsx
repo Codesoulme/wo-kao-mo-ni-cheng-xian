@@ -68,35 +68,7 @@ export function CharacterIntentsCard() {
             const p = it.priority || 1;
             const ps = priorityStyle(p);
             return (
-              <div
-                key={it.id || i}
-                className="flex items-start gap-2 p-1.5 rounded-md hover:bg-accent/5 transition-colors min-w-0"
-              >
-                {/* 优先级数字徽标 */}
-                <span className={cn(
-                  "shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border",
-                  ps.bg, ps.color, ps.border
-                )}>
-                  {p}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-xs font-bold font-serif-cn text-foreground truncate">
-                      {it.title || '无名之意'}
-                    </span>
-                    {it.type && INTENT_LABEL[it.type] && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground shrink-0">
-                        {INTENT_LABEL[it.type]}
-                      </span>
-                    )}
-                  </div>
-                  {it.description && (
-                    <p className="text-[10px] text-muted-foreground font-serif-cn leading-relaxed line-clamp-2 mt-0.5 xianxia-readable">
-                      {sanitizeIntentDescription(it.description)}
-                    </p>
-                  )}
-                </div>
-              </div>
+              <IntentRow key={it.id || i} it={it} p={p} ps={ps} />
             );
             })}
             {sorted.length > 3 && (
@@ -129,4 +101,53 @@ function sanitizeIntentDescription(text: string): string {
     .replace(/若修为不足应闭关苦修/g, '若修为不足，便该闭关磨砺')
     .replace(/说明暂时无法入内的原因/g, '另寻暂缓入内的缘由')
     .trim();
+}
+function IntentRow({ it, p, ps }: { it: any; p: number; ps: { color: string; bg: string; border: string } }) {
+  const [expanded, setExpanded] = useState(false);
+  const desc = it.description ? sanitizeIntentDescription(it.description) : '';
+  const needExpand = desc.length > 40;
+  return (
+    <div
+      className="flex items-start gap-2 p-1.5 rounded-md hover:bg-accent/5 transition-colors min-w-0"
+    >
+      {/* 优先级数字徽标 */}
+      <span className={cn(
+        "shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border",
+        ps.bg, ps.color, ps.border
+      )}>
+        {p}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="text-xs font-bold font-serif-cn text-foreground truncate">
+            {it.title || '无名之意'}
+          </span>
+          {it.type && INTENT_LABEL[it.type] && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-muted/50 text-muted-foreground shrink-0">
+              {INTENT_LABEL[it.type]}
+            </span>
+          )}
+        </div>
+        {it.description && (
+          <>
+            <p className={cn(
+              "text-[10px] text-muted-foreground font-serif-cn leading-relaxed mt-0.5 xianxia-readable",
+              !expanded && 'line-clamp-2'
+            )}>
+              {desc}
+            </p>
+            {needExpand && (
+              <button
+                type="button"
+                onClick={() => setExpanded(v => !v)}
+                className="text-[10px] text-primary/80 hover:text-primary mt-0.5"
+              >
+                {expanded ? '收起' : '展开全文'}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
 }

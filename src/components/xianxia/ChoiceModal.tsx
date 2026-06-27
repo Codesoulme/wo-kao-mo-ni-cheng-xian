@@ -105,7 +105,7 @@ export function ChoiceModal() {
           </CardTitle>
         </CardHeader>
         <CardContent className="relative space-y-3 overflow-y-auto xianxia-scroll flex-1">
-          {/* 前情提要：命节点事件叙事 */}
+          {/* 前情提要：因缘转折事件叙事 */}
           {hasContext && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 overflow-hidden">
               <button
