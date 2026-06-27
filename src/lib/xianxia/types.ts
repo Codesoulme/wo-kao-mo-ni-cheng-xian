@@ -2699,3 +2699,253 @@ export interface TechniqueStudy {
     insight: string;
   }>;
 }
+/**
+ * Phase-I Worker D: 结局光谱（Ending Spectrum）。
+ * 角色一生最终命轨的元数据契约：
+ *  - archetype: 8 种正典结局原型（成仙 / 坐化 / 入魔 / 立宗 / 转世 / 脱世界 / 天地崩 / 凡人隐）
+ *  - condition: 触发该结局所需条件清单 + 权重 + 叙事预览
+ *  - choice: 角色在某个年纪做出的「关键抉择」记录（可逆性 + 替代路径）
+ *  - outcome: 真正落库的世界结果（含世界余波及继承人）
+ *  - pathMap: 角色生涯内的结局/抉择/落库结果聚合
+ *
+ * 本合约由引擎 evaluate/select/apply/branch/summarize 五个函数操作；
+ * AI/前端只能消费它们输出，不得自行捏造结局字段。
+ */
+
+/**
+ * AI-I4xx: 正典结局原型（8 种）。
+ *  - ascend-immortal: 飞升成仙
+ *  - sit-death:        坐化陨落（未成仙、自然死亡、寿尽）
+ *  - fall-demonic:     堕入魔道
+ *  - found-sect:       立宗立派
+ *  - reincarnate:      转世重生
+ *  - escape-world:     脱出本界（离开此方天地）
+ *  - world-collapse:   随天地共灭
+ *  - fade-into-mortal: 褪去修为隐于凡尘
+ */
+export type EndingArchetype =
+  | 'ascend-immortal'
+  | 'sit-death'
+  | 'fall-demonic'
+  | 'found-sect'
+  | 'reincarnate'
+  | 'escape-world'
+  | 'world-collapse'
+  | 'fade-into-mortal';
+
+/**
+ * AI-I431: 结局触发条件。
+ *  - id:               唯一 id，引擎按 id 查表
+ *  - archetype:        该条件对应结局原型
+ *  - requirements:     触发条件清单（元素 / 境界 / 资源 / 因缘状态等可读标记）
+ *  - weight:           0-1 的相对权重，selectEndingPath 用于加权抽样
+ *  - narrativePreview: 给 AI/前端用的叙事预览（一行中文短句）
+ */
+export interface EndingCondition {
+  id: string;
+  archetype: EndingArchetype;
+  requirements: string[];
+  weight: number;
+  narrativePreview: string;
+}
+
+/**
+ * AI-I432: 角色在某一刻做出的「关键抉择」。
+ *  - endingId:         选定的 EndingCondition id（可空：尚未落定）
+ *  - age:              抉择时的年龄
+ *  - reason:           角色动机（一行中文，引擎校验后写入史册）
+ *  - alternativePaths: 同时存在的替代路径 id（可能因后续因缘改写）
+ *  - irreversibility:  是否不可逆（true 表示锁死结局）
+ */
+export interface EndingChoice {
+  endingId: string;
+  age: number;
+  reason: string;
+  alternativePaths: string[];
+  irreversibility: boolean;
+}
+
+/**
+ * AI-I433: 结局实际落库结果。
+ *  - endingId:             对应 EndingCondition id
+ *  - archetype:            落定的原型
+ *  - age:                  落定时的年龄
+ *  - summary:              一句话总结（引擎校验后写入史册）
+ *  - worldStateAftermath:  世界余波（受影响的世界事实 / 宗门 / 因缘）
+ *  - heirIds:              继承人 id 列表（角色物品/衣钵/道统的承接者）
+ */
+export interface EndingOutcome {
+  endingId: string;
+  archetype: EndingArchetype;
+  age: number;
+  summary: string;
+  worldStateAftermath: string[];
+  heirIds: string[];
+}
+
+/**
+ * AI-I434: 单个角色生涯内的「结局路径全图」。
+ *  - endings:           所有可见/可达的结局条件（evaluateEndingConditions 输出）
+ *  - characterChoices:  角色在生涯内做过的关键抉择
+ *  - outcomeHistory:    已经实际落定的结局（按 age 升序）
+ */
+export interface EndingPathMap {
+  endings: EndingCondition[];
+  characterChoices: EndingChoice[];
+  outcomeHistory: EndingOutcome[];
+}
+/**
+ * AI-I401: 传承类型（角色之间传承关系的种类）。
+ *  - bloodline         血脉：父母/祖辈/先天的修为与体质的血脉传承。
+ *  - master-disciple   师徒：师门内部师徒单传的功法与心得。
+ *  - tribal-clan       部族：氏族/部落的群体性图腾传承。
+ *  - sect-lineage      宗门：宗派正统代际传承的功法与地位。
+ *  - blood-oath        血誓：以血脉之约为契的传承（如结义金兰、歃血盟友）。
+ *  - destiny-thread    因缘：命数/天机牵引的无形传承（如因果延续、仙缘牵引）。
+ */
+export type InheritanceKind =
+  | 'bloodline'
+  | 'master-disciple'
+  | 'tribal-clan'
+  | 'sect-lineage'
+  | 'blood-oath'
+  | 'destiny-thread';
+
+/**
+ * AI-I401: 传承接收人（被传承者）的结构化记录。
+ *  - id                    唯一 id（与 CharacterState.id 区分；用于跨代谱系追踪）。
+ *  - kind                  传承类型。
+ *  - sourceCharacterId     传承来源角色 id（师、祖、血缘父/母等）。
+ *  - targetCharacterId     接收人 id。
+ *  - inheritedAbilities    实际继承到的功法/术法/体质/血脉名 id 列表。
+ *  - inheritanceAge        接收人在该岁承接该传承。
+ *  - narrative             世界内的因缘/桥段描述（一句话或一段）。
+ *  - realmRequired         接收时的最低境界要求（Realm 字符串）。
+ */
+export interface InheritanceRecipient {
+  id: string;
+  kind: InheritanceKind;
+  sourceCharacterId: string;
+  targetCharacterId: string;
+  inheritedAbilities: string[];
+  inheritanceAge: number;
+  narrative: string;
+  realmRequired: string;
+}
+
+/**
+ * AI-I401: 传承主张（角色对某项传承发起承接时的请求与状态）。
+ *  - recipientId           主张发起的接收人 id（与 InheritanceRecipient.id 对应）。
+ *  - claimAge              发起主张时的年龄。
+ *  - claimReason           主张承接的理由（一句话，世界内表达）。
+ *  - witnessIds            见证此次主张的角色 id 列表。
+ *  - contested             是否存在竞争者（多人同源）。
+ *  - resolved              是否已裁定（与 contested 配合使用）。
+ */
+export interface InheritanceClaim {
+  recipientId: string;
+  claimAge: number;
+  claimReason: string;
+  witnessIds: string[];
+  contested: boolean;
+  resolved: boolean;
+}
+
+/**
+ * AI-I401: 跨代传承链（一棵根角色出发的多代谱系）。
+ *  - rootCharacterId       根角色 id（通常是最初的传承源 / 始祖 / 开派祖师）。
+ *  - generations           按代排列的接收人列表：generations[0] = 根的直系一代，generations[1] = 二代，以此类推。
+ *  - activeClaims          当前尚未结案的主张（含未了因缘）。
+ *  - lostTechniques        随传承链中断而失传的功法/术法 id 列表（无法自动恢复）。
+ */
+export interface InheritanceChain {
+  rootCharacterId: string;
+  generations: InheritanceRecipient[][];
+  activeClaims: InheritanceClaim[];
+  lostTechniques: string[];
+}
+
+/**
+ * AI-I401: 传承池（某条传承源当前可用名额的容器；角色可从池中"承接"一个名额）。
+ *  - id                    池 id。
+ *  - name                  世界内名称（如"青岚剑意传承池"）。
+ *  - kind                  传承类型。
+ *  - availableSlots        剩余可承接名额（>=0；达到 0 后不再发放）。
+ *  - lockedUntilAge        锁定到该岁之后才允许承接（0 表示无年龄锁）。
+ *  - hostCharacterIds      当前持有/挂载此池的角色 id 列表（空表示该池尚未被认领）。
+ */
+export interface InheritancePool {
+  id: string;
+  name: string;
+  kind: InheritanceKind;
+  availableSlots: number;
+  lockedUntilAge: number;
+  hostCharacterIds: string[];
+}
+// ==================== 鍛借繍鍥炲搷绯荤粺锛圥hase-I Worker C 閲嶅仛锛?====================
+
+/**
+ * AI-C4xx: 鍛借繍鍥炲搷绉嶇被鈥斺€斿懡杩愮綉瑙﹀彂妯″紡鐨勬灇涓俱€? *  - character-callback:    浜虹墿鍥炲搷锛堟棫璇嗛噸閫€佹仼浠囨竻绠楋級
+ *  - place-resonance:       鍦扮偣鍥炲搷锛堟晠鍦伴噸杩斻€佹皵鏈哄叡楦ｏ級
+ *  - item-recall:           鐗╁搧鍥炲搷锛堟硶瀹濊涓汇€侀仐鐗╂劅搴旓級
+ *  - promise-fulfillment:   瑾撶害鍥炲搷锛堝綋骞翠箣绾︺€佷粖鏈濊返璇猴級
+ *  - karma-debt:            鍥犳灉鍥炲搷锛堝鍊轰簡鏂€佹仼鎬ㄥ洖鎶ワ級
+ *  - destiny-collision:     鍛芥暟纰版挒锛堜袱浣嶅懡杩愮浉绯讳箣浜虹浉閬囷級
+ */
+export enum FateEchoKind {
+  CharacterCallback = 'character-callback',
+  PlaceResonance = 'place-resonance',
+  ItemRecall = 'item-recall',
+  PromiseFulfillment = 'promise-fulfillment',
+  KarmaDebt = 'karma-debt',
+  DestinyCollision = 'destiny-collision',
+}
+
+/**
+ * AI-C4xx: 鍛借繍鍥炲搷瑙﹀彂鍣ㄢ€斺€斾粠鍘嗗彶涓瘑鍒嚭鐨勩€佸簲褰撹婵€娲荤殑鍛借繍鑺傜偣銆? *  - id:                  鍞竴 id锛堟寜瑙掕壊 + kind + 婧愪汉鐗?鐗╁搧鐢熸垚锛? *  - kind:                鍥炲搷绉嶇被
+ *  - age:                 瑙﹀彂骞撮緞锛堣鑹插勾榫勫揩鐓э級
+ *  - sourceCharacterId:   瑙﹀彂婧愶紙浜虹墿/鍦扮偣/鐗╁搧/瑾撶害鐨?id锛? *  - targetCharacterId:   琚洖鍝嶅嵎鍏ョ殑鐩爣浜虹墿 id锛堣嚜宸辨垨浠栦汉锛? *  - narrativeHook:       鐜╁鍙鐨勪笘鐣屽唴鍙欎簨閽╁瓙锛堜竴鍙ヨ瘽鎻愮ず锛? *  - urgency:             绱ц揩绋嬪害锛坙ow/normal/high/critical锛夛紝鍐冲畾鎺ㄨ繘鍔涘害
+ */
+export interface FateEchoTrigger {
+  id: string;
+  kind: FateEchoKind;
+  age: number;
+  sourceCharacterId: string;
+  targetCharacterId: string;
+  narrativeHook: string;
+  urgency: 'low' | 'normal' | 'high' | 'critical';
+}
+
+/**
+ * AI-C4xx: 鍛借繍鍥炲搷瑙ｅ喅缁撴灉鈥斺€斿懡杩愮綉涓殑涓€涓洖鍝嶈涓栫晫/鐜╁搴斿鍚庣殑鍥炲簲銆? *  - echoId:                瀵瑰簲鐨?FateEchoTrigger.id
+ *  - resolvedAge:           瑙ｅ喅鏃剁殑瑙掕壊骞撮緞
+ *  - outcome:               缁撳眬锛坒ulfilled=灞ョ害/transformed=杞寲/deferred=寤跺悗/severed=鏂粷锛? *  - narrativeConsequence:  鐜╁鍙鐨勪笘鐣屽唴褰卞搷鎻忚堪
+ *  - involvedCharacterIds:  鍙備笌鍥炲搷鐨勬墍鏈変汉鐗?id锛堝惈鑷繁锛? */
+export interface FateEchoResolution {
+  echoId: string;
+  resolvedAge: number;
+  outcome: 'fulfilled' | 'transformed' | 'deferred' | 'severed';
+  narrativeConsequence: string;
+  involvedCharacterIds: string[];
+}
+
+/**
+ * AI-C4xx: 鍛借繍缃戔€斺€旇鑹插綋鍓嶈儗璐熺殑鍛借繍鍥炲搷鍏ㄩ泦涓庣粐缃戠姸鎬併€? *  - echoes:          寰呭洖鍝嶉泦鍚? *  - resolutions:     宸茶В鍐冲洖鍝嶉泦鍚? *  - threadDensity:   缁囩綉瀵嗗害 0..1锛坋.g. echo/10 cap 鍒?1锛? *  - dominantKind:    涓诲鍥炲搷绉嶇被锛堝嚭鐜版渶澶氱殑锛夛紱鐢ㄤ簬 AI 涓婁笅鏂囪仛鐒? */
+export interface FateWeb {
+  echoes: FateEchoTrigger[];
+  resolutions: FateEchoResolution[];
+  threadDensity: number;
+  dominantKind: FateEchoKind | null;
+}
+
+/**
+ * AI-C4xx: 鍛借繍杞ㄨ抗棰勬祴鈥斺€斿熀浜庡懡杩愮綉 + 瑙掕壊鐘舵€侊紝鏈潵鑻ュ共骞寸殑鍛借繍棰勬祴鑺傜偣銆? *  - age:                  棰勬祴骞撮緞
+ *  - predictedEvent:       棰勬祴浜嬩欢鍚嶏紙涓€鍙ヨ瘽锛? *  - probability:          姒傜巼 0..1
+ *  - rationale:            鎺ㄦ柇鐞嗙敱锛堢帺瀹跺彲瑙佺殑涓枃鐭彞锛? *  - alternativeBranches:  澶囬€夊垎鏀簨浠舵弿杩帮紙鐜╁鍙鐭彞鍒楄〃锛? */
+export interface FatePredictedOutcome {
+  age: number;
+  predictedEvent: string;
+  probability: number;
+  rationale: string;
+  alternativeBranches: string[];
+}

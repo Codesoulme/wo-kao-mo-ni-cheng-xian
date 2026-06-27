@@ -1,11 +1,15 @@
-﻿import { readFileSync, existsSync } from 'fs';
+﻿﻿import { readFileSync, existsSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItem, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStalemateExit, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse, unequipItem, buildEmptyWorldMap, discoverLocation, deriveTravelFeasibility, generateRandomEncounter, summarizeWorldForPrompt, recordNPCMemory, clusterNPCMemories, decayNPCMemories, deriveNPCBehaviorFromMemory, summarizeNPCForPrompt, buildEmptySectGraph, addSectNode, setSectRelation, derivePlayerSectAffinity, queryRelationsTowards, deriveCraftingEligibility, startCraftingSession, resolveCraftingStep, deriveTechniqueProgress, resolveTechniqueBreakthrough } from '../src/lib/xianxia/engine';
+import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItem, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStalemateExit, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse, unequipItem, buildEmptyWorldMap, discoverLocation, deriveTravelFeasibility, generateRandomEncounter, summarizeWorldForPrompt, recordNPCMemory, clusterNPCMemories, decayNPCMemories, deriveNPCBehaviorFromMemory, summarizeNPCForPrompt, buildEmptySectGraph, addSectNode, setSectRelation, derivePlayerSectAffinity, queryRelationsTowards, deriveInheritanceEligibility, claimInheritance, resolveInheritanceContest, propagateInheritance, summarizeInheritanceForPrompt, deriveCraftingEligibility, startCraftingSession, resolveCraftingStep, deriveTechniqueProgress, resolveTechniqueBreakthrough,
+  evaluateSectPhase, projectSectPowerDecade, detectSectCrisis, generateSectEvent, summarizeSectTrajectoryForPrompt,
+  detectFateEchoes, resolveFateEcho, propagateFateConsequences, predictFateTrajectory, summarizeFateWebForPrompt,
+  evaluateEndingConditions, selectEndingPath, applyEndingOutcome, branchAlternativeOutcomes, summarizeEndingForPrompt } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
-import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain, WorldRegion, RegionTier, LocationNode, TravelRoute, WorldMap } from '../src/lib/xianxia/types';
+import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain, WorldRegion, RegionTier, LocationNode, TravelRoute, WorldMap, EndingArchetype, EndingCondition, EndingChoice, EndingOutcome, EndingPathMap, InheritanceKind, InheritanceRecipient, InheritanceClaim, InheritanceChain, InheritancePool, FateEchoTrigger, FateEchoResolution, FateWeb, FatePredictedOutcome } from '../src/lib/xianxia/types';
+import { FateEchoKind } from '../src/lib/xianxia/types';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
 import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
@@ -2838,6 +2842,9 @@ function smokeAi103RumorReliability(): void {
   pgRunPhaseHBWorkerBSmokes();
   pgRunPhaseHSmokeAWorkerAV2();
   pgRunPhaseHDWorkerDSmokes();
+  pgRunPhaseIDWorkerDSmokes();
+  pgRunPhaseIAWorkerASmokes();
+  pgRunPhaseICWorkerCSmokes();
 }
 
 function smokeCombatLabelsDisplay(): void {
@@ -6406,5 +6413,363 @@ function pgRunPhaseHDWorkerDSmokes(): void {
     try { c.fn(); log(c.name, { passed: true }); }
     catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
   }
+}
+
+
+// ==================== Phase-I Worker D: Ending Spectrum (smoke) ====================
+
+function smokeI431EndingConditionEvaluation(): void {
+  const conds1 = evaluateEndingConditions(
+    { name: "PC", age: 200, realm: "immortal", realmLevel: 7, luck: 80 },
+    { worldStability: 0.9, isDoomActive: false }
+  );
+  assert(Array.isArray(conds1), "conds1 should be array");
+  assert(conds1.length >= 1, "conds1 has at least 1 entry");
+  for (let i = 1; i < conds1.length; i++) {
+    assert(conds1[i - 1].weight >= conds1[i].weight, "conds should be sorted by weight desc");
+  }
+}
+
+function smokeI432EndingPathSelection(): void {
+  const conds = evaluateEndingConditions(
+    { name: "PC", age: 200, realm: "immortal", realmLevel: 7, luck: 80 },
+    { worldStability: 0.9, isDoomActive: false }
+  );
+  const result = selectEndingPath({ name: "PC", age: 200 }, conds, 0.99);
+  assert(result && result.chosen && typeof result.chosen.id === "string", "chosen has id");
+  assert(typeof result.rationale === "string" && result.rationale.length > 0, "rationale non-empty");
+  assert(typeof result.chosen.archetype === "string", "chosen.archetype non-empty");
+  const empty = selectEndingPath({ name: "p" }, [], 0.5);
+  assert(empty.chosen && typeof empty.chosen.id === "string", "empty fallback has id");
+}
+
+function smokeI433EndingOutcomeApplication(): void {
+  const conds = evaluateEndingConditions(
+    { name: "PC", age: 200, realm: "immortal", realmLevel: 7, heirCandidateIds: ["heir-a", "heir-b"] },
+    { worldStability: 0.9, isDoomActive: false }
+  );
+  const ascend = conds[0];
+  const outcome = applyEndingOutcome(
+    { name: "PC", age: 200, heirCandidateIds: ["heir-a", "heir-b"] },
+    ascend,
+    { eraName: "default", worldStability: 0.9 }
+  );
+  assert(typeof outcome.endingId === "string", "outcome has endingId");
+  assert(typeof outcome.archetype === "string", "outcome has archetype");
+  assert(typeof outcome.age === "number", "outcome has numeric age");
+  assert(typeof outcome.summary === "string" && outcome.summary.length > 0, "outcome summary non-empty");
+  assert(Array.isArray(outcome.worldStateAftermath), "worldStateAftermath is array");
+  assert(Array.isArray(outcome.heirIds), "heirIds is array");
+}
+
+function smokeI434EndingAlternativeBranches(): void {
+  const conds = evaluateEndingConditions(
+    { name: "PC", age: 200, realm: "immortal", realmLevel: 7, luck: 80 },
+    { worldStability: 0.5, isDoomActive: false }
+  );
+  const main = conds[0];
+  const outcome = applyEndingOutcome({ name: "PC", age: 200 }, main, { eraName: "default" });
+  const branches = branchAlternativeOutcomes(outcome, [
+    { archetype: "sit-death", narrativeTwist: "心魔未除" },
+    { archetype: "fall-demonic", narrativeTwist: "失道入魔" },
+  ]);
+  assert(Array.isArray(branches) && branches.length >= 3, "at least 3 branches (1 main + 2 alt), got " + branches.length);
+  assert(branches[0].endingId === outcome.endingId, "first branch is main");
+}
+
+function pgRunPhaseIDWorkerDSmokes(): void {
+  const cases = [
+    { name: "smoke-i-431-ending-condition-evaluation", fn: smokeI431EndingConditionEvaluation },
+    { name: "smoke-i-432-ending-path-selection", fn: smokeI432EndingPathSelection },
+    { name: "smoke-i-433-ending-outcome-application", fn: smokeI433EndingOutcomeApplication },
+    { name: "smoke-i-434-ending-alternative-branches", fn: smokeI434EndingAlternativeBranches },
+  ];
+  for (const c of cases) {
+    try { c.fn(); log(c.name, { passed: true }); }
+    catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
+  }
+}
+function pgRunPhaseIAWorkerASmokes(): void {
+  const cases = [
+    { name: "smoke-i-401-inheritance-eligibility", fn: smokeI401InheritanceEligibility },
+    { name: "smoke-i-402-inheritance-claim", fn: smokeI402InheritanceClaim },
+    { name: "smoke-i-403-inheritance-contest", fn: smokeI403InheritanceContest },
+    { name: "smoke-i-404-inheritance-propagation", fn: smokeI404InheritancePropagation },
+  ];
+  for (const c of cases) {
+    try { c.fn(); log(c.name, { passed: true }); }
+    catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
+  }
+}
+
+// ==================== Phase-I Worker B: 宗门兴衰 smokes (i-411~i-414) ====================
+function smokeI411SectPhaseEvaluation(): void {
+  const traj = { sectId: 'qingyun', phase: 'prosperous', history: [], powerCurve: [{ combatPower: 50, resourceStock: 60, memberCount: 100, reputation: 70, internalCohesion: 0.7, timeStamp: 20 }], currentLeader: '清虚', factionId: 'qingyun-pavilion', fate: 'growing' };
+  const out = evaluateSectPhase(traj, 20);
+  assert(['founding', 'prosperous', 'stable', 'declining', 'crisis', 'scattered', 'remnant'].indexOf(out.phase) >= 0, "phase enum: " + out.phase);
+  assert(typeof out.reason === "string", "reason string");
+}
+
+function smokeI412SectPowerProjection(): void {
+  const traj = { sectId: 'qingyun', phase: 'stable', history: [], powerCurve: [{ combatPower: 50, resourceStock: 60, memberCount: 100, reputation: 70, internalCohesion: 0.7, timeStamp: 20 }], currentLeader: '清虚', factionId: 'qingyun-pavilion', fate: 'stable' };
+  const out = projectSectPowerDecade(traj, 20);
+  assert(Array.isArray(out), "projection array");
+  assert(out.length === 10, "10-step projection");
+}
+
+function smokeI413SectCrisisDetection(): void {
+  const traj = { sectId: 'qingyun', phase: 'declining', history: [], powerCurve: [{ combatPower: 5, resourceStock: 10, memberCount: 20, reputation: 15, internalCohesion: 0.2, timeStamp: 20 }], currentLeader: '?', factionId: 'qingyun-pavilion', fate: 'fading' };
+  const out = detectSectCrisis(traj, 0.3);
+  assert(Array.isArray(out.crisisEvents), "crisisEvents array");
+  assert(typeof out.severity === "number", "severity numeric");
+}
+
+function smokeI414SectEventGeneration(): void {
+  const traj = { sectId: 'qingyun', phase: 'stable', history: [], powerCurve: [], currentLeader: '清虚', factionId: 'qingyun-pavilion', fate: 'stable' };
+  const ev = generateSectEvent(traj, ['pc-1', 'pc-2'], function () { return 0.3; });
+  assert(typeof ev.id === "string", "id string");
+  assert(['founding', 'prosperous', 'stable', 'declining', 'crisis', 'scattered', 'remnant'].indexOf(ev.phase) >= 0, "phase enum");
+  assert(Array.isArray(ev.characterIds) && ev.characterIds.length === 2, "2 characters");
+}
+
+function pgRunPhaseIBWorkerBSmokes(): void {
+  const cases = [
+    { name: "smoke-i-411-sect-phase-evaluation", fn: smokeI411SectPhaseEvaluation },
+    { name: "smoke-i-412-sect-power-projection", fn: smokeI412SectPowerProjection },
+    { name: "smoke-i-413-sect-crisis-detection", fn: smokeI413SectCrisisDetection },
+    { name: "smoke-i-414-sect-event-generation", fn: smokeI414SectEventGeneration },
+  ];
+  for (const c of cases) {
+    try { c.fn(); log(c.name, { passed: true }); }
+    catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
+  }
+}
+
+// ==================== Phase-I Worker C: 命运回响 smokes (i-421~i-424) ====================
+
+function smokeI421FateEchoDetection(): void {
+  const character = {
+    id: 'pc-1',
+    age: 20,
+    npcs: [{ id: 'npc-meiren', attitude: '亲善' }],
+    longTermMemory: ['初见仙门', '旧时法宝青虹剑', '故地青岚山']
+  };
+  const history: any[] = [
+    { id: 't-enemy-1', category: 'enemy', title: '血煞仇怨', deadlineAge: 22 },
+    { id: 't-promise-1', category: 'promise', title: '十年之约', deadlineAge: 30 },
+  ];
+  const out = detectFateEchoes(character, history);
+  assert(Array.isArray(out), 'fate echoes should be array');
+  assert(out.length >= 1, 'fate echoes should include at least 1 trigger');
+  assert(out.every((e: any) => typeof e.id === 'string' && e.id.length > 0), 'every echo has id');
+  assert(out.every((e: any) => ['low', 'normal', 'high', 'critical'].indexOf(e.urgency) >= 0), 'urgency enum');
+}
+
+function smokeI422FateEchoResolution(): void {
+  const echo = {
+    id: 'e-test-1',
+    kind: FateEchoKind.KarmaDebt,
+    age: 25,
+    sourceCharacterId: 'npc-enemy-1',
+    targetCharacterId: 'pc-1',
+    narrativeHook: '宿债临头',
+    urgency: 'high' as const,
+  };
+  const character = { id: 'pc-1', age: 25 };
+  // Deterministic rand=0.5 → high urgency: fulfilled (<0.45)? no, transformed (<0.75)? yes
+  const out = resolveFateEcho(echo, character, function () { return 0.5; });
+  assert(out.echoId === 'e-test-1', 'echoId preserved, got ' + out.echoId);
+  assert(['fulfilled', 'transformed', 'deferred', 'severed'].indexOf(out.outcome) >= 0, 'outcome enum: ' + out.outcome);
+  assert(out.resolvedAge === 25, 'resolvedAge preserved');
+  assert(Array.isArray(out.involvedCharacterIds) && out.involvedCharacterIds.length >= 1, 'involvedCharacterIds has at least 1');
+  assert(typeof out.narrativeConsequence === 'string' && out.narrativeConsequence.length > 0, 'narrativeConsequence non-empty');
+  // Test low urgency path: rand=0.5 → normal: transformed (<0.65)
+  const echo2 = Object.assign({}, echo, { urgency: 'low' as const });
+  const out2 = resolveFateEcho(echo2, character, function () { return 0.5; });
+  assert(out2.outcome === 'transformed', 'low urgency roll 0.5 → transformed, got ' + out2.outcome);
+}
+
+function smokeI423FatePropagation(): void {
+  const resolution: FateEchoResolution = {
+    echoId: 'e-test-1',
+    resolvedAge: 26,
+    outcome: 'fulfilled',
+    narrativeConsequence: '宿债了结',
+    involvedCharacterIds: ['pc-1', 'npc-enemy-1'],
+  };
+  const web: FateWeb = {
+    echoes: [
+      { id: 'e-test-1', kind: FateEchoKind.KarmaDebt, age: 25, sourceCharacterId: 'npc-enemy-1', targetCharacterId: 'pc-1', narrativeHook: '宿债临头', urgency: 'high' },
+      { id: 'e-test-2', kind: FateEchoKind.PromiseFulfillment, age: 25, sourceCharacterId: 'npc-friend-1', targetCharacterId: 'pc-1', narrativeHook: '故友之约', urgency: 'normal' },
+    ],
+    resolutions: [],
+    threadDensity: 0.2,
+    dominantKind: FateEchoKind.KarmaDebt,
+  };
+  const out = propagateFateConsequences(resolution, web);
+  assert(Array.isArray(out.resolutions) && out.resolutions.length === 1, 'resolutions has 1 entry');
+  assert(Array.isArray(out.echoes) && out.echoes.length === 1, 'echoes drops the resolved one');
+  assert(out.echoes[0].id === 'e-test-2', 'remaining echo is e-test-2, got ' + out.echoes[0].id);
+  assert(typeof out.threadDensity === 'number' && out.threadDensity >= 0 && out.threadDensity <= 1, 'threadDensity in [0,1]');
+  // Fulfilled causes -1 weight on the original kind (KarmaDebt); so dominant should change to PromiseFulfillment
+  assert(out.dominantKind === FateEchoKind.PromiseFulfillment, 'dominant shifts to PromiseFulfillment, got ' + out.dominantKind);
+}
+
+function smokeI424FatePrediction(): void {
+  const character = { id: 'pc-1', age: 30 };
+  const web: FateWeb = {
+    echoes: [
+      { id: 'e-test-3', kind: FateEchoKind.DestinyCollision, age: 30, sourceCharacterId: 'npc-destiny-1', targetCharacterId: 'pc-1', narrativeHook: '命数牵引', urgency: 'normal' },
+    ],
+    resolutions: [],
+    threadDensity: 0.1,
+    dominantKind: FateEchoKind.DestinyCollision,
+  };
+  const out = predictFateTrajectory(character, web, 5);
+  assert(Array.isArray(out), 'predictions array');
+  assert(out.length === 5, '5 predictions for years=5, got ' + out.length);
+  // Sorted by age ascending
+  for (let i = 1; i < out.length; i++) {
+    assert(out[i].age > out[i - 1].age, 'ages strictly increasing at ' + i);
+  }
+  assert(out[0].age === 31, 'first prediction age = start+1, got ' + out[0].age);
+  assert(typeof out[0].probability === 'number' && out[0].probability >= 0 && out[0].probability <= 1, 'probability in [0,1]');
+  assert(Array.isArray(out[0].alternativeBranches) && out[0].alternativeBranches.length === 3, '3 alternative branches');
+  // Test summarize
+  const summary = summarizeFateWebForPrompt(web, 200);
+  assert(typeof summary === 'string' && summary.length > 0, 'summary non-empty');
+  assert(summary.length <= 200, 'summary within charLimit');
+  assert(summary.indexOf('命运网') >= 0, 'summary contains 命运网');
+}
+
+function pgRunPhaseICWorkerCSmokes(): void {
+  const cases = [
+    { name: 'smoke-i-421-fate-echo-detection', fn: smokeI421FateEchoDetection },
+    { name: 'smoke-i-422-fate-echo-resolution', fn: smokeI422FateEchoResolution },
+    { name: 'smoke-i-423-fate-propagation', fn: smokeI423FatePropagation },
+    { name: 'smoke-i-424-fate-prediction', fn: smokeI424FatePrediction },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
+
+// ======================== Phase-I Worker A (phase-i-p3-long): Multi-Character Inheritance (smoke) ======================
+// Additive only. Each smoke targets one engine.ts function in the i-40x batch.
+
+function smokeI401InheritanceEligibility(): void {
+ // AI-I401: deriveInheritanceEligibility - check missing prerequisites by pool/age/host
+  const character: any = { id: 'char-1', name: 'p1', age: 20, realm: 'qi_refining' };
+  const pool: any = {
+    id: 'pool-1',
+    name: 'pool-name',
+    kind: 'master-disciple' as InheritanceKind,
+    availableSlots: 2,
+    lockedUntilAge: 18,
+    hostCharacterIds: ['char-1'],
+  };
+  const eligible1 = deriveInheritanceEligibility(character, pool, 20);
+  assert(eligible1 && Array.isArray(eligible1.missingPrerequisites), 'should return missingPrerequisites array');
+  assert(typeof eligible1.eligible === 'boolean', 'eligible should be boolean');
+  assert(eligible1.inheritanceChain && eligible1.inheritanceChain.rootCharacterId === 'pool-1', 'chain root = pool id');
+
+  // Locked pool should add missing prerequisite
+  const locked = deriveInheritanceEligibility(character, { ...pool, lockedUntilAge: 30 }, 20);
+  assert(locked.missingPrerequisites.some((m: any) => String(m).indexOf('pool:locked_until_age:30') >= 0), 'locked should add missing prereq, got=' + JSON.stringify(locked.missingPrerequisites));
+
+  // No slots should add missing prereq
+  const noSlots = deriveInheritanceEligibility(character, { ...pool, availableSlots: 0 }, 20);
+  assert(noSlots.missingPrerequisites.some((m: any) => m === 'pool:no_slots'), 'no slots should add missing prereq, got=' + JSON.stringify(noSlots.missingPrerequisites));
+  assert(noSlots.eligible === false, 'no slots -> not eligible');
+
+  log('smoke-i-401-inheritance-eligibility', { passed: true, eligible1: eligible1.eligible, noSlots: noSlots.eligible, missing: noSlots.missingPrerequisites });
+}
+
+function smokeI402InheritanceClaim(): void {
+ // AI-I402: claimInheritance - claim from a pool, build updated chain
+  const character: any = { id: 'char-1', name: 'p1', age: 20, realm: 'qi_refining' };
+  const pool: any = {
+    id: 'pool-1',
+    name: 'pool-name',
+    kind: 'master-disciple' as InheritanceKind,
+    availableSlots: 2,
+    lockedUntilAge: 0,
+    hostCharacterIds: [],
+  };
+  const claimInput: any = {
+    recipientId: 'r-1',
+    claimAge: 20,
+    claimReason: 'aptitude-shown',
+    witnessIds: ['w-1'],
+    contested: false,
+    resolved: false,
+  };
+  const out = claimInheritance(character, pool, claimInput);
+  assert(out && out.claim && out.updatedChain, 'should return claim + updatedChain');
+  assert(typeof out.narrative === 'string' && out.narrative.length > 0, 'narrative non-empty');
+  assert(Array.isArray(out.updatedChain.generations), 'generations is array');
+  assert(out.updatedChain.activeClaims.some((c: any) => c.recipientId === out.claim.recipientId), "claim should be in activeClaims");
+
+  // Empty/missing claim should still return a safe structure
+  const safe = claimInheritance(character, pool, { recipientId: '', claimAge: 0, claimReason: '', witnessIds: [], contested: false, resolved: false });
+  assert(safe && safe.updatedChain, 'safe structure even with empty claim');
+  log('smoke-i-402-inheritance-claim', { passed: true, narrative: out.narrative.slice(0, 20), claims: out.updatedChain.activeClaims.length });
+}
+
+function smokeI403InheritanceContest(): void {
+  // AI-I403: resolveInheritanceContest - decide winner among contestants
+  const chain: any = {
+    rootCharacterId: 'root-1',
+    generations: [
+      {
+        id: 'r-gen1', kind: 'bloodline' as InheritanceKind, sourceCharacterId: 'root-1', targetCharacterId: 'a', inheritedAbilities: ['saber-A'], inheritanceAge: 20, narrative: '', realmRequired: 'mortal' },
+    ],
+    activeClaims: [],
+    lostTechniques: [],
+  };
+  const contestants: any[] = [
+    { id: 'a', age: 20, realm: 'qi_refining', comprehension: 60, luck: 40 },
+    { id: 'b', age: 22, realm: 'foundation_building', comprehension: 80, luck: 30 },
+    { id: 'c', age: 18, realm: 'qi_refining', comprehension: 50, luck: 80 },
+  ];
+  const result = resolveInheritanceContest(chain, contestants);
+  assert(result && typeof result.winnerId === 'string' && result.winnerId.length > 0, 'winnerId should be non-empty, got=' + JSON.stringify(result));
+  assert(typeof result.narrative === 'string' && result.narrative.length > 0, 'narrative non-empty');
+  assert(Array.isArray(result.casualties), 'casualties is array');
+  assert(['a', 'b', 'c'].indexOf(result.winnerId) >= 0, 'winner must be a contestant, got=' + result.winnerId);
+  log('smoke-i-403-inheritance-contest', { passed: true, winner: result.winnerId, casualties: result.casualties.length });
+}
+
+function smokeI404InheritancePropagation(): void {
+  // AI-I404: propagateInheritance - age-driven generation propagation (deterministic via age)
+  const seedChain: any = {
+    rootCharacterId: 'root-1',
+    generations: [
+      {
+        id: 'r-gen1', kind: 'master-disciple' as InheritanceKind, sourceCharacterId: 'root-1', targetCharacterId: 'a', inheritedAbilities: ['saber-A', 'sword-B', 'art-C'], inheritanceAge: 18, narrative: '', realmRequired: 'mortal' },
+    ],
+    activeClaims: [],
+    lostTechniques: [],
+  };
+  // Try multiple ages, at least one should grow the chain
+  let grown = false;
+  for (let age = 25; age <= 80; age += 5) {
+    const out = propagateInheritance(seedChain, age);
+    assert(out && Array.isArray(out.generations), 'generations is array');
+    if (out.generations.length > seedChain.generations.length) { grown = true; break; }
+  }
+  assert(grown, 'at least one age should grow the chain');
+  // summarizeInheritanceForPrompt
+  const text = summarizeInheritanceForPrompt(seedChain, 200);
+  assert(typeof text === 'string' && text.length > 0, 'summary should be non-empty');
+  assert(text.length <= 201, 'summary should respect charLimit, got=' + text.length);
+  log('smoke-i-404-inheritance-propagation', { passed: true, grew: grown, summaryLen: text.length });
 }
 

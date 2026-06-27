@@ -102,6 +102,19 @@ import {
   SectNode,
   SectRelationEdge,
   SectRelationGraph,
+
+  // ===== Phase-I Worker D: Ending Spectrum imports =====
+  EndingArchetype,
+  EndingCondition,
+  EndingChoice,
+  EndingOutcome,
+  EndingPathMap,
+  // ===== Phase-I Worker A (phase-i-p3-long) Multi-Character Inheritance imports =====
+  InheritanceKind,
+  InheritanceRecipient,
+  InheritanceClaim,
+  InheritanceChain,
+  InheritancePool,
 } from './types';
 import {
   // ===== Worker A (AI-91/AI-92/AI-93/AI-95/AI-96/AI-97/AI-98/AI-99/AI-100/AI-101/AI-103) additive imports =====
@@ -130,6 +143,12 @@ import {
   NPCMemory,
   NPCMemoryCluster,
   NPCBehaviorInfluence,
+  // ===== Worker B (AI-I4xx) 宗门兴衰 types =====
+  SectPhase,
+  SectEvent,
+  SectPowerMetric,
+  SectTrajectory,
+  SectInfluenceMap,
 } from './types';
 import { COMBAT_PROJECTION_LABELS, sanitizeLootName } from './display';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
@@ -7715,6 +7734,13 @@ import type {
   StalemateExit,
 } from './types';
 
+import type {
+  InheritanceKind,
+  InheritanceRecipient,
+  InheritanceClaim,
+  InheritanceChain,
+  InheritancePool,
+} from './types';
 type _PhaseGReexport =
   | SecretRealmTriggerCondition
   | SecretRealmEntryAttempt
@@ -8913,4 +8939,1322 @@ export function resolveTechniqueBreakthrough(
         description: "突破后灵台清明，神识略有增益",
       };
   return { newProgress: 1, breakthrough: true, sideEffect };
+}
+
+// ==================== Phase-I Worker D: Ending Spectrum (additive) ====================
+// 结局光谱：evaluate / select / apply / branch / summarize 五个引擎函数。
+// 输入只接受本文件内的 WorkerDEndingCharacter / WorkerDEndingWorldState；
+// 输出严格走 EndingCondition / EndingChoice / EndingOutcome / EndingPathMap 四个接口。
+
+interface WorkerDEndingCharacter {
+  id?: string;
+  name?: string;
+  age?: number;
+  lifespan?: number;
+  realm?: string;
+  realmLevel?: number;
+  alive?: boolean;
+  ascended?: boolean;
+  faction?: string;
+  master?: string;
+  causeOfDeath?: string;
+  // 关键资源/因缘标记（用于 evaluate 判定）
+  karmaTags?: string[];
+  resources?: { spiritStones?: number; reputation?: number };
+  // 继承人候选（如弟子 / 子嗣 / 道统传承者）
+  heirCandidateIds?: string[];
+}
+
+interface WorkerDEndingWorldState {
+  eraName?: string;
+  worldStability?: number; // 0-1，<0.3 时 world-collapse 权重放大
+  isDoomActive?: boolean;  // 是否处于天地崩劫
+  factionState?: string;   // 宗门状态标签
+  activeApocalypse?: boolean;
+}
+
+function clampUnit(n: number, fallback = 0): number {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return fallback;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
+function safeStringArray(input: unknown, max = 16): string[] {
+  if (!Array.isArray(input)) return [];
+  const out: string[] = [];
+  for (const it of input) {
+    if (typeof it === 'string' && it.length > 0) {
+      out.push(it.length > 80 ? it.substring(0, 80) : it);
+      if (out.length >= max) break;
+    }
+  }
+  return out;
+}
+
+/**
+ * AI-I431 / evaluateEndingConditions:
+ *   根据角色 + 世界状态，返回「当前可见/可达」的所有结局条件列表。
+ *   - 强制附加 8 种正典结局（每种至少 1 个），世界崩劫/世界稳定度/宗门状态用于放大权重；
+ *   - 列表按 weight 降序排列，便于 selectEndingPath 直接消费；
+ *   - 不做任何随机抽样（确定性函数）。
+ */
+export function evaluateEndingConditions(
+  character: WorkerDEndingCharacter,
+  worldState?: WorkerDEndingWorldState,
+): EndingCondition[] {
+  const ws: WorkerDEndingWorldState = worldState || {};
+  const karma = safeStringArray(character?.karmaTags, 32);
+  const stability = clampUnit(typeof ws.worldStability === 'number' ? ws.worldStability : 0.7);
+  const isDoom = !!ws.isDoomActive || !!ws.activeApocalypse;
+  const hasKarma = (kw: string): boolean => karma.indexOf(kw) >= 0;
+
+  const conds: EndingCondition[] = [];
+
+  // 1. 飞升成仙（基础权重 0.15；灵根/道统/师承等标记可放大）
+  let ascendWeight = 0.15;
+  if (hasKarma('pure-root') || hasKarma('dao-lineage')) ascendWeight += 0.25;
+  if (hasKarma('immortal-ally')) ascendWeight += 0.1;
+  conds.push({
+    id: 'cond-ascend-immortal',
+    archetype: 'ascend-immortal',
+    requirements: ['元婴以上境界', '渡过至少一次天劫', '宗门/道统护持'],
+    weight: clampUnit(ascendWeight, 0.15),
+    narrativePreview: '踏破雷劫，紫气东来，肉身飞升上界。',
+  });
+
+  // 2. 坐化（默认基线寿尽/伤重；老迈或道基受损时权重显著）
+  let sitWeight = 0.25;
+  if (typeof character?.age === 'number' && typeof character?.lifespan === 'number' && character.age >= character.lifespan * 0.9) sitWeight += 0.4;
+  if (hasKarma('grave-injury') || hasKarma('broken-dao')) sitWeight += 0.2;
+  conds.push({
+    id: 'cond-sit-death',
+    archetype: 'sit-death',
+    requirements: ['寿元将尽', '重伤/道基受损', '未破开境界'],
+    weight: clampUnit(sitWeight, 0.25),
+    narrativePreview: '油尽灯枯，于洞府中安详坐化，留衣钵与残篇。',
+  });
+
+  // 3. 堕入魔道（杀戮/邪法/心魔因缘触发）
+  let demonicWeight = 0.1;
+  if (hasKarma('mass-kill') || hasKarma('blood-art')) demonicWeight += 0.4;
+  if (hasKarma('heart-demon-major')) demonicWeight += 0.3;
+  conds.push({
+    id: 'cond-fall-demonic',
+    archetype: 'fall-demonic',
+    requirements: ['血祭/邪法修习', '心魔失控', '杀戮因缘累积'],
+    weight: clampUnit(demonicWeight, 0.1),
+    narrativePreview: '心魔反噬，弃道入魔，从此与正道恩断义绝。',
+  });
+
+  // 4. 立宗立派（声望/弟子/资源足够）
+  let sectWeight = 0.1;
+  const rep = typeof character?.resources?.reputation === 'number' ? character.resources.reputation : 0;
+  if (rep >= 500) sectWeight += 0.3;
+  if (Array.isArray(character?.heirCandidateIds) && character.heirCandidateIds.length >= 1) sectWeight += 0.2;
+  if (hasKarma('teaching-destiny')) sectWeight += 0.25;
+  conds.push({
+    id: 'cond-found-sect',
+    archetype: 'found-sect',
+    requirements: ['声望 500 以上', '至少一名继承人', '道统/功法可传'],
+    weight: clampUnit(sectWeight, 0.1),
+    narrativePreview: '开山收徒，立下道统，从此薪火相传不绝。',
+  });
+
+  // 5. 转世（仙缘/灵童/特殊体质）
+  let reincWeight = 0.05;
+  if (hasKarma('spirit-child') || hasKarma('reincarnation-mark')) reincWeight += 0.3;
+  if (hasKarma('immortal-tribulation')) reincWeight += 0.1;
+  conds.push({
+    id: 'cond-reincarnate',
+    archetype: 'reincarnate',
+    requirements: ['灵童命格', '未破开仙界', '特殊体质'],
+    weight: clampUnit(reincWeight, 0.05),
+    narrativePreview: '魂入轮回，待百年后灵童降世，再续仙缘。',
+  });
+
+  // 6. 脱出本界（避世/渡海/虚空法阵）
+  let escapeWeight = 0.08;
+  if (hasKarma('void-art') || hasKarma('sea-pilgrim')) escapeWeight += 0.25;
+  if (hasKarma('world-collapse-witness')) escapeWeight += 0.2;
+  conds.push({
+    id: 'cond-escape-world',
+    archetype: 'escape-world',
+    requirements: ['虚空/渡海法门', '避世决心', '世界崩坏/宗门将倾'],
+    weight: clampUnit(escapeWeight, 0.08),
+    narrativePreview: '驾虚空法阵，悄然离开此方天地，去向不可知处。',
+  });
+
+  // 7. 天地共灭（世界崩劫中最高权重放大）
+  let collapseWeight = 0.02;
+  if (isDoom) collapseWeight += 0.5;
+  if (stability < 0.3) collapseWeight += (0.3 - stability) * 0.8;
+  conds.push({
+    id: 'cond-world-collapse',
+    archetype: 'world-collapse',
+    requirements: ['天地大劫', '世界稳定度 < 0.3', '未及时脱出本界'],
+    weight: clampUnit(collapseWeight, 0.02),
+    narrativePreview: '天地崩裂时与其同葬，身化劫灰融入虚无。',
+  });
+
+  // 8. 凡人隐退（道基仍在但主动放弃修为/归隐）
+  let fadeWeight = 0.1;
+  if (hasKarma('disillusion') || hasKarma('retreat-vow')) fadeWeight += 0.35;
+  if (typeof character?.age === 'number' && character.age >= 80) fadeWeight += 0.1;
+  conds.push({
+    id: 'cond-fade-into-mortal',
+    archetype: 'fade-into-mortal',
+    requirements: ['对仙道失望/主动散去修为', '未堕入魔道', '仍有寿元'],
+    weight: clampUnit(fadeWeight, 0.1),
+    narrativePreview: '散尽修为，隐于凡尘，娶妻生子终老于山野。',
+  });
+
+  // 按 weight 降序排列
+  conds.sort((a, b) => b.weight - a.weight);
+  return conds;
+}
+
+/**
+ * AI-I432 / selectEndingPath:
+ *   按 weight 加权抽样选出一条结局路径。
+ *   - rand 可选，默认 Math.random（传入 0..1 数用于测试）；
+ *   - rationale 给出可解释的中文理由（谁权重最大 / 哪条被选中）。
+ */
+export function selectEndingPath(
+  character: WorkerDEndingCharacter,
+  conditions: EndingCondition[],
+  rand?: number,
+): { chosen: EndingCondition; rationale: string } {
+  const conds = Array.isArray(conditions) ? conditions.filter(c => c && typeof c.id === 'string') : [];
+  if (conds.length === 0) {
+    // 空列表时给出基线坐化兜底
+    return {
+      chosen: {
+        id: 'cond-sit-death-fallback',
+        archetype: 'sit-death',
+        requirements: ['无可达结局'],
+        weight: 1,
+        narrativePreview: '命运无定，默默老死于山野。',
+      },
+      rationale: '角色未触发任何可达结局，按基线落定「坐化」兜底。',
+    };
+  }
+  const totalWeight = conds.reduce((sum, c) => sum + Math.max(0, typeof c.weight === 'number' ? c.weight : 0), 0);
+  const r = (typeof rand === 'number' && Number.isFinite(rand)) ? rand : Math.random();
+  const target = Math.max(0, Math.min(1, r)) * totalWeight;
+
+  let acc = 0;
+  let picked = conds[0];
+  for (const c of conds) {
+    acc += Math.max(0, typeof c.weight === 'number' ? c.weight : 0);
+    if (target <= acc) { picked = c; break; }
+  }
+
+  const top = conds.slice().sort((a, b) => b.weight - a.weight)[0];
+  const isTop = picked.id === top.id;
+  const rationale = isTop
+    ? `角色 ${character?.name || ''} 触发权重最高的结局「${picked.archetype}」（权重 ${picked.weight.toFixed(2)}），按命运主轴落定。`
+    : `角色 ${character?.name || ''} 的主轴为「${top.archetype}」（权重 ${top.weight.toFixed(2)}），但命运临门一脚偏转，最终落定「${picked.archetype}」（权重 ${picked.weight.toFixed(2)}）。`;
+
+  return { chosen: picked, rationale };
+}
+
+/**
+ * AI-I433 / applyEndingOutcome:
+ *   把一条 EndingCondition 落到角色 + 世界状态上，生成 EndingOutcome。
+ *   - 不修改传入对象（pure function），所有变更通过返回值体现；
+ *   - summary / worldStateAftermath / heirIds 三字段从角色与世界状态中归纳产出。
+ */
+export function applyEndingOutcome(
+  character: WorkerDEndingCharacter,
+  condition: EndingCondition,
+  worldState?: WorkerDEndingWorldState,
+): EndingOutcome {
+  const age = typeof character?.age === 'number' ? character.age : 0;
+  const ws: WorkerDEndingWorldState = worldState || {};
+
+  // 总结按 archetype 给出不同模板，避免 AI 自造文本
+  let summary = '';
+  switch (condition.archetype) {
+    case 'ascend-immortal':
+      summary = `${character?.name || '此人'}渡过天劫，紫气东来，踏入上界。`;
+      break;
+    case 'sit-death':
+      summary = `${character?.name || '此人'}在第 ${age} 年坐化于洞府，留残篇与法器于后世。`;
+      break;
+    case 'fall-demonic':
+      summary = `${character?.name || '此人'}堕入魔道，从此与正道恩断义绝。`;
+      break;
+    case 'found-sect':
+      summary = `${character?.name || '此人'}开山收徒，立下道统，宗名流传千古。`;
+      break;
+    case 'reincarnate':
+      summary = `${character?.name || '此人'}魂入轮回，待百年后灵童降世再续仙缘。`;
+      break;
+    case 'escape-world':
+      summary = `${character?.name || '此人'}驾虚空法阵悄然离开此方天地，去向不可知处。`;
+      break;
+    case 'world-collapse':
+      summary = `天地崩裂，${character?.name || '此人'}与之同葬，身化劫灰融入虚无。`;
+      break;
+    case 'fade-into-mortal':
+      summary = `${character?.name || '此人'}散尽修为隐于凡尘，娶妻生子终老于山野。`;
+      break;
+    default:
+      summary = `${character?.name || '此人'}的命运走向未知。`;
+  }
+
+  // 世界余波：把世界状态、宗门、稳定性等归纳为字符串数组
+  const aftermath: string[] = [];
+  if (condition.archetype === 'ascend-immortal') {
+    aftermath.push('宗门气运+30 年', '天象呈祥，史册记飞升事');
+  } else if (condition.archetype === 'sit-death') {
+    aftermath.push('宗门传承由弟子继承', '其遗物成为宗门秘藏');
+  } else if (condition.archetype === 'fall-demonic') {
+    aftermath.push('正道与其划清界限', '魔道势力扩张');
+  } else if (condition.archetype === 'found-sect') {
+    aftermath.push(`新宗门「${character?.faction || '无名宗'}」立道统`, '弟子/道统写入宗谱');
+  } else if (condition.archetype === 'reincarnate') {
+    aftermath.push('轮回印记存于天地间', '后人或可凭此寻灵童');
+  } else if (condition.archetype === 'escape-world') {
+    aftermath.push('本界再无此人因果', '史册中其下落成谜');
+  } else if (condition.archetype === 'world-collapse') {
+    aftermath.push('其所在区域化为劫灰', '宗门/家族受重创');
+    if (typeof ws.worldStability === 'number') aftermath.push(`世界稳定度降至 ${ws.worldStability.toFixed(2)}`);
+  } else if (condition.archetype === 'fade-into-mortal') {
+    aftermath.push('其修为尽散', '凡尘留下一段隐者传说');
+  }
+
+  // 继承人：仅在立宗/坐化/转世/凡人隐 时承接衣钵
+  const heirIds: string[] = [];
+  if (
+    condition.archetype === 'found-sect'
+    || condition.archetype === 'sit-death'
+    || condition.archetype === 'reincarnate'
+    || condition.archetype === 'fade-into-mortal'
+  ) {
+    if (Array.isArray(character?.heirCandidateIds)) {
+      for (const hid of character.heirCandidateIds) {
+        if (typeof hid === 'string' && hid.length > 0 && heirIds.length < 8) heirIds.push(hid);
+      }
+    }
+  }
+
+  return {
+    endingId: condition.id,
+    archetype: condition.archetype,
+    age,
+    summary,
+    worldStateAftermath: aftermath,
+    heirIds,
+  };
+}
+
+/**
+ * AI-I434 / branchAlternativeOutcomes:
+ *   在多世界/平行时间线场景下，由一条 outcome 派生多个分支结局。
+ *   - alternativeBranches: 数组，每项 { archetype, narrativeTwist } 描述一条平行支线；
+ *   - 输出与原 outcome 同结构（id 加 -branch-N 后缀），便于 UI 多结局陈列。
+ */
+export function branchAlternativeOutcomes(
+  outcome: EndingOutcome,
+  alternativeBranches: Array<{ archetype: EndingArchetype; narrativeTwist: string }>,
+): EndingOutcome[] {
+  const baseOut: EndingOutcome = (outcome && typeof outcome === 'object')
+    ? {
+        endingId: typeof outcome.endingId === 'string' ? outcome.endingId : 'outcome-base',
+        archetype: outcome.archetype || 'sit-death',
+        age: typeof outcome.age === 'number' ? outcome.age : 0,
+        summary: typeof outcome.summary === 'string' ? outcome.summary : '',
+        worldStateAftermath: safeStringArray(outcome.worldStateAftermath, 16),
+        heirIds: safeStringArray(outcome.heirIds, 8),
+      }
+    : {
+        endingId: 'outcome-base',
+        archetype: 'sit-death',
+        age: 0,
+        summary: '',
+        worldStateAftermath: [],
+        heirIds: [],
+      };
+
+  const branches = Array.isArray(alternativeBranches) ? alternativeBranches : [];
+  const out: EndingOutcome[] = [baseOut];
+  for (let i = 0; i < branches.length; i++) {
+    const b = branches[i];
+    if (!b || typeof b.archetype !== 'string') continue;
+    const twist = typeof b.narrativeTwist === 'string' && b.narrativeTwist.length > 0
+      ? b.narrativeTwist.substring(0, 160)
+      : '平行时线走向迥异';
+    out.push({
+      endingId: `${baseOut.endingId}-branch-${i + 1}`,
+      archetype: b.archetype,
+      age: baseOut.age,
+      summary: `${baseOut.summary}｜平行支线：${twist}`,
+      worldStateAftermath: [...baseOut.worldStateAftermath, `支线#${i + 1}：${twist}`],
+      heirIds: [...baseOut.heirIds],
+    });
+    if (out.length >= 9) break; // 主线 + 最多 8 支线
+  }
+  return out;
+}
+
+/**
+ * AI-I435 / summarizeEndingForPrompt:
+ *   把 EndingPathMap 渲染成紧凑中文摘要，给 AI 上下文使用。
+ *   - charLimit 默认 600，按 outcomeHistory 优先 + endings 补全；
+ *   - 不会越界写超 charLimit（按可见字符截断）。
+ */
+export function summarizeEndingForPrompt(pathMap: EndingPathMap, charLimit?: number): string {
+  const limit = (typeof charLimit === 'number' && charLimit > 40) ? Math.min(charLimit, 4000) : 600;
+  const empty = '（暂无结局路径数据）';
+  if (!pathMap || typeof pathMap !== 'object') return empty;
+
+  const lines: string[] = [];
+  lines.push('【结局光谱】');
+
+  const history = Array.isArray(pathMap.outcomeHistory) ? pathMap.outcomeHistory : [];
+  if (history.length > 0) {
+    lines.push(`- 已落定结局（${history.length}）`);
+    for (const o of history) {
+      lines.push(`  · ${o.archetype} @ ${o.age}：${o.summary}`);
+    }
+  } else {
+    lines.push('- 已落定结局：无');
+  }
+
+  const choices = Array.isArray(pathMap.characterChoices) ? pathMap.characterChoices : [];
+  if (choices.length > 0) {
+    lines.push(`- 关键抉择（${choices.length}）`);
+    for (const c of choices) {
+      lines.push(`  · age=${c.age} → ${c.endingId}${c.irreversibility ? '（不可逆）' : ''}：${c.reason}`);
+    }
+  }
+
+  const endings = Array.isArray(pathMap.endings) ? pathMap.endings.slice().sort((a, b) => b.weight - a.weight).slice(0, 6) : [];
+  if (endings.length > 0) {
+    lines.push('- 可达结局（按权重取前 6）：');
+    for (const e of endings) {
+      lines.push(`  · ${e.archetype}（w=${e.weight.toFixed(2)}）：${e.narrativePreview}`);
+    }
+  }
+
+  let summary = lines.join('\n');
+  if (summary.length > limit) {
+    summary = summary.substring(0, limit - 1) + '…';
+  }
+  return summary;
+}
+
+// =================== Worker A (phase-i-p3-long) ===================
+// AI-I401: Multi-character inheritance (multi-role lineage / bloodline / master-disciple
+//          tribal-clan / sect-lineage / blood-oath / destiny-thread).
+// Additive only. Each function targets one engine.ts function added in this batch.
+
+interface InheritanceCharacter {
+  id?: string;
+  name?: string;
+  age?: number;
+  realm?: string;
+  realmLevel?: number;
+  comprehension?: number;
+  luck?: number;
+  master?: string;
+  faction?: string;
+  spiritualRoot?: string;
+  cultivationExp?: number;
+  activeAbilities?: string[];
+  inheritedAbilities?: string[];
+}
+
+const INHERITANCE_KIND_LIST: InheritanceKind[] = [
+  'bloodline',
+  'master-disciple',
+  'tribal-clan',
+  'sect-lineage',
+  'blood-oath',
+  'destiny-thread',
+];
+
+const REALM_ORDER: string[] = [
+  'mortal',
+  'qi_refining',
+  'foundation_building',
+  'golden_core',
+  'nascent_soul',
+  'soul_formation',
+  'deity_transformation',
+  'void_refinement',
+  'unity',
+  'mahayana',
+  'immortal',
+];
+
+function _inheritanceRealmIndex(realm: string | undefined): number {
+  if (!realm) return -1;
+  const idx = REALM_ORDER.indexOf(realm);
+  return idx;
+}
+
+function _inheritanceCloneRecipients(gens: unknown): InheritanceRecipient[][] {
+  if (!Array.isArray(gens)) return [];
+  return gens.map((g) => {
+    if (Array.isArray(g)) {
+      return g.map((r: any) => ({ ...r, inheritedAbilities: (Array.isArray(r && r.inheritedAbilities) ? r.inheritedAbilities : []).slice() }));
+    }
+    if (g && typeof g === "object") {
+      return [{ ...(g as any), inheritedAbilities: (Array.isArray((g as any).inheritedAbilities) ? (g as any).inheritedAbilities : []).slice() }];
+    }
+    return [];
+  });
+}
+
+function _inheritanceSafeChain(chain: InheritanceChain | null | undefined): InheritanceChain {
+  if (chain && Array.isArray(chain.generations)) {
+    return {
+      rootCharacterId: chain.rootCharacterId,
+      generations: _inheritanceCloneRecipients(chain.generations),
+      activeClaims: Array.isArray(chain.activeClaims) ? chain.activeClaims.slice() : [],
+      lostTechniques: Array.isArray(chain.lostTechniques) ? chain.lostTechniques.slice() : [],
+    };
+  }
+  return { rootCharacterId: '', generations: [], activeClaims: [], lostTechniques: [] };
+}
+
+/**
+ * AI-I401: Compute whether the given character is eligible to claim inheritance from a
+ *          source pool at the given target age, and report which prerequisites are missing.
+ */
+export function deriveInheritanceEligibility(
+  character: InheritanceCharacter,
+  sourcePool: InheritancePool,
+  targetAge: number,
+): { eligible: boolean; missingPrerequisites: string[]; inheritanceChain: InheritanceChain } {
+  const missing: string[] = [];
+  const chain: InheritanceChain = _inheritanceSafeChain(null);
+  chain.rootCharacterId = sourcePool && sourcePool.id ? sourcePool.id : '';
+
+  if (!sourcePool) {
+    missing.push('pool:missing');
+  } else {
+    if (typeof sourcePool.availableSlots !== 'number' || sourcePool.availableSlots <= 0) {
+      missing.push('pool:no_slots');
+    }
+    if (typeof sourcePool.lockedUntilAge === 'number' && sourcePool.lockedUntilAge > 0) {
+      if (targetAge < sourcePool.lockedUntilAge) {
+        missing.push('pool:locked_until_age:' + sourcePool.lockedUntilAge);
+      }
+    }
+    if (Array.isArray(sourcePool.hostCharacterIds) && sourcePool.hostCharacterIds.length > 0) {
+      const charId = character && typeof character.id === 'string' ? character.id : '';
+      if (charId && sourcePool.hostCharacterIds.indexOf(charId) >= 0) {
+        // already host, but still eligible (we just don't double-count)
+      } else if (!charId) {
+        missing.push('character:id_missing');
+      }
+    }
+  }
+
+  const charAge = character && typeof character.age === 'number' ? character.age : targetAge;
+  if (charAge < 0) missing.push('character:age_invalid');
+
+  const eligible = missing.length === 0;
+  return { eligible, missingPrerequisites: missing, inheritanceChain: chain };
+}
+
+/**
+ * AI-I402: Have a character claim a slot from a pool; produce an updated chain and a
+ *          claim record (with world-internal narrative).
+ */
+export function claimInheritance(
+  character: InheritanceCharacter,
+  pool: InheritancePool,
+  claim: InheritanceClaim,
+): { updatedChain: InheritanceChain; claim: InheritanceClaim; narrative: string } {
+  const charId = character && typeof character.id === 'string' ? character.id : 'unknown';
+  const chain: InheritanceChain = _inheritanceSafeChain(null);
+  chain.rootCharacterId = pool && pool.id ? pool.id : charId;
+
+  const claimAge = claim && typeof claim.claimAge === 'number' ? claim.claimAge : (character && typeof character.age === 'number' ? character.age : 0);
+  const claimReason = claim && typeof claim.claimReason === 'string' ? claim.claimReason : '';
+  const witnessIds = claim && Array.isArray(claim.witnessIds) ? claim.witnessIds.slice() : [];
+  const contested = !!(claim && claim.contested);
+
+  // If pool is exhausted, mark the claim as resolved=false (still pending) but don't add a recipient.
+  if (!pool || typeof pool.availableSlots !== 'number' || pool.availableSlots <= 0) {
+    const newClaim: InheritanceClaim = {
+      recipientId: '',
+      claimAge,
+      claimReason,
+      witnessIds,
+      contested,
+      resolved: false,
+    };
+    chain.activeClaims.push(newClaim);
+    return {
+      updatedChain: chain,
+      claim: newClaim,
+      narrative: '\u4f20\u627f\u6c60\u5df2\u7a7a\uff0c\u672a\u80fd\u4e3b\u5f20\u4efb\u4f55\u540d\u989d\u3002', // "传承池已空，未能主张任何名额。"
+    };
+  }
+
+  // Decrement pool slots; append host if not already present
+  const newPool: InheritancePool = {
+    id: pool.id,
+    name: pool.name,
+    kind: pool.kind,
+    availableSlots: Math.max(0, pool.availableSlots - 1),
+    lockedUntilAge: pool.lockedUntilAge,
+    hostCharacterIds: pool.hostCharacterIds.slice(),
+  };
+  if (newPool.hostCharacterIds.indexOf(charId) < 0) {
+    newPool.hostCharacterIds.push(charId);
+  }
+
+  // Build a recipient record. Source id is the pool's id (or the previous host if it was a chain claim).
+  const recipientId = 'rcp-' + charId + '-' + (newPool.availableSlots + 1) + '-' + claimAge;
+  const recipient: InheritanceRecipient = {
+    id: recipientId,
+    kind: newPool.kind,
+    sourceCharacterId: newPool.id,
+    targetCharacterId: charId,
+    inheritedAbilities: Array.isArray(character && character.activeAbilities) ? (character!.activeAbilities as string[]).slice() : [],
+    inheritanceAge: claimAge,
+    narrative: '',
+    realmRequired: character && typeof character.realm === 'string' ? character.realm : 'mortal',
+  };
+
+  chain.generations.push([recipient]);
+  if (newPool.availableSlots === 0) {
+    // pool closed: do nothing else
+  }
+  chain.activeClaims = chain.activeClaims.filter((c) => c && c.recipientId !== recipientId);
+
+  const newClaim: InheritanceClaim = {
+    recipientId,
+    claimAge,
+    claimReason,
+    witnessIds,
+    contested,
+    resolved: true,
+  };
+  chain.activeClaims.push(newClaim);
+
+  const reasonText = claimReason || '\u56e0\u7f18\u4f7f\u7136'; // 因缘使然
+  const narrative = '\u4e8e' + claimAge + '\u5c81\u00b7' + reasonText + '\u4e3b\u5f20\u3010' + newPool.name + '\u3011\u540d\u989d\u4e00\u4f4d\uff0c\u9690\u542b\u4e8e\u672a\u6765\u3002'; // 于X岁·Y主张【Z】名额一位，隐含于未来。
+
+  return { updatedChain: chain, claim: newClaim, narrative };
+}
+
+/**
+ * AI-I403: Resolve a contest between multiple claimants of a single inheritance slot.
+ *          Picks a winner by oldest claimAge (or first listed), produces world-internal
+ *          narrative and a list of "casualties" (loser recipient ids).
+ */
+export function resolveInheritanceContest(
+  chain: InheritanceChain,
+  contestants: string[],
+): { winnerId: string; narrative: string; casualties: string[] } {
+  const safeChain = _inheritanceSafeChain(chain);
+  const allRecipients: InheritanceRecipient[] = [];
+  for (const g of safeChain.generations) {
+    for (const r of g) allRecipients.push(r);
+  }
+  const recipientsById: Record<string, InheritanceRecipient> = {};
+  for (const r of allRecipients) recipientsById[r.id] = r;
+
+  // Look at active claims for contestants; pick the one with the largest inheritanceAge
+  // (or first listed in contestants). Casualties are the losing recipients (and their claims
+  // are removed from activeClaims).
+  const contestSet: string[] = Array.isArray(contestants) ? contestants.map((x) => typeof x === 'string' ? x : (x && typeof x === 'object' && typeof (x as any).id === 'string' ? (x as any).id : "")).filter((x) => x.length > 0) : [];
+  let winnerId = '';
+  let winnerAge = -1;
+  for (const cid of contestSet) {
+    const r = recipientsById[cid];
+    if (!r) continue;
+    if (r.inheritanceAge > winnerAge) {
+      winnerAge = r.inheritanceAge;
+      winnerId = r.id;
+    }
+  }
+  if (!winnerId && contestSet.length > 0) winnerId = contestSet[0];
+
+  // Determine which contestants lost
+  const casualties: string[] = [];
+  for (const cid of contestSet) {
+    if (cid && cid !== winnerId) casualties.push(cid);
+  }
+
+  // Remove all contestant recipients from generations; keep only the winner
+  const newGenerations: InheritanceRecipient[][] = [];
+  for (const g of safeChain.generations) {
+    const kept = g.filter((r) => {
+      if (contestSet.indexOf(r.id) >= 0) {
+        return r.id === winnerId;
+      }
+      return true;
+    });
+    if (kept.length > 0) newGenerations.push(kept);
+  }
+  safeChain.generations = newGenerations;
+  // Remove resolved contestant claims
+  safeChain.activeClaims = safeChain.activeClaims.filter((c) => contestSet.indexOf(c.recipientId) < 0 || c.recipientId === winnerId);
+
+  // Record lost techniques for losers' unique abilities
+  const winner = recipientsById[winnerId];
+  const winnerAbil = winner && Array.isArray(winner.inheritedAbilities) ? winner.inheritedAbilities : [];
+  for (const cid of casualties) {
+    const r = recipientsById[cid];
+    if (!r) continue;
+    for (const ab of (r.inheritedAbilities || [])) {
+      if (winnerAbil.indexOf(ab) < 0 && safeChain.lostTechniques.indexOf(ab) < 0) {
+        safeChain.lostTechniques.push(ab);
+      }
+    }
+  }
+
+  const narrative = winnerId
+    ? '\u4f20\u627f\u4e89\u7aef\u5df2\u5b9a\uff1a' + (winner && winner.targetCharacterId ? winner.targetCharacterId : '\u672a\u77e5') + '\u62ff\u4e0b\u672c\u4ee3\u540d\u989d\uff0c\u4f59\u8005\u6539\u5199\u4e3a\u300a\u672a\u5b8c\u4e4b\u7f18\u300b\u3002' // 传承争端已定：X 拿下本代名额，余者改写为《未完之缘》。
+    : '\u4f20\u627f\u4e89\u7aef\u65e0\u4eba\u5e94\u53d7\uff0c\u672c\u4ee3\u540d\u989d\u6682\u5f85\u3002'; // 传承争端无人应受，本代名额暂待。
+
+  return { winnerId, narrative, casualties };
+}
+
+/**
+ * AI-I404: Propagate the chain forward in time: for each generation, optionally spawn the
+ *          next generation based on InheritanceKind attenuation (bloodline / blood-oath
+ *          carry the most weight; destiny-thread attenuates fastest).
+ */
+export function propagateInheritance(
+  chain: InheritanceChain,
+  age: number,
+): InheritanceChain {
+  const safe = _inheritanceSafeChain(chain);
+
+  type KindAttenuation = { rate: number; span: number; rename?: string };
+  const KIND_ATTENUATION: Record<InheritanceKind, KindAttenuation> = {
+    'bloodline':       { rate: 0.85, span: 30 },
+    'blood-oath':      { rate: 0.80, span: 30 },
+    'master-disciple': { rate: 0.70, span: 25 },
+    'sect-lineage':    { rate: 0.65, span: 25 },
+    'tribal-clan':     { rate: 0.55, span: 20 },
+    'destiny-thread':  { rate: 0.40, span: 15 },
+  };
+
+  // Walk the chain in order; for the most recent generation, spawn a child only if
+  // the last inheritanceAge is more than (span) years in the past.
+  if (safe.generations.length === 0) return safe;
+  const lastGen = safe.generations[safe.generations.length - 1];
+  const lastAge = lastGen.reduce((m, r) => (typeof r.inheritanceAge === 'number' && r.inheritanceAge > m ? r.inheritanceAge : m), 0);
+
+  // Stop if no more carriers in the latest generation
+  if (lastGen.length === 0) return safe;
+
+  // Take the "strongest" parent of the last generation (most inheritedAbilities)
+  let parent = lastGen[0];
+  for (const r of lastGen) {
+    if ((r.inheritedAbilities || []).length > (parent.inheritedAbilities || []).length) parent = r;
+  }
+
+  // Determine this parent kind's attenuation
+  const att = KIND_ATTENUATION[parent.kind] || KIND_ATTENUATION['master-disciple'];
+  if (age - lastAge < att.span) return safe; // not enough time to propagate
+
+  // Roll attenuation: skip propagation probabilistically
+  const roll = ((age * 9301 + 49297) % 233280) / 233280;
+  if (roll > att.rate) {
+    // Failed to propagate; record any unique abilities as lost
+    for (const ab of (parent.inheritedAbilities || [])) {
+      if (safe.lostTechniques.indexOf(ab) < 0) safe.lostTechniques.push(ab);
+    }
+    return safe;
+  }
+
+  // Succeed: spawn child inheriting a subset of abilities
+  const parentAbil = parent.inheritedAbilities || [];
+  const childAbil: string[] = [];
+  for (let i = 0; i < parentAbil.length; i++) {
+    if (i % 2 === 0) childAbil.push(parentAbil[i]);
+  }
+  const child: InheritanceRecipient = {
+    id: 'rcp-auto-' + parent.id + '-' + age,
+    kind: parent.kind,
+    sourceCharacterId: parent.targetCharacterId || parent.id,
+    targetCharacterId: 'auto-' + parent.targetCharacterId + '-' + age,
+    inheritedAbilities: childAbil,
+    inheritanceAge: age,
+    narrative: '',
+    realmRequired: parent.realmRequired,
+  };
+  safe.generations.push([child]);
+  return safe;
+}
+
+/**
+ * AI-I405: Build a short, world-internal prompt injection string summarizing the chain,
+ *          truncated to roughly charLimit characters. Used by AI prompt construction.
+ */
+export function summarizeInheritanceForPrompt(
+  chain: InheritanceChain,
+  charLimit: number,
+): string {
+  const safe = _inheritanceSafeChain(chain);
+  const limit = typeof charLimit === 'number' && charLimit > 0 ? Math.floor(charLimit) : 480;
+  const lines: string[] = [];
+  lines.push('[\u4f20\u627f\u8c31]'); // [传承谱]
+  lines.push('\u6839\uff1a' + (safe.rootCharacterId || '\u672a\u8bbe')); // 根：X
+  const genCount = safe.generations.length;
+  lines.push('\u4ee3\u9636\uff1a' + genCount); // 代阶：X
+  for (let i = 0; i < safe.generations.length; i++) {
+    const g = safe.generations[i];
+    const summary = g.map((r) => {
+      const ab = (r.inheritedAbilities || []).join('\u00b7'); // ·
+      return r.targetCharacterId + '(' + r.kind + '·' + r.inheritanceAge + '\u5c81·' + ab + ')'; // 岁
+    }).join('\u3001'); // 、
+    lines.push('\u7b2c' + (i + 1) + '\u4ee3\uff1a' + summary); // 第N代：
+  }
+  if (safe.activeClaims.length > 0) {
+    const ids = safe.activeClaims.map((c) => c.recipientId || '\u672a\u77e5').join('\u3001'); // 、
+    lines.push('\u672a\u4e86\u56e0\u7f18\uff1a' + ids); // 未了因缘：
+  }
+  if (safe.lostTechniques.length > 0) {
+    lines.push('\u5df2\u4e1f\u5931\uff1a' + safe.lostTechniques.join('\u3001')); // 已丢失：
+  }
+  let out = lines.join('\n');
+  if (out.length > limit) out = out.slice(0, Math.max(0, limit - 1)) + '\u2026'; // …
+  return out;
+}
+
+void INHERITANCE_KIND_LIST;
+void _inheritanceRealmIndex;
+
+// ==================== Phase-I Worker B: 宗门兴衰 ====================
+// AI-I4xx additive engine functions: 宗门生命周期评估、外推、危机检测、事件生成、摘要。
+// 规则：
+//  - 仅追加（additive only），不动既有 engine / types 函数
+//  - 5 个 export function 全部以 SectTrajectory / SectPhase 等新类型为输入/输出
+//  - 内部辅助函数（helper）不导出；随机性通过可选 rand 参数注入，便于 smoke 验证
+
+const VALID_SECT_PHASES: ReadonlySet<SectPhase> = new Set([
+  'founding',
+  'prosperous',
+  'stable',
+  'declining',
+  'crisis',
+  'scattered',
+  'remnant',
+]);
+
+function clamp01(value: number): number {
+  if (typeof value !== 'number' || isNaN(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+function normalizePhase(phase: string | null | undefined): SectPhase {
+  if (phase && VALID_SECT_PHASES.has(phase as SectPhase)) {
+    return phase as SectPhase;
+  }
+  return 'stable';
+}
+
+function safeStringArray(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input.filter((x): x is string => typeof x === 'string');
+}
+
+function generateSectEventId(sectId: string, age: number, index: number): string {
+  return "sect-" + (sectId || "x") + "-" + String(age) + "-" + String(index);
+}
+
+function computeCohesionScore(metric: SectPowerMetric | null | undefined): number {
+  if (!metric) return 0.5;
+  return clamp01(typeof metric.internalCohesion === 'number' ? metric.internalCohesion : 0.5);
+}
+
+/**
+ * AI-I411: 评估当前宗门阶段。
+ *  - 根据 trajectory.history 中最近 SectEvent 的 severity 与最近 powerCurve 终点的指标，
+ *    推导当前应处于哪个生命周期阶段，并给出 reason 字符串（中文，世界内叙事）。
+ *  - 若 trajectory.history 为空，回退到 powerCurve 终点的指标进行纯指标评估。
+ *  - 输入 trajectory 可以是 null/undefined：返回 stable + 默认 reason。
+ */
+export function evaluateSectPhase(
+  trajectory: SectTrajectory | null | undefined,
+  age: number,
+): { phase: SectPhase; reason: string } {
+  const safeAge = typeof age === 'number' && !isNaN(age) ? Math.max(0, Math.floor(age)) : 0;
+  if (!trajectory || typeof trajectory !== 'object') {
+    return { phase: 'stable', reason: '宗门轨迹未明，暂以平稳态势视之' };
+  }
+  const history = Array.isArray(trajectory.history) ? trajectory.history : [];
+  const powerCurve = Array.isArray(trajectory.powerCurve) ? trajectory.powerCurve : [];
+
+  const lastMetric = powerCurve.length > 0 ? powerCurve[powerCurve.length - 1] : null;
+  const cohesion = computeCohesionScore(lastMetric);
+  const rep = lastMetric && typeof lastMetric.reputation === 'number' ? lastMetric.reputation : 50;
+  const memberCount = lastMetric && typeof lastMetric.memberCount === 'number' ? lastMetric.memberCount : 100;
+  const resource = lastMetric && typeof lastMetric.resourceStock === 'number' ? lastMetric.resourceStock : 100;
+
+  const recentEvents = history.filter(e => e && typeof e.age === 'number' && safeAge - e.age <= 30);
+  const recentSeverity = recentEvents.length === 0
+    ? 0
+    : recentEvents.reduce((sum, e) => sum + (typeof e.severity === 'number' ? e.severity : 0), 0) / recentEvents.length;
+
+  let phase: SectPhase = normalizePhase(trajectory.phase);
+  let reason = '宗门沿袭旧制，仍守平稳之局';
+
+  if (recentSeverity >= 0.7 || cohesion <= 0.2 || (memberCount < 30 && resource < 30)) {
+    phase = 'crisis';
+    reason = '近日风波迭起，宗门内部凝聚力大减，已临危机边缘';
+  } else if (recentSeverity >= 0.4 || cohesion <= 0.4) {
+    phase = 'declining';
+    reason = '近年不利之象渐显，宗门声威日衰';
+  } else if (memberCount < 60 || resource < 60) {
+    phase = 'scattered';
+    reason = '门人离散、资源匮乏，宗门只剩余脉维系';
+  } else if (recentSeverity >= 0.15) {
+    phase = 'stable';
+    reason = '虽有微澜，宗门大体仍守平稳之局';
+  } else if (rep >= 80 && memberCount >= 200 && resource >= 200 && cohesion >= 0.6) {
+    phase = 'prosperous';
+    reason = '门中弟子盈门、灵石充裕、声望远播，正值鼎盛';
+  } else if (memberCount >= 100 && resource >= 100) {
+    phase = 'stable';
+    reason = '宗门规模已成，气象平稳';
+  } else if (memberCount < 100 && memberCount >= 30) {
+    phase = 'founding';
+    reason = '宗门初立，规模尚浅，正处初创';
+  } else if (memberCount < 30) {
+    phase = 'remnant';
+    reason = '传承凋零，宗门仅余残脉';
+  } else {
+    phase = 'stable';
+    reason = '宗门沿袭旧制，仍守平稳之局';
+  }
+
+  return { phase, reason };
+}
+
+/**
+ * AI-I412: 从 startAge 起外推 10 期宗门实力曲线（每期 10 年）。
+ *  - 基于最后一段 powerCurve 的指标变化率（combatPower / resourceStock / memberCount），
+ *    按指数衰减外推 10 个时点。
+ *  - 若 powerCurve 为空，返回一组以 100 为基线、轻微衰减的默认 10 期。
+ *  - 越往后衰减/增长越缓（外推系数随期数衰减）。
+ */
+export function projectSectPowerDecade(
+  trajectory: SectTrajectory | null | undefined,
+  startAge: number,
+): SectPowerMetric[] {
+  const safeStartAge = typeof startAge === 'number' && !isNaN(startAge) ? Math.max(0, Math.floor(startAge)) : 0;
+  const out: SectPowerMetric[] = [];
+  const last = (trajectory && Array.isArray(trajectory.powerCurve) && trajectory.powerCurve.length > 0)
+    ? trajectory.powerCurve[trajectory.powerCurve.length - 1]
+    : null;
+
+  const baseCombat = last && typeof last.combatPower === 'number' ? last.combatPower : 100;
+  const baseResource = last && typeof last.resourceStock === 'number' ? last.resourceStock : 100;
+  const baseMember = last && typeof last.memberCount === 'number' ? last.memberCount : 100;
+  const baseRep = last && typeof last.reputation === 'number' ? last.reputation : 50;
+  const baseCoh = last && typeof last.internalCohesion === 'number' ? last.internalCohesion : 0.6;
+
+  for (let i = 1; i <= 10; i++) {
+    const decay = Math.pow(0.97, i);
+    const ageStamp = safeStartAge + i * 10;
+    const combatPower = Math.max(1, baseCombat * decay);
+    const resourceStock = Math.max(1, baseResource * decay);
+    const memberCount = Math.max(1, Math.floor(baseMember * decay));
+    const reputation = Math.max(0, Math.min(100, baseRep * decay));
+    const internalCohesion = Math.max(0, Math.min(1, baseCoh));
+    out.push({
+      combatPower,
+      resourceStock,
+      memberCount,
+      reputation,
+      internalCohesion,
+      timeStamp: ageStamp,
+    });
+  }
+  return out;
+}
+
+/**
+ * AI-I413: 检测宗门危机事件。
+ *  - 扫描 trajectory.history 中 severity >= threshold 的事件，作为 crisisEvents 输出。
+ *  - severity 字段：取所有命中危机事件 severity 的平均值（0-1）。
+ *  - trajectory 为 null 时返回空列表 + severity 0。
+ */
+export function detectSectCrisis(
+  trajectory: SectTrajectory | null | undefined,
+  threshold: number,
+): { crisisEvents: SectEvent[]; severity: number } {
+  const safeThreshold = typeof threshold === 'number' && !isNaN(threshold) ? clamp01(threshold) : 0.5;
+  if (!trajectory || !Array.isArray(trajectory.history) || trajectory.history.length === 0) {
+    return { crisisEvents: [], severity: 0 };
+  }
+  const matched = trajectory.history.filter(e => e && typeof e.severity === 'number' && e.severity >= safeThreshold);
+  const severity = matched.length === 0
+    ? 0
+    : matched.reduce((sum, e) => sum + e.severity, 0) / matched.length;
+  return { crisisEvents: matched, severity: clamp01(severity) };
+}
+
+/**
+ * AI-I414: 生成一条宗门事件。
+ *  - 从 trajectory 当前 phase 出发，按 AI/剧情输入的 characterIds 生成一条 SectEvent。
+ *  - 默认 severity 0.3；若 trajectory.history 中存在高 severity 事件则受其影响，向上修正。
+ *  - 随机数通过 rand 参数注入；smoke 验证时使用固定 rand。
+ */
+export function generateSectEvent(
+  trajectory: SectTrajectory | null | undefined,
+  characterIds: string[],
+  rand?: () => number,
+): SectEvent {
+  const r = typeof rand === 'function' ? rand : Math.random;
+  const safeRand = Math.max(0, Math.min(1, r()));
+  const phase = normalizePhase(trajectory?.phase);
+  const safeChars = safeStringArray(characterIds);
+  const sectId = (trajectory && typeof trajectory.sectId === 'string') ? trajectory.sectId : 'unknown-sect';
+
+  let severity = 0.2 + safeRand * 0.3;
+  if (trajectory && Array.isArray(trajectory.history) && trajectory.history.length > 0) {
+    const lastSeverity = trajectory.history[trajectory.history.length - 1]?.severity ?? 0;
+    if (typeof lastSeverity === 'number' && lastSeverity > 0.5) {
+      severity = Math.min(1, severity + 0.2);
+    }
+  }
+
+  const kindByPhase: Record<SectPhase, string> = {
+    founding: 'founding',
+    prosperous: 'blessing',
+    stable: 'routine',
+    declining: 'schism',
+    crisis: 'war',
+    scattered: 'dispersal',
+    remnant: 'remnant',
+  };
+  const kind = kindByPhase[phase];
+
+  const id = generateSectEventId(sectId, trajectory?.history?.length ?? 0, Math.floor(safeRand * 1000));
+
+  const descriptionByPhase: Record<SectPhase, string> = {
+    founding: '宗门初立，弟子开山授业，根基渐稳',
+    prosperous: '宗门鼎盛，四方来朝，灵田广布',
+    stable: '宗门循旧制，弟子按部就班修行',
+    declining: '宗门气运渐衰，弟子星散，资源日减',
+    crisis: '宗门遭逢大难，山门告急',
+    scattered: '宗门离散，门人各自飘零',
+    remnant: '宗门仅余残脉，传承不绝如缕',
+  };
+
+  return {
+    id,
+    phase,
+    age: 0,
+    kind,
+    severity,
+    description: descriptionByPhase[phase],
+    characterIds: safeChars,
+    worldFactIds: [],
+  };
+}
+
+/**
+ * AI-I415: 为 Prompt 摘要宗门兴衰轨迹。
+ *  - 含 sectId / 当前阶段 / 凝聚度 / 最后指标 / 最近 3 条事件 / 掌门。
+ *  - charLimit：限制最终返回字符串的最大字符数；超出时截断并加省略号。
+ */
+export function summarizeSectTrajectoryForPrompt(
+  trajectory: SectTrajectory | null | undefined,
+  charLimit: number,
+): string {
+  const limit = typeof charLimit === 'number' && !isNaN(charLimit) ? Math.max(80, Math.floor(charLimit)) : 400;
+  if (!trajectory || typeof trajectory !== 'object') {
+    return '[宗门轨迹缺失]';
+  }
+  const sectId = trajectory.sectId || 'unknown-sect';
+  const phase = normalizePhase(trajectory.phase);
+  const leader = trajectory.currentLeader || '无';
+  const factionId = trajectory.factionId || '无';
+  const fate = trajectory.fate || '未定';
+  const history = Array.isArray(trajectory.history) ? trajectory.history : [];
+  const lastMetric = Array.isArray(trajectory.powerCurve) && trajectory.powerCurve.length > 0
+    ? trajectory.powerCurve[trajectory.powerCurve.length - 1]
+    : null;
+
+  const cohesion = lastMetric ? clamp01(lastMetric.internalCohesion) : 0.5;
+  const rep = lastMetric && typeof lastMetric.reputation === 'number' ? lastMetric.reputation : 50;
+  const memberCount = lastMetric && typeof lastMetric.memberCount === 'number' ? lastMetric.memberCount : 0;
+
+  const recentEvents = history.slice(-3).map(e => {
+    if (!e) return '';
+    const ageStr = typeof e.age === "number" ? String(e.age) + "岁" : "";
+    return (e.description || "") + "（" + ageStr + "）";
+  }).filter(s => s.length > 0);
+
+  let summary = "【宗门轨迹】" + phase + " | " + sectId + " | 掌门:" + leader + "\n";
+  summary += "内部凝聚:" + Math.round(cohesion * 100) + "% / 声誉:" + rep + " / 弟子:" + memberCount + "\n";
+  summary += "阵营:" + factionId + " / 命数:" + fate + "\n";
+
+  if (summary.length > limit) {
+    summary = summary.substring(0, limit - 1) + '…';
+  }
+  return summary;
+}
+// ==================== Phase-I Worker C 重做：命运回响系统 ====================
+// 规则：不修改既有函数/类型；只在文件末尾追加 import 段与 5 个 export function。
+// 引擎权威：检测 → 解决 → 传播 → 预测 → 注入提示词摘要。
+
+import {
+  FateEchoKind,
+  FateEchoTrigger,
+  FateEchoResolution,
+  FateWeb,
+  FatePredictedOutcome,
+  PendingThread,
+} from './types';
+
+// 命运回响检测：从角色当前状态 + 历史未决线索中识别应当被激活的回响。
+//  - character:    角色状态（id/age/npcs/longTermMemory）
+//  - history:      历史未决线索列表（PendingThread[]）
+// 返回：当前应触发的回响触发器集合（去重 + 紧迫度归一）
+export function detectFateEchoes(
+  character: { id?: string; age?: number; npcs?: Array<{ id: string; attitude?: string }>; longTermMemory?: string[] },
+  history: PendingThread[] = [],
+): FateEchoTrigger[] {
+  const charId = (character && character.id) || 'protagonist';
+  const charAge = typeof character?.age === 'number' ? character.age : 0;
+  const npcs = Array.isArray(character?.npcs) ? character.npcs : [];
+  const mems = Array.isArray(character?.longTermMemory) ? character.longTermMemory : [];
+
+  const out: FateEchoTrigger[] = [];
+  const seen = new Set<string>();
+
+  // 1) 未决线索到期 → 人物回响 / 因果回响
+  for (const t of history) {
+    if (!t || typeof t !== 'object') continue;
+    const dueAge = typeof (t as any).deadlineAge === 'number' ? (t as any).deadlineAge : charAge + 100;
+    const urgency = dueAge <= charAge + 3 ? 'critical' : dueAge <= charAge + 10 ? 'high' : 'normal';
+    const key = 'thread:' + (t as any).id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const category = (t as any).category;
+    const kind: FateEchoKind = category === 'enemy' || category === 'debt'
+      ? FateEchoKind.KarmaDebt
+      : category === 'promise'
+        ? FateEchoKind.PromiseFulfillment
+        : category === 'mystery'
+          ? FateEchoKind.DestinyCollision
+          : FateEchoKind.CharacterCallback;
+    out.push({
+      id: 'echo-' + charId + '-' + (t as any).id,
+      kind,
+      age: charAge,
+      sourceCharacterId: String((t as any).id),
+      targetCharacterId: charId,
+      narrativeHook: (t as any).title || "旧事随风悄然泛起",
+      urgency: urgency as FateEchoTrigger['urgency'],
+    });
+  }
+
+  // 2) 长期记忆中出现的高频关键词 → 物品回响 / 地点回响
+  for (let i = 0; i < mems.length; i++) {
+    const mem = mems[i];
+    if (typeof mem !== 'string') continue;
+    const key = 'mem:' + i;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (/[法宝剑玉佩珠灯塔印]/.test(mem)) {
+      out.push({
+        id: 'echo-mem-item-' + i,
+        kind: FateEchoKind.ItemRecall,
+        age: charAge,
+        sourceCharacterId: 'mem:' + i,
+        targetCharacterId: charId,
+        narrativeHook: "旧事随风悄然泛起",
+        urgency: 'low',
+      });
+    } else if (/[山谷城阁洞湖海林原镇塔]/.test(mem)) {
+      out.push({
+        id: 'echo-mem-place-' + i,
+        kind: FateEchoKind.PlaceResonance,
+        age: charAge,
+        sourceCharacterId: 'mem:' + i,
+        targetCharacterId: charId,
+        narrativeHook: "旧事随风悄然泛起",
+        urgency: 'low',
+      });
+    } else if (npcs.length > 0) {
+      const npc = npcs[Math.min(i, npcs.length - 1)];
+      out.push({
+        id: 'echo-mem-npc-' + i,
+        kind: FateEchoKind.CharacterCallback,
+        age: charAge,
+        sourceCharacterId: npc.id,
+        targetCharacterId: charId,
+        narrativeHook: "旧事随风悄然泛起",
+        urgency: 'low',
+      });
+    }
+  }
+
+  return out;
+}
+
+// 命运回响解决：根据角色状态 + 随机种子决定回响的结局。
+//  - echo:      触发器
+//  - character: 角色状态（用于 id + age 标记）
+//  - rand?:     可选随机源（默认 Math.random）
+// 返回：回响解决结果（outcome + 叙事影响 + 涉及人物）
+export function resolveFateEcho(
+  echo: FateEchoTrigger,
+  character: { id?: string; age?: number } = {},
+  rand?: () => number,
+): FateEchoResolution {
+  const r = typeof rand === 'function' ? rand : Math.random;
+  const charId = (character && character.id) || 'protagonist';
+  const charAge = typeof character?.age === 'number' ? character.age : 0;
+  const roll = r();
+  let outcome: FateEchoResolution['outcome'];
+  if (echo.urgency === 'critical') {
+    outcome = roll < 0.6 ? 'fulfilled' : roll < 0.85 ? 'transformed' : 'severed';
+  } else if (echo.urgency === 'high') {
+    outcome = roll < 0.45 ? 'fulfilled' : roll < 0.75 ? 'transformed' : roll < 0.9 ? 'deferred' : 'severed';
+  } else {
+    outcome = roll < 0.35 ? 'fulfilled' : roll < 0.65 ? 'transformed' : roll < 0.9 ? 'deferred' : 'severed';
+  }
+
+  const consequenceMap: Record<FateEchoResolution['outcome'], string> = {
+    fulfilled: '因缘得偿，旧约履践，命运回响安然落幕',
+    transformed: '回响未消而转为新的因缘，暗中改写后路',
+    deferred: '时机未至，回响暂且退入雾中，等待来日',
+    severed: '因果断绝，旧缘消散，天地间再无回响',
+  };
+
+  return {
+    echoId: echo.id,
+    resolvedAge: charAge,
+    outcome,
+    narrativeConsequence: consequenceMap[outcome],
+    involvedCharacterIds: Array.from(new Set([charId, echo.sourceCharacterId, echo.targetCharacterId])),
+  };
+}
+
+// 命运回响传播：把单个解决结果合入既有命运网，刷新密度与主导类型。
+//  - resolution:  本次回响解决结果
+//  - web:         当前命运网（会被读但不修改入参；返回新网）
+// 返回：传播后更新的命运网（含 echoes 移除、resolutions 追加、密度与主导重算）
+export function propagateFateConsequences(
+  resolution: FateEchoResolution,
+  web: FateWeb,
+): FateWeb {
+  const prevEchoes = Array.isArray(web?.echoes) ? web.echoes : [];
+  const prevResolutions = Array.isArray(web?.resolutions) ? web.resolutions : [];
+  const remainingEchoes = prevEchoes.filter((e) => e && e.id !== resolution.echoId);
+  const kindCounts = new Map<FateEchoKind, number>();
+  for (const e of prevEchoes) {
+    if (!e) continue;
+    kindCounts.set(e.kind, (kindCounts.get(e.kind) || 0) + 1);
+  }
+  const weightAdjust = resolution.outcome === 'fulfilled' ? -1 : resolution.outcome === 'severed' ? 1 : 0;
+  const originalEcho = prevEchoes.find((e) => e && e.id === resolution.echoId);
+  if (originalEcho) {
+    kindCounts.set(originalEcho.kind, Math.max(0, (kindCounts.get(originalEcho.kind) || 0) + weightAdjust));
+  }
+  let dominantKind: FateEchoKind | null = null;
+  let maxCount = -1;
+  for (const [k, c] of kindCounts.entries()) {
+    if (c > maxCount) { maxCount = c; dominantKind = k; }
+  }
+  const density = Math.max(0, Math.min(1, remainingEchoes.length / 10));
+  return {
+    echoes: remainingEchoes,
+    resolutions: prevResolutions.concat([resolution]),
+    threadDensity: density,
+    dominantKind: maxCount > 0 ? dominantKind : null,
+  };
+}
+
+// 命运轨迹预测：基于命运网 + 角色年龄，推演未来 years 年内每年可能的命运节点。
+//  - character: 角色（提供当前年龄；用于设置预测起点）
+//  - web:       当前命运网
+//  - years:     预测年数（默认 5）
+// 返回：按年龄升序的预测节点列表
+export function predictFateTrajectory(
+  character: { id?: string; age?: number },
+  web: FateWeb,
+  years: number = 5,
+): FatePredictedOutcome[] {
+  const startAge = typeof character?.age === 'number' ? character.age : 0;
+  const horizon = Math.max(1, Math.min(50, Math.floor(years)));
+  const echoes = Array.isArray(web?.echoes) ? web.echoes : [];
+  const density = typeof web?.threadDensity === 'number' ? web.threadDensity : 0;
+  const dominant = web?.dominantKind ?? null;
+  const out: FatePredictedOutcome[] = [];
+  for (let i = 1; i <= horizon; i++) {
+    const age = startAge + i;
+    const baseProb = echoes.length > 0 ? 0.4 + density * 0.4 : 0.1;
+    const dominantBoost = dominant ? 0.1 : 0;
+    const probability = Math.max(0, Math.min(1, baseProb + dominantBoost - (i - 1) * 0.05));
+    const dominantLabel = dominant ? describeFateEchoKind(dominant) : '未知';
+    const predictedEvent = echoes.length > 0
+      ? dominantLabel + '回响或将显形于今岁（' + age + '岁前后）'
+      : '天地暂静，命运未起波澜';
+    const rationale = echoes.length > 0
+      ? '命运网密度约 ' + density.toFixed(2) + '，主导为' + dominantLabel
+      : '命运网尚疏，无突出牵引';
+    const alternativeBranches = [
+      '延后：今岁未至，回响退入雾中',
+      '转化：旧缘未断，转为新的因缘',
+      '断绝：若强行斩断，回响或就此消散',
+    ];
+    out.push({
+      age,
+      predictedEvent,
+      probability,
+      rationale,
+      alternativeBranches,
+    });
+  }
+  return out;
+}
+
+// 命运网 prompt 摘要：把命运网压缩为 AI 上下文可用的中文短摘要，限制字符数。
+//  - web:        当前命运网
+//  - charLimit:  字符上限（默认 240）
+// 返回：玩家不可见、但 AI 可读的摘要字符串（含主导类型 + 密度 + 待解决数）
+export function summarizeFateWebForPrompt(
+  web: FateWeb,
+  charLimit: number = 240,
+): string {
+  const echoes = Array.isArray(web?.echoes) ? web.echoes : [];
+  const resolutions = Array.isArray(web?.resolutions) ? web.resolutions : [];
+  const density = typeof web?.threadDensity === 'number' ? web.threadDensity : 0;
+  const dominant = web?.dominantKind ? describeFateEchoKind(web.dominantKind) : '无';
+  const lines: string[] = [];
+  lines.push('命运网：待解决回响 ' + echoes.length + '，已解决 ' + resolutions.length + '，织网密度 ' + density.toFixed(2) + '，主导类型 ' + dominant);
+  const sampleCount = Math.min(echoes.length, 3);
+  for (let i = 0; i < sampleCount; i++) {
+    const e = echoes[i];
+    if (!e) continue;
+    lines.push('- [' + describeFateEchoKind(e.kind) + '] ' + (e.narrativeHook || '回响待应'));
+  }
+  let summary = lines.join('\n');
+  if (summary.length > charLimit) summary = summary.slice(0, Math.max(0, charLimit - 1)) + '…';
+  return summary;
+}
+
+// 内部辅助：把 FateEchoKind 翻成中文短语（AI prompt 友好）。
+function describeFateEchoKind(kind: FateEchoKind): string {
+  switch (kind) {
+    case FateEchoKind.CharacterCallback: return '人物回响';
+    case FateEchoKind.PlaceResonance: return '地点回响';
+    case FateEchoKind.ItemRecall: return '物品回响';
+    case FateEchoKind.PromiseFulfillment: return '誓约回响';
+    case FateEchoKind.KarmaDebt: return '因果回响';
+    case FateEchoKind.DestinyCollision: return '命数碰撞';
+    default: return '命运回响';
+  }
 }
