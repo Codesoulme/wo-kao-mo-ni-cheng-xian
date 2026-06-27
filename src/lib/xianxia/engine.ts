@@ -10013,7 +10013,6 @@ import {
   FateEchoResolution,
   FateWeb,
   FatePredictedOutcome,
-  PendingThread,
 } from './types';
 
 // 命运回响检测：从角色当前状态 + 历史未决线索中识别应当被激活的回响。
