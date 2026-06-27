@@ -122,6 +122,19 @@ model Character {
   // 每条记录：{ realmId, lastExploredAge, timesExplored, bestReward? }
   exploredRealmsJson String @default("[]")
 
+  // ===== AI-73: Schema Migration =====
+  // 飞升会话状态（optional，未开启时为 false）；开启后由 AscensionModal 写入 session JSON
+  ascensionPending     Boolean @default(false)
+  ascensionSessionJson String  @default("null")  // JSON: AscensionSession | null
+  // 禁制待交互状态（optional）
+  restrictionPending     Boolean @default(false)
+  restrictionDataJson    String  @default("null")  // JSON: Restriction | null
+
+  // ===== AI-74: Tribulation session =====
+  tribulationPending    Boolean @default(false)
+  tribulationSessionJson String  @default("null")  // JSON: TribulationSession | null
+  tribulationResultJson  String  @default("null")  // JSON: { passed, narrative } | null
+
   // 世界历 JSON（WorldCalendarState）—— 持久化当前世界历，避免刷新后重置
   worldCalendarJson String @default("{\"eraName\":\"青岚仙历\",\"calendarYear\":5000,\"elapsedDays\":0}")
 

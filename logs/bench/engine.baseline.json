@@ -1,0 +1,36 @@
+{
+  "date": "2026-06-27T00:50:34.577Z",
+  "iterations": 10000,
+  "results": [
+    {
+      "name": "resolveTribulationBolt",
+      "iters": 10000,
+      "totalMs": 9.8,
+      "perOpUs": 0.98
+    },
+    {
+      "name": "resolveHeartDemon",
+      "iters": 10000,
+      "totalMs": 4.16,
+      "perOpUs": 0.42
+    },
+    {
+      "name": "deriveCrossRealmPaths",
+      "iters": 10000,
+      "totalMs": 36.57,
+      "perOpUs": 3.66
+    },
+    {
+      "name": "checkRestrictionAccess",
+      "iters": 10000,
+      "totalMs": 4.62,
+      "perOpUs": 0.46
+    },
+    {
+      "name": "deriveAscensionRequirements",
+      "iters": 10000,
+      "totalMs": 1.04,
+      "perOpUs": 0.1
+    }
+  ]
+}

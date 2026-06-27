@@ -19,6 +19,7 @@ import { GameMenu } from '@/components/xianxia/GameMenu';
 import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
 import { AscensionModal } from '@/components/xianxia/AscensionModal';
 import { RestrictionModal } from '@/components/xianxia/RestrictionModal';
+import { TribulationModal } from '@/components/xianxia/TribulationModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Scroll, Sparkles, Package } from 'lucide-react';
 
@@ -220,6 +221,41 @@ export default function Home() {
                 <RestrictionModal
                   restriction={character.restrictionPending}
                   onInteract={async () => {/* 由 store / route 触发 */}}
+                />
+              </div>
+            )}
+
+            {/* AI-74: TribulationModal 接入（onBolt → /api/game/tribulation/action, onEnd → /api/game/tribulation/end） */}
+            {character.tribulationPending && (
+              <div className="shrink-0 px-3 pb-2" data-testid="tribulation-section">
+                <TribulationModal
+                  session={character.tribulationPending}
+                  onBolt={async (boltNumber) => {
+                    await fetch('/api/game/tribulation/action', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'bolt',
+                        boltNumber,
+                        characterRoll: Math.random(),
+                        heartDemon: 0,
+                        soulStrength: 50,
+                        bondedArtifactResonance: false,
+                      }),
+                    });
+                  }}
+                  onHeartDemon={async () => {/* 由心魔面板触发 */}}
+                  onEnd={async () => {
+                    await fetch('/api/game/tribulation/end', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        sessionId: character.tribulationPending?.id ?? '',
+                        outcome: 'passed',
+                        boltsCompleted: character.tribulationPending?.boltsCompleted ?? 0,
+                      }),
+                    });
+                  }}
                 />
               </div>
             )}

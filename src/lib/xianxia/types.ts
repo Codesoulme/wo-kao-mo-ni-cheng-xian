@@ -1459,6 +1459,9 @@ export interface CharacterState {
   // ===== AI-72: L3 modals 接入 =====
   ascensionPending?: AscensionSession | null;   // 待结算飞升会话
   restrictionPending?: Restriction | null;      // 待交互禁制
+  // ===== AI-74: Tribulation session 持久化 =====
+  tribulationPending?: TribulationSession | null;   // 待渡劫会话
+  tribulationResult?: { passed: boolean; narrative: string } | null;  // 最近渡劫结果
 }
 
 // ==================== AI-66: 宗门历史条目 ====================
