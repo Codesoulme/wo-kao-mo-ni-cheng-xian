@@ -1,0 +1,17 @@
+[
+  {
+    "label": "phase-j-A 文本去重",
+    "task": "Phase J worker A: 文本去重与心跳检测.\n\n工作目录: E:\\aigame2_publish\n任务: 给 xianxia 引擎加 4 个 export function + 4 个 smoke，检测并防止模式崩溃:\n\n1. detectRepetitiveText(texts: string[], windowSize: number): { duplicates: Array<{ text, count, lastSeenAt }> } — 在最近 windowSize 条 narrative 中找出重复字符串\n2. deduplicateNarrativeHooks(hooks: string[], existingHooks: string[]): { kept: string[], dropped: string[] } — 相似度 > 0.7 的 hook 丢掉\n3. detectStaleTemplatePhrases(events: any[], phraseBlacklist: string[]): { stale: Array<{ eventId, phrase }> } — 检测 AI 输出是否复用模板口头禅（'天机晦暗'/'细碎积累'等）\n4. summarizeTextHealthForPrompt(textHistory: string[]): string — 给 AI 上下文的'最近文字风格摘要'\n\nSmoke 文件: scripts/xianxia-regression-smoke.ts 末尾追加。Wrapper 名: pgRunPhaseJAWorkerASmokes。\nSmoke 用例 j-501 ~ j-504。\n\n硬性规则:\n- 不修改现有 engine.ts / types.ts 的已有函数（只追加在文件末尾）\n- 不修改 existing smoke 函数\n- 完成后用 `bun run scripts/xianxia-regression-smoke.ts` 验证 312+4 = 316/316 通过\n- 不 commit/push（owner 来做）\n- 不创建 cron / worker\n- 把交付清单写到 .handoff/meeting/phase-j-anti-pattern-collapse/xiaoxin-A-to-xiaoxia.md\n- 任务模型名: MiniMax-M3（不需要你指定）\n",
+    "label2": "phase-j worker A 文本去重"
+  },
+  {
+    "label": "phase-j-B 槽位越界",
+    "task": "Phase J worker B: 槽位越界防护.\n\n工作目录: E:\\aigame2_publish\n任务: 给 xianxia 引擎加 4 个 export function + 4 个 smoke，AI 输出 category/displayGroup 走白名单:\n\n1. validateUISlotMapping(slot: { category, displayGroup, displaySlots, tone, renderHint }): { valid: boolean, warnings: string[] } — 检查 slot 元数据是否在已知白名单\n2. clampCategoryToKnownSlot(slot, knownCategories: Set<string>): { clampedSlot, fallbackUsed: boolean } — 未知 category 走 fallback ('misc'/'uncategorized')\n3. inferSlotFromNarrativeText(text: string, hints: string[]): { suggestedCategory, suggestedDisplayGroup, confidence: number } — 给一段文字推断应放进哪个槽位\n4. summarizeSlotMappingForPrompt(activeSlots: any[]): string — 给 AI 上下文的'当前已注册槽位清单'\n\nSmoke 文件: scripts/xianxia-regression-smoke.ts 末尾追加。Wrapper 名: pgRunPhaseJBWorkerBSmokes。\nSmoke 用例 j-511 ~ j-514。\n\n硬性规则:\n- 不修改现有 engine.ts / types.ts 的已有函数（只追加在文件末尾）\n- 不修改 existing smoke 函数\n- 完成后用 `bun run scripts/xianxia-regression-smoke.ts` 验证 316+4 = 320/320 通过\n- 不 commit/push\n- 不创建 cron / worker\n- 把交付清单写到 .handoff/meeting/phase-j-anti-pattern-collapse/xiaoxin-B-to-xiaoxia.md\n",
+    "label2": "phase-j worker B 槽位越界防护"
+  },
+  {
+    "label": "phase-j-C 跨系统因果",
+    "task": "Phase J worker C: 跨函数因果连贯校验.\n\n工作目录: E:\\aigame2_publish\n任务: 给 xianxia 引擎加 4 个 export function + 4 个 smoke，校验修真特异化/传承/命运回响之间的 cross-reference:\n\n1. validateCrossSystemContinuity(character, inheritanceChain, fateEchoes, sectState): { breaks: Array<{ system, severity, reason }> } — 检测三个系统的引用是否断裂\n2. findBrokenCrossRefs(character, allChains, allEchoes, allSects): Array<{ refId, expectedSystem, actualSystem }> — 找出指向不存在 ID 的引用\n3. reconcileFateAndInheritance(fateEcho, inheritancePool): { compatible: boolean, suggestedNarrative: string } — 命运回响与传承池是否能衔接\n4. summarizeContinuityForPrompt(character, breaks: any[]): string — 给 AI 上下文的'因果链健康摘要'\n\nSmoke 文件: scripts/xianxia-regression-smoke.ts 末尾追加。Wrapper 名: pgRunPhaseJCWorkerCSmokes。\nSmoke 用例 j-521 ~ j-524。\n\n硬性规则:\n- 不修改现有 engine.ts / types.ts 的已有函数（只追加在文件末尾）\n- 不修改 existing smoke 函数\n- 完成后用 `bun run scripts/xianxia-regression-smoke.ts` 验证 320+4 = 324/324 通过\n- 不 commit/push\n- 不创建 cron / worker\n- 把交付清单写到 .handoff/meeting/phase-j-anti-pattern-collapse/xiaoxin-C-to-xiaoxia.md\n",
+    "label2": "phase-j worker C 跨系统因果校验"
+  }
+]

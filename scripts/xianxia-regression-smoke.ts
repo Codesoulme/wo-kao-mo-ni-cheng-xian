@@ -1,11 +1,14 @@
-﻿﻿import { readFileSync, existsSync } from 'fs';
+﻿import { readFileSync, existsSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItem, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStalemateExit, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse, unequipItem, buildEmptyWorldMap, discoverLocation, deriveTravelFeasibility, generateRandomEncounter, summarizeWorldForPrompt, recordNPCMemory, clusterNPCMemories, decayNPCMemories, deriveNPCBehaviorFromMemory, summarizeNPCForPrompt, buildEmptySectGraph, addSectNode, setSectRelation, derivePlayerSectAffinity, queryRelationsTowards, deriveInheritanceEligibility, claimInheritance, resolveInheritanceContest, propagateInheritance, summarizeInheritanceForPrompt, deriveCraftingEligibility, startCraftingSession, resolveCraftingStep, deriveTechniqueProgress, resolveTechniqueBreakthrough,
   evaluateSectPhase, projectSectPowerDecade, detectSectCrisis, generateSectEvent, summarizeSectTrajectoryForPrompt,
   detectFateEchoes, resolveFateEcho, propagateFateConsequences, predictFateTrajectory, summarizeFateWebForPrompt,
-  evaluateEndingConditions, selectEndingPath, applyEndingOutcome, branchAlternativeOutcomes, summarizeEndingForPrompt } from '../src/lib/xianxia/engine';
+  evaluateEndingConditions, selectEndingPath, applyEndingOutcome, branchAlternativeOutcomes, summarizeEndingForPrompt,
+  validateCrossSystemContinuity, findBrokenCrossRefs, reconcileFateAndInheritance, summarizeContinuityForPrompt } from '../src/lib/xianxia/engine';
+import { validateUISlotMapping, clampCategoryToKnownSlot, inferSlotFromNarrativeText, summarizeSlotMappingForPrompt } from '../src/lib/xianxia/engine';
+import { detectRepetitiveText, deduplicateNarrativeHooks, detectStaleTemplatePhrases, summarizeTextHealthForPrompt } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
 import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain, WorldRegion, RegionTier, LocationNode, TravelRoute, WorldMap, EndingArchetype, EndingCondition, EndingChoice, EndingOutcome, EndingPathMap, InheritanceKind, InheritanceRecipient, InheritanceClaim, InheritanceChain, InheritancePool, FateEchoTrigger, FateEchoResolution, FateWeb, FatePredictedOutcome } from '../src/lib/xianxia/types';
@@ -2845,6 +2848,9 @@ function smokeAi103RumorReliability(): void {
   pgRunPhaseIDWorkerDSmokes();
   pgRunPhaseIAWorkerASmokes();
   pgRunPhaseICWorkerCSmokes();
+  pgRunPhaseJCWorkerCSmokes();
+  pgRunPhaseJBWorkerBSmokes();
+  pgRunPhaseJAWorkerASmokes();
 }
 
 function smokeCombatLabelsDisplay(): void {
@@ -6773,3 +6779,584 @@ function smokeI404InheritancePropagation(): void {
   log('smoke-i-404-inheritance-propagation', { passed: true, grew: grown, summaryLen: text.length });
 }
 
+
+
+// ======================== Phase-J Worker C: Cross-System Continuity (smoke) ========================
+// Additive only. Each smoke targets one engine.ts function in the j-5xx batch.
+
+function smokeJ521CrossSystemContinuity(): void {
+  // AI-J521: validateCrossSystemContinuity - check 修真特异化/传承/命运回响/宗门 cross-ref
+  const character: any = { id: 'char-1', name: 'smoke-p1', age: 22, realm: 'qi_refining' };
+  const chain: any = {
+    rootCharacterId: 'root-1',
+    generations: [
+      { id: 'g1', kind: 'master-disciple' as InheritanceKind, sourceCharacterId: 'root-1', targetCharacterId: 'char-1', inheritedAbilities: ['sword-A'], inheritanceAge: 18, narrative: '', realmRequired: 'mortal' },
+    ],
+    activeClaims: [],
+    lostTechniques: [],
+  };
+  const echoes: any[] = [
+    { id: 'echo-1', kind: FateEchoKind.CharacterCallback, age: 22, sourceCharacterId: 'root-1', targetCharacterId: 'char-1', narrativeHook: 'sect-resonance', urgency: 'normal' },
+  ];
+  const sect: any = { sectId: 'sect-1', sectName: 'smoke-sect', role: 'inner' };
+  // happy path: should have 0 breaks
+  const ok = validateCrossSystemContinuity(character, chain, echoes, sect);
+  assert(ok && Array.isArray(ok.breaks), 'should return breaks array');
+  assert(ok.breaks.length === 0, 'happy path: 0 breaks, got=' + JSON.stringify(ok.breaks));
+
+  // bad rootCharacterId should be flagged
+  const badChain = { ...chain, rootCharacterId: '' };
+  const r1 = validateCrossSystemContinuity(character, badChain, echoes, sect);
+  assert(r1.breaks.some((b: any) => b.system === 'inheritance' && b.severity === 'error'), 'missing root should be error, got=' + JSON.stringify(r1.breaks));
+
+  // echo missing id should be flagged
+  const badEchoes: any[] = [{}];
+  const r2 = validateCrossSystemContinuity(character, chain, badEchoes, sect);
+  assert(r2.breaks.some((b: any) => b.system === 'fateEcho' && b.severity === 'error'), 'echo missing id should be error');
+
+  // constitution fate/karma with no karma echoes should be info
+  const char4: any = { id: 'char-1', name: 'x', age: 30, realm: 'mortal', constitution: { category: 'fate' } };
+  const r3 = validateCrossSystemContinuity(char4, chain, echoes, sect);
+  assert(r3.breaks.some((b: any) => b.system === 'constitution' && b.severity === 'info'), 'fate-constitution w/o karma echoes -> info, got=' + JSON.stringify(r3.breaks));
+
+  // null inputs should be safe
+  const safe = validateCrossSystemContinuity(null, null, null, null);
+  assert(Array.isArray(safe.breaks), 'null inputs should still return breaks array');
+
+  log('smoke-j-521-cross-system-continuity', { passed: true, okBreaks: ok.breaks.length, r1Breaks: r1.breaks.length, r2Breaks: r2.breaks.length });
+}
+
+function smokeJ522BrokenCrossRefs(): void {
+  // AI-J522: findBrokenCrossRefs - find refs to non-existent ids across systems
+  const character: any = { id: 'char-1', name: 'smoke-p2', age: 25, realm: 'mortal', sectId: 'ghost-sect' };
+  const chain: any = {
+    rootCharacterId: 'root-1',
+    generations: [
+      { id: 'g1', kind: 'master-disciple' as InheritanceKind, sourceCharacterId: 'root-1', targetCharacterId: 'char-1', inheritedAbilities: [], inheritanceAge: 18, narrative: '', realmRequired: 'mortal' },
+    ],
+    activeClaims: [{ recipientId: 'orphan-claim', claimAge: 20, claimReason: 'r', witnessIds: [], contested: false, resolved: false }],
+    lostTechniques: [],
+  };
+  const echoes: any[] = [
+    { id: 'echo-1', kind: FateEchoKind.KarmaDebt, age: 30, sourceCharacterId: 'phantom-source', targetCharacterId: 'phantom-target', narrativeHook: 'h', urgency: 'low' },
+  ];
+  const sects: any[] = [
+    { id: 'sect-1', name: 'a', alignment: 'orthodox' as any, realmTierMin: 1, realmTierMax: 5, powerRank: 10, currentLeader: 'l', seatLocation: 'loc', publicStance: 'stance' },
+  ];
+  const out = findBrokenCrossRefs(character, [chain], echoes, sects);
+  assert(Array.isArray(out), 'should return array');
+  // Expect at least: orphan-claim (inheritance), phantom-source, phantom-target (fateEcho), ghost-sect (sect)
+  const ids = out.map((x: any) => x.refId);
+  assert(ids.indexOf('orphan-claim') >= 0, 'should include orphan-claim, got=' + JSON.stringify(ids));
+  assert(ids.indexOf('phantom-source') >= 0, 'should include phantom-source, got=' + JSON.stringify(ids));
+  assert(ids.indexOf('phantom-target') >= 0, 'should include phantom-target, got=' + JSON.stringify(ids));
+  assert(ids.indexOf('ghost-sect') >= 0, 'should include ghost-sect, got=' + JSON.stringify(ids));
+
+  // each entry should have expectedSystem + actualSystem fields
+  for (const item of out) {
+    assert(typeof item.expectedSystem === 'string' && item.expectedSystem.length > 0, 'expectedSystem should be non-empty string');
+    assert(item.actualSystem === 'unknown', 'actualSystem should be "unknown", got=' + item.actualSystem);
+  }
+
+  // null inputs should be safe
+  const safe = findBrokenCrossRefs(null, null, null, null);
+  assert(Array.isArray(safe) && safe.length === 0, 'null inputs -> empty array');
+
+  // All-known scenario: all refs resolve
+  const allKnownChar: any = { id: 'char-1', sectId: 'sect-1' };
+  const allKnownChain: any = { rootCharacterId: 'root-1', generations: [], activeClaims: [], lostTechniques: [] };
+  const allKnownEchoes: any[] = [
+    { id: 'echo-1', kind: FateEchoKind.CharacterCallback, age: 22, sourceCharacterId: 'root-1', targetCharacterId: 'char-1', narrativeHook: 'h', urgency: 'low' },
+  ];
+  const noBreaks = findBrokenCrossRefs(allKnownChar, [allKnownChain], allKnownEchoes, sects);
+  assert(noBreaks.length === 0, 'all-known should have 0 broken refs, got=' + JSON.stringify(noBreaks));
+
+  log('smoke-j-522-broken-cross-refs', { passed: true, brokenCount: out.length, noBreaks: noBreaks.length });
+}
+
+function smokeJ523ReconcileFateInheritance(): void {
+  // AI-J523: reconcileFateAndInheritance - check 命运回响 与 传承池 compatibility
+  // Strong link: echo.source 在 pool.hostCharacterIds 里
+  const strongPool: any = {
+    id: 'pool-1', name: 'master-lineage', kind: 'master-disciple' as InheritanceKind,
+    availableSlots: 2, lockedUntilAge: 0, hostCharacterIds: ['root-1'],
+  };
+  const strongEcho: any = { id: 'echo-1', kind: FateEchoKind.CharacterCallback, age: 22, sourceCharacterId: 'root-1', targetCharacterId: 'char-1', narrativeHook: '', urgency: 'normal' };
+  const r1 = reconcileFateAndInheritance(strongEcho, strongPool);
+  assert(r1.compatible === true, 'strong link should be compatible');
+  assert(typeof r1.suggestedNarrative === 'string' && r1.suggestedNarrative.indexOf('传承池') >= 0, 'narrative should mention 传承池, got=' + r1.suggestedNarrative);
+
+  // Category match but no strong link
+  const catPool: any = {
+    id: 'pool-2', name: 'artifact-pool', kind: 'artifact' as InheritanceKind,
+    availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['someone-else'],
+  };
+  const itemEcho: any = { id: 'echo-2', kind: FateEchoKind.ItemRecall, age: 25, sourceCharacterId: 'npc-x', targetCharacterId: 'char-1', narrativeHook: '', urgency: 'low' };
+  const r2 = reconcileFateAndInheritance(itemEcho, catPool);
+  assert(r2.compatible === true, 'item-recall + artifact should be compatible');
+  assert(r2.suggestedNarrative.indexOf('相合') >= 0, 'narrative should say 相合, got=' + r2.suggestedNarrative);
+
+  // Incompatible: karma echo with bloodline pool (no match, no host link)
+  const incompatPool: any = {
+    id: 'pool-3', name: 'bloodline', kind: 'bloodline' as InheritanceKind,
+    availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['other-npc'],
+  };
+  const karmaEcho: any = { id: 'echo-3', kind: FateEchoKind.ItemRecall, age: 30, sourceCharacterId: 'phantom', targetCharacterId: 'char-1', narrativeHook: '', urgency: 'low' };
+  const r3 = reconcileFateAndInheritance(karmaEcho, incompatPool);
+  // bloodline only matches CharacterCallback/PlaceResonance/PromiseFulfillment
+  assert(r3.compatible === false, 'item-recall + bloodline should be incompatible');
+  assert(r3.suggestedNarrative.indexOf('不相合') >= 0, 'narrative should say 不相合, got=' + r3.suggestedNarrative);
+
+  // No slots -> not compatible
+  const noSlotPool: any = { ...strongPool, availableSlots: 0 };
+  const r4 = reconcileFateAndInheritance(strongEcho, noSlotPool);
+  assert(r4.compatible === false, 'no slots should be incompatible');
+  assert(r4.suggestedNarrative.indexOf('名额已尽') >= 0, 'narrative should say 名额已尽, got=' + r4.suggestedNarrative);
+
+  // Null inputs
+  const r5 = reconcileFateAndInheritance(null as any, null as any);
+  assert(r5.compatible === false, 'null inputs -> not compatible');
+
+  // Critical urgency + no strong link should add note
+  const critPool: any = { ...catPool, hostCharacterIds: ['unrelated'] };
+  const critEcho: any = { ...karmaEcho, kind: FateEchoKind.ItemRecall, urgency: 'critical' as const };
+  const r6 = reconcileFateAndInheritance(critEcho, critPool);
+  assert(r6.suggestedNarrative.indexOf('紧迫') >= 0 || r6.suggestedNarrative.indexOf('破例') >= 0, 'critical urgency should add 紧迫/破例 note, got=' + r6.suggestedNarrative);
+
+  log('smoke-j-523-reconcile-fate-inheritance', { passed: true, strong: r1.compatible, cat: r2.compatible, incompat: r3.compatible });
+}
+
+function smokeJ524SummarizeContinuityForPrompt(): void {
+  // AI-J524: summarizeContinuityForPrompt - AI prompt 健康摘要
+  const character: any = { id: 'c1', name: 'smoke-p4', age: 25, realm: 'mortal' };
+
+  // With explicit breaks
+  const breaks: any[] = [
+    { system: 'inheritance', severity: 'error', reason: 'root-missing' },
+    { system: 'fateEcho', severity: 'warn', reason: 'echo-incomplete' },
+    { system: 'sect', severity: 'info', reason: 'no-current-sect' },
+    { system: 'constitution', severity: 'info', reason: 'fate-no-karma' },
+  ];
+  const summary = summarizeContinuityForPrompt(character, breaks, 240);
+  assert(typeof summary === 'string' && summary.length > 0, 'summary non-empty');
+  assert(summary.length <= 240, 'summary within charLimit, got=' + summary.length);
+  assert(summary.indexOf('因果链健康') >= 0, 'should contain 因果链健康, got=' + summary);
+  assert(summary.indexOf('smoke-p4') >= 0, 'should contain character name, got=' + summary);
+  assert(summary.indexOf('error=1') >= 0, 'should show error=1, got=' + summary);
+  assert(summary.indexOf('warn=1') >= 0, 'should show warn=1, got=' + summary);
+  assert(summary.indexOf('info=2') >= 0, 'should show info=2, got=' + summary);
+
+  // With null breaks, should auto-fallback
+  const fallback = summarizeContinuityForPrompt(character, null, 200);
+  assert(typeof fallback === 'string' && fallback.length > 0, 'fallback non-empty');
+  assert(fallback.indexOf('因果链健康') >= 0, 'fallback should contain 因果链健康');
+
+  // CharLimit truncation
+  const manyBreaks: any[] = [];
+  for (let i = 0; i < 30; i++) {
+    manyBreaks.push({ system: 'sys-' + i, severity: 'info', reason: 'reason-' + i + '-long-content-for-truncation-test' });
+  }
+  const truncated = summarizeContinuityForPrompt(character, manyBreaks, 80);
+  assert(truncated.length <= 80, 'truncated should respect charLimit, got=' + truncated.length);
+
+  // Empty breaks
+  const empty = summarizeContinuityForPrompt(character, [], 200);
+  assert(typeof empty === 'string', 'empty breaks -> string');
+  assert(empty.indexOf('error=0') >= 0, 'empty -> error=0, got=' + empty);
+
+  log('smoke-j-524-summarize-continuity-for-prompt', { passed: true, summaryLen: summary.length, truncatedLen: truncated.length });
+}
+
+function pgRunPhaseJCWorkerCSmokes(): void {
+  const cases = [
+    { name: 'smoke-j-521-cross-system-continuity', fn: smokeJ521CrossSystemContinuity },
+    { name: 'smoke-j-522-broken-cross-refs', fn: smokeJ522BrokenCrossRefs },
+    { name: 'smoke-j-523-reconcile-fate-inheritance', fn: smokeJ523ReconcileFateInheritance },
+    { name: 'smoke-j-524-summarize-continuity-for-prompt', fn: smokeJ524SummarizeContinuityForPrompt },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+// ======================== Phase-J Worker B (anti-pattern-collapse): UI Slot Boundary Guard (smoke) ========================
+// Additive only. Each smoke targets one engine.ts function in the j-5xx batch.
+
+function smokeJ511ValidateUISlotMapping(): void {
+  // AI-J511: validateUISlotMapping - well-formed slot should be valid+no warnings;
+  // a malformed slot should be invalid with explicit warnings; null should be
+  // safely rejected without throwing.
+  const good: any = {
+    category: 'attribute',
+    displayGroup: 'attribute',
+    displaySlots: ['topTags', 'characterDetail'],
+    tone: 'good',
+    renderHint: 'card',
+  };
+  const ok = validateUISlotMapping(good);
+  assert(ok && ok.valid === true, 'good slot should be valid');
+  assert(Array.isArray(ok.warnings) && ok.warnings.length === 0, 'good slot should have no warnings, got=' + JSON.stringify(ok.warnings));
+
+  const bad: any = {
+    category: 'fakeCategory',
+    displayGroup: 'fakeGroup',
+    displaySlots: ['bogusSlot', 'topTags'],
+    tone: 'fakeTone',
+    renderHint: 'fakeHint',
+  };
+  const badResult = validateUISlotMapping(bad);
+  assert(badResult.valid === false, 'bad slot should be invalid');
+  const w = badResult.warnings || [];
+  assert(w.indexOf('category_unknown:fakeCategory') >= 0, 'should warn unknown category, got=' + JSON.stringify(w));
+  assert(w.indexOf('displayGroup_unknown:fakeGroup') >= 0, 'should warn unknown displayGroup, got=' + JSON.stringify(w));
+  assert(w.indexOf('displaySlots_unknown:bogusSlot') >= 0, 'should warn unknown displaySlot, got=' + JSON.stringify(w));
+  assert(w.indexOf('tone_unknown:fakeTone') >= 0, 'should warn unknown tone, got=' + JSON.stringify(w));
+  assert(w.indexOf('renderHint_unknown:fakeHint') >= 0, 'should warn unknown renderHint, got=' + JSON.stringify(w));
+
+  // Null / undefined should be safely rejected.
+  const nullResult = validateUISlotMapping(null);
+  assert(nullResult.valid === false && nullResult.warnings.indexOf('slot_missing') >= 0, 'null slot -> slot_missing, got=' + JSON.stringify(nullResult));
+  const undefResult = validateUISlotMapping(undefined as any);
+  assert(undefResult.valid === false, 'undefined slot should be invalid');
+
+  // Non-string displaySlots entries should be flagged.
+  const mixed: any = { category: 'attribute', displaySlots: ['topTags', 42, null] };
+  const mixedResult = validateUISlotMapping(mixed);
+  assert(mixedResult.valid === false, 'mixed displaySlots should be invalid');
+  assert(mixedResult.warnings.indexOf('displaySlots_non_string_entry') >= 0, 'should flag non-string entry, got=' + JSON.stringify(mixedResult.warnings));
+
+  log('smoke-j-511-validate-ui-slot-mapping', { passed: true, goodWarnings: ok.warnings.length, badWarnings: badResult.warnings.length });
+}
+
+function smokeJ512ClampCategoryToKnownSlot(): void {
+  // AI-J512: clampCategoryToKnownSlot - unknown categories should fall back to
+  // 'misc' (or 'uncategorized' if misc is disallowed); in-set categories pass
+  // through unchanged. displayGroup / displaySlots / tone / renderHint also
+  // get clamped to the global whitelist.
+  const known = new Set<string>(['attribute', 'constitution', 'misc', 'uncategorized']);
+  const ok = clampCategoryToKnownSlot(
+    { category: 'attribute', displayGroup: 'attribute', displaySlots: ['topTags'], tone: 'good', renderHint: 'card' },
+    known,
+  );
+  assert(ok.fallbackUsed === false, 'in-set slot should not use fallback, got=' + JSON.stringify(ok));
+  assert(ok.clampedSlot.category === 'attribute', 'category stays as attribute');
+
+  // Unknown category -> 'misc' fallback
+  const fallback = clampCategoryToKnownSlot(
+    { category: 'totallyFakeCategory', displayGroup: 'attribute', displaySlots: ['topTags'], tone: 'good', renderHint: 'card' },
+    known,
+  );
+  assert(fallback.fallbackUsed === true, 'unknown should trigger fallback, got=' + JSON.stringify(fallback));
+  assert(fallback.clampedSlot.category === 'misc', 'unknown should clamp to misc, got=' + fallback.clampedSlot.category);
+
+  // Set without 'misc' but with 'uncategorized' -> 'uncategorized' fallback
+  const noMisc = new Set<string>(['attribute', 'uncategorized']);
+  const fallback2 = clampCategoryToKnownSlot({ category: 'fake' }, noMisc);
+  assert(fallback2.clampedSlot.category === 'uncategorized', 'no-misc set should fall back to uncategorized, got=' + fallback2.clampedSlot.category);
+  assert(fallback2.fallbackUsed === true, 'fallbackUsed should be true');
+
+  // Set with neither misc nor uncategorized -> use first available
+  const restrictive = new Set<string>(['attribute', 'constitution']);
+  const fallback3 = clampCategoryToKnownSlot({ category: 'fake' }, restrictive);
+  assert(fallback3.clampedSlot.category === 'attribute' || fallback3.clampedSlot.category === 'constitution', 'restrictive set should fall back to first, got=' + fallback3.clampedSlot.category);
+  assert(fallback3.fallbackUsed === true, 'restrictive fallback should be flagged');
+
+  // displayGroup / displaySlots / tone / renderHint also get clamped
+  const messy = clampCategoryToKnownSlot(
+    { category: 'attribute', displayGroup: 'fakeGroup', displaySlots: ['topTags', 'fakeSlot'], tone: 'fakeTone', renderHint: 'fakeHint' },
+    known,
+  );
+  assert(messy.clampedSlot.displayGroup === 'misc', 'displayGroup should clamp to misc, got=' + messy.clampedSlot.displayGroup);
+  assert(Array.isArray(messy.clampedSlot.displaySlots) && messy.clampedSlot.displaySlots.indexOf('topTags') >= 0 && messy.clampedSlot.displaySlots.indexOf('fakeSlot') < 0, 'fakeSlot should be filtered out');
+  assert(messy.clampedSlot.tone === 'neutral', 'fakeTone should clamp to neutral');
+  assert(messy.clampedSlot.renderHint === 'badge', 'fakeHint should clamp to badge');
+
+  // Also works with array form for knownCategories.
+  const arrKnown = ['attribute', 'misc'];
+  const arrResult = clampCategoryToKnownSlot({ category: 'fake' }, arrKnown);
+  assert(arrResult.clampedSlot.category === 'misc', 'array form should also clamp to misc, got=' + arrResult.clampedSlot.category);
+
+  log('smoke-j-512-clamp-category-to-known-slot', { passed: true, fallback: fallback.clampedSlot.category, fallback3: fallback3.clampedSlot.category });
+}
+
+function smokeJ513InferSlotFromNarrativeText(): void {
+  // AI-J513: inferSlotFromNarrativeText - pure heuristic. Each well-formed
+  // narrative should infer a sensible category+displayGroup pair with
+  // confidence > 0.5; unknown text should fall back to misc with confidence
+  // 0.3.
+  const constitutionText = 'You inherited an ancient bloodline constitution; physique awakening stirs within you.';
+  const constitutionResult = inferSlotFromNarrativeText(constitutionText, ['constitution']);
+  assert(constitutionResult.suggestedCategory === 'constitution' || constitutionResult.suggestedCategory === 'attribute', 'constitution text should infer constitution/attribute, got=' + constitutionResult.suggestedCategory);
+  assert(typeof constitutionResult.confidence === 'number' && constitutionResult.confidence > 0.5, 'confidence should be > 0.5, got=' + constitutionResult.confidence);
+  assert(['constitution', 'attribute', 'fate', 'misc'].indexOf(constitutionResult.suggestedDisplayGroup) >= 0, 'displayGroup should be in whitelist, got=' + constitutionResult.suggestedDisplayGroup);
+
+  const identityText = 'You were inducted into the Green Cloud Sect and now hold the role of an outer disciple.';
+  const identityResult = inferSlotFromNarrativeText(identityText, ['identity', 'sect']);
+  assert(identityResult.suggestedCategory === 'identity', 'identity text should infer identity, got=' + JSON.stringify(identityResult));
+  assert(identityResult.suggestedDisplayGroup === 'identity', 'identity text should map to identity group, got=' + identityResult.suggestedDisplayGroup);
+
+  const injuryText = 'You were grievously wounded in the night raid; a poison debuff now clings to your meridians.';
+  const injuryResult = inferSlotFromNarrativeText(injuryText, ['debuff', 'injury']);
+  assert(injuryResult.suggestedCategory === 'debuff', 'injury text should infer debuff, got=' + JSON.stringify(injuryResult));
+  assert(injuryResult.suggestedDisplayGroup === 'debuff', 'injury text should map to debuff group, got=' + injuryResult.suggestedDisplayGroup);
+
+  const techniqueText = 'You learned a new combat technique, the Falling Star Sword art.';
+  const techResult = inferSlotFromNarrativeText(techniqueText, ['technique', 'skill']);
+  assert(techResult.suggestedCategory === 'technique' || techResult.suggestedCategory === 'item', 'technique text should infer technique/item, got=' + JSON.stringify(techResult));
+  assert(techResult.confidence >= 0.3, 'confidence should be at least 0.3, got=' + techResult.confidence);
+
+  // Unknown / random text falls back to misc with confidence 0.3
+  const unknown = inferSlotFromNarrativeText('xyzzy plover banana rainbow', []);
+  assert(unknown.suggestedCategory === 'misc', 'unknown text should fall back to misc, got=' + unknown.suggestedCategory);
+  assert(unknown.suggestedDisplayGroup === 'misc', 'unknown text should fall back to misc group');
+  assert(Math.abs(unknown.confidence - 0.3) < 0.001, 'unknown confidence should be 0.3, got=' + unknown.confidence);
+
+  // Null / undefined should not throw and should return a safe default
+  const nullResult = inferSlotFromNarrativeText(null);
+  assert(nullResult.suggestedCategory === 'misc', 'null text should give misc, got=' + nullResult.suggestedCategory);
+  const undefHints = inferSlotFromNarrativeText('x', undefined as any);
+  assert(undefHints.suggestedCategory === 'misc' || typeof undefHints.suggestedCategory === 'string', 'undefined hints should still work');
+
+  log('smoke-j-513-infer-slot-from-narrative-text', { passed: true, constitutionCat: constitutionResult.suggestedCategory, identityCat: identityResult.suggestedCategory, injuryCat: injuryResult.suggestedCategory, unknownConfidence: unknown.confidence });
+}
+
+function smokeJ514SummarizeSlotMappingForPrompt(): void {
+  // AI-J514: summarizeSlotMappingForPrompt - empty array -> "no slots
+  // registered" string; populated array -> multi-line summary with
+  // categories / displaySlots / tones / renderHints / displayGroups listed.
+  const empty = summarizeSlotMappingForPrompt([], 200);
+  assert(typeof empty === 'string' && empty.length > 0, 'empty should return a non-empty string');
+  assert(empty.toLowerCase().indexOf('no slots') >= 0 || empty.toLowerCase().indexOf('misc') >= 0, 'empty should mention no slots / fallback, got=' + empty);
+
+  // Null / undefined should not throw
+  const nullResult = summarizeSlotMappingForPrompt(null as any, 200);
+  assert(typeof nullResult === 'string' && nullResult.length > 0, 'null should return non-empty string');
+  const undefResult = summarizeSlotMappingForPrompt(undefined as any, 200);
+  assert(typeof undefResult === 'string' && undefResult.length > 0, 'undefined should return non-empty string');
+
+  // 3-slot registry should produce a summary that lists categories,
+  // displaySlots, tones, renderHints, displayGroups
+  const registry: any[] = [
+    { category: 'attribute', displayGroup: 'attribute', displaySlots: ['topTags', 'characterDetail'], tone: 'good', renderHint: 'card' },
+    { category: 'constitution', displayGroup: 'constitution', displaySlots: ['topTags', 'statusPage'], tone: 'rare', renderHint: 'badge' },
+    { category: 'buff', displayGroup: 'buff', displaySlots: ['topTags'], tone: 'good', renderHint: 'badge' },
+  ];
+  const text = summarizeSlotMappingForPrompt(registry, 500);
+  assert(typeof text === 'string' && text.length > 0, 'registry summary should be non-empty');
+  assert(text.indexOf('3') >= 0, 'should mention count 3, got=' + text);
+  assert(text.indexOf('attribute') >= 0, 'should mention attribute category, got=' + text);
+  assert(text.indexOf('constitution') >= 0, 'should mention constitution category, got=' + text);
+  assert(text.indexOf('buff') >= 0, 'should mention buff category, got=' + text);
+  assert(text.indexOf('topTags') >= 0, 'should mention topTags displaySlot, got=' + text);
+  assert(text.indexOf('characterDetail') >= 0, 'should mention characterDetail displaySlot, got=' + text);
+  assert(text.indexOf('good') >= 0, 'should mention good tone, got=' + text);
+  assert(text.indexOf('badge') >= 0, 'should mention badge renderHint, got=' + text);
+  assert(text.length <= 501, 'summary should respect charLimit, got=' + text.length);
+
+  // charLimit truncation: very small charLimit should still produce output
+  // that fits within (or at) the limit.
+  const tiny = summarizeSlotMappingForPrompt(registry, 60);
+  assert(tiny.length <= 65, 'tiny charLimit should clip output, got=' + tiny.length);
+  assert(tiny.length > 0, 'tiny output should still be non-empty');
+
+  // charLimit too small -> clamped to 40 minimum
+  const floor = summarizeSlotMappingForPrompt(registry, 0);
+  assert(floor.length > 0, 'charLimit=0 should still return non-empty, got=' + floor);
+
+  // Robust against malformed entries
+  const messy: any[] = [
+    null,
+    undefined,
+    { category: null, displaySlots: 'not-an-array' },
+    { category: 'attribute', displaySlots: ['topTags', null] },
+  ];
+  const messyResult = summarizeSlotMappingForPrompt(messy, 300);
+  assert(typeof messyResult === 'string' && messyResult.length > 0, 'messy input should not throw, got=' + messyResult);
+
+  log('smoke-j-514-summarize-slot-mapping-for-prompt', { passed: true, registryLen: text.length, tinyLen: tiny.length, messyLen: messyResult.length });
+}
+
+function pgRunPhaseJBWorkerBSmokes(): void {
+  const cases = [
+    { name: 'smoke-j-511-validate-ui-slot-mapping', fn: smokeJ511ValidateUISlotMapping },
+    { name: 'smoke-j-512-clamp-category-to-known-slot', fn: smokeJ512ClampCategoryToKnownSlot },
+    { name: 'smoke-j-513-infer-slot-from-narrative-text', fn: smokeJ513InferSlotFromNarrativeText },
+    { name: 'smoke-j-514-summarize-slot-mapping-for-prompt', fn: smokeJ514SummarizeSlotMappingForPrompt },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ==================== Phase-J Worker A: 文本去重与心跳检测 smokes ====================
+// AI-J501~J504：每个 smoke 验证一个 engine.ts 末尾新增的 export function。
+// 仅追加，不修改既有 smoke / main。
+
+function smokeJ501DetectRepetitiveText(): void {
+  // AI-J501: detectRepetitiveText
+  // 1) 重复字符串必须被捕获
+  const texts = [
+    '夜凉如水', '市声渐远', '夜凉如水', '独自立在檐下',
+    '炉火未熄', '夜凉如水', '钟声远来',
+  ];
+  const r1 = detectRepetitiveText(texts, 7);
+  assert(r1 && Array.isArray(r1.duplicates), 'should return duplicates array');
+  const dupA = r1.duplicates.find(d => d.text.trim() === '夜凉如水');
+  assert(dupA !== undefined, 'should find duplicate "夜凉如水", got=' + JSON.stringify(r1.duplicates));
+  assert(dupA.count === 3, 'count should be 3, got=' + dupA.count);
+  assert(dupA.lastSeenAt === 6, 'lastSeenAt should be 6 (1-based in window), got=' + dupA.lastSeenAt);
+
+  // 2) 窗口外的不计入
+  const r2 = detectRepetitiveText(texts, 4);
+  const dupsInWindow = r2.duplicates.filter(d => d.text.trim() === '夜凉如水');
+  assert(dupsInWindow.length === 0 || (dupsInWindow.length === 1 && dupsInWindow[0].count < 3),
+    'window=4 should not see all 3 occurrences, got=' + JSON.stringify(r2.duplicates));
+
+  // 3) 空白和短串被忽略
+  const r3 = detectRepetitiveText(['', '   ', 'a', '夜凉如水', '夜凉如水'], 5);
+  assert(r3.duplicates.length === 1 && r3.duplicates[0].count === 2,
+    'only "夜凉如水" should be reported, got=' + JSON.stringify(r3.duplicates));
+
+  // 4) 无重复返回空
+  const r4 = detectRepetitiveText(['甲乙丙', '丁戊己', '庚辛壬'], 3);
+  assert(r4.duplicates.length === 0, 'no dupes -> empty, got=' + JSON.stringify(r4.duplicates));
+
+  // 5) 容错：非数组
+  const r5 = detectRepetitiveText(null as any, 5);
+  assert(Array.isArray(r5.duplicates) && r5.duplicates.length === 0, 'null texts -> empty');
+
+  }
+
+function smokeJ502DeduplicateNarrativeHooks(): void {
+  // AI-J502: deduplicateNarrativeHooks
+  const existing = ['血色残月照孤城', '剑鸣如龙破九天'];
+
+  // 1) 完全相同应被丢弃
+  const r1 = deduplicateNarrativeHooks(['血色残月照孤城', '新的钩子'], existing);
+  assert(r1.dropped.indexOf('血色残月照孤城') >= 0, 'identical should be dropped');
+  assert(r1.kept.indexOf('新的钩子') >= 0, 'distinct should be kept');
+  assert(r1.kept.indexOf('血色残月照孤城') < 0, 'identical must NOT be in kept');
+
+  // 2) 高度相似的也应该被丢弃（>0.7 阈值）
+  const r2 = deduplicateNarrativeHooks(['血色残月照孤城', '血色残月照孤亭', '完全不相关的一句话'],
+    existing);
+  // 第二条与首条相似度接近 1，应被丢
+  assert(r2.dropped.length >= 1, 'similar variants should be dropped, got=' + JSON.stringify(r2.dropped));
+
+  // 3) 跨批去重：被丢弃的也会被计入已存在
+  const r3 = deduplicateNarrativeHooks(['剑鸣如龙破九霄'], existing);
+  assert(r3.dropped.indexOf('剑鸣如龙破九霄') >= 0, 'near-match should be dropped across batch');
+
+  // 4) 空串被丢弃
+  const r4 = deduplicateNarrativeHooks(['', '   ', '有效的钩子'], []);
+  assert(r4.dropped.indexOf('') >= 0, 'empty should be dropped');
+  assert(r4.kept.indexOf('有效的钩子') >= 0, 'valid should be kept');
+
+  // 5) 自定义阈值
+  const r5 = deduplicateNarrativeHooks(['血色残月照孤城', '血色残月照孤亭', '天上掉下一颗星'], existing, 0.5);
+  // threshold=0.5 更严格，应该丢掉更多
+  assert(r5.dropped.length >= 1, 'stricter threshold drops more, got=' + JSON.stringify(r5.dropped));
+
+  }
+
+function smokeJ503DetectStaleTemplatePhrases(): void {
+  // AI-J503: detectStaleTemplatePhrases
+  const events = [
+    { id: 'ev-1', narrative: '他感到天机晦暗，难以言说。' },
+    { id: 'ev-2', summary: '细碎积累之下，功力渐深。' },
+    { id: 'ev-3', description: '寻常的一段旅途，无事发生。' },
+    { id: 'ev-4', narrative: '天机晦暗中，他忽然顿悟。', text: '细碎积累的功夫终有回报。' },
+  ];
+  const blacklist = ['天机晦暗', '细碎积累'];
+
+  const r = detectStaleTemplatePhrases(events, blacklist);
+  assert(r && Array.isArray(r.stale), 'should return stale array');
+  // ev-1 命中"天机晦暗"，ev-2 命中"细碎积累"，ev-3 不命中，ev-4 两个都命中
+  const ev1Hits = r.stale.filter(s => s.eventId === 'ev-1').map(s => s.phrase);
+  const ev2Hits = r.stale.filter(s => s.eventId === 'ev-2').map(s => s.phrase);
+  const ev3Hits = r.stale.filter(s => s.eventId === 'ev-3');
+  const ev4Hits = r.stale.filter(s => s.eventId === 'ev-4').map(s => s.phrase);
+  assert(ev1Hits.indexOf('天机晦暗') >= 0, 'ev-1 should match "天机晦暗", got=' + JSON.stringify(ev1Hits));
+  assert(ev2Hits.indexOf('细碎积累') >= 0, 'ev-2 should match "细碎积累", got=' + JSON.stringify(ev2Hits));
+  assert(ev3Hits.length === 0, 'ev-3 should have no hits, got=' + JSON.stringify(ev3Hits));
+  assert(ev4Hits.length === 2, 'ev-4 should match both phrases, got=' + JSON.stringify(ev4Hits));
+
+  // 2) 大小写不敏感
+  const r2 = detectStaleTemplatePhrases([{ id: 'ev-x', narrative: '天机晦暗 but English.' }],
+    ['天机晦暗']);
+  assert(r2.stale.length === 1, 'case-insensitive substring match, got=' + JSON.stringify(r2.stale));
+
+  // 3) 空事件或缺 id 容错
+  const r3 = detectStaleTemplatePhrases([null, { narrative: '天机晦暗' }], ['天机晦暗']);
+  assert(r3.stale.length === 1 && r3.stale[0].eventId === '(no-id)', 'missing id -> (no-id), got=' + JSON.stringify(r3.stale));
+
+  // 4) 空 blacklist
+  const r4 = detectStaleTemplatePhrases([{ id: 'ev-q', narrative: '天机晦暗' }], []);
+  assert(r4.stale.length === 0, 'empty blacklist -> no hits');
+
+  }
+
+function smokeJ504SummarizeTextHealthForPrompt(): void {
+  // AI-J504: summarizeTextHealthForPrompt
+  // 1) 正常情况：返回字符串、未触发模板口头禅
+  const hist1 = [
+    '夜凉如水，独步山径。',
+    '偶遇樵夫，相谈甚欢。',
+    '山间雾气渐浓，前路依稀。',
+    '忽闻远处钟声，心头一凛。',
+  ];
+  const s1 = summarizeTextHealthForPrompt(hist1);
+  assert(typeof s1 === 'string' && s1.length > 0, 'should return non-empty string');
+  assert(s1.indexOf('样本 4 条') >= 0, 'should mention sample count, got=' + s1);
+  assert(s1.indexOf('未发现模板口头禅') >= 0, 'clean text should report no stale, got=' + s1);
+
+  // 2) 含重复串时应有"重复句式"提示
+  const hist2 = ['夜凉如水', '夜凉如水', '夜凉如水', '夜凉如水'];
+  const s2 = summarizeTextHealthForPrompt(hist2);
+  assert(s2.indexOf('重复串') >= 0 && s2.indexOf('重复句式') >= 0,
+    'should mention dup count + suggestion, got=' + s2);
+
+  // 3) 含模板口头禅时应有"少用 XXX"提示
+  const hist3 = [
+    '天机晦暗，难以言说。',
+    '细碎积累之下，功力渐深。',
+    '又一日过去。',
+  ];
+  const s3 = summarizeTextHealthForPrompt(hist3);
+  assert(s3.indexOf('少用') >= 0, 'should suggest reducing stale phrases, got=' + s3);
+  assert(s3.indexOf('天机晦暗') >= 0 || s3.indexOf('细碎积累') >= 0,
+    'should mention actual stale phrase, got=' + s3);
+
+  // 4) charLimit 限制生效
+  const hist4 = Array.from({ length: 20 }, (_, i) => '第 ' + (i + 1) + ' 条叙事，内容很长很长很长很长。');
+  const s4 = summarizeTextHealthForPrompt(hist4, 60);
+  assert(s4.length <= 80, 'charLimit loosely enforced (<=limit+ellipsis), got=' + s4.length);
+  assert(s4.length > 0, 'should still return non-empty, got empty');
+
+  // 5) 空历史容错
+  const s5 = summarizeTextHealthForPrompt([]);
+  assert(typeof s5 === 'string' && s5.length > 0, 'empty -> still returns summary, got=' + s5);
+
+  }
+
+function pgRunPhaseJAWorkerASmokes(): void {
+  const cases = [
+    { name: 'smoke-j-501-detect-repetitive-text', fn: smokeJ501DetectRepetitiveText },
+    { name: 'smoke-j-502-deduplicate-narrative-hooks', fn: smokeJ502DeduplicateNarrativeHooks },
+    { name: 'smoke-j-503-detect-stale-template-phrases', fn: smokeJ503DetectStaleTemplatePhrases },
+    { name: 'smoke-j-504-summarize-text-health-for-prompt', fn: smokeJ504SummarizeTextHealthForPrompt },
+  ];
+  for (const c of cases) {
+    try { c.fn(); log(c.name, { passed: true }); }
+    catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
+  }
+}
