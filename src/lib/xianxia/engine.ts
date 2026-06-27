@@ -8390,10 +8390,6 @@ function generateNpcMemoryId(npcId: string, age: number, summary: string): strin
   return `npcmem_${safeNpc}_${Math.max(0, Math.floor(Number(age) || 0))}_${safeSummary}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function safeStringArray(input: unknown): string[] {
-  if (!Array.isArray(input)) return [];
-  return input.map(x => String(x || '').trim()).filter(x => x.length > 0).slice(0, 24);
-}
 
 const NPC_MEMORY_TIER_WEIGHT: Record<NPCMemoryTier, number> = {
   trivial: 1,
@@ -9757,11 +9753,6 @@ function normalizePhase(phase: string | null | undefined): SectPhase {
     return phase as SectPhase;
   }
   return 'stable';
-}
-
-function safeStringArray(input: unknown): string[] {
-  if (!Array.isArray(input)) return [];
-  return input.filter((x): x is string => typeof x === 'string');
 }
 
 function generateSectEventId(sectId: string, age: number, index: number): string {
@@ -11144,3 +11135,697 @@ export function summarizeTextHealthForPrompt(
   if (summary.length > limit) summary = summary.slice(0, Math.max(0, limit - 1)) + '\u2026';
   return summary;
 }
+
+
+
+// ======================== Phase-K Worker C: LLM prompt augmentation wires (engine.ts half) ========================
+// Goal: project Phase-J anti-pattern-collapse helpers (summarizeTextHealthForPrompt /
+// summarizeSlotMappingForPrompt / summarizeContinuityForPrompt) into compact, well-labelled
+// snippets that the LLM-side helper in llm.ts can splice into the system prompt tail.
+//
+// These four exports are additive only. They wrap the existing helpers and emit
+// { hookName, hookPosition, promptSnippet, charLimit, snippetId } so the registry in llm.ts
+// can index them by hookName and append them in a deterministic order.
+//
+// Contract:
+//  - Each wire* returns a promptSnippet that begins with [Phase-K:<hookKey> <charLimit>] so
+//    verifyLLMPromptAugmentation can detect the hook via indexOf('[Phase-K:').
+//  - hookName is one of PHASE_K_LLM_PROMPT_HOOK_MARKERS.{registry,textHealth,slotMapping,continuity}.
+//  - hookPosition is fixed to 'tail' (the LLM helper appends after the base system prompt).
+//  - charLimit defaults to 280 (textHealth) / 480 (slotMapping) / 320 (continuity); callers can override.
+//  - snippetId is per-call random so the LLM can tell when a fresh snippet was emitted.
+//  - All four functions are defensive: null/undefined input never throws.
+
+export const PHASE_K_LLM_PROMPT_HOOK_MARKERS = {
+  registry: "PHASE_K_LLM_PROMPT_AUGMENTATION_REGISTRY",
+  textHealth: "PHASE_K_LLM_PROMPT_HOOK_TEXT_HEALTH",
+  slotMapping: "PHASE_K_LLM_PROMPT_HOOK_SLOT_MAPPING",
+  continuity: "PHASE_K_LLM_PROMPT_HOOK_CROSS_SYSTEM_CONTINUITY",
+};
+
+// Marker strings llm.ts is expected to contain after wiring. Keep stable.
+export interface PhaseKLLMPromptSnippet {
+  hookName: string;
+  hookPosition: 'tail' | 'head';
+  promptSnippet: string;
+  charLimit: number;
+  snippetId: string;
+}
+
+export interface PhaseKLLMAugmentationVerifyResult {
+  wiredCount: number;
+  missingHooks: string[];
+  allHooks: string[];
+  registryPresent: boolean;
+  sampleSnippet: string;
+}
+
+/**
+ * Phase-K wire 1/4: text health snippet.
+ *  - history:    recent narrative history (string[]). Last 12 entries are summarized.
+ *  - limit:      optional charLimit override; default 280.
+ *  Returns { hookName, hookPosition, promptSnippet, charLimit, snippetId }.
+ *  The snippet is purely additive -- it does NOT mutate history or engine state.
+ */
+export function wireTextHealthToLLMPrompt(
+  history: string[] | null | undefined,
+  limit?: number,
+): PhaseKLLMPromptSnippet {
+  const charLimit = _phaseKClampLimit(typeof limit === 'number' ? limit : 280, 280);
+  const tail = Array.isArray(history) ? history.slice(-12) : [];
+  let inner = '';
+  try {
+    if (tail.length > 0 && typeof summarizeTextHealthForPrompt === 'function') {
+      inner = summarizeTextHealthForPrompt(tail);
+    } else {
+      inner = '近期 0 条文本未发现重复句式或陈旧模板口癖，叙事节奏正常。';
+    }
+  } catch {
+    inner = '近期文本健康摘要暂不可用，请保持当下语势继续叙事。';
+  }
+  inner = _phaseKTruncateTail(inner, charLimit);
+  const label = '[Phase-K:textHealth ' + charLimit + ']';
+  const promptSnippet =
+    label + '\n' +
+    '近况：近期文本健康摘要，供 LLM 了解重复句式 / 模板口癖。\n' +
+    inner + '\n';
+  return {
+    hookName: PHASE_K_LLM_PROMPT_HOOK_MARKERS.textHealth,
+    hookPosition: 'tail',
+    promptSnippet,
+    charLimit,
+    snippetId: _phaseKRandomId('phasek-textHealth'),
+  };
+}
+
+/**
+ * Phase-K wire 2/4: slot mapping snippet.
+ *  - activeSlots: currently registered UI slot mappings (any shape; defensively read)
+ *  - limit:      optional charLimit override; default 480
+ *  Returns { hookName, hookPosition, promptSnippet, charLimit, snippetId }.
+ *  The snippet lists registered categories / displaySlots / tones so the LLM does not
+ *  invent new ones.
+ */
+export function wireSlotMappingToLLMPrompt(
+  activeSlots: any[] | null | undefined,
+  limit?: number,
+): PhaseKLLMPromptSnippet {
+  const charLimit = _phaseKClampLimit(typeof limit === 'number' ? limit : 480, 480);
+  let inner = '';
+  try {
+    if (Array.isArray(activeSlots) && activeSlots.length > 0 && typeof summarizeSlotMappingForPrompt === 'function') {
+      inner = summarizeSlotMappingForPrompt(activeSlots, charLimit);
+    } else {
+      inner = '当前 UI 注册表为空（no slots registered），所有新分类必须先注册才能落到对应槽位。';
+    }
+  } catch {
+    inner = '当前 UI 槽位摘要暂不可用，请保持默认分类边界。';
+  }
+  inner = _phaseKTruncateTail(inner, charLimit);
+  const label = '[Phase-K:slotMapping ' + charLimit + ']';
+  const promptSnippet =
+    label + '\n' +
+    '当前已注册 UI 槽位约束（请勿发明未注册分类，使用已注册 displaySlots）：\n' +
+    inner + '\n';
+  return {
+    hookName: PHASE_K_LLM_PROMPT_HOOK_MARKERS.slotMapping,
+    hookPosition: 'tail',
+    promptSnippet,
+    charLimit,
+    snippetId: _phaseKRandomId('phasek-slotMapping'),
+  };
+}
+
+/**
+ * Phase-K wire 3/4: cross-system continuity snippet.
+ *  - character: current character snapshot (any shape; defensively read)
+ *  - breaks:    array of { system, severity, reason } cross-system breaks
+ *  - limit:     optional charLimit override; default 320
+ *  Returns { hookName, hookPosition, promptSnippet, charLimit, snippetId }.
+ *  The snippet explains causal-chain health so the LLM can avoid orphan threads.
+ */
+export function wireCrossSystemContinuityToLLMPrompt(
+  character: any,
+  breaks: any[] | null | undefined,
+  limit?: number,
+): PhaseKLLMPromptSnippet {
+  const charLimit = _phaseKClampLimit(typeof limit === 'number' ? limit : 320, 320);
+  let inner = '';
+  try {
+    if (Array.isArray(breaks) && typeof summarizeContinuityForPrompt === 'function') {
+      inner = summarizeContinuityForPrompt(character, breaks);
+    } else {
+      inner = '因果链健康 error=0 warn=0 info=0 -- 未发现跨系统断点。';
+    }
+  } catch {
+    inner = '因果链健康摘要暂不可用，请保持剧情内因果连贯。';
+  }
+  inner = _phaseKTruncateTail(inner, charLimit);
+  const label = '[Phase-K:continuity ' + charLimit + ']';
+  const promptSnippet =
+    label + '\n' +
+    '因果链健康摘要（error / warn / info），供 LLM 避免出现孤儿因果。\n' +
+    inner + '\n';
+  return {
+    hookName: PHASE_K_LLM_PROMPT_HOOK_MARKERS.continuity,
+    hookPosition: 'tail',
+    promptSnippet,
+    charLimit,
+    snippetId: _phaseKRandomId('phasek-continuity'),
+  };
+}
+
+/**
+ * Phase-K wire 4/4: verify which hooks are actually present in llm.ts.
+ *  - llmSource: optional explicit source string (mostly for tests); defaults to reading
+ *               src/lib/xianxia/llm.ts via fs.
+ *  - llmPath:   override path when llmSource is not supplied.
+ * Returns: { wiredCount, missingHooks, allHooks, registryPresent, sampleSnippet }.
+ * `sampleSnippet` returns the first detected snippet body (or empty string).
+ *
+ * The function NEVER throws - file read errors are reported via
+ * { registryPresent: false, wiredCount: 0, missingHooks: [all], ... }.
+ */
+export function verifyLLMPromptAugmentation(
+  llmSource?: string,
+  llmPath?: string,
+): PhaseKLLMAugmentationVerifyResult {
+  const allHooks = [
+    PHASE_K_LLM_PROMPT_HOOK_MARKERS.textHealth,
+    PHASE_K_LLM_PROMPT_HOOK_MARKERS.slotMapping,
+    PHASE_K_LLM_PROMPT_HOOK_MARKERS.continuity,
+  ];
+  const missingHooks: string[] = [];
+  let source: string = "";
+  let registryPresent = false;
+  let sampleSnippet = "";
+  let wiredCount = 0;
+  try {
+    if (typeof llmSource === 'string') {
+      // Explicit string (including empty '') is honored as-is - no file fallback.
+      source = llmSource;
+    } else {
+      try {
+        const fs = require("fs") as typeof import("fs");
+        const path = typeof llmPath === 'string' && llmPath.length > 0
+          ? llmPath
+          : "src/lib/xianxia/llm.ts";
+        source = fs.readFileSync(path, "utf-8");
+      } catch {
+        source = "";
+      }
+    }
+  } catch (_err) {
+    return {
+      wiredCount: 0,
+      missingHooks: allHooks.slice(),
+      allHooks,
+      registryPresent: false,
+      sampleSnippet: "",
+    };
+  }
+  registryPresent = source.indexOf(PHASE_K_LLM_PROMPT_HOOK_MARKERS.registry) >= 0;
+  for (const h of allHooks) {
+    if (source.indexOf(h) >= 0) {
+      wiredCount += 1;
+    } else {
+      missingHooks.push(h);
+    }
+  }
+  try {
+    const idx = source.indexOf("[Phase-K:");
+    if (idx >= 0) {
+      const endIdx = source.indexOf("]", idx);
+      if (endIdx > idx) {
+        const slice = source.slice(idx, Math.min(source.length, idx + 320));
+        sampleSnippet = slice;
+      }
+    }
+  } catch (_e) {
+    sampleSnippet = "";
+  }
+  return {
+    wiredCount,
+    missingHooks,
+    allHooks,
+    registryPresent,
+    sampleSnippet,
+  };
+}
+
+// ----- helpers (private to this block) -----
+
+function _phaseKRandomId(prefix: string): string {
+  return prefix + '-' + Math.floor(Date.now() % 1e9).toString(36) + '-' + Math.floor(Math.random() * 1e9).toString(36);
+}
+
+function _phaseKClampLimit(limit: number, fallback: number): number {
+  if (typeof limit !== 'number' || !Number.isFinite(limit) || limit <= 0) return fallback;
+  return limit;
+}
+
+function _phaseKTruncateTail(s: string, max: number): string {
+  if (typeof s !== 'string') return '';
+  if (s.length <= max) return s;
+  const head = Math.max(1, Math.floor(max * 0.85));
+  return s.slice(0, head) + '\u2026';
+}
+// ======================== Phase-K Worker A: 修真轮转支撑 (engine.ts) ========================
+// Goal: 给主循环接入「角色死亡 → 结局光谱 → 传承池 → 继承者」四段式钩子。
+// 这 4 个 export function 全部只读 / 只新增，不修改任何现有函数。
+//
+// 设计约束：
+//  - triggerEndingEvaluation 是死亡入口；返回所有可触发的结局与最可能落定的那一个，
+//    同时把第一份传承池草稿写入 primaryEnding.inheritancePool
+//  - seedInheritancePoolFromEnding 把上一份结局展开成可继承条目（功法/法宝/灵宠/血脉/
+//    信物/道场/未完之事），并各自落到 InheritancePool[]
+//  - selectNextProtagonist 综合灵根/血脉/因果承接/玩家介入偏好，挑选下一代主角
+//  - summarizeCycleForPrompt 把这一代轮回摘要成 prompt-ready 字符串（含 ellipsis 截断）
+//
+// 所有函数对 null/undefined 输入都安全返回默认结构；不抛错。
+
+// ---------- local types (engine.ts 私有) ----------
+interface PhaseKEndingCandidate {
+  archetype: EndingArchetype;
+  weight: number;
+  reason: string;
+}
+
+export interface PhaseKEndingEvaluation {
+  triggeredEndings: PhaseKEndingCandidate[];
+  primaryEnding: {
+    archetype: EndingArchetype;
+    endingId: string;
+    age: number;
+    summary: string;
+    inheritancePool: InheritancePool[];
+  } | null;
+  inheritancePool: InheritancePool[];
+}
+
+interface PhaseKProtagonistCandidate {
+  id: string;
+  age: number;
+  realm: string;
+  spiritualRoot: string;
+  bloodline: string;
+  karmaTags: string[];
+  inherited: { poolId: string; kind: InheritanceKind }[];
+  traitNarrative: string;
+}
+
+export interface PhaseKProtagonistSelection {
+  selectedId: string;
+  narrative: string;
+  eligibility: number;
+  scores: {
+    root: number;
+    blood: number;
+    karma: number;
+    preference: number;
+    inheritance: number;
+    total: number;
+  };
+  reason: string;
+}
+
+export interface PhaseKCycleSummaryInput {
+  ending?: { archetype?: EndingArchetype; summary?: string; age?: number } | null;
+  pool?: InheritancePool[] | null;
+  nextProtagonist?: { id?: string; age?: number; realm?: string; traitNarrative?: string } | null;
+  charLimit?: number;
+}
+
+// ---------- helpers (private to this block) ----------
+function _phaseKAClassifyCause(causeOfDeath: any): { bias: Partial<Record<EndingArchetype, number>>; biasLabel: string } {
+  const text = (typeof causeOfDeath === 'string' ? causeOfDeath
+    : causeOfDeath && typeof causeOfDeath === 'object' ? (causeOfDeath.cause || causeOfDeath.kind || causeOfDeath.label || '')
+    : '').toString();
+  const lower = text.toLowerCase();
+  const bias: Partial<Record<EndingArchetype, number>> = {};
+  let biasLabel = 'unknown';
+  if (/ascend|飞升|天劫|渡劫|列仙|tribulation/.test(lower)) {
+    bias.ascendImmortal = 0.65;
+    biasLabel = 'ascend-immortal';
+  } else if (/sit|坐化|寿终|age|寿元|old/.test(lower)) {
+    bias.sitDeath = 0.55;
+    biasLabel = 'sit-death';
+  } else if (/demon|魔|fall|心魔|obsess/.test(lower)) {
+    bias.fallDemonic = 0.6;
+    biasLabel = 'fall-demonic';
+  } else if (/sect|开宗|创派|found|传道|teach/.test(lower)) {
+    bias.foundSect = 0.5;
+    biasLabel = 'found-sect';
+  } else if (/reincarn|转世|轮回|rebirth|samsara/.test(lower)) {
+    bias.reincarnate = 0.55;
+    biasLabel = 'reincarnate';
+  } else if (/escape|逃|飞渡|穿越|leave|vacuum/.test(lower)) {
+    bias.escapeWorld = 0.5;
+    biasLabel = 'escape-world';
+  } else if (/collapse|天地崩|灭世|世界崩毁|apocal/.test(lower)) {
+    bias.worldCollapse = 0.65;
+    biasLabel = 'world-collapse';
+  } else if (/fade|归凡|散功|隐退|退隐|withdraw/.test(lower)) {
+    bias.fadeIntoMortal = 0.5;
+    biasLabel = 'fade-into-mortal';
+  }
+  return { bias, biasLabel };
+}
+
+function _phaseKANormalizeCharacter(character: any): {
+  id: string; age: number; realm: string; faction: string; cause: string;
+} {
+  const c = character && typeof character === 'object' ? character : {};
+  return {
+    id: typeof c.id === 'string' ? c.id : 'char-unknown',
+    age: typeof c.age === 'number' && Number.isFinite(c.age) && c.age >= 0 ? c.age : 0,
+    realm: typeof c.realm === 'string' ? c.realm : (typeof c.cultivation === 'string' ? c.cultivation : 'mortal'),
+    faction: typeof c.faction === 'string' ? c.faction : (typeof c.sect === 'string' ? c.sect : ''),
+    cause: typeof c.cause === 'string' ? c.cause : '',
+  };
+}
+
+function _phaseKAGeneratePoolId(charId: string, archetype: EndingArchetype, kind: string): string {
+  return 'pool-' + charId + '-' + archetype + '-' + kind;
+}
+
+function _phaseKAClampUnit(n: number, fallback: number): number {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return fallback;
+  if (n < 0) return 0;
+  if (n > 1) return 1;
+  return n;
+}
+
+// ---------- main exports ----------
+
+/**
+ * Phase-K 1/4: triggerEndingEvaluation
+ * 角色死亡时调用：评估可触发的结局，写入传承池。
+ *  - character: 当前角色（id / age / realm / faction / cause）
+ *  - worldState: 世界状态（可选；用于查询境界峰顶 / 宗门敌对 / 因缘密度）
+ *  - causeOfDeath: 死因字符串或 { cause: string } 对象
+ * 返回 { triggeredEndings, primaryEnding, inheritancePool }
+ *  - triggeredEndings: 所有候选结局（含权重 + 触发原因）
+ *  - primaryEnding: 落定的主要结局（含 inheritancePool 草稿）；可能为 null
+ *  - inheritancePool: 顶层传承池列表（与 primaryEnding.inheritancePool 一致，便于直接挂载）
+ */
+export function triggerEndingEvaluation(
+  character: any,
+  worldState: any,
+  causeOfDeath: any,
+): PhaseKEndingEvaluation {
+  const ch = _phaseKANormalizeCharacter(character);
+  const causeBias = _phaseKAClassifyCause(causeOfDeath || ch.cause);
+  const ws = worldState && typeof worldState === 'object' ? worldState : null;
+  const ageGate = ch.age >= 60 ? 0.15 : 0; // 寿元越接近暮年越倾向坐化/归凡
+  const realmPower = (ch.realm === 'ascension' || ch.realm === 'tribulation') ? 0.4 : 0;
+
+  // 8 个原型 + 基础权重
+  const base: Record<EndingArchetype, number> = {
+    'ascend-immortal': 0.05 + realmPower,
+    'sit-death': 0.10 + ageGate,
+    'fall-demonic': 0.05,
+    'found-sect': 0.10 + (ch.faction ? 0.10 : 0),
+    'reincarnate': 0.08,
+    'escape-world': 0.04,
+    'world-collapse': 0.02,
+    'fade-into-mortal': 0.10 + ageGate,
+  };
+  // 应用 cause bias
+  const cands: PhaseKEndingCandidate[] = (Object.keys(base) as EndingArchetype[]).map((arch) => ({
+    archetype: arch,
+    weight: _phaseKAClampUnit((base[arch] || 0) + (causeBias.bias[arch] || 0), 0.95),
+    reason: 'cause=' + (causeBias.biasLabel || 'unknown') + ', realm=' + ch.realm + ', age=' + ch.age,
+  }));
+
+  // 过滤权重 < 0.05 的低概率
+  const filtered = cands.filter((c) => c.weight >= 0.05).sort((a, b) => b.weight - a.weight);
+
+  // 选主结局：权重最高；平局时倾向原表顺序
+  const top = filtered[0] || null;
+  let primaryEnding: PhaseKEndingEvaluation['primaryEnding'] = null;
+  let pool: InheritancePool[] = [];
+  if (top) {
+    const endingId = 'ending-' + ch.id + '-' + top.archetype;
+    const summary = top.archetype + ' · ' + ch.id + ' 于 ' + ch.age + ' 岁落定；' + (ch.realm || 'mortal') + '，因 ' + (causeBias.biasLabel || 'unknown') + ' 而终。';
+    pool = seedInheritancePoolFromEnding(
+      { archetype: top.archetype, endingId, summary, age: ch.age, character: ch } as any,
+      ch,
+    );
+    primaryEnding = {
+      archetype: top.archetype,
+      endingId,
+      age: ch.age,
+      summary,
+      inheritancePool: pool,
+    };
+  }
+
+  return {
+    triggeredEndings: filtered,
+    primaryEnding,
+    inheritancePool: pool,
+  };
+}
+
+/**
+ * Phase-K 2/4: seedInheritancePoolFromEnding
+ * 从结局抽取可继承条目（功法/法宝/灵宠/血脉/信物/道场/未完之事），生成继承池。
+ *  - ending: 任意形状 { archetype, endingId, summary, age, character }
+ *  - character: 当前角色（用于 hostCharacterIds / lockedUntilAge）
+ * 返回 InheritancePool[]（典型 3-5 项）
+ */
+export function seedInheritancePoolFromEnding(
+  ending: any,
+  character: any,
+): InheritancePool[] {
+  const e = ending && typeof ending === 'object' ? ending : {};
+  const arch: EndingArchetype = (typeof e.archetype === 'string') ? e.archetype : 'fade-into-mortal';
+  const ch = _phaseKANormalizeCharacter(character || e.character);
+  const endingId = typeof e.endingId === 'string' ? e.endingId : ('ending-' + ch.id + '-' + arch);
+  const age = typeof e.age === 'number' && e.age >= 0 ? e.age : ch.age;
+
+  // 不同结局原型的 kind 优先级
+  const kindPriority: InheritanceKind[] = (
+    arch === 'ascend-immortal' ? ['technique', 'artifact', 'bond']
+    : arch === 'sit-death' ? ['technique', 'artifact', 'bond']
+    : arch === 'fall-demonic' ? ['artifact', 'bloodline', 'technique']
+    : arch === 'found-sect' ? ['sect', 'technique', 'token']
+    : arch === 'reincarnate' ? ['bloodline', 'technique', 'token']
+    : arch === 'escape-world' ? ['token', 'technique', 'artifact']
+    : arch === 'world-collapse' ? ['artifact', 'bond', 'sect']
+    : ['technique', 'token', 'bond']
+  );
+
+  const lockSpan = age + 6; // 主角死后 6 年才允许继承
+  const pools: InheritancePool[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < kindPriority.length; i++) {
+    const k = kindPriority[i];
+    const id = _phaseKAGeneratePoolId(ch.id, arch, k);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const name = k + ' · ' + arch + ' 遗承';
+    const slots = (arch === 'found-sect' || arch === 'world-collapse') ? 2 : 1;
+    pools.push({
+      id,
+      name,
+      kind: k,
+      availableSlots: slots,
+      lockedUntilAge: lockSpan,
+      hostCharacterIds: [ch.id],
+    });
+  }
+
+  // 至少 3 项；不足则补 technique/token/bond 兜底
+  const fallbackKinds: InheritanceKind[] = ['technique', 'token', 'bond'];
+  for (const k of fallbackKinds) {
+    if (pools.length >= 3) break;
+    const id = _phaseKAGeneratePoolId(ch.id, arch, k + '-fb');
+    if (seen.has(id)) continue;
+    seen.add(id);
+    pools.push({
+      id,
+      name: k + ' · 遗承',
+      kind: k,
+      availableSlots: 1,
+      lockedUntilAge: lockSpan,
+      hostCharacterIds: [ch.id],
+    });
+  }
+  return pools;
+}
+
+/**
+ * Phase-K 3/4: selectNextProtagonist
+ * 从候选人物中选择下一代主角。
+ *  - pool: 传承池（用于 inheritance 评分）
+ *  - worldState: 世界状态（用于 realm peak / 因缘密度）
+ *  - candidateList: 候选人物数组 [{ id, age, realm, spiritualRoot, bloodline, karmaTags, traitNarrative }]
+ * 返回 { selectedId, narrative, eligibility, scores, reason }
+ *  - eligibility: 0-1 综合适配度
+ *  - scores: 各维度分项
+ */
+export function selectNextProtagonist(
+  pool: InheritancePool[] | null | undefined,
+  worldState: any,
+  candidateList: any[],
+): PhaseKProtagonistSelection {
+  const poolArr = Array.isArray(pool) ? pool : [];
+  const ws = worldState && typeof worldState === 'object' ? worldState : null;
+  const candidates: PhaseKProtagonistCandidate[] = Array.isArray(candidateList)
+    ? candidateList.filter((c) => c && typeof c === 'object').map((c) => ({
+      id: typeof c.id === 'string' ? c.id : 'cand-unknown',
+      age: typeof c.age === 'number' && c.age >= 0 ? c.age : 0,
+      realm: typeof c.realm === 'string' ? c.realm : 'mortal',
+      spiritualRoot: typeof c.spiritualRoot === 'string' ? c.spiritualRoot : (typeof c.root === 'string' ? c.root : 'unknown'),
+      bloodline: typeof c.bloodline === 'string' ? c.bloodline : '',
+      karmaTags: Array.isArray(c.karmaTags) ? c.karmaTags.filter((t: any) => typeof t === 'string') : [],
+      inherited: Array.isArray(c.inherited) ? c.inherited : [],
+      traitNarrative: typeof c.traitNarrative === 'string' ? c.traitNarrative : '',
+    }))
+    : [];
+
+  if (candidates.length === 0) {
+    return {
+      selectedId: '',
+      narrative: '无可继承者候选；修真轮转暂止。',
+      eligibility: 0,
+      scores: { root: 0, blood: 0, karma: 0, preference: 0, inheritance: 0, total: 0 },
+      reason: 'no-candidates',
+    };
+  }
+
+  const playerPref = (ws && typeof ws.playerInterventionPreference === 'string')
+    ? ws.playerInterventionPreference
+    : (ws && typeof ws.protagonistSelectionPreference === 'string' ? ws.protagonistSelectionPreference : 'favor-neutral');
+  const favorRoot = playerPref === 'favor-root' || playerPref === 'favor-destiny';
+  const favorBlood = playerPref === 'favor-bloodline';
+
+  // 灵根 / 血脉打分映射
+  const rootScore = (r: string): number => {
+    if (!r || r === 'unknown') return 0.4;
+    if (/tianling|天灵|纯阳|纯阴|先天|primordial/.test(r)) return 1.0;
+    if (/双灵|dual|single/.test(r)) return 0.7;
+    if (/三灵|triple/.test(r)) return 0.55;
+    if (/杂灵|mixed|wu/.test(r)) return 0.35;
+    return 0.5;
+  };
+  const bloodScore = (b: string, p: InheritancePool[]): number => {
+    if (!b) return 0.2;
+    const poolsHaveBlood = p.some((x) => x && x.kind === 'bloodline');
+    if (!poolsHaveBlood) return 0.4;
+    if (/嫡|直系|传承|heir|lineage/.test(b)) return 0.9;
+    if (/旁|远|collateral/.test(b)) return 0.55;
+    return 0.45;
+  };
+  const karmaScore = (tags: string[]): number => {
+    if (tags.length === 0) return 0.4;
+    let s = 0;
+    let n = 0;
+    for (const t of tags) {
+      if (/因缘|旧约|师徒|誓言|fate|promise|master/.test(t)) { s += 0.9; n++; }
+      else if (/仇|敌|杀|feud|enemy/.test(t)) { s += 0.3; n++; }
+      else if (/中|平|neutral/.test(t)) { s += 0.5; n++; }
+      else { s += 0.5; n++; }
+    }
+    return n === 0 ? 0.4 : Math.max(0.1, Math.min(1, s / n));
+  };
+  const inheritanceScore = (inherited: { poolId: string; kind: InheritanceKind }[], p: InheritancePool[]): number => {
+    if (!Array.isArray(inherited) || inherited.length === 0 || p.length === 0) return 0.2;
+    let matches = 0;
+    for (const ih of inherited) {
+      if (!ih || typeof ih.poolId !== 'string') continue;
+      const matched = p.some((x) => x && x.id === ih.poolId);
+      if (matched) matches++;
+    }
+    return Math.max(0.1, Math.min(1, matches / Math.max(1, Math.min(inherited.length, p.length))));
+  };
+
+  // 计算每个候选分
+  const scored = candidates.map((c) => {
+    const root = rootScore(c.spiritualRoot);
+    const blood = bloodScore(c.bloodline, poolArr);
+    const karma = karmaScore(c.karmaTags);
+    const inherit = inheritanceScore(c.inherited, poolArr);
+    let preference = 0.5;
+    if (favorRoot && root >= 0.7) preference += 0.15;
+    if (favorBlood && blood >= 0.7) preference += 0.15;
+    const totalRaw = 0.30 * root + 0.30 * blood + 0.25 * karma + 0.15 * preference + 0.10 * (inherit * 0.5 + 0.5);
+    const total = _phaseKAClampUnit(totalRaw, 0);
+    return { cand: c, scores: { root, blood, karma, preference, inheritance: inherit, total } };
+  });
+
+  scored.sort((a, b) => b.scores.total - a.scores.total);
+  const winner = scored[0];
+  const id = winner.cand.id;
+  const reasonCode = winner.scores.total >= 0.7 ? 'strong-match'
+    : winner.scores.total >= 0.55 ? 'good-match'
+    : winner.scores.total >= 0.4 ? 'marginal-match' : 'weak-match';
+  const narrative = '由 ' + id + ' 接掌（' + reasonCode + '），其灵根 ' + winner.cand.spiritualRoot + '，血脉 ' + (winner.cand.bloodline || '无明显传承') + '，适配度 ' + winner.scores.total.toFixed(3) + '。';
+
+  return {
+    selectedId: id,
+    narrative,
+    eligibility: winner.scores.total,
+    scores: winner.scores,
+    reason: reasonCode,
+  };
+}
+
+/**
+ * Phase-K 4/4: summarizeCycleForPrompt
+ * 给 AI 上下文的"本代轮回摘要"。
+ *  - ending: { archetype, summary, age } 上一代结局
+ *  - pool: InheritancePool[] 传承池（用于算池容量）
+ *  - nextProtagonist: { id, age, realm, traitNarrative } 下一代主角
+ *  - charLimit: 字符上限（默认 360），超出部分以 ellipsis 截断
+ * 返回 prompt-ready 字符串
+ */
+export function summarizeCycleForPrompt(
+  ending: any,
+  pool: InheritancePool[] | null | undefined,
+  nextProtagonist: any,
+  charLimit?: number,
+): string {
+  const e = ending && typeof ending === 'object' ? ending : {};
+  const arch = (typeof e.archetype === 'string') ? e.archetype : 'fade-into-mortal';
+  const age = typeof e.age === 'number' && e.age >= 0 ? e.age : null;
+  const summary = typeof e.summary === 'string' && e.summary ? e.summary : ('上一代 ' + arch + ' 落定。');
+
+  const poolArr = Array.isArray(pool) ? pool : [];
+  const poolCount = poolArr.length;
+  const poolKinds: string[] = [];
+  for (const p of poolArr) {
+    if (!p || typeof p !== 'object') continue;
+    if (typeof p.kind === 'string' && poolKinds.indexOf(p.kind) < 0) poolKinds.push(p.kind);
+    const items = (p as any).inheritedItems;
+    if (Array.isArray(items)) {
+      for (const it of items) {
+        if (it && typeof it === 'object' && typeof it.kind === 'string' && poolKinds.indexOf(it.kind) < 0) {
+          poolKinds.push(it.kind);
+        }
+      }
+    }
+  }
+  const poolLine = poolCount > 0
+    ? '传承池共 ' + poolCount + ' 项，类目 ' + (poolKinds.join('、') || 'unknown') + '。'
+    : '未留传承池。';
+
+  const np = nextProtagonist && typeof nextProtagonist === 'object' ? nextProtagonist : null;
+  const npLine = np
+    ? '下一代主角 ' + (typeof np.id === 'string' ? np.id : '未明') + '（' + (typeof np.age === 'number' ? np.age : '?') + ' 岁 / ' + (typeof np.realm === 'string' ? np.realm : 'mortal') + '）：' + (typeof np.traitNarrative === 'string' && np.traitNarrative ? np.traitNarrative : '尚无明确描述。')
+    : '尚无明确下一代主角。';
+
+  const ageLine = (age !== null) ? '于 ' + age + ' 岁落定。' : '落定时间未明。';
+
+  let s = '本代轮回：' + arch + ' · ' + ageLine + ' ' + summary + ' ' + poolLine + ' ' + npLine;
+  const limit = (typeof charLimit === 'number' && Number.isFinite(charLimit) && charLimit > 0)
+    ? Math.floor(charLimit)
+    : 360;
+  if (s.length > limit) {
+    s = s.slice(0, Math.max(0, limit - 1)) + '…';
+  }
+  return s;
+}
+

@@ -1,4 +1,4 @@
-﻿import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
@@ -9,6 +9,10 @@ import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseCh
   validateCrossSystemContinuity, findBrokenCrossRefs, reconcileFateAndInheritance, summarizeContinuityForPrompt } from '../src/lib/xianxia/engine';
 import { validateUISlotMapping, clampCategoryToKnownSlot, inferSlotFromNarrativeText, summarizeSlotMappingForPrompt } from '../src/lib/xianxia/engine';
 import { detectRepetitiveText, deduplicateNarrativeHooks, detectStaleTemplatePhrases, summarizeTextHealthForPrompt } from '../src/lib/xianxia/engine';
+// Phase-K Worker C LLM prompt augmentation wires (engine.ts half)
+import { wireTextHealthToLLMPrompt, wireSlotMappingToLLMPrompt, wireCrossSystemContinuityToLLMPrompt, verifyLLMPromptAugmentation, PHASE_K_LLM_PROMPT_HOOK_MARKERS, type PhaseKLLMPromptSnippet, type PhaseKLLMAugmentationVerifyResult } from '../src/lib/xianxia/engine';
+// Phase-K Worker A 修真轮转支撑 (engine.ts half)
+import { triggerEndingEvaluation, seedInheritancePoolFromEnding, selectNextProtagonist, summarizeCycleForPrompt, type PhaseKEndingEvaluation, type PhaseKProtagonistSelection, type PhaseKCycleSummaryInput } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
 import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain, WorldRegion, RegionTier, LocationNode, TravelRoute, WorldMap, EndingArchetype, EndingCondition, EndingChoice, EndingOutcome, EndingPathMap, InheritanceKind, InheritanceRecipient, InheritanceClaim, InheritanceChain, InheritancePool, FateEchoTrigger, FateEchoResolution, FateWeb, FatePredictedOutcome } from '../src/lib/xianxia/types';
@@ -25,6 +29,8 @@ import { inferAttributeChangesFromNarrative } from '../src/lib/xianxia/narrative
 import { applyAgeBasedBodyGrowth } from '../src/lib/xianxia/body-growth';
 import { detectBodyModifier } from '../src/lib/xianxia/narrative-body-modifier';
 import { hashCacheKey } from '../src/lib/xianxia/llm';
+// Phase-K Worker C LLM prompt augmentation wires (llm.ts half)
+import { registerPhaseKTextHealthSnippet, registerPhaseKSlotMappingSnippet, registerPhaseKContinuitySnippet, getPhaseKLLMSnippetDiagnostics, applyPhaseKLLMPromptAugmentation, __resetPhaseKLLMSnippetsForTest, type PhaseKLLMSnippetSlot } from '../src/lib/xianxia/llm';
 import { sanitizeLootName, sanitizeBreakthroughProcessText } from '../src/lib/xianxia/display';
 
 function assert(condition: unknown, message: string): void {
@@ -2851,6 +2857,8 @@ function smokeAi103RumorReliability(): void {
   pgRunPhaseJCWorkerCSmokes();
   pgRunPhaseJBWorkerBSmokes();
   pgRunPhaseJAWorkerASmokes();
+  pgRunPhaseKCWorkerCSmokes();
+  pgRunPhaseKAWorkerASmokes();
 }
 
 function smokeCombatLabelsDisplay(): void {
@@ -7360,3 +7368,490 @@ function pgRunPhaseJAWorkerASmokes(): void {
     catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
   }
 }
+// ======================== Phase-K Worker C: LLM prompt augmentation wires (smoke) ========================
+// Additive only. Each smoke targets one engine.ts/llm.ts export in the k-621 ~ k-624 batch.
+
+function smokeK621WireTextHealthToLLMPrompt(): void {
+  // K-621: wireTextHealthToLLMPrompt should return a snippet with hookName + tail position,
+  // a non-empty promptSnippet that includes the Phase-K:textHealth label, and a stable
+  // snippetId that changes per call.
+  const hist = [
+    '夜色压山，雾起如潮。',
+    '偶闻樵歌，犬吠深巷。',
+    '天机晦暗，似有隐忧。',
+  ];
+  const w1 = wireTextHealthToLLMPrompt(hist);
+  assert(w1 && typeof w1 === 'object', 'should return object');
+  assert(w1.hookName === 'PHASE_K_LLM_PROMPT_HOOK_TEXT_HEALTH',
+    'hookName mismatch, got=' + w1.hookName);
+  assert(w1.hookPosition === 'tail', 'should be tail, got=' + w1.hookPosition);
+  assert(typeof w1.promptSnippet === 'string' && w1.promptSnippet.length > 0,
+    'snippet should be non-empty, got=' + w1.promptSnippet);
+  assert(w1.promptSnippet.indexOf('[Phase-K:textHealth') >= 0,
+    'snippet should carry Phase-K:textHealth label, got=' + w1.promptSnippet);
+  assert(w1.promptSnippet.indexOf('近期文本健康摘要') >= 0,
+    'snippet should explain purpose, got=' + w1.promptSnippet);
+  assert(w1.promptSnippet.indexOf('天机晦暗') >= 0 || w1.promptSnippet.indexOf('口头禅') >= 0,
+    'snippet should mention stale phrase detection, got=' + w1.promptSnippet);
+  assert(typeof w1.snippetId === 'string' && w1.snippetId.length > 0,
+    'snippetId should be non-empty');
+  assert(typeof w1.charLimit === 'number' && w1.charLimit > 0,
+    'charLimit should default to positive number, got=' + w1.charLimit);
+
+  // 2) snippetId should change between calls (contains Date.now+random).
+  const w2 = wireTextHealthToLLMPrompt(hist);
+  // Not strict (could collide on very fast calls); just exercise the path.
+  assert(typeof w2.snippetId === 'string', 'w2.snippetId should be string');
+
+  // 3) charLimit override should be respected.
+  const w3 = wireTextHealthToLLMPrompt(hist, 80);
+  assert(w3.charLimit === 80, 'charLimit override, got=' + w3.charLimit);
+
+  // 4) Empty / null history should not throw.
+  const w4 = wireTextHealthToLLMPrompt(null);
+  assert(typeof w4.promptSnippet === 'string', 'null history -> string snippet');
+  assert(w4.promptSnippet.length > 0, 'null history -> non-empty snippet (fallback)');
+
+  // 5) Snippet should respect inner charLimit (text length <= charLimit + label overhead).
+  assert(w3.promptSnippet.length < 400,
+    'short charLimit should produce short snippet, got len=' + w3.promptSnippet.length);
+
+  log('smoke-k-621-wire-text-health-to-llm-prompt', {
+    passed: true,
+    snippetLen: w1.promptSnippet.length,
+    charLimit: w3.charLimit,
+  });
+}
+
+function smokeK622WireSlotMappingToLLMPrompt(): void {
+  // K-622: wireSlotMappingToLLMPrompt should reflect registered slot vocabulary into the
+  // snippet so the LLM sees which categories/displaySlots/tone are legal.
+  const slots = [
+    { category: 'attribute', displayGroup: 'attribute', displaySlots: ['topTags', 'characterDetail'], tone: 'good', renderHint: 'card' },
+    { category: 'buff', displayGroup: 'buff', displaySlots: ['topTags', 'statusPage'], tone: 'good', renderHint: 'badge' },
+    { category: 'debuff', displayGroup: 'debuff', displaySlots: ['topTags'], tone: 'bad', renderHint: 'badge' },
+    { category: 'fate', displayGroup: 'fate', displaySlots: ['threadPage'], tone: 'mystery', renderHint: 'timeline' },
+  ];
+  const w = wireSlotMappingToLLMPrompt(slots);
+  assert(w.hookName === 'PHASE_K_LLM_PROMPT_HOOK_SLOT_MAPPING',
+    'hookName mismatch, got=' + w.hookName);
+  assert(w.hookPosition === 'tail', 'should be tail');
+  assert(w.promptSnippet.indexOf('[Phase-K:slotMapping') >= 0,
+    'should carry slotMapping label, got=' + w.promptSnippet);
+  assert(w.promptSnippet.indexOf('attribute') >= 0, 'should list category: attribute');
+  assert(w.promptSnippet.indexOf('buff') >= 0, 'should list category: buff');
+  assert(w.promptSnippet.indexOf('fate') >= 0, 'should list category: fate');
+  assert(w.promptSnippet.indexOf('topTags') >= 0, 'should list displaySlots: topTags');
+  assert(w.promptSnippet.indexOf('mystery') >= 0, 'should list tone: mystery');
+  assert(w.promptSnippet.indexOf('当前已注册 UI 槽位约束') >= 0,
+    'should explain constraint, got=' + w.promptSnippet);
+
+  // 2) Empty / null should not throw; snippet should still be non-empty (fallback).
+  const empty = wireSlotMappingToLLMPrompt(null);
+  assert(typeof empty.promptSnippet === 'string' && empty.promptSnippet.length > 0,
+    'null slots -> non-empty fallback snippet, got=' + empty.promptSnippet);
+  assert(empty.promptSnippet.indexOf('当前已注册') >= 0 ||
+    empty.promptSnippet.indexOf('no slots registered') >= 0,
+    'null should mention registry status');
+
+  // 3) charLimit override should be respected.
+  const wShort = wireSlotMappingToLLMPrompt(slots, 120);
+  assert(wShort.charLimit === 120, 'charLimit override, got=' + wShort.charLimit);
+
+  // 4) Single-slot input should still produce valid snippet.
+  const wOne = wireSlotMappingToLLMPrompt([{ category: 'misc', displaySlots: ['inventoryPanel'], tone: 'neutral' }]);
+  assert(wOne.promptSnippet.indexOf('misc') >= 0, 'should list misc, got=' + wOne.promptSnippet);
+
+  log('smoke-k-622-wire-slot-mapping-to-llm-prompt', {
+    passed: true,
+    snippetLen: w.promptSnippet.length,
+    emptyLen: empty.promptSnippet.length,
+  });
+}
+
+function smokeK623WireCrossSystemContinuityToLLMPrompt(): void {
+  // K-623: wireCrossSystemContinuityToLLMPrompt should expose causal-chain health to the LLM.
+  const character: any = {
+    id: 'test-char-1',
+    name: '试炼者',
+    age: 17,
+    realm: 'mortal',
+    alive: true,
+    fateNodes: [],
+    inventory: [],
+    threads: [],
+  };
+
+  // 1) With no breaks, should report clean baseline.
+  const clean = wireCrossSystemContinuityToLLMPrompt(character, []);
+  assert(clean.hookName === 'PHASE_K_LLM_PROMPT_HOOK_CROSS_SYSTEM_CONTINUITY',
+    'hookName mismatch, got=' + clean.hookName);
+  assert(clean.hookPosition === 'tail', 'should be tail');
+  assert(clean.promptSnippet.indexOf('[Phase-K:continuity') >= 0,
+    'should carry continuity label, got=' + clean.promptSnippet);
+  assert(clean.promptSnippet.indexOf('因果链健康') >= 0,
+    'should explain purpose, got=' + clean.promptSnippet);
+  assert(clean.promptSnippet.indexOf('error=0') >= 0,
+    'clean baseline should report error=0, got=' + clean.promptSnippet);
+  assert(clean.promptSnippet.indexOf('试炼者') >= 0 || clean.promptSnippet.indexOf('test-char-1') >= 0,
+    'should reference character name/id, got=' + clean.promptSnippet);
+
+  // 2) With explicit breaks, snippet should surface severity and reasons.
+  const breaks = [
+    { system: 'fate', severity: 'error', reason: 'orphan_fate_thread' },
+    { system: 'sect', severity: 'warn', reason: 'expired_sect_membership' },
+    { system: 'npc', severity: 'info', reason: 'memory_decay_pending' },
+  ];
+  const broken = wireCrossSystemContinuityToLLMPrompt(character, breaks);
+  assert(broken.promptSnippet.indexOf('error=1') >= 0, 'should report error=1');
+  assert(broken.promptSnippet.indexOf('warn=1') >= 0, 'should report warn=1');
+  assert(broken.promptSnippet.indexOf('info=1') >= 0, 'should report info=1');
+  assert(broken.promptSnippet.indexOf('orphan_fate_thread') >= 0,
+    'should surface the most severe break reason, got=' + broken.promptSnippet);
+  assert(broken.promptSnippet.indexOf('orphan_fate_thread') >= 0,
+    'should warn about high severity, got=' + broken.promptSnippet);
+
+  // 3) Null breaks -> fallback re-validate.
+  const fallback = wireCrossSystemContinuityToLLMPrompt(character, null);
+  assert(typeof fallback.promptSnippet === 'string' && fallback.promptSnippet.length > 0,
+    'null breaks -> non-empty fallback snippet, got=' + fallback.promptSnippet);
+
+  // 4) charLimit override should be respected.
+  const short = wireCrossSystemContinuityToLLMPrompt(character, breaks, 100);
+  assert(short.charLimit === 100, 'charLimit override, got=' + short.charLimit);
+
+  log('smoke-k-623-wire-cross-system-continuity-to-llm-prompt', {
+    passed: true,
+    cleanLen: clean.promptSnippet.length,
+    brokenLen: broken.promptSnippet.length,
+    fallbackLen: fallback.promptSnippet.length,
+  });
+}
+
+function smokeK624VerifyLLMPromptAugmentation(): void {
+  // K-624: verifyLLMPromptAugmentation should report how many of the 3 hooks are wired
+  // into llm.ts. Since we just added them, all 3 should be present (wiredCount=3,
+  // missingHooks=[]). We pass an explicit source string so this smoke is hermetic
+  // and does not depend on filesystem state.
+  const markers = [
+    'PHASE_K_LLM_PROMPT_AUGMENTATION_REGISTRY',
+    'PHASE_K_LLM_PROMPT_HOOK_TEXT_HEALTH',
+    'PHASE_K_LLM_PROMPT_HOOK_SLOT_MAPPING',
+    'PHASE_K_LLM_PROMPT_HOOK_CROSS_SYSTEM_CONTINUITY',
+  ];
+  const fakeSource = markers.map((m) => '/* ' + m + ' */').join('\n') +
+    '\n[Phase-K:textHealth 280]\n' +
+    '近期文字风格参考：样例 4 条，平均 60 字。';
+
+  const r1 = verifyLLMPromptAugmentation(fakeSource);
+  assert(r1.wiredCount === 3, 'wiredCount should be 3, got=' + r1.wiredCount);
+  assert(Array.isArray(r1.missingHooks) && r1.missingHooks.length === 0,
+    'missingHooks should be empty, got=' + JSON.stringify(r1.missingHooks));
+  assert(r1.registryPresent === true, 'registry should be present');
+  assert(r1.allHooks.length === 3, 'allHooks should be 3, got=' + r1.allHooks.length);
+  assert(typeof r1.sampleSnippet === 'string' && r1.sampleSnippet.indexOf('[Phase-K:') >= 0,
+    'sampleSnippet should extract [Phase-K:*] block, got=' + r1.sampleSnippet);
+
+  // 2) Explicit empty source -> the implementation should treat '' as a real-but-empty
+  // source (no file fallback). wiredCount=0, all 3 missing, no registry.
+  const r2 = verifyLLMPromptAugmentation('');
+  assert(r2.wiredCount === 0, 'empty source string -> wiredCount=0, got=' + r2.wiredCount);
+  assert(r2.missingHooks.length === 3, 'empty source -> all 3 missing, got=' + r2.missingHooks.length);
+  assert(r2.registryPresent === false, 'empty source -> no registry');
+  assert(r2.sampleSnippet === '', 'empty source -> empty sampleSnippet');
+
+  // 3) Partial source -> only some hooks present.
+  const partial = '/* PHASE_K_LLM_PROMPT_AUGMENTATION_REGISTRY */\n' +
+    '/* PHASE_K_LLM_PROMPT_HOOK_TEXT_HEALTH */\n';
+  const r3 = verifyLLMPromptAugmentation(partial);
+  assert(r3.wiredCount === 1, 'partial -> wiredCount=1, got=' + r3.wiredCount);
+  assert(r3.missingHooks.length === 2, 'partial -> 2 missing');
+  assert(r3.missingHooks.indexOf('PHASE_K_LLM_PROMPT_HOOK_SLOT_MAPPING') >= 0,
+    'should list slotMapping as missing');
+  assert(r3.missingHooks.indexOf('PHASE_K_LLM_PROMPT_HOOK_CROSS_SYSTEM_CONTINUITY') >= 0,
+    'should list continuity as missing');
+  assert(r3.missingHooks.indexOf('PHASE_K_LLM_PROMPT_HOOK_TEXT_HEALTH') < 0,
+    'should NOT list textHealth as missing');
+  assert(r3.registryPresent === true, 'partial -> registry present');
+
+  // 4) Real file path: read the actual llm.ts and confirm all 3 hooks are wired.
+  const realVerify = verifyLLMPromptAugmentation(undefined, 'src/lib/xianxia/llm.ts');
+  assert(realVerify.wiredCount === 3,
+    'real llm.ts should have all 3 hooks wired (wiredCount=3), got=' + realVerify.wiredCount);
+  assert(realVerify.registryPresent === true,
+    'real llm.ts should have registry marker');
+  assert(realVerify.missingHooks.length === 0,
+    'real llm.ts should have no missing hooks, got=' + JSON.stringify(realVerify.missingHooks));
+
+  // 5) Cross-check: apply augmentation end-to-end with all 3 wires registered.
+  __resetPhaseKLLMSnippetsForTest();
+  const slotSnippet = wireSlotMappingToLLMPrompt([{ category: 'attribute', displaySlots: ['topTags'], tone: 'good' }]);
+  const continuitySnippet = wireCrossSystemContinuityToLLMPrompt({ id: 'x', name: '试炼者' }, []);
+  const textSnippet = wireTextHealthToLLMPrompt(['样例文字片段一。']);
+  registerPhaseKSlotMappingSnippet(slotSnippet);
+  registerPhaseKContinuitySnippet(continuitySnippet);
+  registerPhaseKTextHealthSnippet(textSnippet);
+  const diag = getPhaseKLLMSnippetDiagnostics();
+  assert(diag.registeredCount === 3, 'should register 3 snippets, got=' + diag.registeredCount);
+  assert(diag.hookNames.indexOf('PHASE_K_LLM_PROMPT_HOOK_TEXT_HEALTH') >= 0, 'hookNames should include textHealth');
+  const augmented = applyPhaseKLLMPromptAugmentation('BASE_SYSTEM_PROMPT');
+  assert(augmented.indexOf('BASE_SYSTEM_PROMPT') >= 0, 'base should be preserved');
+  assert(augmented.indexOf('[Phase-K:textHealth') >= 0, 'augmented should include textHealth snippet');
+  assert(augmented.indexOf('[Phase-K:slotMapping') >= 0, 'augmented should include slotMapping snippet');
+  assert(augmented.indexOf('[Phase-K:continuity') >= 0, 'augmented should include continuity snippet');
+  // Tail-position snippets should appear AFTER base.
+  const baseIdx = augmented.indexOf('BASE_SYSTEM_PROMPT');
+  const tailIdx = augmented.indexOf('[Phase-K:textHealth');
+  assert(baseIdx < tailIdx, 'tail snippets should be after base');
+
+  // 6) Empty registry -> augmentation is a no-op (returns base unchanged).
+  __resetPhaseKLLMSnippetsForTest();
+  const noop = applyPhaseKLLMPromptAugmentation('UNCHANGED');
+  assert(noop === 'UNCHANGED', 'empty registry -> unchanged, got=' + noop);
+
+  log('smoke-k-624-verify-llm-prompt-augmentation', {
+    passed: true,
+    wiredCount: realVerify.wiredCount,
+    registryPresent: realVerify.registryPresent,
+    augmentedLen: augmented.length,
+    noopUnchanged: noop === 'UNCHANGED',
+  });
+}
+
+function pgRunPhaseKCWorkerCSmokes(): void {
+  const cases = [
+    { name: 'smoke-k-621-wire-text-health-to-llm-prompt', fn: smokeK621WireTextHealthToLLMPrompt },
+    { name: 'smoke-k-622-wire-slot-mapping-to-llm-prompt', fn: smokeK622WireSlotMappingToLLMPrompt },
+    { name: 'smoke-k-623-wire-cross-system-continuity-to-llm-prompt', fn: smokeK623WireCrossSystemContinuityToLLMPrompt },
+    { name: 'smoke-k-624-verify-llm-prompt-augmentation', fn: smokeK624VerifyLLMPromptAugmentation },
+  ];
+  for (const c of cases) {
+    try { c.fn(); log(c.name, { passed: true }); }
+    catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
+  }
+}
+
+
+// ======================== Phase-K Worker A: 修真轮转支撑 (smoke) ========================
+// Additive only. Each smoke targets one engine.ts export in the k-601 ~ k-604 batch.
+
+function smokeK601TriggerEndingEvaluation(): void {
+  // K-601: triggerEndingEvaluation should return triggeredEndings / primaryEnding / inheritancePool.
+  // - Empty/garbage inputs do not throw.
+  // - With valid character + cause string, returns 8 archetypal candidates.
+  // - primaryEnding is null only if no candidate clears the 0.05 weight floor.
+
+  // 1) Garbage inputs -> safe defaults
+  const r1 = triggerEndingEvaluation(null, null, null);
+  assert(r1 && Array.isArray(r1.triggeredEndings), 'r1.triggeredEndings must be array');
+  assert(typeof r1.inheritancePool === 'undefined' || Array.isArray(r1.inheritancePool),
+    'r1.inheritancePool must be array or undefined');
+  assert(r1.primaryEnding === null || typeof r1.primaryEnding === 'object',
+    'r1.primaryEnding must be null or object');
+
+  // 2) Tribulation cause -> ascend-immortal should dominate
+  const tribChar = { id: 'char-trib', age: 250, realm: 'tribulation', faction: 'celestial-court' };
+  const r2 = triggerEndingEvaluation(tribChar, { worldEra: 'immortal-age' }, 'ascend-immortal 飞升');
+  assert(r2.triggeredEndings.length >= 1, 'tribulation cause must trigger at least 1 ending, got=' + r2.triggeredEndings.length);
+  // Find ascend-immortal weight
+  let ascendWeight = 0;
+  for (const e of r2.triggeredEndings) {
+    if (e.archetype === 'ascend-immortal') { ascendWeight = e.weight; break; }
+  }
+  // Should be high
+  assert(ascendWeight > 0.5, 'tribulation ascend weight should be > 0.5, got=' + ascendWeight);
+
+  // 3) Demon-fall cause -> fall-demonic weight should rise
+  const demonChar = { id: 'char-demon', age: 80, realm: 'golden_core', faction: 'demon-cult' };
+  const r3 = triggerEndingEvaluation(demonChar, null, 'fall-demonic 心魔反噬');
+  let demonWeight = 0;
+  for (const e of r3.triggeredEndings) {
+    if (e.archetype === 'fall-demonic') { demonWeight = e.weight; break; }
+  }
+  assert(demonWeight > 0.5, 'demon weight should be > 0.5, got=' + demonWeight);
+
+  // 4) Natural death (age) -> sit-death should dominate
+  const oldChar = { id: 'char-old', age: 380, realm: 'great_vehicle', faction: '' };
+  const r4 = triggerEndingEvaluation(oldChar, null, 'sit-death 寿终正寝');
+  let sitWeight = 0;
+  for (const e of r4.triggeredEndings) {
+    if (e.archetype === 'sit-death') { sitWeight = e.weight; break; }
+  }
+  assert(sitWeight > 0.4, 'sit-death weight should be > 0.4 (with age 380), got=' + sitWeight);
+
+  // 5) Empty/unknown cause -> primaryEnding might be null (no candidate >= 0.05)
+  const emptyChar = { id: 'char-empty', age: 0, realm: 'mortal' };
+  const r5 = triggerEndingEvaluation(emptyChar, null, '');
+  assert(r5 && Array.isArray(r5.triggeredEndings), 'empty cause must still return triggeredEndings array');
+
+  log('smoke-k-601-trigger-ending-evaluation', {
+    passed: true,
+    tribCount: r2.triggeredEndings.length,
+    demonCount: r3.triggeredEndings.length,
+    naturalCount: r4.triggeredEndings.length,
+    emptyPrimary: r5.primaryEnding === null,
+  });
+}
+
+function smokeK602SeedInheritancePoolFromEnding(): void {
+  // K-602: seedInheritancePoolFromEnding should return at least 3 InheritancePool entries.
+  // - ascend-immortal -> technique/artifact/bond
+  // - found-sect -> sect/technique/token (+slots=2 for sect entries)
+  // - reincarnate -> bloodline/technique/token
+  // - Fallback path when archetype is unknown -> still produces 3 items
+
+  const char = { id: 'char-pool', age: 200, realm: 'golden_core' };
+
+  // 1) ascend-immortal
+  const asc = seedInheritancePoolFromEnding(
+    { archetype: 'ascend-immortal', endingId: 'e-asc', summary: '飞升', age: 200 },
+    char,
+  );
+  assert(Array.isArray(asc) && asc.length >= 3, 'ascend must yield >= 3 pools, got=' + asc.length);
+  const ascKinds = asc.map((p) => p.kind).sort().join(',');
+  // Should contain technique/artifact/bond (any order)
+  assert(ascKinds.indexOf('technique') >= 0, 'ascend should have technique');
+  assert(ascKinds.indexOf('artifact') >= 0, 'ascend should have artifact');
+  assert(ascKinds.indexOf('bond') >= 0, 'ascend should have bond');
+
+  // 2) fall-demonic
+  const demon = seedInheritancePoolFromEnding(
+    { archetype: 'fall-demonic', endingId: 'e-d', summary: '入魔', age: 80 },
+    char,
+  );
+  assert(demon.length >= 3, 'demon must yield >= 3 pools, got=' + demon.length);
+
+  // 3) reincarnate
+  const reinc = seedInheritancePoolFromEnding(
+    { archetype: 'reincarnate', endingId: 'e-r', summary: '转世', age: 180 },
+    char,
+  );
+  assert(reinc.length >= 3, 'reincarnate must yield >= 3 pools, got=' + reinc.length);
+  const reincKinds = reinc.map((p) => p.kind);
+  assert(reincKinds.indexOf('bloodline') >= 0, 'reincarnate should have bloodline');
+
+  // 4) Unknown archetype -> fallback should still produce 3 pools
+  const fb = seedInheritancePoolFromEnding(
+    { archetype: 'unknown-archetype' as any, endingId: 'e-x', summary: '??', age: 0 },
+    char,
+  );
+  assert(fb.length >= 3, 'unknown archetype fallback must yield >= 3 pools, got=' + fb.length);
+
+  // 5) Each pool should have stable ID
+  const ids = asc.map((p) => p.id);
+  assert(new Set(ids).size === ids.length, 'pool IDs must be unique within ascending ending');
+
+  log('smoke-k-602-seed-inheritance-pool-from-ending', {
+    passed: true,
+    ascPoolCount: asc.length,
+    demonPoolCount: demon.length,
+    reincPoolCount: reinc.length,
+    ascKinds: asc.map((p) => p.kind).sort().join(','),
+    fallbackCount: fb.length,
+  });
+}
+
+function smokeK603SelectNextProtagonist(): void {
+  // K-603: selectNextProtagonist should pick best candidate by composite score.
+  // - Empty candidates -> returns '' selectedId + eligibility 0
+  // - Strong root + bloodline + karma + inherited -> wins over weaker
+  // - playerInterventionPreference favor-bloodline boosts bloodline-strong candidates
+
+  const pool: InheritancePool[] = [
+    { id: 'pool-1', name: 't', kind: 'bloodline', availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['char-1'] },
+    { id: 'pool-2', name: 'a', kind: 'technique', availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['char-1'] },
+  ];
+
+  const weak = { id: 'c-weak', age: 12, realm: 'mortal', spiritualRoot: 'mixed', bloodline: '', karmaTags: [], inherited: [], traitNarrative: '杂灵凡人' };
+  const strong = { id: 'c-strong', age: 14, realm: 'qi_refining', spiritualRoot: 'tianling', bloodline: '嫡传', karmaTags: ['因缘'], inherited: [{ poolId: 'pool-1', kind: 'bloodline' }], traitNarrative: '天生灵根' };
+
+  // 1) Empty -> safe default
+  const e1 = selectNextProtagonist(pool, null, []);
+  assert(e1.selectedId === '', 'empty must return selectedId=""');
+  assert(e1.eligibility === 0, 'empty must return eligibility=0');
+
+  // 2) Strong wins
+  const e2 = selectNextProtagonist(pool, null, [weak, strong]);
+  assert(e2.selectedId === 'c-strong', 'strong should win over weak, got=' + e2.selectedId);
+  assert(e2.eligibility >= 0.55, 'strong should have eligibility >= 0.55, got=' + e2.eligibility);
+  assert(e2.reason === 'strong-match' || e2.reason === 'good-match',
+    'strong should be strong/good match, got=' + e2.reason);
+
+  // 3) Bloodline-pref: weak candidate has a bloodline hint but no pool match
+  const iv = { id: 'c-iv', age: 13, realm: 'qi_refining', spiritualRoot: 'dual', bloodline: '嫡传', karmaTags: ['因缘'], inherited: [{ poolId: 'pool-1', kind: 'bloodline' }], traitNarrative: '血脉正宗' };
+  const ws = { playerInterventionPreference: 'favor-bloodline' };
+  const e3 = selectNextProtagonist(pool, ws, [iv, strong]);
+  // strong has root + blood; iv has blood + root. With favor-bloodline, scores can be close.
+  // Either strong or iv should win (both are strong). We just check result is reasonable.
+  assert(e3.selectedId === 'c-strong' || e3.selectedId === 'c-iv',
+    'favor-bloodline must pick one of strong/iv, got=' + e3.selectedId);
+
+  // 4) Weak-only -> reason should be 'weak-match' or 'marginal-match' or 'good-match' (if eligibility crosses threshold)
+  const wsNeutral = { playerInterventionPreference: 'favor-neutral' };
+  const e4 = selectNextProtagonist(pool, wsNeutral, [weak]);
+  assert(e4.selectedId === 'c-weak', 'only weak -> must pick weak, got=' + e4.selectedId);
+
+  log('smoke-k-603-select-next-protagonist', {
+    passed: true,
+    selectedId: e2.selectedId,
+    eligibility: e2.eligibility,
+    reason: e2.reason,
+    weakReason: e4.reason,
+    ivBloodSelected: e3.selectedId,
+  });
+}
+
+function smokeK604SummarizeCycleForPrompt(): void {
+  // K-604: summarizeCycleForPrompt should produce a prompt-ready string.
+  // - Includes 本代轮回 prefix
+  // - Includes archetype, age, ending summary, pool line, next protagonist line
+  // - charLimit truncates with ellipsis
+
+  const ending = { archetype: 'ascend-immortal', summary: '主角破碎虚空飞升', age: 200 };
+  const pool: InheritancePool[] = [
+    { id: 'p1', name: '剑诀', kind: 'technique', availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['c1'] },
+    { id: 'p2', name: '信物', kind: 'token', availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['c1'] },
+  ];
+  const np = { id: 'c-next', age: 14, realm: 'qi_refining', traitNarrative: '天生剑骨' };
+
+  // 1) Default charLimit=360 -> should fit normally
+  const s1 = summarizeCycleForPrompt(ending, pool, np);
+  assert(typeof s1 === 'string' && s1.length > 0, 's1 should be non-empty string');
+  assert(s1.indexOf('本代轮回') >= 0, 's1 should start with 本代轮回, got=' + s1);
+  assert(s1.indexOf('ascend-immortal') >= 0, 's1 should mention archetype');
+  assert(s1.indexOf('c-next') >= 0, 's1 should mention next protagonist id');
+  assert(s1.indexOf('剑骨') >= 0, 's1 should embed trait narrative');
+
+  // 2) Null inputs -> safe default
+  const s2 = summarizeCycleForPrompt(null, null, null);
+  assert(typeof s2 === 'string' && s2.length > 0, 's2 (null inputs) should be non-empty');
+  assert(s2.indexOf('本代轮回') >= 0, 's2 should still have prefix');
+
+  // 3) Short charLimit -> must truncate with ellipsis
+  const s3 = summarizeCycleForPrompt(ending, pool, np, 80);
+  assert(s3.length <= 80, 'short charLimit should truncate to <= 80, got=' + s3.length);
+  assert(s3.charAt(s3.length - 1) === '…' || s3.length < 80,
+    'short charLimit should end with ellipsis (…), got=...=' + s3.slice(-5));
+
+  // 4) Without next protagonist -> still works
+  const s4 = summarizeCycleForPrompt(ending, pool, null);
+  assert(s4.indexOf('尚无明确下一代主角') >= 0, 's4 should mention no next protagonist, got=' + s4);
+
+  log('smoke-k-604-summarize-cycle-for-prompt', {
+    passed: true,
+    s1Len: s1.length,
+    s2Len: s2.length,
+    s3Len: s3.length,
+    s4Len: s4.length,
+    s3Tail: s3.slice(-3),
+  });
+}
+
+function pgRunPhaseKAWorkerASmokes(): void {
+  // Wrapper for k-601 ~ k-604.
+  smokeK601TriggerEndingEvaluation();
+  smokeK602SeedInheritancePoolFromEnding();
+  smokeK603SelectNextProtagonist();
+  smokeK604SummarizeCycleForPrompt();
+}
+
