@@ -13,6 +13,7 @@ import { detectRepetitiveText, deduplicateNarrativeHooks, detectStaleTemplatePhr
 import { wireTextHealthToLLMPrompt, wireSlotMappingToLLMPrompt, wireCrossSystemContinuityToLLMPrompt, verifyLLMPromptAugmentation, PHASE_K_LLM_PROMPT_HOOK_MARKERS, type PhaseKLLMPromptSnippet, type PhaseKLLMAugmentationVerifyResult } from '../src/lib/xianxia/engine';
 // Phase-K Worker A 修真轮转支撑 (engine.ts half)
 import { triggerEndingEvaluation, seedInheritancePoolFromEnding, selectNextProtagonist, summarizeCycleForPrompt, type PhaseKEndingEvaluation, type PhaseKProtagonistSelection, type PhaseKCycleSummaryInput } from '../src/lib/xianxia/engine';
+import { projectInheritanceForUI, projectSectTrajectoryForUI, projectFateEchoForUI, projectEndingForUI } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
 import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain, WorldRegion, RegionTier, LocationNode, TravelRoute, WorldMap, EndingArchetype, EndingCondition, EndingChoice, EndingOutcome, EndingPathMap, InheritanceKind, InheritanceRecipient, InheritanceClaim, InheritanceChain, InheritancePool, FateEchoTrigger, FateEchoResolution, FateWeb, FatePredictedOutcome } from '../src/lib/xianxia/types';
@@ -7855,3 +7856,116 @@ function pgRunPhaseKAWorkerASmokes(): void {
   smokeK604SummarizeCycleForPrompt();
 }
 
+
+
+// ======================== Phase-K Worker B (cycle-and-ui-projection): UI Projection (smoke) ========================
+// Additive only. Each smoke targets one engine.ts export in the k-611 ~ k-614 batch.
+
+function smokeK611ProjectInheritanceForUI(): void {
+  const proj = projectInheritanceForUI(
+    { id: 'c1', age: 18, realm: 'lianqi', master: 'master-x', faction: 'shenluo' },
+    {
+      rootCharacterId: 'c0',
+      generations: [{ generation: 1, characterId: 'c1', inheritedFromId: 'c0' }],
+      activeClaims: [{ claimId: 'cl1', fromId: 'c0', toId: 'c1', status: 'open' }],
+      lostTechniques: [{ name: '血煞诀残篇', lostAtGeneration: 0 }],
+    }
+  );
+  assert(proj && typeof proj === 'object', 'should return object');
+  assert(typeof proj.kind === 'string' && proj.kind.length > 0, 'kind should be non-empty string');
+  assert(Array.isArray(proj.slots), 'slots should be array');
+  assert(proj.slots.length >= 1, 'should have at least 1 slot, got=' + proj.slots.length);
+
+  const nullProj = projectInheritanceForUI(null, null);
+  assert(nullProj && Array.isArray(nullProj.slots), 'null character+chain should be safe');
+
+  const charOnly = projectInheritanceForUI({ id: 'c2', age: 8, master: 'master-y' }, null);
+  assert(charOnly && Array.isArray(charOnly.slots), 'character only should be safe');
+  assert(charOnly.slots.length >= 1, 'character with master should have slot, got=' + charOnly.slots.length);
+
+  log('smoke-k-611-project-inheritance-for-ui', { passed: true, slotCount: proj.slots.length, nullSlotCount: nullProj.slots.length });
+}
+
+function smokeK612ProjectSectTrajectoryForUI(): void {
+  const proj = projectSectTrajectoryForUI(
+    { id: 'c1', age: 22, realm: 'zhuji', faction: 'shenluo' },
+    {
+      sectId: 'shenluo',
+      phase: 'growth',
+      currentPower: 0.7,
+      history: [{ year: 0, event: 'founding' }],
+    }
+  );
+  assert(proj && typeof proj === 'object', 'should return object');
+  assert(proj.kind === 'sect-trajectory', 'kind should be sect-trajectory, got=' + proj.kind);
+  assert(Array.isArray(proj.slots), 'slots should be array');
+  assert(proj.slots.length >= 3, 'should have phase+power+history slots, got=' + proj.slots.length);
+
+  const nullProj = projectSectTrajectoryForUI(null, null);
+  assert(nullProj && Array.isArray(nullProj.slots), 'null should be safe');
+
+  log('smoke-k-612-project-sect-trajectory-for-ui', { passed: true, slotCount: proj.slots.length, nullSlotCount: nullProj.slots.length });
+}
+
+function smokeK613ProjectFateEchoForUI(): void {
+  const proj = projectFateEchoForUI(
+    { id: 'c1', age: 30, realm: 'jindan' },
+    [
+      { echoId: 'e1', resolved: false, linkedThreadId: 'th1' },
+      { echoId: 'e2', resolved: true },
+    ]
+  );
+  assert(proj && typeof proj === 'object', 'should return object');
+  assert(proj.kind === 'fate-echo', 'kind should be fate-echo, got=' + proj.kind);
+  assert(Array.isArray(proj.slots), 'slots should be array');
+  assert(proj.slots.length >= 1, 'should have at least density slot, got=' + proj.slots.length);
+
+  const nullProj = projectFateEchoForUI(null, null);
+  assert(nullProj && Array.isArray(nullProj.slots), 'null should be safe');
+
+  const emptyList = projectFateEchoForUI({ id: 'c2' }, []);
+  assert(emptyList && Array.isArray(emptyList.slots), 'empty echoes should be safe');
+
+  log('smoke-k-613-project-fate-echo-for-ui', { passed: true, slotCount: proj.slots.length, nullSlotCount: nullProj.slots.length });
+}
+
+function smokeK614ProjectEndingForUI(): void {
+  const proj = projectEndingForUI(
+    { id: 'c1', age: 280, realm: 'yuanying' },
+    {
+      possibleEndings: [
+        { archetype: 'ascend-immortal', weight: 0.4 },
+        { archetype: 'sit-death', weight: 0.3 },
+      ],
+      fixedEndings: [],
+      irreversibleChoices: [{ choiceId: 'ic1' }],
+      endgameMeter: 0.65,
+    }
+  );
+  assert(proj && typeof proj === 'object', 'should return object');
+  assert(proj.kind === 'ending', 'kind should be ending, got=' + proj.kind);
+  assert(Array.isArray(proj.slots), 'slots should be array');
+  assert(proj.slots.length >= 1, 'should have at least 1 slot, got=' + proj.slots.length);
+
+  const nullProj = projectEndingForUI(null, null);
+  assert(nullProj && Array.isArray(nullProj.slots), 'null should be safe');
+
+  log('smoke-k-614-project-ending-for-ui', { passed: true, slotCount: proj.slots.length, nullSlotCount: nullProj.slots.length });
+}
+
+function pgRunPhaseKBWorkerBSmokes(): void {
+  const cases = [
+    { name: 'smoke-k-611-project-inheritance-for-ui', fn: smokeK611ProjectInheritanceForUI },
+    { name: 'smoke-k-612-project-sect-trajectory-for-ui', fn: smokeK612ProjectSectTrajectoryForUI },
+    { name: 'smoke-k-613-project-fate-echo-for-ui', fn: smokeK613ProjectFateEchoForUI },
+    { name: 'smoke-k-614-project-ending-for-ui', fn: smokeK614ProjectEndingForUI },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
