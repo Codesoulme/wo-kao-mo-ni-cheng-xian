@@ -17,6 +17,8 @@ import { SettlementModal } from '@/components/xianxia/SettlementModal';
 import { ActionButtons } from '@/components/xianxia/ActionButtons';
 import { GameMenu } from '@/components/xianxia/GameMenu';
 import { InventoryPanel } from '@/components/xianxia/InventoryPanel';
+import { AscensionModal } from '@/components/xianxia/AscensionModal';
+import { RestrictionModal } from '@/components/xianxia/RestrictionModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Scroll, Sparkles, Package } from 'lucide-react';
 
@@ -202,6 +204,25 @@ export default function Home() {
             <div className="shrink-0 px-3 pb-1" data-testid="world-legacy-section">
               <WorldLegacyPanel character={character} defaultCollapsed={true} maxCollapsed={3} />
             </div>
+
+            {/* AI-72: L3 modals 占位（飞升/禁制），按 character 状态条件渲染 */}
+            {character.ascensionPending && (
+              <div className="shrink-0 px-3 pb-2" data-testid="ascension-section">
+                <AscensionModal
+                  session={character.ascensionPending}
+                  onRoll={async () => {/* 由 store / route 触发 */}}
+                  onEnd={async () => {/* 由 store / route 触发 */}}
+                />
+              </div>
+            )}
+            {character.restrictionPending && (
+              <div className="shrink-0 px-3 pb-2" data-testid="restriction-section">
+                <RestrictionModal
+                  restriction={character.restrictionPending}
+                  onInteract={async () => {/* 由 store / route 触发 */}}
+                />
+              </div>
+            )}
 
             {/* Tab 切换 */}
             <div className="shrink-0 px-3 pb-2">

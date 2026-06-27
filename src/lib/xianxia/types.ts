@@ -894,6 +894,9 @@ export interface WorldNpc {
   // AI-64: 道侣系统
   spouseOf?: string | null;             // 若为某角色道侣，存 characterId
   dualCultivationProgress?: number;     // 双修进度 0-100
+  // AI-69: 三界 NPC + 跨域通道
+  worldTier?: WorldTier;                // NPC 所属三界层级
+  crossRealmAccess?: boolean;           // 是否持有跨域通行权
 }
 
 // AI-64: 道侣引用（NpcRef — 简单引用结构）
@@ -1453,6 +1456,9 @@ export interface CharacterState {
   sectHistory?: SectHistoryEntry[];        // 宗门历史（加入/离开/原因）
   teacherRef?: NpcRef | null;              // 师父
   apprentices?: NpcRef[];                  // 徒弟列表
+  // ===== AI-72: L3 modals 接入 =====
+  ascensionPending?: AscensionSession | null;   // 待结算飞升会话
+  restrictionPending?: Restriction | null;      // 待交互禁制
 }
 
 // ==================== AI-66: 宗门历史条目 ====================
@@ -1522,6 +1528,57 @@ export type TribulationStage =
 
 // 心魔类型（5 种：执/恨/爱/惧/悔）
 export type HeartDemonType = 'obsession' | 'hatred' | 'love' | 'fear' | 'regret';
+
+// ==================== AI-68: 飞升系统 ====================
+// 三界层级：凡间 → 灵界 → 仙界
+export type WorldTier = 'humanWorld' | 'spiritWorld' | 'immortalWorld';
+
+// 飞升要求（按 WorldTier 组合）
+export interface AscensionRequirement {
+  fromTier: WorldTier;
+  toTier: WorldTier;
+  minRealm: Realm;
+  tribulationPassed: boolean;
+  lifespanMin: number;       // 最低寿命要求
+  reputationMin: number;     // 最低声望
+  cultivationExpMin: number; // 最低修为
+  daoHeartMin: number;       // 道心强度 0-100
+}
+
+// 飞升会话
+export interface AscensionSession {
+  id: string;
+  characterId: string;
+  fromTier: WorldTier;
+  toTier: WorldTier;
+  requirements: AscensionRequirement;
+  startedAge: number;
+  passed: boolean;
+  outcome: 'ascended' | 'failed' | 'ongoing' | 'abandoned';
+  narrative: string;
+}
+
+// ==================== AI-70: 禁制系统 ====================
+// 禁制类型（6 种）：门/困/传送/封/卫/障
+export type RestrictionType = 'door' | 'trap' | 'transport' | 'seal' | 'ward' | 'barrier';
+
+// 禁制开启方式（6 种）：令牌/口令/身份/钥匙/时机/战斗
+export type RestrictionAccessMethod = 'token' | 'password' | 'identity' | 'key' | 'timing' | 'combat';
+
+// 禁制定义
+export interface Restriction {
+  id: string;
+  name: string;
+  type: RestrictionType;
+  accessMethod: RestrictionAccessMethod;
+  requiredItemId?: string;        // 钥匙/令牌时填
+  requiredPassword?: string;      // 口令时填
+  requiredIdentity?: string;      // 身份要求（如"宗门弟子""渡劫期"）
+  combatPower?: number;           // 战斗要求（仅 combat）
+  timingWindows?: string[];       // 时机要求（如"月圆之夜""正午"）
+  description: string;
+  difficulty: number;             // 0-100
+}
 
 // 天劫会话
 export interface TribulationSession {
@@ -1666,6 +1723,9 @@ export interface SecretRealm {
   entryRequirement?: string;     // 入境前置，如“潮湿玉片”“水禁钥纹”“宗门令牌”
   entryAlternatives?: string[];  // 其他可行入境方式，避免只有买钥匙一条路
   isStoryRealm?: boolean;        // 是否为剧情中发现的秘境
+  // AI-71: 禁制 + 洞府联动
+  restrictions?: Restriction[];                 // 秘境入口禁制列表
+  requiredRestrictionsPassed?: string[];        // 进入需通过的禁制 id 列表
   // 探索特性
   dangerLevel: number;         // 危险度 1-10（影响战斗触发率/伤害）
   rewardMultiplier: number;    // 奖励倍率（影响物品稀有度/数量）

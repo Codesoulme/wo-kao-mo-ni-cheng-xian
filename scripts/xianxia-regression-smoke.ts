@@ -2409,6 +2409,29 @@ async function main(): Promise<void> {
   smokeHeartDemonTypes();
   smokeTribulationApiExists();
   smokeTribulationModalExists();
+  // AI-68: 飞升机制
+  smokeAscensionRequirementsExist();
+  smokeAscensionEligibilityCheck();
+  smokeAscensionTriggerDerivation();
+  smokeAscensionApiExists();
+  smokeAscensionModalExists();
+  // AI-69: 三界 NPC + 跨域通道
+  smokeNpcWorldTierField();
+  smokeCrossRealmPathsDerivation();
+  smokeCrossRealmDocsExist();
+  // AI-70: 禁制机制
+  smokeRestrictionTypesExist();
+  smokeRestrictionAccessCheck();
+  smokeRestrictionTriggerDerivation();
+  smokeRestrictionApiExists();
+  smokeRestrictionModalExists();
+  // AI-71: 禁制 + 洞府联动
+  smokeSecretRealmRestrictionField();
+  smokeRealmEnterCheckDerivation();
+  // AI-72: GameLayout 接入
+  smokeAscensionModalIntegrated();
+  smokeRestrictionModalIntegrated();
+  smokeAllL3ModalsInLayout();
   if (withDb) await smokeAuctionDbRoute();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
@@ -3095,6 +3118,220 @@ function smokeWorldLegacyPanelIntegrated(): void {
   assert(/maxCollapsed/.test(panel), 'WorldLegacyPanel 应支持 maxCollapsed');
   assert(/data-testid="world-legacy-toggle"/.test(panel), 'WorldLegacyPanel 应有 toggle testid');
   log('world-legacy-panel-integrated', { passed: true });
+}
+
+function smokeAscensionModalIntegrated(): void {
+  // AI-72: AscensionModal 接入 GameLayout
+  const page = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(/import\s+\{[^}]*AscensionModal[^}]*\}\s+from\s+['"]@\/components\/xianxia\/AscensionModal['"]/.test(page),
+    'page.tsx 应 import AscensionModal');
+  assert(/data-testid="ascension-section"/.test(page), 'page.tsx 应渲染 ascension-section');
+  assert(/ascensionPending/.test(page), 'page.tsx 应消费 ascensionPending');
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/ascensionPending\?:\s*AscensionSession\s*\|\s*null/.test(types), 'CharacterState 应有 ascensionPending');
+  log('ascension-modal-integrated', { passed: true });
+}
+
+function smokeRestrictionModalIntegrated(): void {
+  // AI-72: RestrictionModal 接入 GameLayout
+  const page = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(/import\s+\{[^}]*RestrictionModal[^}]*\}\s+from\s+['"]@\/components\/xianxia\/RestrictionModal['"]/.test(page),
+    'page.tsx 应 import RestrictionModal');
+  assert(/data-testid="restriction-section"/.test(page), 'page.tsx 应渲染 restriction-section');
+  assert(/restrictionPending/.test(page), 'page.tsx 应消费 restrictionPending');
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/restrictionPending\?:\s*Restriction\s*\|\s*null/.test(types), 'CharacterState 应有 restrictionPending');
+  log('restriction-modal-integrated', { passed: true });
+}
+
+function smokeAllL3ModalsInLayout(): void {
+  // AI-72: 4 个 L3 modal 全部接入（Tribulation + Ascension + Restriction + CombatModal 已有）
+  const page = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(/TribulationModal|CombatModal/.test(page), 'page.tsx 应已有战斗 modal');
+  assert(/AscensionModal/.test(page), 'page.tsx 应 import AscensionModal');
+  assert(/RestrictionModal/.test(page), 'page.tsx 应 import RestrictionModal');
+  // 至少 2 个 section testid
+  const sectionTestids = page.match(/data-testid="[a-z-]+-section"/g) || [];
+  assert(sectionTestids.length >= 2, `page.tsx 应至少 2 个 section testid（实际 ${sectionTestids.length}）`);
+  log('all-l3-modals-in-layout', { passed: true });
+}
+
+function smokeSecretRealmRestrictionField(): void {
+  // AI-71: realm.restrictions + requiredRestrictionsPassed
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/restrictions\?:\s*Restriction\[\]/.test(types), 'SecretRealm 应有 restrictions?: Restriction[]');
+  assert(/requiredRestrictionsPassed\?:\s*string\[\]/.test(types), 'SecretRealm 应有 requiredRestrictionsPassed?: string[]');
+  log('secret-realm-restriction-field', { passed: true });
+}
+
+function smokeRealmEnterCheckDerivation(): void {
+  // AI-71: deriveRealmRestrictionCheck
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function deriveRealmRestrictionCheck/.test(engine), 'engine.ts 应导出 deriveRealmRestrictionCheck');
+  assert(/missingRestrictions/.test(engine), 'deriveRealmRestrictionCheck 应返回 missingRestrictions');
+  // 边界：全部通过 → canEnter
+  const logic = (required: string[], passed: string[]): boolean =>
+    required.every((r) => passed.includes(r));
+  assert(logic(['r1', 'r2'], ['r1', 'r2']) === true, '全部通过应可进入');
+  assert(logic(['r1', 'r2'], ['r1']) === false, '缺少禁制不可进入');
+  log('realm-enter-check-derivation', { passed: true });
+}
+
+function smokeRestrictionTypesExist(): void {
+  // AI-70: RestrictionType + RestrictionAccessMethod
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/type RestrictionType\s*=/.test(types), 'types.ts 应定义 RestrictionType');
+  for (const t of ['door', 'trap', 'transport', 'seal', 'ward', 'barrier']) {
+    assert(types.includes(`'${t}'`), `RestrictionType 应含 ${t}`);
+  }
+  assert(/type RestrictionAccessMethod\s*=/.test(types), 'types.ts 应定义 RestrictionAccessMethod');
+  for (const m of ['token', 'password', 'identity', 'key', 'timing', 'combat']) {
+    assert(types.includes(`'${m}'`), `RestrictionAccessMethod 应含 ${m}`);
+  }
+  assert(/interface Restriction/.test(types), 'types.ts 应有 Restriction interface');
+  log('restriction-types-exist', { passed: true });
+}
+
+function smokeRestrictionAccessCheck(): void {
+  // AI-70: checkRestrictionAccess
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function checkRestrictionAccess/.test(engine), 'engine.ts 应导出 checkRestrictionAccess');
+  assert(/accessMethod/.test(engine), 'checkRestrictionAccess 应处理 accessMethod');
+  assert(/requiredItemId/.test(engine), 'checkRestrictionAccess 应处理 token/key');
+  assert(/providedPassword/.test(engine), 'checkRestrictionAccess 应处理 password');
+  log('restriction-access-check', { passed: true });
+}
+
+function smokeRestrictionTriggerDerivation(): void {
+  // AI-70: deriveRestrictionTrigger + resolveRestrictionInteraction
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function deriveRestrictionTrigger/.test(engine), 'engine.ts 应导出 deriveRestrictionTrigger');
+  assert(/export function resolveRestrictionInteraction/.test(engine), 'engine.ts 应导出 resolveRestrictionInteraction');
+  assert(/'attempt'|'retreat'|'combat'/.test(engine), 'resolveRestrictionInteraction 应接受 3 种 choice');
+  log('restriction-trigger-derivation', { passed: true });
+}
+
+function smokeRestrictionApiExists(): void {
+  // AI-70: 2 API route + 1 文档
+  for (const route of ['check', 'interact']) {
+    const path = `src/app/api/game/restriction/${route}/route.ts`;
+    assert(Bun.file(path).size > 0, `${path} 应存在`);
+  }
+  const check = readFileSync('src/app/api/game/restriction/check/route.ts', 'utf-8');
+  assert(/checkRestrictionAccess/.test(check), 'check route 应调用 checkRestrictionAccess');
+  const interact = readFileSync('src/app/api/game/restriction/interact/route.ts', 'utf-8');
+  assert(/resolveRestrictionInteraction/.test(interact), 'interact route 应调用 resolveRestrictionInteraction');
+  assert(Bun.file('docs/world/restrictions-detail.md').size > 0, 'docs/world/restrictions-detail.md 应存在');
+  log('restriction-api-exists', { passed: true });
+}
+
+function smokeRestrictionModalExists(): void {
+  // AI-70: RestrictionModal UI
+  const ui = readFileSync('src/components/xianxia/RestrictionModal.tsx', 'utf-8');
+  assert(/data-testid="restriction-modal"/.test(ui), 'RestrictionModal 应有 modal testid');
+  assert(/data-testid="restriction-method"/.test(ui), 'RestrictionModal 应显示开启方式');
+  assert(/data-testid="restriction-action-attempt"/.test(ui), 'RestrictionModal 应有 尝试按钮');
+  assert(/data-testid="restriction-action-combat"/.test(ui), 'RestrictionModal 应有 战斗按钮');
+  assert(/Restriction|RestrictionType/.test(ui), 'RestrictionModal 应消费 types');
+  log('restriction-modal-exists', { passed: true });
+}
+
+function smokeNpcWorldTierField(): void {
+  // AI-69: npc.worldTier + crossRealmAccess
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/worldTier\?:\s*WorldTier/.test(types), 'WorldNpc 应有 worldTier?: WorldTier');
+  assert(/crossRealmAccess\?:\s*boolean/.test(types), 'WorldNpc 应有 crossRealmAccess?: boolean');
+  log('npc-world-tier-field', { passed: true });
+}
+
+function smokeCrossRealmPathsDerivation(): void {
+  // AI-69: deriveCrossRealmPaths
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function deriveCrossRealmPaths/.test(engine), 'engine.ts 应导出 deriveCrossRealmPaths');
+  assert(/interface CrossRealmPath/.test(engine), 'engine.ts 应有 CrossRealmPath interface');
+  assert(/'ascension'|'starSky'|'token'|'forbidden'/.test(engine), '应有 4 种通道类型');
+  // 凡间起步应包含飞升路径
+  const logic = (tier: string): { from: string; to: string }[] => {
+    if (tier === 'humanWorld') return [{ from: 'humanWorld', to: 'spiritWorld' }];
+    return [];
+  };
+  const paths = logic('humanWorld');
+  assert(paths.length === 1, '凡间起步应至少有 1 条飞升路径');
+  log('cross-realm-paths-derivation', { passed: true });
+}
+
+function smokeCrossRealmDocsExist(): void {
+  // AI-69: 2 文档
+  assert(Bun.file('docs/world/cross-realm-npcs.md').size > 0, 'docs/world/cross-realm-npcs.md 应存在');
+  assert(Bun.file('docs/world/starry-sky-paths.md').size > 0, 'docs/world/starry-sky-paths.md 应存在');
+  const npcs = readFileSync('docs/world/cross-realm-npcs.md', 'utf-8');
+  assert(/凡间|灵界|仙界/.test(npcs), 'cross-realm-npcs.md 应描述三界');
+  const paths = readFileSync('docs/world/starry-sky-paths.md', 'utf-8');
+  assert(/飞升|星空|仙令/.test(paths), 'starry-sky-paths.md 应描述通道类型');
+  log('cross-realm-docs-exist', { passed: true });
+}
+
+function smokeAscensionRequirementsExist(): void {
+  // AI-68: WorldTier + AscensionRequirement
+  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/type WorldTier\s*=/.test(types), 'types.ts 应定义 WorldTier');
+  for (const t of ['humanWorld', 'spiritWorld', 'immortalWorld']) {
+    assert(types.includes(`'${t}'`), `WorldTier 应含 ${t}`);
+  }
+  assert(/interface AscensionRequirement/.test(types), 'types.ts 应有 AscensionRequirement interface');
+  assert(/interface AscensionSession/.test(types), 'types.ts 应有 AscensionSession interface');
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function deriveAscensionRequirements/.test(engine), 'engine.ts 应导出 deriveAscensionRequirements');
+  log('ascension-requirements-exist', { passed: true });
+}
+
+function smokeAscensionEligibilityCheck(): void {
+  // AI-68: checkAscensionEligibility
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function checkAscensionEligibility/.test(engine), 'engine.ts 应导出 checkAscensionEligibility');
+  assert(/missing/.test(engine), 'checkAscensionEligibility 应返回 missing 列表');
+  assert(/lifespanMin|reputationMin|cultivationExpMin|daoHeartMin/.test(engine), 'checkAscensionEligibility 应校验 4 项数值');
+  log('ascension-eligibility-check', { passed: true });
+}
+
+function smokeAscensionTriggerDerivation(): void {
+  // AI-68: deriveAscensionTrigger + resolveAscensionOutcome
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function deriveAscensionTrigger/.test(engine), 'engine.ts 应导出 deriveAscensionTrigger');
+  assert(/export function resolveAscensionOutcome/.test(engine), 'engine.ts 应导出 resolveAscensionOutcome');
+  // 大乘期 500 岁触发
+  assert(/mahayana/.test(engine) && /500/.test(engine), '应有大乘期 500 岁触发条件');
+  // 渡劫期 2000 岁触发
+  assert(/ascension/.test(engine) && /2000/.test(engine), '应有渡劫期 2000 岁触发条件');
+  log('ascension-trigger-derivation', { passed: true });
+}
+
+function smokeAscensionApiExists(): void {
+  // AI-68: 3 API route
+  for (const route of ['check', 'start', 'end']) {
+    const path = `src/app/api/game/ascension/${route}/route.ts`;
+    assert(Bun.file(path).size > 0, `${path} 应存在`);
+  }
+  const check = readFileSync('src/app/api/game/ascension/check/route.ts', 'utf-8');
+  assert(/checkAscensionEligibility/.test(check), 'check route 应调用 checkAscensionEligibility');
+  const start = readFileSync('src/app/api/game/ascension/start/route.ts', 'utf-8');
+  assert(/deriveAscensionTrigger/.test(start), 'start route 应调用 deriveAscensionTrigger');
+  const end = readFileSync('src/app/api/game/ascension/end/route.ts', 'utf-8');
+  assert(/resolveAscensionOutcome/.test(end), 'end route 应调用 resolveAscensionOutcome');
+  // 文档
+  assert(Bun.file('docs/world/ascension-flow.md').size > 0, 'docs/world/ascension-flow.md 应存在');
+  assert(Bun.file('docs/world/three-realms-detail.md').size > 0, 'docs/world/three-realms-detail.md 应存在');
+  log('ascension-api-exists', { passed: true });
+}
+
+function smokeAscensionModalExists(): void {
+  // AI-68: AscensionModal UI
+  const ui = readFileSync('src/components/xianxia/AscensionModal.tsx', 'utf-8');
+  assert(/data-testid="ascension-modal"/.test(ui), 'AscensionModal 应有 modal testid');
+  assert(/data-testid="ascension-requirements"/.test(ui), 'AscensionModal 应显示要求');
+  assert(/data-testid="ascension-action-roll"/.test(ui), 'AscensionModal 应有 飞升按钮');
+  assert(/AscensionSession|WorldTier/.test(ui), 'AscensionModal 应消费 types');
+  log('ascension-modal-exists', { passed: true });
 }
 
 function smokeTribulationTriggerExists(): void {

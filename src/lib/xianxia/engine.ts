@@ -72,6 +72,12 @@ import {
   PetCareAIOutcome,
   // AI-67
   HeartDemonType,
+  // AI-68
+  WorldTier,
+  AscensionRequirement,
+  AscensionSession,
+  // AI-70
+  Restriction,
 } from './types';
 import { COMBAT_PROJECTION_LABELS, sanitizeLootName } from './display';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
@@ -5786,7 +5792,244 @@ export function startExploration(state: CharacterState, realm: SecretRealm): Cha
   return newState;
 }
 
-// ==================== AI-67: 天劫 + 心魔独立战斗派生函数 ====================
+// ==================== AI-68: 多界飞升派生函数 ====================
+// 飞升要求表（按境界 → 三界层级）
+const ASCENSION_REQUIREMENTS: Record<WorldTier, AscensionRequirement> = {
+  humanWorld: {
+    fromTier: 'humanWorld',
+    toTier: 'spiritWorld',
+    minRealm: 'mahayana',
+    tribulationPassed: true,
+    lifespanMin: 500,
+    reputationMin: 5000,
+    cultivationExpMin: 100000,
+    daoHeartMin: 80,
+  },
+  spiritWorld: {
+    fromTier: 'spiritWorld',
+    toTier: 'immortalWorld',
+    minRealm: 'ascension',
+    tribulationPassed: true,
+    lifespanMin: 2000,
+    reputationMin: 50000,
+    cultivationExpMin: 1000000,
+    daoHeartMin: 95,
+  },
+  immortalWorld: {
+    fromTier: 'immortalWorld',
+    toTier: 'immortalWorld',
+    minRealm: 'ascension',
+    tribulationPassed: true,
+    lifespanMin: 99999,
+    reputationMin: 999999,
+    cultivationExpMin: 99999999,
+    daoHeartMin: 100,
+  },
+};
+
+/**
+ * AI-68: 派生飞升要求（按当前三界层级）
+ */
+export function deriveAscensionRequirements(currentTier: WorldTier): AscensionRequirement {
+  return ASCENSION_REQUIREMENTS[currentTier];
+}
+
+/**
+ * AI-68: 检查角色是否符合飞升资格
+ */
+export function checkAscensionEligibility(
+  character: { realm: Realm; cultivationExp: number; lifespan: number; reputation: number; daoHeart?: number },
+  requirements: AscensionRequirement,
+): { eligible: boolean; missing: string[] } {
+  const missing: string[] = [];
+  // 境界顺序比对（避免硬编码 enum 索引）
+  const realmOrder: Realm[] = [
+    'qi_refining', 'foundation_building', 'golden_core', 'nascent_soul',
+    'deity_transformation', 'void_refinement', 'unity', 'tribulation',
+    'mahayana', 'ascension',
+  ];
+  const charIdx = realmOrder.indexOf(character.realm);
+  const reqIdx = realmOrder.indexOf(requirements.minRealm);
+  if (charIdx < reqIdx) missing.push(`境界不足（需 ${requirements.minRealm}）`);
+  if (!requirements.tribulationPassed) missing.push('未渡天劫');
+  if (character.lifespan < requirements.lifespanMin) missing.push(`寿命不足（需 ${requirements.lifespanMin}）`);
+  if (character.reputation < requirements.reputationMin) missing.push(`声望不足（需 ${requirements.reputationMin}）`);
+  if (character.cultivationExp < requirements.cultivationExpMin) missing.push(`修为不足（需 ${requirements.cultivationExpMin}）`);
+  if ((character.daoHeart ?? 0) < requirements.daoHeartMin) missing.push(`道心不足（需 ${requirements.daoHeartMin}）`);
+  return { eligible: missing.length === 0, missing };
+}
+
+/**
+ * AI-68: 派生飞升触发（年龄 + 境界触发）
+ */
+export function deriveAscensionTrigger(age: number, realm: Realm): { triggered: boolean; reason: string } {
+  if (realm === 'mahayana' && age >= 500) return { triggered: true, reason: '大乘期 500 岁可尝试飞升' };
+  if (realm === 'ascension' && age >= 2000) return { triggered: true, reason: '渡劫期 2000 岁可尝试飞升仙界' };
+  return { triggered: false, reason: `${realm} @ ${age} 岁，未达飞升条件` };
+}
+
+/**
+ * AI-68: 飞升判定（roll + 阈值）
+ */
+export function resolveAscensionOutcome(opts: {
+  characterRoll: number;
+  daoHeart: number;
+  tribulationPassed: boolean;
+  requirements: AscensionRequirement;
+}): { passed: boolean; narrative: string } {
+  if (!opts.tribulationPassed) {
+    return { passed: false, narrative: '天劫未渡，飞升失败。' };
+  }
+  const baseThreshold = 0.5;
+  const daoBonus = opts.daoHeart / 200;
+  const effectiveRoll = opts.characterRoll + daoBonus;
+  const passed = effectiveRoll >= baseThreshold;
+  return {
+    passed,
+    narrative: passed
+      ? `渡过 ${opts.requirements.fromTier} → ${opts.requirements.toTier} 飞升天劫！`
+      : `飞升失败，跌回原境。`,
+  };
+}
+
+/**
+ * AI-69: 派生跨域通道（按当前层级）
+ */
+export interface CrossRealmPath {
+  from: WorldTier;
+  to: WorldTier;
+  type: 'ascension' | 'starSky' | 'token' | 'forbidden';
+  difficulty: number; // 0-100
+  costSpiritStones: number;
+}
+
+export function deriveCrossRealmPaths(currentTier: WorldTier): CrossRealmPath[] {
+  const paths: CrossRealmPath[] = [];
+  // 升界
+  if (currentTier === 'humanWorld') {
+    paths.push({ from: 'humanWorld', to: 'spiritWorld', type: 'ascension', difficulty: 80, costSpiritStones: 0 });
+  } else if (currentTier === 'spiritWorld') {
+    paths.push({ from: 'spiritWorld', to: 'immortalWorld', type: 'ascension', difficulty: 95, costSpiritStones: 0 });
+  }
+  // 降界 + 跨界
+  if (currentTier === 'spiritWorld') {
+    paths.push({ from: 'spiritWorld', to: 'humanWorld', type: 'starSky', difficulty: 60, costSpiritStones: 100000 });
+  } else if (currentTier === 'immortalWorld') {
+    paths.push({ from: 'immortalWorld', to: 'spiritWorld', type: 'token', difficulty: 40, costSpiritStones: 0 });
+    paths.push({ from: 'immortalWorld', to: 'humanWorld', type: 'token', difficulty: 70, costSpiritStones: 0 });
+  }
+  return paths;
+}
+
+// ==================== AI-70: 禁制派生函数 ====================
+
+/**
+ * AI-70: 检查禁制开启条件
+ */
+export function checkRestrictionAccess(
+  restriction: Restriction,
+  character: { inventory: ItemEntry[]; realm: Realm; faction?: string },
+  providedPassword?: string,
+  currentTiming?: string,
+): { accessible: boolean; reason: string } {
+  switch (restriction.accessMethod) {
+    case 'token':
+    case 'key': {
+      if (!restriction.requiredItemId) return { accessible: false, reason: '禁制缺少钥匙定义' };
+      const has = character.inventory.some((it) => it.id === restriction.requiredItemId);
+      return has
+        ? { accessible: true, reason: '持有钥匙/令牌' }
+        : { accessible: false, reason: `缺少 ${restriction.requiredItemId}` };
+    }
+    case 'password': {
+      if (providedPassword && restriction.requiredPassword === providedPassword) {
+        return { accessible: true, reason: '口令正确' };
+      }
+      return { accessible: false, reason: '口令错误' };
+    }
+    case 'identity': {
+      if (!restriction.requiredIdentity) return { accessible: false, reason: '禁制缺少身份定义' };
+      if (restriction.requiredIdentity.includes('realm:')) {
+        const req = restriction.requiredIdentity.replace('realm:', '');
+        return character.realm === req
+          ? { accessible: true, reason: `身份（${req}）符合` }
+          : { accessible: false, reason: `需 ${req} 境界` };
+      }
+      // faction 等其他身份
+      return restriction.requiredIdentity === character.faction
+        ? { accessible: true, reason: '身份符合' }
+        : { accessible: false, reason: '身份不符' };
+    }
+    case 'timing': {
+      if (!restriction.timingWindows || restriction.timingWindows.length === 0) {
+        return { accessible: false, reason: '禁制缺少时机定义' };
+      }
+      if (currentTiming && restriction.timingWindows.includes(currentTiming)) {
+        return { accessible: true, reason: `时机（${currentTiming}）符合` };
+      }
+      return { accessible: false, reason: '时机不符' };
+    }
+    case 'combat': {
+      return { accessible: false, reason: '需战斗开启' };
+    }
+    default:
+      return { accessible: false, reason: '未知开启方式' };
+  }
+}
+
+/**
+ * AI-70: 派生禁制触发（根据角色是否进入禁制范围）
+ */
+export function deriveRestrictionTrigger(
+  restriction: Restriction,
+  character: { realm: Realm },
+): { triggered: boolean; reason: string } {
+  // 默认：进入范围即触发
+  const triggered = true;
+  return { triggered, reason: `进入 ${restriction.name} 范围` };
+}
+
+/**
+ * AI-70: 禁制交互判定
+ */
+export function resolveRestrictionInteraction(
+  restriction: Restriction,
+  characterChoice: 'attempt' | 'retreat' | 'combat',
+  characterPower: number,
+): { outcome: 'unlocked' | 'locked' | 'combat' | 'retreated'; narrative: string } {
+  if (characterChoice === 'retreat') {
+    return { outcome: 'retreated', narrative: `退出 ${restriction.name}` };
+  }
+  if (restriction.accessMethod === 'combat') {
+    if (characterPower >= (restriction.combatPower ?? 100)) {
+      return { outcome: 'unlocked', narrative: `以力破禁，开启 ${restriction.name}` };
+    }
+    return { outcome: 'combat', narrative: `${restriction.name} 力量不足，进入战斗` };
+  }
+  // 非战斗类由 checkRestrictionAccess 判定
+  return { outcome: 'locked', narrative: `尝试开启 ${restriction.name}，需进一步验证` };
+}
+
+// ==================== AI-71: 禁制 + 洞府联动 ====================
+
+/**
+ * AI-71: 派生秘境禁制检查
+ */
+export function deriveRealmRestrictionCheck(
+  realm: { id: string; requiredRestrictionsPassed?: string[]; restrictions?: Restriction[] },
+  passedRestrictionIds: string[],
+): { canEnter: boolean; missingRestrictions: string[]; reason: string } {
+  const required = realm.requiredRestrictionsPassed ?? [];
+  const missing = required.filter((rid) => !passedRestrictionIds.includes(rid));
+  const allRestrictions = realm.restrictions ?? [];
+  return {
+    canEnter: missing.length === 0,
+    missingRestrictions: missing,
+    reason: missing.length === 0
+      ? `禁制已通过（${allRestrictions.length} 道），可进入秘境`
+      : `需通过 ${missing.length} 道禁制：${missing.join('、')}`,
+  };
+}
 // 以下为纯函数派生器，不依赖 db/store，调用方负责持久化。仅作契约层 + 简单逻辑：
 // - deriveTribulationTrigger: 判断境界突破是否触发天劫
 // - resolveTribulationBolt: 渡一道雷的判定

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { CharacterState, useGameStore } from '@/lib/xianxia/store';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
