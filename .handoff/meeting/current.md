@@ -1,4 +1,4 @@
 # ??????
 
-> ????: p3-archival-and-slot-coverage-plus-l1-worldview [ARCHIVED commit 9e46f02]
-> ????: phase-a-l2-contracts-plus-l3-tribulation [AGENDA]
+> ????: phase-a-l2-contracts-plus-l3-tribulation [ARCHIVED commit 499db04]
+> ????: phase-b-l3-full-grand-slam [AGENDA]

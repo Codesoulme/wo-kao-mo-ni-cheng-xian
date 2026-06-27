@@ -1,0 +1,118 @@
+# ??? -> ?? (?? B: L3 ?? Grand Slam)
+
+> ??: 2026-06-27 08:00
+> ??: [AGENDA] -> [SYNC]
+> ???: ?? A ? ship (commit 499db04), 161 smoke ??. owner ????, ??????.
+> ??: ????? L3 ?? (???? + ????)
+
+## ?? (5 ?, AI-68~AI-72, ?? 300 ?? -> ??? ~50 ??)
+
+### AI-68: ?????? (90 ???, ~12 ????)
+
+types.ts:
+- WorldTier enum: humanWorld / spiritWorld / immortalWorld
+- AscensionRequirement + AscensionSession interface
+
+engine.ts ? 4 ?????:
+- deriveAscensionRequirements(realm)
+- checkAscensionEligibility(character, requirements)
+- deriveAscensionTrigger(age, character)
+- resolveAscensionOutcome(session, characterRoll)
+
+3 ? API: ascension/check + start + end
+1 ? UI: AscensionModal.tsx (???? + ???? + ????)
+2 ??????: docs/world/ascension-flow.md + docs/world/three-realms-detail.md
+
+5 smoke:
+- smokeAscensionRequirementsExist
+- smokeAscensionEligibilityCheck
+- smokeAscensionTriggerDerivation
+- smokeAscensionApiExists
+- smokeAscensionModalExists
+
+### AI-69: ?? NPC + ???? (60 ???, ~8 ????)
+
+types.ts:
+- npc.worldTier: WorldTier
+- npc.crossRealmAccess: boolean
+
+engine.ts:
+- deriveCrossRealmPaths(worldTier) -> [{from, to, type, difficulty}]
+
+2 ??????: docs/world/cross-realm-npcs.md + docs/world/starry-sky-paths.md
+
+3 smoke:
+- smokeNpcWorldTierField
+- smokeCrossRealmPathsDerivation
+- smokeCrossRealmDocsExist
+
+### AI-70: ???? (90 ???, ~12 ????)
+
+types.ts:
+- RestrictionType enum: door / trap / transport / seal / ward / barrier
+- RestrictionAccessMethod enum: token / password / identity / key / timing / combat
+- Restriction interface
+
+engine.ts ? 3 ?????:
+- checkRestrictionAccess(restriction, character, inventory)
+- deriveRestrictionTrigger(restriction, character)
+- resolveRestrictionInteraction(restriction, characterChoice)
+
+2 ? API: restriction/check + interact
+1 ? UI: RestrictionModal.tsx (???? + ????)
+1 ??????: docs/world/restrictions-detail.md
+
+5 smoke:
+- smokeRestrictionTypesExist
+- smokeRestrictionAccessCheck
+- smokeRestrictionTriggerDerivation
+- smokeRestrictionApiExists
+- smokeRestrictionModalExists
+
+### AI-71: ?? + ??/???? (45 ???, ~6 ????)
+
+types.ts:
+- realm.restrictions: Restriction[]
+- realm.requiredRestrictionsPassed: string[]
+
+engine.ts:
+- deriveRealmRestrictionCheck(realm, character)
+
+2 smoke:
+- smokeSecretRealmRestrictionField
+- smokeRealmEnterCheckDerivation
+
+### AI-72: ???? + GameLayout ?? (15 ???, ~3 ????)
+
+src/app/page.tsx:
+- import AscensionModal + RestrictionModal
+- ?? GameLayout, ?? + ????
+
+3 smoke:
+- smokeAscensionModalIntegrated
+- smokeRestrictionModalIntegrated
+- smokeAllL3ModalsInLayout
+
+## ??
+
+- types.ts enum ????, ????
+- engine.ts ???????, ???????
+- ?? API route ??, ???? route ??
+- ?????? / Git (schema migration ????)
+
+## ??
+
+1. AI-68 -> 2. AI-69 -> 3. AI-70 -> 4. AI-71 -> 5. AI-72
+
+token ????: AI-68 + AI-70 ?? (2 ???), ?????
+
+## ??
+
+5 ??? 300 ?? -> ?? 40-60 ?? (????? 5x)
+
+## ??
+
+- ??? 2 ??? ## ????
+- ?????? ## ??????
+- ?? commit + push, ? owner ??
+
