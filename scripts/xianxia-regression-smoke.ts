@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+﻿﻿import { readFileSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
@@ -2450,6 +2450,21 @@ async function main(): Promise<void> {
   smokeEnginePerformanceBaseline();
   smokeHotPathOptimized();
   if (withDb) await smokeAuctionDbRoute();
+  // AI-77: TribulationModal callback wired to store
+  smokeTribulationStoreExports();
+  smokeTribulationActionsPersistCeremony();
+  smokeTribulationBoltAndHeartDemon();
+  // AI-78: AscensionModal + RestrictionModal callbacks wired to store
+  smokeAscensionStoreExports();
+  smokeAscensionRollOutcomeDerivation();
+  smokeRestrictionAccessAndCombatActions();
+  // AI-79: db push verification
+  await smokePrismaTribulationFieldsPushed();
+  smokeBackupScriptPrismaPushScript();
+  // AI-80: pynput Trae auto-dispatch scripts
+  smokeTraeAutoDispatchScriptExists();
+  smokeTraeMonitorScriptExists();
+  smokeTraeScriptsUsePynput();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
 
@@ -4087,3 +4102,176 @@ main().catch(error => {
 
 
 
+
+function smokeTribulationStoreExports(): void {
+  // AI-77: store.ts 应导出 TribulationCeremony 接口 + startTribulation/endTribulation action
+  const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  assert(/export interface TribulationCeremony\b/.test(src), 'store.ts 应导出 TribulationCeremony');
+  assert(/startTribulation:\s*\(/.test(src), 'store.ts 应定义 startTribulation action');
+  assert(/endTribulation:\s*\(/.test(src), 'store.ts 应定义 endTribulation action');
+  assert(/setTribulationCeremony:\s*\(/.test(src), 'store.ts 应定义 setTribulationCeremony setter');
+  log('tribulation-store-exports', { passed: true });
+}
+
+function smokeTribulationActionsPersistCeremony(): void {
+  // AI-77: startTribulation 应设置 tribulationCeremony 并清空旧 result
+  const { useGameStore } = require('../src/lib/xianxia/store') as typeof import('../src/lib/xianxia/store');
+  const session: any = {
+    id: 'tb-1', characterId: 'c-1', startedAge: 100, fromRealm: 'great_vehicle', toRealm: 'tribulation',
+    currentStage: 'opening', boltsCompleted: 0, hpRemaining: 100, heartDemonActive: null,
+    heartDemonResolved: false, narrative: '', passed: false, outcome: 'ongoing',
+  };
+  useGameStore.getState().startTribulation(session, 'sky darkens');
+  let cur = useGameStore.getState().tribulationCeremony;
+  assert(cur && cur.session.id === 'tb-1' && cur.narrative === 'sky darkens', 'startTribulation 应写入 ceremony');
+  assert(useGameStore.getState().tribulationResult === null, 'startTribulation 应清空旧 result');
+  useGameStore.getState().endTribulation();
+  assert(useGameStore.getState().tribulationCeremony === null, 'endTribulation 应清空 ceremony');
+  const result = useGameStore.getState().tribulationResult;
+  assert(result && result.boltsCompleted === 0 && result.passed === false, 'endTribulation 应写出 result');
+  log('tribulation-actions-persist-ceremony', { passed: true });
+}
+
+function smokeTribulationBoltAndHeartDemon(): void {
+  // AI-77: recordTribulationBolt + resolveTribulationHeartDemon 应更新 session
+  const { useGameStore } = require('../src/lib/xianxia/store') as typeof import('../src/lib/xianxia/store');
+  useGameStore.setState({
+    tribulationCeremony: null, tribulationResult: null, ascensionCeremony: null, restrictionChallenge: null,
+  } as any);
+  const session: any = {
+    id: 'tb-2', characterId: 'c-1', startedAge: 200, fromRealm: 'great_vehicle', toRealm: 'tribulation',
+    currentStage: 'opening', boltsCompleted: 0, hpRemaining: 100, heartDemonActive: 'fear',
+    heartDemonResolved: false, narrative: '', passed: false, outcome: 'ongoing',
+  };
+  useGameStore.getState().startTribulation(session, '');
+  useGameStore.getState().recordTribulationBolt(3);
+  let cur = useGameStore.getState().tribulationCeremony;
+  assert(cur && cur.session.boltsCompleted === 3, 'recordTribulationBolt(3) 应推进 boltsCompleted');
+  useGameStore.getState().recordTribulationBolt(20);
+  cur = useGameStore.getState().tribulationCeremony;
+  assert(cur && cur.session.boltsCompleted === 9 && cur.session.currentStage === 'passed', '9 雷后应设为 passed');
+  useGameStore.getState().resolveTribulationHeartDemon('regret');
+  cur = useGameStore.getState().tribulationCeremony;
+  assert(cur && cur.session.heartDemonResolved === true, 'resolveTribulationHeartDemon 应标记已破');
+  log('tribulation-bolt-and-heart-demon', { passed: true });
+}
+
+function smokeAscensionStoreExports(): void {
+  // AI-78: store.ts 应导出 AscensionCeremony/RestrictionChallenge 接口 + start/end/fight action
+  const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  assert(/export interface AscensionCeremony\b/.test(src), 'store.ts 应导出 AscensionCeremony');
+  assert(/export interface RestrictionChallenge\b/.test(src), 'store.ts 应导出 RestrictionChallenge');
+  assert(/startAscension:\s*\(/.test(src), 'store.ts 应定义 startAscension action');
+  assert(/endAscension:\s*\(/.test(src), 'store.ts 应定义 endAscension action');
+  assert(/tryRestrictionAccess:\s*\(/.test(src), 'store.ts 应定义 tryRestrictionAccess action');
+  assert(/fightRestriction:\s*\(/.test(src), 'store.ts 应定义 fightRestriction action');
+  log('ascension-store-exports', { passed: true });
+}
+
+function smokeAscensionRollOutcomeDerivation(): void {
+  // AI-78: resolveAscensionRoll 应根据 characterRoll + tribulationPassed 推导 passed/outcome
+  const { useGameStore } = require('../src/lib/xianxia/store') as typeof import('../src/lib/xianxia/store');
+  useGameStore.setState({
+    tribulationCeremony: null, tribulationResult: null, ascensionCeremony: null, restrictionChallenge: null,
+  } as any);
+  const passedTrib: any = {
+    id: 'a-1', characterId: 'c-1', fromTier: 'spiritWorld', toTier: 'immortalWorld',
+    requirements: { fromTier: 'spiritWorld', toTier: 'immortalWorld', minRealm: 'tribulation', tribulationPassed: true, lifespanMin: 1000, reputationMin: 5000, cultivationExpMin: 100000, daoHeartMin: 80 },
+    startedAge: 500, passed: false, outcome: 'ongoing', narrative: 'ascending',
+  };
+  const failedTrib: any = { ...passedTrib, id: 'a-2', requirements: { ...passedTrib.requirements, tribulationPassed: false } };
+  useGameStore.getState().startAscension(passedTrib, '');
+  useGameStore.getState().resolveAscensionRoll(0.9);
+  let cur = useGameStore.getState().ascensionCeremony;
+  assert(cur && cur.session.outcome === 'ascended' && cur.session.passed === true, '高 roll + tribulation passed -> ascended');
+  useGameStore.getState().startAscension(passedTrib, '');
+  useGameStore.getState().resolveAscensionRoll(0.1);
+  cur = useGameStore.getState().ascensionCeremony;
+  assert(cur && cur.session.outcome === 'failed', '低 roll 应 -> failed');
+  useGameStore.getState().startAscension(failedTrib, '');
+  useGameStore.getState().resolveAscensionRoll(0.99);
+  cur = useGameStore.getState().ascensionCeremony;
+  assert(cur && cur.session.outcome === 'failed', '未渡劫 -> failed');
+  log('ascension-roll-outcome-derivation', { passed: true });
+}
+
+function smokeRestrictionAccessAndCombatActions(): void {
+  // AI-78: tryRestrictionAccess / fightRestriction 应写 restrictionChallenge.narrative
+  const { useGameStore } = require('../src/lib/xianxia/store') as typeof import('../src/lib/xianxia/store');
+  useGameStore.setState({
+    tribulationCeremony: null, tribulationResult: null, ascensionCeremony: null, restrictionChallenge: null,
+  } as any);
+  const restriction: any = {
+    id: 'r-1', name: 'mystic gate', type: 'door', accessMethod: 'password',
+    requiredPassword: 'open-sesame', description: 'a heavy gate', difficulty: 60,
+  };
+  useGameStore.getState().tryRestrictionAccess(restriction, 'attempt', 'open-sesame');
+  let cur = useGameStore.getState().restrictionChallenge;
+  assert(cur && cur.restriction.id === 'r-1' && cur.narrative.includes('attempt') && cur.narrative.includes('open-sesame'), 'tryRestrictionAccess 应记录 password');
+  useGameStore.getState().tryRestrictionAccess(restriction, 'retreat');
+  cur = useGameStore.getState().restrictionChallenge;
+  assert(cur && cur.narrative.includes('retreat'), 'retreat 应被记录');
+  useGameStore.getState().fightRestriction(restriction);
+  cur = useGameStore.getState().restrictionChallenge;
+  assert(cur && /combat initiated/.test(cur.narrative), 'fightRestriction 应记录 combat initiated');
+  log('restriction-access-and-combat-actions', { passed: true });
+}
+
+async function smokePrismaTribulationFieldsPushed(): Promise<void> {
+  // AI-79: prisma schema 应包含 tribulationPending/SessionJson/ResultJson 且 dev.db 有这些列
+  const schema = readFileSync('prisma/schema.prisma', 'utf-8');
+  assert(/tribulationPending\s+Boolean/.test(schema), 'schema.prisma 应有 tribulationPending Boolean');
+  assert(/tribulationSessionJson\s+String/.test(schema), 'schema.prisma 应有 tribulationSessionJson String');
+  assert(/tribulationResultJson\s+String/.test(schema), 'schema.prisma 应有 tribulationResultJson String');
+  const dbPath = (process.env.DATABASE_URL?.replace(/^file:/, '')) || 'prisma/dev.db';
+  if (Bun.file(dbPath).size > 0) {
+    const { db } = await import('../src/lib/db');
+    const cols = await db.$queryRawUnsafe('PRAGMA table_info("Character");') as any[];
+    const names: string[] = cols.map((c: any) => c.name);
+    assert(names.includes('tribulationPending'), 'dev.db Character 表应有 tribulationPending 列');
+    assert(names.includes('tribulationSessionJson'), 'dev.db Character 表应有 tribulationSessionJson 列');
+    assert(names.includes('tribulationResultJson'), 'dev.db Character 表应有 tribulationResultJson 列');
+    assert(names.includes('ascensionSessionJson'), 'dev.db Character 表应有 ascensionSessionJson 列');
+    assert(names.includes('restrictionDataJson'), 'dev.db Character 表应有 restrictionDataJson 列');
+  }
+  log('prisma-tribulation-fields-pushed', { passed: true });
+}
+
+function smokeBackupScriptPrismaPushScript(): void {
+  // AI-79: 备份脚本 + db push script (package.json) 都应存在
+  assert(Bun.file('scripts/backup-real-saves.ts').size > 0, 'scripts/backup-real-saves.ts 应存在');
+  const backup = readFileSync('scripts/backup-real-saves.ts', 'utf-8');
+  assert(/copyFileSync/.test(backup), 'backup 脚本应使用 copyFileSync');
+  assert(/logs\/backups/.test(backup), 'backup 脚本应输出到 logs/backups/');
+  const pkg = readFileSync('package.json', 'utf-8');
+  assert(/db:push|prisma\s+db\s+push/.test(pkg), 'package.json 应有 prisma db push script');
+  log('backup-script-prisma-push-script', { passed: true });
+}
+
+function smokeTraeAutoDispatchScriptExists(): void {
+  // AI-80: scripts/trae-auto-dispatch.py 应存在并 import pynput + pywinauto
+  const path = 'scripts/trae-auto-dispatch.py';
+  assert(Bun.file(path).size > 0, 'scripts/trae-auto-dispatch.py 应存在');
+  const src = readFileSync(path, 'utf-8');
+  assert(/import pynput|from pynput/.test(src), 'trae-auto-dispatch.py 应 import pynput');
+  assert(/pywinauto|win32|find_window|WindowNotFoundError/.test(src), 'trae-auto-dispatch.py 应使用 pywinauto 找窗口');
+  log('trae-auto-dispatch-script-exists', { passed: true });
+}
+
+function smokeTraeMonitorScriptExists(): void {
+  // AI-80: scripts/trae-monitor.py 应存在
+  const path = 'scripts/trae-monitor.py';
+  assert(Bun.file(path).size > 0, 'scripts/trae-monitor.py 应存在');
+  const src = readFileSync(path, 'utf-8');
+  assert(/import pynput|from pynput/.test(src), 'trae-monitor.py 应 import pynput');
+  log('trae-monitor-script-exists', { passed: true });
+}
+
+function smokeTraeScriptsUsePynput(): void {
+  // AI-80: 两个脚本都应有 keyboard/mouse Listener
+  const dispatch = readFileSync('scripts/trae-auto-dispatch.py', 'utf-8');
+  const monitor = readFileSync('scripts/trae-monitor.py', 'utf-8');
+  assert(/keyboard\.Listener|mouse\.Listener/.test(dispatch), 'trae-auto-dispatch 应注册 pynput Listener');
+  assert(/keyboard\.Listener|mouse\.Listener/.test(monitor), 'trae-monitor 应注册 pynput Listener');
+  log('trae-scripts-use-pynput', { passed: true });
+}

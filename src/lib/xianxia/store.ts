@@ -1,7 +1,8 @@
-'use client';
+﻿﻿﻿'use client';
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { TribulationSession, AscensionSession, Restriction, HeartDemonType } from './types';
 
 // 流式叙事：绕过 React 状态系统，直接更新 DOM
 export interface StreamingState {
@@ -224,6 +225,24 @@ export interface BreakthroughCeremony {
   statBoosts: { label: string; value: number }[];
 }
 
+// AI-77: tribulation ceremony shell
+export interface TribulationCeremony {
+  session: TribulationSession;
+  narrative: string;
+}
+
+// AI-78: ascension ceremony shell
+export interface AscensionCeremony {
+  session: AscensionSession;
+  narrative: string;
+}
+
+// AI-78: restriction challenge shell
+export interface RestrictionChallenge {
+  restriction: Restriction;
+  narrative: string;
+}
+
 interface GameState {
   character: CharacterState | null;
   events: GameEvent[];
@@ -242,6 +261,14 @@ interface GameState {
   selectedEventId: string | null;
   // 新增：突破仪式
   breakthroughCeremony: BreakthroughCeremony | null;
+  // AI-77: tribulation ceremony state for TribulationModal
+  tribulationCeremony: TribulationCeremony | null;
+  // AI-77: tribulation result (passed/failed) shown after modal closes
+  tribulationResult: { passed: boolean; narrative: string; boltsCompleted: number } | null;
+  // AI-78: ascension ceremony state for AscensionModal
+  ascensionCeremony: AscensionCeremony | null;
+  // AI-78: restriction challenge state for RestrictionModal
+  restrictionChallenge: RestrictionChallenge | null;
   // Task 21-d-1：坊市弹窗开关（玩家可主动访问坊市购买/出售物品）
   marketOpen: boolean;
   // Task 24：秘境探索弹窗开关（玩家可主动前往秘境探索）
@@ -271,6 +298,21 @@ interface GameState {
   setLastInterfereAge: (age: number | null) => void;
   setSelectedEventId: (id: string | null) => void;
   setBreakthroughCeremony: (b: BreakthroughCeremony | null) => void;
+  // AI-77: TribulationModal setters / actions
+  setTribulationCeremony: (t: TribulationCeremony | null) => void;
+  setTribulationResult: (r: { passed: boolean; narrative: string; boltsCompleted: number } | null) => void;
+  startTribulation: (session: TribulationSession, narrative: string) => void;
+  endTribulation: () => void;
+  recordTribulationBolt: (boltNumber: number) => void;
+  resolveTribulationHeartDemon: (demon: HeartDemonType) => void;
+  // AI-78: AscensionModal / RestrictionModal setters / actions
+  setAscensionCeremony: (a: AscensionCeremony | null) => void;
+  setRestrictionChallenge: (r: RestrictionChallenge | null) => void;
+  startAscension: (session: AscensionSession, narrative: string) => void;
+  endAscension: () => void;
+  resolveAscensionRoll: (characterRoll: number) => void;
+  tryRestrictionAccess: (restriction: Restriction, choice: 'attempt' | 'retreat' | 'combat', password?: string) => void;
+  fightRestriction: (restriction: Restriction) => void;
   // Task 21-d-1：坊市弹窗开关
   setMarketOpen: (open: boolean) => void;
   // Task 24：秘境弹窗开关
@@ -304,7 +346,7 @@ interface GameState {
 
 export const useGameStore = create<GameState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       character: null,
       events: [],
       choices: [],
@@ -318,6 +360,10 @@ export const useGameStore = create<GameState>()(
       lastInterfereAge: null,
       selectedEventId: null,
       breakthroughCeremony: null,
+      tribulationCeremony: null,
+      tribulationResult: null,
+      ascensionCeremony: null,
+      restrictionChallenge: null,
       marketOpen: false,
       explorationOpen: false,
       lastExploration: null,
@@ -346,6 +392,71 @@ export const useGameStore = create<GameState>()(
       setLastInterfereAge: (age) => set({ lastInterfereAge: age }),
       setSelectedEventId: (id) => set({ selectedEventId: id }),
       setBreakthroughCeremony: (b) => set({ breakthroughCeremony: b }),
+      // AI-77: TribulationModal state
+      setTribulationCeremony: (t) => set({ tribulationCeremony: t }),
+      setTribulationResult: (r) => set({ tribulationResult: r }),
+      startTribulation: (session, narrative) => set({
+        tribulationCeremony: { session, narrative },
+        tribulationResult: null,
+      }),
+      endTribulation: () => {
+        const cur = get().tribulationCeremony;
+        if (cur && (!cur.session.outcome || cur.session.outcome === 'ongoing')) {
+          const session = cur.session;
+          const passed = session.outcome === 'ascended' || session.passed;
+          set({
+            tribulationResult: { passed, narrative: cur.narrative, boltsCompleted: session.boltsCompleted },
+            tribulationCeremony: null,
+          });
+          return;
+        }
+        set({ tribulationCeremony: null });
+      },
+      recordTribulationBolt: (boltNumber) => set((s) => {
+        const cur = s.tribulationCeremony;
+        if (!cur) return {};
+        const nextBolts = Math.max(cur.session.boltsCompleted, Math.min(9, boltNumber));
+        const nextSession: TribulationSession = { ...cur.session, boltsCompleted: nextBolts };
+        if (nextBolts >= 9) nextSession.currentStage = 'passed';
+        return { tribulationCeremony: { session: nextSession, narrative: cur.narrative } };
+      }),
+      resolveTribulationHeartDemon: (demon) => set((s) => {
+        const cur = s.tribulationCeremony;
+        if (!cur) return {};
+        const nextSession: TribulationSession = { ...cur.session, heartDemonResolved: true };
+        return { tribulationCeremony: { session: nextSession, narrative: cur.narrative } };
+      }),
+      // AI-78: AscensionModal state
+      setAscensionCeremony: (a) => set({ ascensionCeremony: a }),
+      startAscension: (session, narrative) => set({
+        ascensionCeremony: { session, narrative },
+      }),
+      endAscension: () => set({ ascensionCeremony: null }),
+      resolveAscensionRoll: (characterRoll) => set((s) => {
+        const cur = s.ascensionCeremony;
+        if (!cur) return {};
+        const success = characterRoll >= 0.5 && cur.session.requirements.tribulationPassed;
+        const nextSession: AscensionSession = {
+          ...cur.session,
+          passed: success,
+          outcome: success ? 'ascended' : 'failed',
+        };
+        return { ascensionCeremony: { session: nextSession, narrative: cur.narrative } };
+      }),
+      // AI-78: RestrictionModal state
+      setRestrictionChallenge: (r) => set({ restrictionChallenge: r }),
+      tryRestrictionAccess: (restriction, choice, password) => set({
+        restrictionChallenge: {
+          restriction,
+          narrative: 'access attempt: ' + choice + (password ? ' (key=' + password + ')' : ''),
+        },
+      }),
+      fightRestriction: (restriction) => set({
+        restrictionChallenge: {
+          restriction,
+          narrative: 'combat initiated against restriction',
+        },
+      }),
       setMarketOpen: (open) => set({ marketOpen: open }),
       setExplorationOpen: (open) => set({ explorationOpen: open }),
       setLastExploration: (e) => set({ lastExploration: e }),
