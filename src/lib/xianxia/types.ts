@@ -2420,6 +2420,17 @@ export interface NPCMemoryCluster {
   lastInteractionAge: number;
 }
 
+/**
+ * AI-H313b: tunables for decayNPCMemories.
+ * - trivialDecayYears: age gap after which 	rivial memories are dropped (default 8).
+ * - downgradeYears: age gap after which 
+otable / significant memories are downgraded one tier (default 20).
+ */
+export interface NPCMemoryDecayConfig {
+  trivialDecayYears?: number;
+  downgradeYears?: number;
+}
+
 export interface NPCBehaviorInfluence {
   friendlyWeight: number;
   hostileWeight: number;

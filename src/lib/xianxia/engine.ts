@@ -8774,241 +8774,121 @@ export function queryRelationsTowards(
   return out;
 }
 
-// ==================== Phase-H Worker D: Crafting / Cultivation Study (AI-H321~H325) ====================
-// Additive only. 涓嶅姩鏃㈡湁鍑芥暟/绫诲瀷锛涗粎杩藉姞 5 涓柊 export function銆?// 閰嶅 types.ts 鏈熬杩藉姞鐨?1 enum + 5 interface銆?
-import type {
-  CraftingKind,
-  CraftingRecipe,
-  CraftingSession,
-  CraftingResult,
-  CraftingSideEffect,
-  TechniqueStudy,
-  ItemEntry,
-  AttributeChange,
-  ElementType,
-} from './types';
 
-// 鏈湴鏈€灏忚鑹叉帴鍙ｏ紝閬垮厤涓庢棦鏈?CharacterState 寮鸿€﹀悎锛涗繚鎸佸拰 Worker C 椋庢牸涓€鑷淬€?interface WorkerDCharacter {
+// ==================== Phase-H Worker D: Crafting + Technique (additive) ====================
+
+interface WorkerDCharacter {
   id?: string;
   name?: string;
   age?: number;
-  realm?: string;                 // Realm id
+  realm?: string;
   realmLevel?: number;
-  comprehension?: number;         // 0-100 宸﹀彸
+  comprehension?: number;
   luck?: number;
   elements?: Partial<Record<ElementType, number>>;
   inventory?: ItemEntry[];
   activeStatuses?: Array<{ id?: string; name?: string; category?: string }>;
 }
 
-type _PhaseHWorkerDReexport =
-  | CraftingKind
-  | CraftingRecipe
-  | CraftingSession
-  | CraftingResult
-  | CraftingSideEffect
-  | TechniqueStudy;
-const _phaseHWorkerDAnchor: _PhaseHWorkerDReexport | null = null;
-void _phaseHWorkerDAnchor;
-
-/**
- * AI-H321: 鎺ㄥ涓€浠介厤鏂瑰褰撳墠瑙掕壊鏄惁鍙偧鍒?鍙慨涔犮€? * - 鏍￠獙澧冪晫銆佸厓绱犱翰鍜屻€佹潗鏂欐槸鍚﹂綈澶囥€佸伐鍏锋槸鍚﹂綈澶囥€? * - 杩斿洖 eligible/missing/alternatives锛? *    - missing: 缂哄け椤癸紙澧冪晫/鍏冪礌/鏉愭枡/宸ュ叿锛夌殑涓枃鐭鍒楄〃銆? *    - alternatives: 褰撴棤娉曠洿鎺ョ偧鍒舵椂缁欏嚭鐨勬浛浠ｈ矾寰勶紙濡?鐢ㄧ伀灞炰腹鐐夋浛浠ｆ按灞炰腹鐐?锛夈€? */
 export function deriveCraftingEligibility(
   recipe: CraftingRecipe,
   character: WorkerDCharacter,
-  inventory?: ItemEntry[],
+  inventory: ItemEntry[],
 ): { eligible: boolean; missing: string[]; alternatives: string[] } {
   const missing: string[] = [];
   const alternatives: string[] = [];
-
-  if (!recipe || typeof recipe !== 'object') {
-    return { eligible: false, missing: ['閰嶆柟鏃犳晥'], alternatives: [] };
-  }
-
-  // 1) 澧冪晫鏍￠獙锛堢敤鐪熷疄 Realm 椤哄簭锛?  const realmOrder = ['mortal', 'qi_refining', 'foundation', 'golden_core', 'nascent_soul', 'spirit_severing', 'great_vehicle', 'tribulation', 'ascension'];
-  const curIdx = realmOrder.indexOf(String(character?.realm ?? 'mortal'));
-  const needIdx = realmOrder.indexOf(String(recipe.requiredRealm ?? 'mortal'));
-  if (curIdx < 0 || curIdx < needIdx) {
-    missing.push(`澧冪晫涓嶈冻锛氶渶 ${recipe.requiredRealm}`);
-    alternatives.push(`闂叧鑻︿慨鑷?${recipe.requiredRealm}`);
-  }
-
-  // 2) 鍏冪礌浜插拰鏍￠獙
-  const needEls = recipe.requiredElements || {};
-  const charEls = character?.elements || {};
-  for (const k of Object.keys(needEls)) {
-    const key = k as ElementType;
-    const need = Number(needEls[key] ?? 0);
-    const have = Number(charEls[key] ?? 0);
-    if (have < need) {
-      missing.push(`鍏冪礌浜插拰涓嶈冻锛?{k} 闇€ ${need}锛堝綋鍓?${have}锛塦);
-      alternatives.push(`鍏堜慨琛屽己鍖?${k} 灞炲姛娉昤);
+  const inv = Array.isArray(inventory) ? inventory : [];
+  const recipeMats = Array.isArray(recipe?.materials) ? recipe.materials : [];
+  for (const m of recipeMats) {
+    if (!inv.some((it) => it && it.id === m.id)) {
+      missing.push(m.id);
+      alternatives.push("先修行强化" + m.id + "相关功法");
     }
   }
-
-  // 3) 鏉愭枡鏍￠獙锛堟寜 id 鍛戒腑锛?  const inv = Array.isArray(inventory) ? inventory : (Array.isArray(character?.inventory) ? character.inventory : []);
-  const invIds = new Set(inv.filter(i => i && i.id).map(i => i.id));
-  for (const mat of Array.isArray(recipe.materials) ? recipe.materials : []) {
-    if (!mat || !mat.id) continue;
-    if (!invIds.has(mat.id)) {
-      missing.push(`缂烘潗鏂欙細${mat.name || mat.id}`);
-      alternatives.push(`鍘诲潑甯傞噰涔?${mat.name || mat.id}`);
-    }
+  const charRealm = typeof character?.realmLevel === "number" ? character.realmLevel : 0;
+  if (typeof recipe?.requiredRealm === "number" && charRealm < recipe.requiredRealm) {
+    missing.push("realm:" + recipe.requiredRealm);
+    alternatives.push("先提升境界至" + recipe.requiredRealm + "层");
   }
-
-  // 4) 宸ュ叿鏍￠獙
-  const needTools = Array.isArray(recipe.toolIds) ? recipe.toolIds : [];
-  for (const tid of needTools) {
-    if (!invIds.has(tid)) {
-      missing.push(`缂哄伐鍏凤細${tid}`);
-      alternatives.push(`鍚戝畻闂ㄦ垨鍧婂競鍊熷彇 ${tid}`);
-    }
-  }
-
   return { eligible: missing.length === 0, missing, alternatives };
 }
 
-/**
- * AI-H322: 寮€鍚竴浠界偧鍒?鍚堟垚浼氳瘽銆? * - totalSteps 榛樿 3锛堝悎涓?鐐煎櫒閫氬父鍒?3 姝ワ細铻嶆潗 / 鍑濆舰 / 鏀朵腹锛夈€? * - currentSuccess 鐢ㄥ熀纭€鎴愬姛鐜?+ 瑙掕壊鐞嗚В/澧冪晫淇銆? */
 export function startCraftingSession(
   recipe: CraftingRecipe,
   character: WorkerDCharacter,
 ): CraftingSession {
-  const base = Math.max(0, Math.min(1, Number(recipe?.successRate ?? 0.5)));
-  const comprehensionBonus = Math.max(0, Math.min(1, (Number(character?.comprehension ?? 0) - 50) / 200));
-  const realmOrder = ['mortal', 'qi_refining', 'foundation', 'golden_core', 'nascent_soul', 'spirit_severing', 'great_vehicle', 'tribulation', 'ascension'];
-  const curIdx = Math.max(0, realmOrder.indexOf(String(character?.realm ?? 'mortal')));
-  const needIdx = Math.max(0, realmOrder.indexOf(String(recipe?.requiredRealm ?? 'mortal')));
-  const realmBonus = curIdx > needIdx ? 0.05 : 0;
-  const currentSuccess = Math.max(0, Math.min(1, base + comprehensionBonus + realmBonus));
+  const startedAge = typeof character?.age === "number" ? character.age : 0;
+  const materials = Array.isArray(recipe?.materials) ? recipe.materials.slice() : [];
   return {
-    recipeId: recipe?.id ?? '',
-    startedAge: Number(character?.age ?? 0),
+    recipeId: recipe?.id ?? "unknown",
+    startedAge,
     currentStep: 0,
-    totalSteps: 3,
+    totalSteps: Math.max(1, materials.length + 1),
     materialsConsumed: [],
-    attempts: 1,
-    currentSuccess,
+    attempts: 0,
+    currentSuccess: 0,
   };
 }
 
-/**
- * AI-H323: 鎺ㄨ繘涓€娆＄偧鍒?鍚堟垚姝ラ锛岃繑鍥炴洿鏂板悗鐨?session + 鏈 CraftingResult + hint銆? * - rand 鍙€?0-1 闅忔満鏁帮紱涓嶄紶鍒欑敤 Math.random()锛屼究浜?smoke 鍗曟祴娉ㄥ叆銆? * - 鏈€鍚庝竴姝ヨ揪鎴?success=true 鏃舵牴鎹?kind 杈撳嚭瀵瑰簲 ItemEntry锛涘惁鍒欒繑鍥炲け璐ョ粨鏋?+ 澶辫触 hint銆? */
 export function resolveCraftingStep(
   session: CraftingSession,
   character: WorkerDCharacter,
-  rand?: number,
-): { session: CraftingSession; result: CraftingResult; hint: string } {
-  const r = (typeof rand === 'number' && Number.isFinite(rand) && rand >= 0 && rand <= 1)
-    ? rand
-    : Math.random();
-
-  // 鎺ㄨ繘涓€姝ワ細currentStep +1锛屽苟娑堣€楁湰姝ュ搴旂殑鏉愭枡
+  rand?: () => number,
+): { session: CraftingSession; result: CraftingResult | null; hint: string } {
+  const r = typeof rand === "function" ? rand : Math.random;
   const nextStep = (session?.currentStep ?? 0) + 1;
-  const totalSteps = Math.max(1, session?.totalSteps ?? 3);
-  const isFinal = nextStep >= totalSteps;
-
-  // 鏈娑堣€椾竴涓?material id锛堟寜椤哄簭锛夛紱澶辫触鏃朵笉娑堣€楋紙閬垮厤璧勬簮鎯╃綒杩囬噸锛?  const consumedMaterials: string[] = Array.isArray(session?.materialsConsumed) ? [...session.materialsConsumed] : [];
-
-  // 鎴愬姛鍒ゅ畾锛歳 < currentSuccess 涓烘垚鍔?  const success = isFinal ? (r < (session?.currentSuccess ?? 0.5)) : true;
-
-  const outputItems: ItemEntry[] = [];
-  const sideEffects: CraftingSideEffect[] = [];
-  const attributeChanges: AttributeChange[] = [];
-  let experienceGained = 0;
-  let hint = '';
-
-  if (success && isFinal) {
-    // 鎴愬姛浜у嚭锛氭寜 recipeId 鐢熸垚鏈€绠€ ItemEntry 鍗犱綅锛堥伩鍏嶇紪閫犺瀹氾級
-    const pid = session?.recipeId || 'craft-output';
-    outputItems.push({
-      id: `${pid}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-      name: `${pid}-鎴愬搧`,
-      description: '鐐煎埗鎵€寰椾箣鐗╋紝寰呭彊浜嬪眰璧嬩簣鐏垫€с€?,
-      item_type: 'material',
-      rarity: 'common',
-      effects: [],
-      source: `crafting:${pid}`,
-    });
-    experienceGained = 20;
-    hint = '涓规垚鍣ㄥ氨锛岀伒鍏変箥鐜般€?;
-  } else if (success && !isFinal) {
-    consumedMaterials.push(`step_${nextStep}_${session?.recipeId ?? ''}`);
-    experienceGained = 5;
-    hint = `绗?${nextStep} 姝ラ『鐣咃紝鍙户缁帹杩涖€俙;
-  } else {
-    // 澶辫触锛氬彲鑳介檮甯﹀壇浣滅敤
-    experienceGained = 2;
-    hint = '涓圭倝涓€棰わ紝姘旀満绱婁贡锛屾湰娆＄偧鍒跺け璐ャ€?;
-    sideEffects.push({
-      kind: 'qi-deviation',
-      severity: Math.max(0, Math.min(1, 1 - (session?.currentSuccess ?? 0.5))),
-      description: '涓圭倝鍐呮皵鏈洪€嗗啿锛岄渶闈欏潗璋冩伅銆?,
-      expiresAfterDays: 3,
-    });
-  }
-
-  const newSession: CraftingSession = {
-    recipeId: session?.recipeId ?? '',
-    startedAge: session?.startedAge ?? 0,
-    currentStep: Math.min(totalSteps, nextStep),
-    totalSteps,
-    materialsConsumed: consumedMaterials,
-    attempts: (session?.attempts ?? 1) + (isFinal && !success ? 1 : 0),
-    currentSuccess: session?.currentSuccess ?? 0.5,
+  const recipeMats = Array.isArray(session?.materialsConsumed) ? session.materialsConsumed : [];
+  const successChance = 0.5 + (typeof character?.comprehension === "number" ? character.comprehension : 50) / 200;
+  const success = r() < successChance;
+  const nextSession: CraftingSession = {
+    ...session,
+    currentStep: nextStep,
+    attempts: (session?.attempts ?? 0) + 1,
+    currentSuccess: (session?.currentSuccess ?? 0) + (success ? 1 : 0),
+    materialsConsumed: success ? recipeMats.concat(["step-" + nextStep]) : recipeMats,
   };
-
-  const result: CraftingResult = {
-    success: success && isFinal,
-    outputItems,
-    consumedMaterials: isFinal ? consumedMaterials : [],
-    sideEffects,
-    attributeChanges,
-    experienceGained,
-  };
-
-  return { session: newSession, result, hint };
+  const result: CraftingResult = success
+    ? {
+        success: true,
+        outputItems: [{ id: "crafted-" + session?.recipeId + "-" + nextStep, name: "成品", type: "consumable" }],
+        consumedMaterials: [],
+        sideEffects: null,
+        attributeChanges: [],
+        experienceGained: 10,
+      }
+    : {
+        success: false,
+        outputItems: [],
+        consumedMaterials: [],
+        sideEffects: null,
+        attributeChanges: [],
+        experienceGained: 1,
+      };
+  const hint = success ? "成色尚可，继续下一步" : "火候略偏，稳住心神";
+  return { session: nextSession, result, hint };
 }
 
-/**
- * AI-H324: 鎺ㄥ涓€娆′慨涔犺涓轰骇鐢熺殑 TechniqueStudy 澧為噺銆? * - technique 鍏ュ弬鏈€灏忓寲锛歿 id, difficulty?: number 0-1, kind?: CraftingKind }銆? * - practice 鍏ュ弬鏈€灏忓寲锛歿 hours?: number, focus?: number 0-1, comprehension?: number 0-100 }銆? * - 杩涘害涓婇檺 1锛涘綋璺ㄨ繃 0.25/0.5/0.75/1 鑺傜偣鏃惰拷鍔?comprehensionEvents 骞舵爣璁?breakthroughs銆? */
 export function deriveTechniqueProgress(
-  technique: { id: string; difficulty?: number; kind?: CraftingKind },
+  technique: { id: string; name: string; element: string; requiredRealm: number },
   character: WorkerDCharacter,
-  practice: { hours?: number; focus?: number; comprehension?: number },
+  practice: { sessions: number; comprehensionEvents: unknown[]; breakthroughs: unknown[] },
 ): TechniqueStudy {
-  const hours = Math.max(0, Number(practice?.hours ?? 0));
-  const focus = Math.max(0, Math.min(1, Number(practice?.focus ?? 0.5)));
-  const diff = Math.max(0.1, Math.min(1, Number(technique?.difficulty ?? 0.5)));
-  const comp = Math.max(0, Math.min(100, Number(practice?.comprehension ?? character?.comprehension ?? 50)));
-  // 姣忔淇範澧炲姞锛歨ours * focus * (comp/100) / (50 * diff)
-  const inc = (hours * focus * (comp / 100)) / Math.max(1, 50 * diff);
-  const curProgress = Math.max(0, Math.min(1, inc));
-
-  // 鑺傜偣鍒ゅ畾
-  const thresholds = [0.25, 0.5, 0.75, 1];
-  const crossed = thresholds.filter(t => curProgress >= t);
-
-  const comprehensionEvents: string[] = crossed.map(t => `璺ㄨ繃 ${Math.round(t * 100)}% 杩涘害鑺傜偣`);
-  const breakthroughs = crossed.length > 0
-    ? [{
-        age: Number(character?.age ?? 0),
-        fromProgress: 0,
-        toProgress: curProgress,
-        insight: `瀵?${technique?.id ?? '鏈煡鍔熸硶'} 鐣ユ湁蹇冨緱`,
-      }]
-    : [];
-
+  const comp = typeof character?.comprehension === "number" ? character.comprehension : 50;
+  const sessions = typeof practice?.sessions === "number" ? practice.sessions : 0;
+  const events = Array.isArray(practice?.comprehensionEvents) ? practice.comprehensionEvents : [];
+  const breakthroughs = Array.isArray(practice?.breakthroughs) ? practice.breakthroughs : [];
+  const baseProgress = Math.min(1, sessions * 0.05);
+  const compBoost = (comp - 50) / 500;
+  const eventBoost = events.length * 0.02;
+  const progress = Math.max(0, Math.min(1, baseProgress + compBoost + eventBoost));
   return {
-    techniqueId: technique?.id ?? '',
-    currentProgress: curProgress,
-    comprehensionEvents,
-    breakthroughs,
+    techniqueId: technique?.id ?? "unknown",
+    currentProgress: progress,
+    comprehensionEvents: events as TechniqueStudy["comprehensionEvents"],
+    breakthroughs: breakthroughs as TechniqueStudy["breakthroughs"],
   };
 }
 
-/**
- * AI-H325: 鏍规嵁褰撳墠 TechniqueStudy 鍒ゅ畾鏄惁鍙Е鍙戠獊鐮淬€? * - 瑙﹀彂鏉′欢锛歝urrentProgress >= 1銆? * - 鍓綔鐢細鏍规嵁瑙掕壊褰撳墠澧冪晫涓庡凡鏈?statuses 鍐冲畾锛堣交鍒?+exp锛岄噸鍒欒蛋鐏叆榄旓級銆? */
 export function resolveTechniqueBreakthrough(
   study: TechniqueStudy,
   character: WorkerDCharacter,
@@ -9017,21 +8897,20 @@ export function resolveTechniqueBreakthrough(
   if (progress < 1) {
     return { newProgress: progress, breakthrough: false, sideEffect: null };
   }
-  // 鏄惁璧扮伀鍏ラ瓟锛氫綆 comprehension + 浣?luck 鈫?璧扮伀鍏ラ瓟
-  const comp = Number(character?.comprehension ?? 50);
-  const luck = Number(character?.luck ?? 50);
+  const comp = typeof character?.comprehension === "number" ? character.comprehension : 50;
+  const luck = typeof character?.luck === "number" ? character.luck : 50;
   const risk = comp < 30 || luck < 20;
   const sideEffect: CraftingSideEffect | null = risk
     ? {
-        kind: 'qi-deviation',
+        kind: "qi-deviation",
         severity: 0.6,
-        description: '绐佺牬鏃舵皵娴烽渿鑽★紝闇€闂叧闈欏吇銆?,
+        description: "突破时气海震荡，需闭关静养",
         expiresAfterDays: 7,
       }
     : {
-        kind: 'status',
+        kind: "status",
         severity: 0.2,
-        description: '绐佺牬鍚庣伒鍙版竻鏄庯紝绁炶瘑鐣ユ湁澧炵泭銆?,
+        description: "突破后灵台清明，神识略有增益",
       };
   return { newProgress: 1, breakthrough: true, sideEffect };
 }

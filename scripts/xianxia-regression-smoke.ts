@@ -2,7 +2,7 @@
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItem, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStalemateExit, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse, unequipItem, buildEmptyWorldMap, discoverLocation, deriveTravelFeasibility, generateRandomEncounter, summarizeWorldForPrompt, recordNPCMemory, clusterNPCMemories, decayNPCMemories, deriveNPCBehaviorFromMemory, summarizeNPCForPrompt, buildEmptySectGraph, addSectNode, setSectRelation, derivePlayerSectAffinity, queryRelationsTowards } from '../src/lib/xianxia/engine';
+import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItem, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStalemateExit, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse, unequipItem, buildEmptyWorldMap, discoverLocation, deriveTravelFeasibility, generateRandomEncounter, summarizeWorldForPrompt, recordNPCMemory, clusterNPCMemories, decayNPCMemories, deriveNPCBehaviorFromMemory, summarizeNPCForPrompt, buildEmptySectGraph, addSectNode, setSectRelation, derivePlayerSectAffinity, queryRelationsTowards, deriveCraftingEligibility, startCraftingSession, resolveCraftingStep, deriveTechniqueProgress, resolveTechniqueBreakthrough } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
 import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain, WorldRegion, RegionTier, LocationNode, TravelRoute, WorldMap } from '../src/lib/xianxia/types';
@@ -2836,6 +2836,8 @@ function smokeAi103RumorReliability(): void {
   pgRunPhaseH314Smokes();
   pgRunPhaseHAWorkerASmokes();
   pgRunPhaseHBWorkerBSmokes();
+  pgRunPhaseHSmokeAWorkerAV2();
+  pgRunPhaseHDWorkerDSmokes();
 }
 
 function smokeCombatLabelsDisplay(): void {
@@ -5831,19 +5833,19 @@ function smokeH301SectGraphEmptyAndAdd(): void {
   const g0 = buildEmptySectGraph();
   assert(Array.isArray(g0.nodes) && g0.nodes.length === 0, 'empty graph should have no nodes');
   assert(Array.isArray(g0.edges) && g0.edges.length === 0, 'empty graph should have no edges');
-  const n1 = { id: 'qingyun', name: '青云阁', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚真人', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' };
+  const n1 = { id: 'qingyun', name: '青云阁', alignment: 'qingyun-pavilion', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚真人', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' };
   const g1 = addSectNode(g0, n1);
   assert(g1.nodes.length === 1, 'addSectNode should append one node');
   assert(g1 !== g0, 'addSectNode should return a new graph (immutable)');
-  const g2 = addSectNode(g1, { id: 'blood-saber', name: '血刀宗', alignment: 'demonic', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' });
+  const g2 = addSectNode(g1, { id: 'blood-saber', name: '血刀宗', alignment: 'blood-saber-sect', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' });
   assert(g2.nodes.length === 2, 'second addSectNode should have 2 nodes');
   assert(g2.edges.length === 0, 'no edges yet');
 }
 
 function smokeH302SectRelationSet(): void {
   let g = buildEmptySectGraph();
-  g = addSectNode(g, { id: 'a', name: '甲宗', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 5, currentLeader: '甲祖', seatLocation: 'central-plains/a', publicStance: 'open' });
-  g = addSectNode(g, { id: 'b', name: '乙宗', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 4, currentLeader: '乙祖', seatLocation: 'eastern-sea/b', publicStance: 'open' });
+  g = addSectNode(g, { id: 'a', name: '甲宗', alignment: 'qingyun-pavilion', realmTierMin: 1, realmTierMax: 9, powerRank: 5, currentLeader: '甲祖', seatLocation: 'central-plains/a', publicStance: 'open' });
+  g = addSectNode(g, { id: 'b', name: '乙宗', alignment: 'qingyun-pavilion', realmTierMin: 1, realmTierMax: 9, powerRank: 4, currentLeader: '乙祖', seatLocation: 'eastern-sea/b', publicStance: 'open' });
   const g2 = setSectRelation(g, 'a', 'b', 'ally', 0.8);
   const edge = g2.edges.find(function (e) { return e.from === 'a' && e.to === 'b'; });
   assert(!!edge, 'ally edge should be present');
@@ -5858,8 +5860,8 @@ function smokeH302SectRelationSet(): void {
 function smokeH303PlayerSectAffinity(): void {
   const character = { faction: 'qingyun-pavilion', master: 'qingyun-pavilion', reputation: 0.6, age: 20 };
   const graph = { nodes: [
-    { id: 'qingyun', name: '青云阁', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' },
-    { id: 'blood-saber', name: '血刀宗', alignment: 'demonic', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' },
+    { id: 'qingyun', name: '青云阁', alignment: 'qingyun-pavilion', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' },
+    { id: 'blood-saber', name: '血刀宗', alignment: 'blood-saber-sect', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' },
   ], edges: [], lastUpdatedAge: 0, currentAge: 20 };
   const aff = derivePlayerSectAffinity(character, graph);
   assert(aff.aligned === 'qingyun-pavilion', 'player should align with faction');
@@ -5869,9 +5871,9 @@ function smokeH303PlayerSectAffinity(): void {
 
 function smokeH304QueryRelations(): void {
   let g = buildEmptySectGraph();
-  g = addSectNode(g, { id: 'qingyun', name: '青云阁', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' });
-  g = addSectNode(g, { id: 'blood-saber', name: '血刀宗', alignment: 'demonic', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' });
-  g = addSectNode(g, { id: 'heavenly-talisman', name: '天符宗', alignment: 'righteous', realmTierMin: 3, realmTierMax: 9, powerRank: 5, currentLeader: '天符', seatLocation: 'eastern-sea/heavenly-talisman-sect', publicStance: 'open' });
+  g = addSectNode(g, { id: 'qingyun', name: '青云阁', alignment: 'qingyun-pavilion', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' });
+  g = addSectNode(g, { id: 'blood-saber', name: '血刀宗', alignment: 'blood-saber-sect', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' });
+  g = addSectNode(g, { id: 'heavenly-talisman', name: '天符宗', alignment: 'qingyun-pavilion', realmTierMin: 3, realmTierMax: 9, powerRank: 5, currentLeader: '天符', seatLocation: 'eastern-sea/heavenly-talisman-sect', publicStance: 'open' });
   g = setSectRelation(g, 'qingyun', 'blood-saber', 'enemy', 0.95);
   g = setSectRelation(g, 'heavenly-talisman', 'blood-saber', 'rival', 0.7);
   const incoming = queryRelationsTowards(g, 'blood-saber');
@@ -6155,3 +6157,254 @@ function pgRunPhaseH314Smokes(): void {
   smokeNewH313Decay();
   smokeNewH314Behavior();
 }
+
+// === phase-h-p2-mid Worker A: 宗门关系图 (smoke-h-301~h-304) ===
+function smokeH301EmptyAndAddV2(): void {
+  const g0 = buildEmptySectGraph();
+  assert(g0 !== null && typeof g0 === 'object', 'buildEmptySectGraph returns object');
+  assert(Array.isArray(g0.nodes) && g0.nodes.length === 0, 'empty graph has no nodes');
+  assert(Array.isArray(g0.edges) && g0.edges.length === 0, 'empty graph has no edges');
+  assert(g0.lastUpdatedAge === 0 && g0.currentAge === 0, 'empty graph ages are zero');
+
+  const node: any = {
+    id: 'qingyun-pavilion',
+    name: '青云阁',
+    alignment: 'qingyun-pavilion',
+    realmTierMin: 1,
+    realmTierMax: 9,
+    powerRank: 3,
+    currentLeader: '云虚真人',
+    seatLocation: 'central-plains/qingyun-pavilion',
+    publicStance: 'righteous',
+  };
+  const g1 = addSectNode(g0, node);
+  assert(g1 !== g0, 'addSectNode must be immutable (return new graph)');
+  assert(g0.nodes.length === 0, 'original graph unchanged after addSectNode');
+  assert(g1.nodes.length === 1, 'new graph has 1 node');
+  assert(g1.nodes[0].id === 'qingyun-pavilion', 'node id preserved');
+
+  // 同 id 应覆盖
+  const node2: any = { ...node, name: '青云阁（更名）', powerRank: 2 };
+  const g2 = addSectNode(g1, node2);
+  assert(g2.nodes.length === 1, 'same-id addSectNode should overwrite, not duplicate');
+  assert(g2.nodes[0].name === '青云阁（更名）', 'overwrite applies new fields');
+  assert(g2.nodes[0].powerRank === 2, 'overwrite applies new powerRank');
+
+  // 不同 id 应追加
+  const g3 = addSectNode(g2, {
+    id: 'blood-saber-sect',
+    name: '血刀宗',
+    alignment: 'blood-saber-sect',
+    realmTierMin: 2,
+    realmTierMax: 9,
+    powerRank: 5,
+    currentLeader: '血刀老祖',
+    seatLocation: 'northern-waste/blood-saber-sect',
+    publicStance: 'demonic',
+  });
+  assert(g3.nodes.length === 2, 'different-id addSectNode appends');
+  assert(g3.edges.length === 0, 'addSectNode does not touch edges');
+
+  log('smoke-h-301-sect-graph-empty-and-add', {
+    passed: true,
+    empty: { nodes: g0.nodes.length, edges: g0.edges.length },
+    afterAdd: { nodes: g3.nodes.length, edges: g3.edges.length },
+    overwriteKeptLen: g2.nodes.length,
+  });
+}
+
+function smokeH302RelationSetV2(): void {
+  let g = buildEmptySectGraph();
+  const base: any = {
+    nodes: [
+      { id: 'qingyun-pavilion', name: '青云阁', alignment: 'qingyun-pavilion', realmTierMin: 1, realmTierMax: 9, powerRank: 3, currentLeader: '云虚真人', seatLocation: 'central/qingyun', publicStance: 'righteous' },
+      { id: 'ten-thousand-sword-sect', name: '万剑宗', alignment: 'ten-thousand-sword-sect', realmTierMin: 3, realmTierMax: 9, powerRank: 2, currentLeader: '剑尊', seatLocation: 'north/ten-thousand-sword', publicStance: 'righteous' },
+      { id: 'blood-saber-sect', name: '血刀宗', alignment: 'blood-saber-sect', realmTierMin: 2, realmTierMax: 9, powerRank: 5, currentLeader: '血刀老祖', seatLocation: 'north/blood-saber', publicStance: 'demonic' },
+    ],
+    edges: [],
+    lastUpdatedAge: 20,
+    currentAge: 20,
+  };
+  g = { ...base, nodes: base.nodes.slice() } as any;
+
+  // 初次设定 ally 关系
+  const g2 = setSectRelation(g, 'qingyun-pavilion', 'ten-thousand-sword-sect', 'ally', 0.8);
+  assert(g2 !== g, 'setSectRelation returns new graph');
+  assert(g.edges.length === 0, 'original edges unchanged');
+  assert(g2.edges.length === 1, 'one edge created');
+  const e1 = g2.edges[0];
+  assert(e1.from === 'qingyun-pavilion' && e1.to === 'ten-thousand-sword-sect', 'edge endpoints correct');
+  assert(e1.relation === 'ally', 'relation is ally');
+  assert(e1.intensity === 0.8, 'intensity preserved as 0.8');
+  assert(e1.sinceAge === 20, 'sinceAge inherited from currentAge');
+
+  // 重写同一 from->to 关系（应替换，不追加）
+  const g3 = setSectRelation(g2, 'qingyun-pavilion', 'ten-thousand-sword-sect', 'wary-respect', 0.5);
+  assert(g3.edges.length === 1, 'overwrite keeps single edge');
+  assert(g3.edges[0].relation === 'wary-respect', 'overwrite applied new relation');
+  assert(g3.edges[0].intensity === 0.5, 'overwrite applied new intensity');
+
+  // intensity 超界应被 clamp
+  const g4 = setSectRelation(g3, 'blood-saber-sect', 'qingyun-pavilion', 'enemy', 2.5);
+  const g5 = setSectRelation(g4, 'blood-saber-sect', 'ten-thousand-sword-sect', 'rival', -1);
+  const eHigh = g4.edges.find((e: any) => e.from === 'blood-saber-sect' && e.to === 'qingyun-pavilion');
+  const eLow = g5.edges.find((e: any) => e.from === 'blood-saber-sect' && e.to === 'ten-thousand-sword-sect');
+  assert(eHigh && eHigh.intensity === 1, 'intensity clamped to 1, got ' + (eHigh && eHigh.intensity));
+  assert(eLow && eLow.intensity === 0, 'intensity clamped to 0, got ' + (eLow && eLow.intensity));
+
+  log('smoke-h-302-sect-relation-set', {
+    passed: true,
+    edgeCountAfter: g5.edges.length,
+    overwriteKept: g3.edges.length === 1,
+    clampHigh: eHigh && eHigh.intensity,
+    clampLow: eLow && eLow.intensity,
+  });
+}
+
+function smokeH303PlayerAffinityV2(): void {
+  let g = buildEmptySectGraph();
+  g = addSectNode(g, { id: 'qingyun-pavilion', name: '青云阁', alignment: 'qingyun-pavilion', realmTierMin: 1, realmTierMax: 9, powerRank: 3, currentLeader: '云虚真人', seatLocation: 'central/qingyun', publicStance: 'righteous' });
+  g = addSectNode(g, { id: 'blood-saber-sect', name: '血刀宗', alignment: 'blood-saber-sect', realmTierMin: 2, realmTierMax: 9, powerRank: 5, currentLeader: '血刀老祖', seatLocation: 'north/blood', publicStance: 'demonic' });
+  g = addSectNode(g, { id: 'ten-thousand-sword-sect', name: '万剑宗', alignment: 'ten-thousand-sword-sect', realmTierMin: 3, realmTierMax: 9, powerRank: 2, currentLeader: '剑尊', seatLocation: 'north/tws', publicStance: 'righteous' });
+  g = setSectRelation(g, 'qingyun-pavilion', 'ten-thousand-sword-sect', 'ally', 0.8);
+  g = setSectRelation(g, 'blood-saber-sect', 'qingyun-pavilion', 'enemy', 0.9);
+
+  // 1) 出身 qingyun-pavilion + master=云虚真人：affinity 应 > 0.6
+  const char1: any = { faction: 'qingyun-pavilion', master: '云虚真人', reputation: 50 };
+  const aff1 = derivePlayerSectAffinity(char1, g);
+  assert(aff1.aligned === 'qingyun-pavilion', 'aligned = qingyun-pavilion');
+  assert(aff1.affinity >= 0.75, 'faction+master gives >=0.75, got ' + aff1.affinity);
+  assert(aff1.affinity <= 1, 'affinity clamped to 1, got ' + aff1.affinity);
+  assert(typeof aff1.reason === 'string' && aff1.reason.length > 0, 'reason non-empty');
+
+  // 2) 出身 blood-saber-sect，无 master，敌对 qingyun：affinity 应仍 > 0（自身）
+  const char2: any = { faction: 'blood-saber-sect', reputation: 30 };
+  const aff2 = derivePlayerSectAffinity(char2, g);
+  assert(aff2.aligned === 'blood-saber-sect', 'aligned = blood-saber-sect');
+  assert(aff2.affinity >= 0.5, 'own-faction baseline >=0.5, got ' + aff2.affinity);
+
+  // 3) 无 faction，无 master：高名望散修微加成
+  const char3: any = { faction: '', master: '', reputation: 80 };
+  const aff3 = derivePlayerSectAffinity(char3, g);
+  assert(aff3.aligned === 'wandering-cultivator', 'no faction defaults to wandering-cultivator');
+  assert(aff3.affinity >= 0.1, 'reputation>=80 gives at least 0.1 wandering bonus, got ' + aff3.affinity);
+
+  // 4) 无 faction，无 master，低名望：affinity=0
+  const char4: any = { faction: '', master: '', reputation: 10 };
+  const aff4 = derivePlayerSectAffinity(char4, g);
+  assert(aff4.affinity === 0, 'low-rep neutral gives 0, got ' + aff4.affinity);
+
+  log('smoke-h-303-player-sect-affinity', {
+    passed: true,
+    char1: { aligned: aff1.aligned, affinity: aff1.affinity },
+    char2: { aligned: aff2.aligned, affinity: aff2.affinity },
+    char3: { aligned: aff3.aligned, affinity: aff3.affinity },
+    char4: { aligned: aff4.aligned, affinity: aff4.affinity },
+  });
+}
+
+function smokeH304QueryRelationsV2(): void {
+  let g = buildEmptySectGraph();
+  g = addSectNode(g, { id: 'qingyun-pavilion', name: '青云阁', alignment: 'qingyun-pavilion', realmTierMin: 1, realmTierMax: 9, powerRank: 3, currentLeader: '云虚真人', seatLocation: 'central/qingyun', publicStance: 'righteous' });
+  g = addSectNode(g, { id: 'blood-saber-sect', name: '血刀宗', alignment: 'blood-saber-sect', realmTierMin: 2, realmTierMax: 9, powerRank: 5, currentLeader: '血刀老祖', seatLocation: 'north/blood', publicStance: 'demonic' });
+  g = addSectNode(g, { id: 'ten-thousand-sword-sect', name: '万剑宗', alignment: 'ten-thousand-sword-sect', realmTierMin: 3, realmTierMax: 9, powerRank: 2, currentLeader: '剑尊', seatLocation: 'north/tws', publicStance: 'righteous' });
+  g = addSectNode(g, { id: 'heavenly-talisman-sect', name: '天符宗', alignment: 'heavenly-talisman-sect', realmTierMin: 3, realmTierMax: 9, powerRank: 4, currentLeader: '符圣', seatLocation: 'east/hts', publicStance: 'righteous' });
+  g = setSectRelation(g, 'qingyun-pavilion', 'blood-saber-sect', 'enemy', 0.95);
+  g = setSectRelation(g, 'ten-thousand-sword-sect', 'blood-saber-sect', 'rival', 0.6);
+  g = setSectRelation(g, 'heavenly-talisman-sect', 'blood-saber-sect', 'wary-respect', 0.4);
+  g = setSectRelation(g, 'qingyun-pavilion', 'ten-thousand-sword-sect', 'ally', 0.8);
+
+  // blood-saber-sect 应有 3 条入边
+  const incoming = queryRelationsTowards(g, 'blood-saber-sect');
+  assert(incoming.length === 3, 'blood-saber-sect has 3 incoming edges, got ' + incoming.length);
+  assert(incoming.every((e: any) => e.to === 'blood-saber-sect'), 'all incoming edges target blood-saber-sect');
+  const relations = incoming.map((e: any) => e.relation).sort();
+  assert(relations.indexOf('enemy') >= 0 && relations.indexOf('rival') >= 0 && relations.indexOf('wary-respect') >= 0, 'all 3 relations present');
+
+  // ten-thousand-sword-sect 应有 1 条入边 (来自 qingyun-pavilion)
+  const incoming2 = queryRelationsTowards(g, 'ten-thousand-sword-sect');
+  assert(incoming2.length === 1, 'ten-thousand-sword-sect has 1 incoming edge, got ' + incoming2.length);
+  assert(incoming2[0].from === 'qingyun-pavilion' && incoming2[0].relation === 'ally', 'incoming edge from qingyun-pavilion ally');
+
+  // qingyun-pavilion 无入边（但有出边）
+  const incoming3 = queryRelationsTowards(g, 'qingyun-pavilion');
+  assert(incoming3.length === 0, 'qingyun-pavilion has 0 incoming edges, got ' + incoming3.length);
+
+  // 不存在的 target：返回空数组
+  const incomingNone = queryRelationsTowards(g, 'no-such-sect');
+  assert(Array.isArray(incomingNone) && incomingNone.length === 0, 'unknown target returns []');
+
+  // 空字符串 target：返回空数组
+  const incomingEmpty = queryRelationsTowards(g, '');
+  assert(Array.isArray(incomingEmpty) && incomingEmpty.length === 0, 'empty target returns []');
+
+  log('smoke-h-304-query-relations', {
+    passed: true,
+    bloodSaberIncoming: incoming.length,
+    tenThousandSwordIncoming: incoming2.length,
+    qingyunIncoming: incoming3.length,
+    unknownIncoming: incomingNone.length,
+  });
+}
+
+function pgRunPhaseHSmokeAWorkerAV2(): void {
+  smokeH301EmptyAndAddV2();
+  smokeH302RelationSetV2();
+  smokeH303PlayerAffinityV2();
+  smokeH304QueryRelationsV2();
+}
+
+
+// === phase-h worker D: crafting + technique smokes (h-331..h-334) ===
+function smokeH331CraftingEligibility(): void {
+  const recipe = { id: 'r-1', name: '凝元丹', kind: 'pill-refining', requiredRealm: 1, requiredElements: ['gold', 'fire'], materials: [{ id: 'herb-1' }, { id: 'herb-2' }], toolIds: ['cauldron'], successRate: 0.6, sideEffectChance: 0.1 };
+  const character = { age: 18, realm: 2, realmLevel: 2, spiritualRoots: ['gold', 'fire', 'wood'], inventory: [{ id: 'herb-1' }, { id: 'herb-2' }, { id: 'cauldron' }] };
+  const result = deriveCraftingEligibility(recipe, character, character.inventory);
+  assert(result.eligible === true, 'eligible should be true, got ' + JSON.stringify(result));
+  const poorChar = { age: 18, realm: 2, realmLevel: 2, spiritualRoots: ['gold', 'fire', 'wood'], inventory: [{ id: 'cauldron' }] };
+  const poor = deriveCraftingEligibility(recipe, poorChar, poorChar.inventory);
+  assert(poor.eligible === false, 'missing materials should be ineligible, got ' + JSON.stringify(poor));
+  assert(Array.isArray(poor.missing) && poor.missing.length > 0, 'missing list should be non-empty');
+}
+
+function smokeH332CraftingStep(): void {
+  const recipe = { id: 'r-1', name: '凝元丹', kind: 'pill-refining', requiredRealm: 1, requiredElements: ['gold', 'fire'], materials: [{ id: 'herb-1' }, { id: 'herb-2' }], toolIds: ['cauldron'], successRate: 1.0, sideEffectChance: 0.0 };
+  const character = { age: 18, realm: 2, spiritualRoots: ['gold', 'fire', 'wood'] };
+  const session = startCraftingSession(recipe, character);
+  assert(session.recipeId === 'r-1', 'session should hold recipe id');
+  assert(typeof session.startedAge === 'number', 'startedAge numeric');
+  assert(typeof session.currentStep === 'number' && session.totalSteps > 0, 'step counters valid');
+  const step1 = resolveCraftingStep(session, character, function () { return 0.5; });
+  assert(step1.session.currentStep >= 1, 'step should advance');
+}
+
+function smokeH333TechniqueProgress(): void {
+  const character = { age: 25, realm: 3, spiritualRoots: ['water', 'wood'], intellect: 8 };
+  const technique = { id: 't-1', name: '潮汐诀', element: 'water', requiredRealm: 2 };
+  const practice = { sessions: 5, comprehensionEvents: [], breakthroughs: [] };
+  const study = deriveTechniqueProgress(technique, character, practice);
+  assert(study.techniqueId === 't-1', 'study should hold technique id');
+  assert(typeof study.currentProgress === 'number' && study.currentProgress >= 0 && study.currentProgress <= 1, 'progress in [0, 1]');
+}
+
+function smokeH334TechniqueBreakthrough(): void {
+  const character = { age: 30, realm: 4, spiritualRoots: ['gold', 'metal'] };
+  const study = { techniqueId: 't-1', currentProgress: 0.95, comprehensionEvents: [{ age: 28, note: '顿悟' }], breakthroughs: [] };
+  const result = resolveTechniqueBreakthrough(study, character);
+  assert(typeof result.newProgress === 'number' && result.newProgress >= 0 && result.newProgress <= 1, 'newProgress in [0, 1]');
+  assert(typeof result.breakthrough === 'boolean', 'breakthrough boolean');
+}
+
+function pgRunPhaseHDWorkerDSmokes(): void {
+  const cases = [
+    { name: 'smoke-h-331-crafting-eligibility', fn: smokeH331CraftingEligibility },
+    { name: 'smoke-h-332-crafting-step', fn: smokeH332CraftingStep },
+    { name: 'smoke-h-333-technique-progress', fn: smokeH333TechniqueProgress },
+    { name: 'smoke-h-334-technique-breakthrough', fn: smokeH334TechniqueBreakthrough },
+  ];
+  for (const c of cases) {
+    try { c.fn(); log(c.name, { passed: true }); }
+    catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
+  }
+}
+
