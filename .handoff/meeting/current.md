@@ -1,5 +1,6 @@
 # ??????
 
 > ????: phase-d-tribulation-callbacks-and-db-migration [ARCHIVED commit 1c213c7]
-> ????: phase-e-parallel-grand-slam [AGENDA]
-> ??: 2 subagent ?? (worker-A + worker-B)
+> ????: phase-f-owner-delegation-full-pipeline [AGENDA]
+> ??: 4 subagent ?? (A types/engine + B UI + C perf/test + D docs)
+> ? 20 ?, ? 60-90 ??
