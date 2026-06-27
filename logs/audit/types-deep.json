@@ -1,0 +1,3583 @@
+{
+  "date": "2026-06-27T02:39:32.622Z",
+  "surface": [
+    {
+      "name": "Realm",
+      "kind": "type",
+      "startLine": 7,
+      "endLine": 18,
+      "sizeChars": 293,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "RealmTraits",
+      "kind": "interface",
+      "startLine": 18,
+      "endLine": 32,
+      "sizeChars": 301,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 10,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatProjectionTraits",
+      "kind": "interface",
+      "startLine": 32,
+      "endLine": 47,
+      "sizeChars": 332,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 12,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "RealmInfo",
+      "kind": "interface",
+      "startLine": 47,
+      "endLine": 59,
+      "sizeChars": 256,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 8,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "RealmProfile",
+      "kind": "interface",
+      "startLine": 59,
+      "endLine": 287,
+      "sizeChars": 15843,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 187,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "SpiritualRoot",
+      "kind": "type",
+      "startLine": 287,
+      "endLine": 295,
+      "sizeChars": 205,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "SpiritualRootInfo",
+      "kind": "interface",
+      "startLine": 295,
+      "endLine": 314,
+      "sizeChars": 953,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 12,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "Element",
+      "kind": "type",
+      "startLine": 314,
+      "endLine": 315,
+      "sizeChars": 70,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ElementType",
+      "kind": "type",
+      "startLine": 315,
+      "endLine": 327,
+      "sizeChars": 461,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "StatusCategory",
+      "kind": "type",
+      "startLine": 327,
+      "endLine": 331,
+      "sizeChars": 151,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ConstitutionCategory",
+      "kind": "type",
+      "startLine": 331,
+      "endLine": 332,
+      "sizeChars": 95,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ConstitutionRiskType",
+      "kind": "type",
+      "startLine": 332,
+      "endLine": 334,
+      "sizeChars": 102,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ConstitutionAwakeningStage",
+      "kind": "interface",
+      "startLine": 334,
+      "endLine": 344,
+      "sizeChars": 205,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 7,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ConstitutionProfile",
+      "kind": "interface",
+      "startLine": 344,
+      "endLine": 359,
+      "sizeChars": 445,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 12,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "StatusEntry",
+      "kind": "interface",
+      "startLine": 359,
+      "endLine": 371,
+      "sizeChars": 341,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 9,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EffectOperation",
+      "kind": "type",
+      "startLine": 371,
+      "endLine": 373,
+      "sizeChars": 96,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "StatusEffect",
+      "kind": "interface",
+      "startLine": 373,
+      "endLine": 382,
+      "sizeChars": 191,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ItemType",
+      "kind": "type",
+      "startLine": 382,
+      "endLine": 385,
+      "sizeChars": 183,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EquipSlot",
+      "kind": "type",
+      "startLine": 385,
+      "endLine": 404,
+      "sizeChars": 703,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 9,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "TechniqueRequirement",
+      "kind": "interface",
+      "startLine": 404,
+      "endLine": 413,
+      "sizeChars": 468,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "TechniqueTrait",
+      "kind": "interface",
+      "startLine": 413,
+      "endLine": 420,
+      "sizeChars": 125,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ArtifactAbility",
+      "kind": "interface",
+      "startLine": 420,
+      "endLine": 432,
+      "sizeChars": 333,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 9,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "TechniqueProfile",
+      "kind": "interface",
+      "startLine": 432,
+      "endLine": 442,
+      "sizeChars": 443,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CultivationFactor",
+      "kind": "interface",
+      "startLine": 442,
+      "endLine": 450,
+      "sizeChars": 347,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 5,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ItemEntry",
+      "kind": "interface",
+      "startLine": 450,
+      "endLine": 473,
+      "sizeChars": 796,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 13,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "AlchemyAIOutcome",
+      "kind": "interface",
+      "startLine": 473,
+      "endLine": 485,
+      "sizeChars": 601,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 8,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "MarketAIItem",
+      "kind": "interface",
+      "startLine": 485,
+      "endLine": 486,
+      "sizeChars": 84,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": "ItemEntry"
+    },
+    {
+      "name": "MarketAIOutcome",
+      "kind": "interface",
+      "startLine": 486,
+      "endLine": 488,
+      "sizeChars": 104,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "AuctionAIOutcome",
+      "kind": "interface",
+      "startLine": 488,
+      "endLine": 495,
+      "sizeChars": 330,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatLootAIOutcome",
+      "kind": "interface",
+      "startLine": 495,
+      "endLine": 497,
+      "sizeChars": 109,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetBondAIOutcome",
+      "kind": "interface",
+      "startLine": 497,
+      "endLine": 512,
+      "sizeChars": 381,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 12,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetCareAIOutcome",
+      "kind": "interface",
+      "startLine": 512,
+      "endLine": 527,
+      "sizeChars": 390,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 8,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "BlueprintCategory",
+      "kind": "type",
+      "startLine": 527,
+      "endLine": 541,
+      "sizeChars": 545,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EventBlueprint",
+      "kind": "interface",
+      "startLine": 541,
+      "endLine": 596,
+      "sizeChars": 5568,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 11,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CharacterIntent",
+      "kind": "interface",
+      "startLine": 596,
+      "endLine": 610,
+      "sizeChars": 598,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PendingThread",
+      "kind": "interface",
+      "startLine": 610,
+      "endLine": 630,
+      "sizeChars": 906,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 17,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "QuestEntryStage",
+      "kind": "type",
+      "startLine": 630,
+      "endLine": 631,
+      "sizeChars": 75,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "QuestEntryKind",
+      "kind": "type",
+      "startLine": 631,
+      "endLine": 635,
+      "sizeChars": 206,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "QuestEntry",
+      "kind": "interface",
+      "startLine": 635,
+      "endLine": 657,
+      "sizeChars": 463,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 16,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatActionGroupKey",
+      "kind": "type",
+      "startLine": 657,
+      "endLine": 658,
+      "sizeChars": 106,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatTempo",
+      "kind": "type",
+      "startLine": 658,
+      "endLine": 659,
+      "sizeChars": 114,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatActionOptionType",
+      "kind": "type",
+      "startLine": 659,
+      "endLine": 660,
+      "sizeChars": 131,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatActionOptionSource",
+      "kind": "type",
+      "startLine": 660,
+      "endLine": 664,
+      "sizeChars": 366,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatActionOption",
+      "kind": "interface",
+      "startLine": 664,
+      "endLine": 686,
+      "sizeChars": 549,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 18,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatActionGroup",
+      "kind": "interface",
+      "startLine": 686,
+      "endLine": 693,
+      "sizeChars": 144,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatTacticalSituation",
+      "kind": "interface",
+      "startLine": 693,
+      "endLine": 702,
+      "sizeChars": 228,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatActionPalette",
+      "kind": "interface",
+      "startLine": 702,
+      "endLine": 714,
+      "sizeChars": 354,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 9,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CultivationAttributeEntry",
+      "kind": "interface",
+      "startLine": 714,
+      "endLine": 724,
+      "sizeChars": 249,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 7,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatEnemy",
+      "kind": "interface",
+      "startLine": 724,
+      "endLine": 741,
+      "sizeChars": 614,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 12,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatRound",
+      "kind": "interface",
+      "startLine": 741,
+      "endLine": 773,
+      "sizeChars": 1298,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 24,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatRoundProposal",
+      "kind": "interface",
+      "startLine": 773,
+      "endLine": 804,
+      "sizeChars": 1009,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 23,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatSession",
+      "kind": "interface",
+      "startLine": 804,
+      "endLine": 876,
+      "sizeChars": 2843,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 49,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "WorldNpcAttitude",
+      "kind": "type",
+      "startLine": 876,
+      "endLine": 878,
+      "sizeChars": 101,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "WorldNpc",
+      "kind": "interface",
+      "startLine": 878,
+      "endLine": 903,
+      "sizeChars": 687,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 19,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "NpcRef",
+      "kind": "interface",
+      "startLine": 903,
+      "endLine": 910,
+      "sizeChars": 169,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CausalNodeType",
+      "kind": "type",
+      "startLine": 910,
+      "endLine": 911,
+      "sizeChars": 140,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CausalEdgeType",
+      "kind": "type",
+      "startLine": 911,
+      "endLine": 913,
+      "sizeChars": 152,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CausalNode",
+      "kind": "interface",
+      "startLine": 913,
+      "endLine": 923,
+      "sizeChars": 170,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 7,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CausalEdge",
+      "kind": "interface",
+      "startLine": 923,
+      "endLine": 932,
+      "sizeChars": 145,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CausalGraph",
+      "kind": "interface",
+      "startLine": 932,
+      "endLine": 938,
+      "sizeChars": 111,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 3,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "WorldFactKind",
+      "kind": "type",
+      "startLine": 938,
+      "endLine": 940,
+      "sizeChars": 131,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "WorldFact",
+      "kind": "interface",
+      "startLine": 940,
+      "endLine": 953,
+      "sizeChars": 245,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 10,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ScheduledEventKind",
+      "kind": "type",
+      "startLine": 953,
+      "endLine": 954,
+      "sizeChars": 97,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ScheduledEventAction",
+      "kind": "type",
+      "startLine": 954,
+      "endLine": 955,
+      "sizeChars": 125,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ScheduledEventResolutionStage",
+      "kind": "type",
+      "startLine": 955,
+      "endLine": 957,
+      "sizeChars": 121,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ScheduledEventHint",
+      "kind": "interface",
+      "startLine": 957,
+      "endLine": 971,
+      "sizeChars": 345,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 11,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "WorldPressureOpportunityMap",
+      "kind": "interface",
+      "startLine": 971,
+      "endLine": 980,
+      "sizeChars": 206,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EventSchedulerPlan",
+      "kind": "interface",
+      "startLine": 980,
+      "endLine": 988,
+      "sizeChars": 203,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 5,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "InputClass",
+      "kind": "type",
+      "startLine": 988,
+      "endLine": 990,
+      "sizeChars": 87,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "NarrativeFocusKind",
+      "kind": "type",
+      "startLine": 990,
+      "endLine": 991,
+      "sizeChars": 113,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "NarrativeOutcomeKind",
+      "kind": "type",
+      "startLine": 991,
+      "endLine": 993,
+      "sizeChars": 110,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "NarrativeContract",
+      "kind": "interface",
+      "startLine": 993,
+      "endLine": 1002,
+      "sizeChars": 246,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "NarrativeContractFeedbackEntry",
+      "kind": "interface",
+      "startLine": 1002,
+      "endLine": 1019,
+      "sizeChars": 436,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 13,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "TimeAdvance",
+      "kind": "interface",
+      "startLine": 1019,
+      "endLine": 1028,
+      "sizeChars": 232,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ActionProjection",
+      "kind": "interface",
+      "startLine": 1028,
+      "endLine": 1042,
+      "sizeChars": 455,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 11,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "AIEventOutput",
+      "kind": "interface",
+      "startLine": 1042,
+      "endLine": 1149,
+      "sizeChars": 3268,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 44,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "AttributeChange",
+      "kind": "interface",
+      "startLine": 1149,
+      "endLine": 1155,
+      "sizeChars": 149,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 3,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "SpiritualRootChange",
+      "kind": "interface",
+      "startLine": 1155,
+      "endLine": 1161,
+      "sizeChars": 121,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 3,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EffectResolveSeverity",
+      "kind": "type",
+      "startLine": 1161,
+      "endLine": 1163,
+      "sizeChars": 69,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EffectResolveTrace",
+      "kind": "interface",
+      "startLine": 1163,
+      "endLine": 1174,
+      "sizeChars": 218,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 8,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EffectResolveResult",
+      "kind": "interface",
+      "startLine": 1174,
+      "endLine": 1181,
+      "sizeChars": 180,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ChoicePrompt",
+      "kind": "interface",
+      "startLine": 1181,
+      "endLine": 1186,
+      "sizeChars": 101,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 2,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ChoiceOption",
+      "kind": "interface",
+      "startLine": 1186,
+      "endLine": 1193,
+      "sizeChars": 136,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 2,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ChoiceResultOutput",
+      "kind": "interface",
+      "startLine": 1193,
+      "endLine": 1229,
+      "sizeChars": 1067,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 27,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "InterfereOutput",
+      "kind": "interface",
+      "startLine": 1229,
+      "endLine": 1267,
+      "sizeChars": 1251,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 27,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EngineStateContext",
+      "kind": "interface",
+      "startLine": 1267,
+      "endLine": 1349,
+      "sizeChars": 3284,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 58,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FateNode",
+      "kind": "interface",
+      "startLine": 1349,
+      "endLine": 1374,
+      "sizeChars": 1804,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 8,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "EquippedMap",
+      "kind": "type",
+      "startLine": 1374,
+      "endLine": 1376,
+      "sizeChars": 68,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CharacterState",
+      "kind": "interface",
+      "startLine": 1376,
+      "endLine": 1468,
+      "sizeChars": 3485,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 63,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "SectHistoryEntry",
+      "kind": "interface",
+      "startLine": 1468,
+      "endLine": 1478,
+      "sizeChars": 298,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 5,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FormationType",
+      "kind": "type",
+      "startLine": 1478,
+      "endLine": 1490,
+      "sizeChars": 414,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "Formation",
+      "kind": "interface",
+      "startLine": 1490,
+      "endLine": 1518,
+      "sizeChars": 761,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 16,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "AlchemyHeatLevel",
+      "kind": "type",
+      "startLine": 1518,
+      "endLine": 1521,
+      "sizeChars": 149,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FormationCategory",
+      "kind": "type",
+      "startLine": 1521,
+      "endLine": 1525,
+      "sizeChars": 189,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "TribulationStage",
+      "kind": "type",
+      "startLine": 1525,
+      "endLine": 1533,
+      "sizeChars": 247,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "HeartDemonType",
+      "kind": "type",
+      "startLine": 1533,
+      "endLine": 1537,
+      "sizeChars": 165,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "WorldTier",
+      "kind": "type",
+      "startLine": 1537,
+      "endLine": 1540,
+      "sizeChars": 100,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "AscensionRequirement",
+      "kind": "interface",
+      "startLine": 1540,
+      "endLine": 1552,
+      "sizeChars": 312,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 8,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "AscensionSession",
+      "kind": "interface",
+      "startLine": 1552,
+      "endLine": 1566,
+      "sizeChars": 377,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 9,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "RestrictionType",
+      "kind": "type",
+      "startLine": 1566,
+      "endLine": 1569,
+      "sizeChars": 128,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "RestrictionAccessMethod",
+      "kind": "type",
+      "startLine": 1569,
+      "endLine": 1572,
+      "sizeChars": 115,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "Restriction",
+      "kind": "interface",
+      "startLine": 1572,
+      "endLine": 1587,
+      "sizeChars": 469,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 11,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "TribulationSession",
+      "kind": "interface",
+      "startLine": 1587,
+      "endLine": 1604,
+      "sizeChars": 540,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 13,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetSpecies",
+      "kind": "type",
+      "startLine": 1604,
+      "endLine": 1618,
+      "sizeChars": 412,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "Pet",
+      "kind": "interface",
+      "startLine": 1618,
+      "endLine": 1690,
+      "sizeChars": 4219,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 52,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "TalismanType",
+      "kind": "type",
+      "startLine": 1690,
+      "endLine": 1708,
+      "sizeChars": 539,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "SecretRealmTier",
+      "kind": "type",
+      "startLine": 1708,
+      "endLine": 1716,
+      "sizeChars": 248,
+      "hasIndexSig": false,
+      "hasGenericParam": true,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "SecretRealm",
+      "kind": "interface",
+      "startLine": 1716,
+      "endLine": 1860,
+      "sizeChars": 5356,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 109,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ExplorationRecord",
+      "kind": "interface",
+      "startLine": 1860,
+      "endLine": 1872,
+      "sizeChars": 397,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PillSideEffect",
+      "kind": "type",
+      "startLine": 1872,
+      "endLine": 1879,
+      "sizeChars": 241,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PillEffectiveness",
+      "kind": "interface",
+      "startLine": 1879,
+      "endLine": 1900,
+      "sizeChars": 588,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 12,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PillSideEffectResolution",
+      "kind": "interface",
+      "startLine": 1900,
+      "endLine": 1914,
+      "sizeChars": 506,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 7,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FormationDrawingStep",
+      "kind": "type",
+      "startLine": 1914,
+      "endLine": 1922,
+      "sizeChars": 240,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FormationDrawingSession",
+      "kind": "interface",
+      "startLine": 1922,
+      "endLine": 1944,
+      "sizeChars": 537,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 13,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FormationDrawingProgress",
+      "kind": "interface",
+      "startLine": 1944,
+      "endLine": 1957,
+      "sizeChars": 419,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetEvolutionStage",
+      "kind": "type",
+      "startLine": 1957,
+      "endLine": 1964,
+      "sizeChars": 167,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetEvolutionRequirement",
+      "kind": "interface",
+      "startLine": 1964,
+      "endLine": 1977,
+      "sizeChars": 255,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 5,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetEvolutionEligibility",
+      "kind": "interface",
+      "startLine": 1977,
+      "endLine": 1989,
+      "sizeChars": 335,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 5,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetInsight",
+      "kind": "interface",
+      "startLine": 1989,
+      "endLine": 2004,
+      "sizeChars": 429,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 9,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetCommunication",
+      "kind": "interface",
+      "startLine": 2004,
+      "endLine": 2018,
+      "sizeChars": 417,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetCombatSkill",
+      "kind": "interface",
+      "startLine": 2018,
+      "endLine": 2035,
+      "sizeChars": 433,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 8,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetSkillUsage",
+      "kind": "interface",
+      "startLine": 2035,
+      "endLine": 2042,
+      "sizeChars": 161,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 3,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetCombatSkillEvent",
+      "kind": "interface",
+      "startLine": 2042,
+      "endLine": 2057,
+      "sizeChars": 439,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 10,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatStance",
+      "kind": "type",
+      "startLine": 2057,
+      "endLine": 2064,
+      "sizeChars": 187,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatStanceUsage",
+      "kind": "interface",
+      "startLine": 2064,
+      "endLine": 2078,
+      "sizeChars": 341,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatResourceType",
+      "kind": "type",
+      "startLine": 2078,
+      "endLine": 2085,
+      "sizeChars": 185,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatResourceUsage",
+      "kind": "interface",
+      "startLine": 2085,
+      "endLine": 2099,
+      "sizeChars": 354,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 5,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "BreakthroughStage",
+      "kind": "type",
+      "startLine": 2099,
+      "endLine": 2107,
+      "sizeChars": 209,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "BreakthroughAttempt",
+      "kind": "interface",
+      "startLine": 2107,
+      "endLine": 2122,
+      "sizeChars": 424,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 7,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ComboChain",
+      "kind": "interface",
+      "startLine": 2122,
+      "endLine": 2162,
+      "sizeChars": 1034,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 17,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "CombatLogEntry",
+      "kind": "interface",
+      "startLine": 2162,
+      "endLine": 2171,
+      "sizeChars": 171,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 5,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "LootTable",
+      "kind": "interface",
+      "startLine": 2171,
+      "endLine": 2177,
+      "sizeChars": 99,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 3,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "LootCondition",
+      "kind": "interface",
+      "startLine": 2177,
+      "endLine": 2189,
+      "sizeChars": 311,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 8,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "StatusExpireRule",
+      "kind": "type",
+      "startLine": 2189,
+      "endLine": 2195,
+      "sizeChars": 85,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "StatusExpiryMeta",
+      "kind": "interface",
+      "startLine": 2195,
+      "endLine": 2202,
+      "sizeChars": 150,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 3,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PetCultivationPath",
+      "kind": "type",
+      "startLine": 2202,
+      "endLine": 2209,
+      "sizeChars": 133,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PillRecipeUnlockCondition",
+      "kind": "type",
+      "startLine": 2209,
+      "endLine": 2215,
+      "sizeChars": 94,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PillRecipe",
+      "kind": "interface",
+      "startLine": 2215,
+      "endLine": 2227,
+      "sizeChars": 366,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 9,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "PillCraftResult",
+      "kind": "interface",
+      "startLine": 2227,
+      "endLine": 2235,
+      "sizeChars": 170,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FormationStackRule",
+      "kind": "type",
+      "startLine": 2235,
+      "endLine": 2241,
+      "sizeChars": 96,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FormationStackResult",
+      "kind": "interface",
+      "startLine": 2241,
+      "endLine": 2249,
+      "sizeChars": 177,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "BidderPersonality",
+      "kind": "type",
+      "startLine": 2249,
+      "endLine": 2255,
+      "sizeChars": 93,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "BidderAction",
+      "kind": "interface",
+      "startLine": 2255,
+      "endLine": 2263,
+      "sizeChars": 164,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "ThreadChainNode",
+      "kind": "interface",
+      "startLine": 2263,
+      "endLine": 2273,
+      "sizeChars": 233,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "BottleSpirit",
+      "kind": "interface",
+      "startLine": 2273,
+      "endLine": 2282,
+      "sizeChars": 170,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 6,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "SwordAptitude",
+      "kind": "type",
+      "startLine": 2282,
+      "endLine": 2288,
+      "sizeChars": 84,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "InnatePhysique",
+      "kind": "type",
+      "startLine": 2288,
+      "endLine": 2296,
+      "sizeChars": 134,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 0,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "FakeDeathRule",
+      "kind": "interface",
+      "startLine": 2296,
+      "endLine": 2304,
+      "sizeChars": 168,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 4,
+      "literalFields": [],
+      "extendsOther": null
+    },
+    {
+      "name": "NPCMemoryEntry",
+      "kind": "interface",
+      "startLine": 2304,
+      "endLine": 2313,
+      "sizeChars": 221,
+      "hasIndexSig": false,
+      "hasGenericParam": false,
+      "fieldCount": 5,
+      "literalFields": [],
+      "extendsOther": null
+    }
+  ],
+  "enums": [],
+  "literalUnions": [
+    {
+      "name": "Realm",
+      "literals": [
+        "mortal",
+        "qi_refining",
+        "foundation",
+        "golden_core",
+        "nascent_soul",
+        "spirit_severing",
+        "great_vehicle",
+        "tribulation",
+        "ascension"
+      ]
+    },
+    {
+      "name": "SpiritualRoot",
+      "literals": [
+        "none",
+        "mixed",
+        "common",
+        "pure",
+        "heavenly",
+        "chaos"
+      ]
+    },
+    {
+      "name": "Element",
+      "literals": [
+        "metal",
+        "wood",
+        "water",
+        "fire",
+        "earth"
+      ]
+    },
+    {
+      "name": "StatusCategory",
+      "literals": [
+        "attribute",
+        "skill",
+        "buff",
+        "debuff",
+        "special",
+        "constitution",
+        "identity",
+        "quest",
+        "environment"
+      ]
+    },
+    {
+      "name": "ConstitutionCategory",
+      "literals": [
+        "element",
+        "combat",
+        "social",
+        "fate",
+        "body",
+        "dao"
+      ]
+    },
+    {
+      "name": "ConstitutionRiskType",
+      "literals": [
+        "none",
+        "heart_demon",
+        "backlash",
+        "attention",
+        "conflict"
+      ]
+    },
+    {
+      "name": "EffectOperation",
+      "literals": [
+        "add",
+        "multiply",
+        "override",
+        "cap",
+        "floor",
+        "trigger"
+      ]
+    },
+    {
+      "name": "ItemType",
+      "literals": [
+        "weapon",
+        "armor",
+        "accessory",
+        "artifact",
+        "consumable",
+        "material",
+        "tool",
+        "scripture"
+      ]
+    },
+    {
+      "name": "EquipSlot",
+      "literals": [
+        "weapon",
+        "armor",
+        "accessory",
+        "artifact",
+        "scripture"
+      ]
+    },
+    {
+      "name": "BlueprintCategory",
+      "literals": [
+        "cultivation",
+        "encounter",
+        "social",
+        "combat",
+        "trade",
+        "exploration",
+        "heritage",
+        "trial",
+        "emotion",
+        "inner_demon",
+        "thread_resolve",
+        "daily"
+      ]
+    },
+    {
+      "name": "QuestEntryStage",
+      "literals": [
+        "open",
+        "urgent",
+        "completed",
+        "failed"
+      ]
+    },
+    {
+      "name": "CombatActionGroupKey",
+      "literals": [
+        "basicAttack",
+        "technique",
+        "spell",
+        "defense",
+        "item",
+        "other"
+      ]
+    },
+    {
+      "name": "CombatTempo",
+      "literals": [
+        "pressing",
+        "stalemate",
+        "opening",
+        "danger",
+        "flee_window",
+        "turning",
+        "chaos"
+      ]
+    },
+    {
+      "name": "CombatActionOptionType",
+      "literals": [
+        "basic_attack",
+        "technique",
+        "spell",
+        "defense",
+        "item",
+        "talisman",
+        "other",
+        "flee"
+      ]
+    },
+    {
+      "name": "CombatActionOptionSource",
+      "literals": [
+        "body",
+        "weapon",
+        "technique",
+        "spell",
+        "artifact",
+        "armor",
+        "item",
+        "environment",
+        "social",
+        "pet",
+        "status",
+        "ai"
+      ]
+    },
+    {
+      "name": "WorldNpcAttitude",
+      "literals": [
+        "ally",
+        "friendly",
+        "neutral",
+        "hostile",
+        "enemy",
+        "unknown"
+      ]
+    },
+    {
+      "name": "CausalNodeType",
+      "literals": [
+        "event",
+        "thread",
+        "npc",
+        "item",
+        "status",
+        "realm",
+        "memory",
+        "choice",
+        "combat",
+        "pet",
+        "system"
+      ]
+    },
+    {
+      "name": "CausalEdgeType",
+      "literals": [
+        "created",
+        "updated",
+        "resolved",
+        "failed",
+        "mentions",
+        "caused",
+        "rewards",
+        "harms",
+        "continues",
+        "triggers"
+      ]
+    },
+    {
+      "name": "WorldFactKind",
+      "literals": [
+        "location",
+        "faction",
+        "realm",
+        "npc",
+        "relationship",
+        "rule",
+        "lore",
+        "resource",
+        "event"
+      ]
+    },
+    {
+      "name": "ScheduledEventKind",
+      "literals": [
+        "quest",
+        "deadline",
+        "realm",
+        "npc",
+        "world",
+        "downtime"
+      ]
+    },
+    {
+      "name": "ScheduledEventAction",
+      "literals": [
+        "advance",
+        "advance_or_resolve",
+        "resolve_or_fail",
+        "echo_or_develop",
+        "background"
+      ]
+    },
+    {
+      "name": "ScheduledEventResolutionStage",
+      "literals": [
+        "open",
+        "escalating",
+        "cooling",
+        "background",
+        "resolved",
+        "failed"
+      ]
+    },
+    {
+      "name": "InputClass",
+      "literals": [
+        "action",
+        "dialogue",
+        "overreach",
+        "rule_manipulation"
+      ]
+    },
+    {
+      "name": "NarrativeFocusKind",
+      "literals": [
+        "threat",
+        "opportunity",
+        "location",
+        "npc",
+        "faction",
+        "realm",
+        "daily"
+      ]
+    },
+    {
+      "name": "NarrativeOutcomeKind",
+      "literals": [
+        "advanced",
+        "resolved",
+        "failed",
+        "deferred",
+        "echoed",
+        "ignored"
+      ]
+    },
+    {
+      "name": "EffectResolveSeverity",
+      "literals": [
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    {
+      "name": "FormationType",
+      "literals": [
+        "spirit_gathering",
+        "protection",
+        "concealment",
+        "killing",
+        "illusion",
+        "fire",
+        "water",
+        "wood",
+        "metal",
+        "earth"
+      ]
+    },
+    {
+      "name": "AlchemyHeatLevel",
+      "literals": [
+        "micro",
+        "weak",
+        "moderate",
+        "strong",
+        "extreme"
+      ]
+    },
+    {
+      "name": "FormationCategory",
+      "literals": [
+        "binding",
+        "slaughter",
+        "illusion",
+        "defense",
+        "support",
+        "trap"
+      ]
+    },
+    {
+      "name": "TribulationStage",
+      "literals": [
+        "opening",
+        "bolt1",
+        "bolt2",
+        "bolt3",
+        "bolt4",
+        "bolt5",
+        "bolt6",
+        "bolt7",
+        "bolt8",
+        "bolt9",
+        "passed",
+        "failed"
+      ]
+    },
+    {
+      "name": "HeartDemonType",
+      "literals": [
+        "obsession",
+        "hatred",
+        "love",
+        "fear",
+        "regret"
+      ]
+    },
+    {
+      "name": "WorldTier",
+      "literals": [
+        "humanWorld",
+        "spiritWorld",
+        "immortalWorld"
+      ]
+    },
+    {
+      "name": "RestrictionType",
+      "literals": [
+        "door",
+        "trap",
+        "transport",
+        "seal",
+        "ward",
+        "barrier"
+      ]
+    },
+    {
+      "name": "RestrictionAccessMethod",
+      "literals": [
+        "token",
+        "password",
+        "identity",
+        "key",
+        "timing",
+        "combat"
+      ]
+    },
+    {
+      "name": "PetSpecies",
+      "literals": [
+        "fox",
+        "wolf",
+        "snake",
+        "turtle",
+        "eagle",
+        "ape",
+        "spider",
+        "butterfly",
+        "fish",
+        "tiger",
+        "phoenix",
+        "dragon"
+      ]
+    },
+    {
+      "name": "TalismanType",
+      "literals": [
+        "talisman_attack",
+        "talisman_defense",
+        "talisman_heal",
+        "talisman_escape",
+        "talisman_stun"
+      ]
+    },
+    {
+      "name": "SecretRealmTier",
+      "literals": [
+        "common",
+        "uncommon",
+        "rare",
+        "epic",
+        "legendary",
+        "mythic"
+      ]
+    },
+    {
+      "name": "PillSideEffect",
+      "literals": [
+        "toxicity",
+        "cultivation-deviation",
+        "karma",
+        "qi-turbulence"
+      ]
+    },
+    {
+      "name": "FormationDrawingStep",
+      "literals": [
+        "meditate",
+        "trace",
+        "infuse",
+        "anchor",
+        "activate"
+      ]
+    },
+    {
+      "name": "PetEvolutionStage",
+      "literals": [
+        "infant",
+        "youth",
+        "mature",
+        "ascended"
+      ]
+    },
+    {
+      "name": "CombatStance",
+      "literals": [
+        "aggressive",
+        "defensive",
+        "cunning",
+        "retreat"
+      ]
+    },
+    {
+      "name": "CombatResourceType",
+      "literals": [
+        "qi",
+        "soul",
+        "stamina",
+        "focus"
+      ]
+    },
+    {
+      "name": "BreakthroughStage",
+      "literals": [
+        "perception",
+        "condense",
+        "storm",
+        "stabilize",
+        "passed"
+      ]
+    },
+    {
+      "name": "StatusExpireRule",
+      "literals": [
+        "turns",
+        "years",
+        "condition",
+        "event"
+      ]
+    },
+    {
+      "name": "PetCultivationPath",
+      "literals": [
+        "combat",
+        "assist",
+        "transform",
+        "contract"
+      ]
+    },
+    {
+      "name": "PillRecipeUnlockCondition",
+      "literals": [
+        "manual",
+        "discover",
+        "inherit",
+        "buy"
+      ]
+    },
+    {
+      "name": "FormationStackRule",
+      "literals": [
+        "independent",
+        "boosted",
+        "conflict",
+        "replace"
+      ]
+    },
+    {
+      "name": "BidderPersonality",
+      "literals": [
+        "cautious",
+        "aggressive",
+        "random",
+        "hostile"
+      ]
+    },
+    {
+      "name": "SwordAptitude",
+      "literals": [
+        "untrained",
+        "novice",
+        "adept",
+        "master"
+      ]
+    },
+    {
+      "name": "InnatePhysique",
+      "literals": [
+        "waste_body",
+        "spirit_vein",
+        "frozen_blood",
+        "flame_heart",
+        "dao_bone",
+        "chaos_eye"
+      ]
+    }
+  ],
+  "discriminatedUnions": [],
+  "brands": [],
+  "orphans": [
+    "RealmTraits",
+    "RealmInfo",
+    "SpiritualRootInfo",
+    "ConstitutionRiskType",
+    "ConstitutionAwakeningStage",
+    "EffectOperation",
+    "TechniqueTrait",
+    "MarketAIItem",
+    "QuestEntryKind",
+    "CombatTempo",
+    "CombatActionOptionType",
+    "CombatActionOptionSource",
+    "CombatActionGroup",
+    "CombatTacticalSituation",
+    "WorldNpcAttitude",
+    "NpcRef",
+    "CausalNodeType",
+    "CausalEdgeType",
+    "ScheduledEventKind",
+    "ScheduledEventAction",
+    "NarrativeFocusKind",
+    "EffectResolveSeverity",
+    "ChoiceOption",
+    "FateNode",
+    "SectHistoryEntry",
+    "AlchemyHeatLevel",
+    "FormationCategory",
+    "RestrictionType",
+    "RestrictionAccessMethod"
+  ],
+  "warnings": [
+    {
+      "name": "RealmProfile",
+      "kind": "oversized",
+      "detail": "size=15843 chars (consider splitting)"
+    },
+    {
+      "name": "RealmProfile",
+      "kind": "too-many-fields",
+      "detail": "fields=187"
+    },
+    {
+      "name": "MarketAIOutcome",
+      "kind": "empty-interface"
+    },
+    {
+      "name": "CombatLootAIOutcome",
+      "kind": "empty-interface"
+    },
+    {
+      "name": "EventBlueprint",
+      "kind": "oversized",
+      "detail": "size=5568 chars (consider splitting)"
+    },
+    {
+      "name": "CombatSession",
+      "kind": "too-many-fields",
+      "detail": "fields=49"
+    },
+    {
+      "name": "AIEventOutput",
+      "kind": "too-many-fields",
+      "detail": "fields=44"
+    },
+    {
+      "name": "EngineStateContext",
+      "kind": "too-many-fields",
+      "detail": "fields=58"
+    },
+    {
+      "name": "CharacterState",
+      "kind": "too-many-fields",
+      "detail": "fields=63"
+    },
+    {
+      "name": "CharacterState",
+      "kind": "reference",
+      "detail": "central state shape; verify all engine APIs accept Partial<CharacterState>"
+    },
+    {
+      "name": "Pet",
+      "kind": "too-many-fields",
+      "detail": "fields=52"
+    },
+    {
+      "name": "SecretRealm",
+      "kind": "oversized",
+      "detail": "size=5356 chars (consider splitting)"
+    },
+    {
+      "name": "SecretRealm",
+      "kind": "too-many-fields",
+      "detail": "fields=109"
+    }
+  ],
+  "usage": {
+    "Realm": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/components/dev/L3Tester.tsx",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "RealmTraits": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatProjectionTraits": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "RealmInfo": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "RealmProfile": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "SpiritualRoot": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "SpiritualRootInfo": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "Element": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/constitutions.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ElementType": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "StatusCategory": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/content-registry.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ConstitutionCategory": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/constitutions.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ConstitutionRiskType": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ConstitutionAwakeningStage": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ConstitutionProfile": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/constitutions.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "StatusEntry": {
+      "importCount": 7,
+      "importingFiles": [
+        "src/components/xianxia/InventoryPanel.tsx",
+        "src/lib/xianxia/constitutions.ts",
+        "src/lib/xianxia/content-registry.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/event-effects.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EffectOperation": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "StatusEffect": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/content-registry.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ItemType": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/components/xianxia/InventoryPanel.tsx",
+        "src/lib/xianxia/content-registry.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EquipSlot": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "TechniqueRequirement": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "TechniqueTrait": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ArtifactAbility": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "TechniqueProfile": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CultivationFactor": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ItemEntry": {
+      "importCount": 7,
+      "importingFiles": [
+        "src/app/api/game/auction/route.ts",
+        "src/components/xianxia/AlchemyFurnace.tsx",
+        "src/lib/xianxia/content-registry.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/event-effects.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "AlchemyAIOutcome": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "MarketAIItem": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "MarketAIOutcome": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "AuctionAIOutcome": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/app/api/game/auction/route.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatLootAIOutcome": {
+      "importCount": 4,
+      "importingFiles": [
+        "src/app/api/game/combat/end/route.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetBondAIOutcome": {
+      "importCount": 4,
+      "importingFiles": [
+        "src/app/api/game/pet/route.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetCareAIOutcome": {
+      "importCount": 4,
+      "importingFiles": [
+        "src/app/api/game/pet/route.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "BlueprintCategory": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EventBlueprint": {
+      "importCount": 5,
+      "importingFiles": [
+        "src/lib/xianxia/advance-preload.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts",
+        "src/lib/xianxia/world-time.ts"
+      ]
+    },
+    "CharacterIntent": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PendingThread": {
+      "importCount": 6,
+      "importingFiles": [
+        "src/app/api/game/auction/route.ts",
+        "src/lib/xianxia/content-registry.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts",
+        "src/lib/xianxia/world-time.ts"
+      ]
+    },
+    "QuestEntryStage": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "QuestEntryKind": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "QuestEntry": {
+      "importCount": 4,
+      "importingFiles": [
+        "src/lib/xianxia/ai-boundary-validator.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatActionGroupKey": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatTempo": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatActionOptionType": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatActionOptionSource": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatActionOption": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatActionGroup": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatTacticalSituation": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatActionPalette": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CultivationAttributeEntry": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatEnemy": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatRound": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatRoundProposal": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatSession": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "WorldNpcAttitude": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "WorldNpc": {
+      "importCount": 4,
+      "importingFiles": [
+        "src/app/api/game/auction/route.ts",
+        "src/lib/xianxia/content-registry.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "NpcRef": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CausalNodeType": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CausalEdgeType": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CausalNode": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/app/api/game/auction/route.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CausalEdge": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/app/api/game/auction/route.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CausalGraph": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/event-scheduler.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "WorldFactKind": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "WorldFact": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ScheduledEventKind": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ScheduledEventAction": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ScheduledEventResolutionStage": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/event-scheduler.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ScheduledEventHint": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/event-scheduler.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "WorldPressureOpportunityMap": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/event-scheduler.ts",
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EventSchedulerPlan": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/event-scheduler.ts",
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "InputClass": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "NarrativeFocusKind": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "NarrativeOutcomeKind": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "NarrativeContract": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "NarrativeContractFeedbackEntry": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/event-scheduler.ts",
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "TimeAdvance": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/store.ts",
+        "src/lib/xianxia/types.ts",
+        "src/lib/xianxia/world-time.ts"
+      ]
+    },
+    "ActionProjection": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/store.ts",
+        "src/lib/xianxia/types.ts",
+        "src/lib/xianxia/world-time.ts"
+      ]
+    },
+    "AIEventOutput": {
+      "importCount": 5,
+      "importingFiles": [
+        "src/lib/xianxia/ai-boundary-validator.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "AttributeChange": {
+      "importCount": 14,
+      "importingFiles": [
+        "src/app/api/game/auction/route.ts",
+        "src/app/api/game/combat/action/route.ts",
+        "src/app/api/game/combat/end/route.ts",
+        "src/app/api/game/formation/route.ts",
+        "src/app/api/game/market/route.ts",
+        "src/app/api/game/pet/route.ts",
+        "src/lib/xianxia/ai-boundary-validator.ts",
+        "src/lib/xianxia/effect-resolver.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/event-effects.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/narrative-inference.ts",
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "SpiritualRootChange": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EffectResolveSeverity": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EffectResolveTrace": {
+      "importCount": 4,
+      "importingFiles": [
+        "src/lib/xianxia/effect-resolver.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EffectResolveResult": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/effect-resolver.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ChoicePrompt": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ChoiceOption": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ChoiceResultOutput": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "InterfereOutput": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EngineStateContext": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FateNode": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "EquippedMap": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CharacterState": {
+      "importCount": 18,
+      "importingFiles": [
+        "src/app/api/game/auction/route.ts",
+        "src/app/api/game/formation/route.ts",
+        "src/app/api/game/pet/route.ts",
+        "src/components/xianxia/ActionButtons.tsx",
+        "src/components/xianxia/CharacterDetailSheet.tsx",
+        "src/components/xianxia/StatusPanel.tsx",
+        "src/lib/xianxia/ai-boundary-validator.ts",
+        "src/lib/xianxia/body-growth.ts",
+        "src/lib/xianxia/display-registry.ts",
+        "src/lib/xianxia/effect-resolver.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/event-effects.ts",
+        "src/lib/xianxia/event-scheduler.ts",
+        "src/lib/xianxia/narrative-inference.ts",
+        "src/lib/xianxia/settlement.ts",
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/store.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "SectHistoryEntry": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FormationType": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/components/xianxia/FormationPanel.tsx",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "Formation": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "AlchemyHeatLevel": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FormationCategory": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "TribulationStage": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/app/api/game/tribulation/start/route.ts",
+        "src/components/xianxia/TribulationModal.tsx",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "HeartDemonType": {
+      "importCount": 4,
+      "importingFiles": [
+        "src/components/xianxia/TribulationModal.tsx",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/store.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "WorldTier": {
+      "importCount": 5,
+      "importingFiles": [
+        "src/app/api/game/ascension/check/route.ts",
+        "src/app/api/game/ascension/start/route.ts",
+        "src/components/xianxia/AscensionModal.tsx",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "AscensionRequirement": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "AscensionSession": {
+      "importCount": 5,
+      "importingFiles": [
+        "src/app/api/game/ascension/start/route.ts",
+        "src/components/xianxia/AscensionModal.tsx",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/store.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "RestrictionType": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "RestrictionAccessMethod": {
+      "importCount": 1,
+      "importingFiles": [
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "Restriction": {
+      "importCount": 7,
+      "importingFiles": [
+        "src/app/api/game/restriction/check/route.ts",
+        "src/app/api/game/restriction/interact/route.ts",
+        "src/components/dev/L3Tester.tsx",
+        "src/components/xianxia/RestrictionModal.tsx",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/store.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "TribulationSession": {
+      "importCount": 4,
+      "importingFiles": [
+        "src/app/api/game/tribulation/start/route.ts",
+        "src/components/xianxia/TribulationModal.tsx",
+        "src/lib/xianxia/store.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetSpecies": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "Pet": {
+      "importCount": 6,
+      "importingFiles": [
+        "src/app/api/game/pet/route.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/event-effects.ts",
+        "src/lib/xianxia/llm.ts",
+        "src/lib/xianxia/state-change-log.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "TalismanType": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "SecretRealmTier": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/components/xianxia/SecretRealmPanel.tsx",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "SecretRealm": {
+      "importCount": 5,
+      "importingFiles": [
+        "src/app/api/game/exploration/route.ts",
+        "src/components/xianxia/SecretRealmPanel.tsx",
+        "src/lib/xianxia/content-registry.ts",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ExplorationRecord": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/store.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PillSideEffect": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PillEffectiveness": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PillSideEffectResolution": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FormationDrawingStep": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FormationDrawingSession": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FormationDrawingProgress": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetEvolutionStage": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetEvolutionRequirement": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetEvolutionEligibility": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetInsight": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetCommunication": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetCombatSkill": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetSkillUsage": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetCombatSkillEvent": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatStance": {
+      "importCount": 3,
+      "importingFiles": [
+        "src/components/xianxia/CombatModal.tsx",
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatStanceUsage": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatResourceType": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatResourceUsage": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "BreakthroughStage": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "BreakthroughAttempt": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ComboChain": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "CombatLogEntry": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "LootTable": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "LootCondition": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "StatusExpireRule": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "StatusExpiryMeta": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PetCultivationPath": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PillRecipeUnlockCondition": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PillRecipe": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "PillCraftResult": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FormationStackRule": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FormationStackResult": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "BidderPersonality": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "BidderAction": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "ThreadChainNode": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "BottleSpirit": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "SwordAptitude": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "InnatePhysique": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "FakeDeathRule": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    },
+    "NPCMemoryEntry": {
+      "importCount": 2,
+      "importingFiles": [
+        "src/lib/xianxia/engine.ts",
+        "src/lib/xianxia/types.ts"
+      ]
+    }
+  }
+}

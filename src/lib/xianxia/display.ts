@@ -275,6 +275,20 @@ export const RELATION_MENTOR_LABEL = {
 } as const;
 
 // AI-65: 灵宠/灵虫/灵兽类型 label
+
+// 心志/志向类型 → 中文标签（AI-102 HeartIntentPanel）
+export const HEART_INTENT_LABEL: Record<string, string> = {
+  ambition: '志向',
+  attachment: '牵挂',
+  obsession: '执念',
+  vow: '誓愿',
+  resentment: '积怨',
+  compassion: '悯念',
+  curiosity: '求索',
+  fear: '畏心',
+  resolve: '心志',
+  yearning: '慕道',
+} as const;
 export const PET_TYPE_LABEL = {
   pet: '灵宠',
   insect: '灵虫',

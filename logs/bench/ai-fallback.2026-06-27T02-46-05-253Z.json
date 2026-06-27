@@ -1,0 +1,92 @@
+{
+  "suite": "test-ai-fallback",
+  "date": "2026-06-27T02:46:05.253Z",
+  "policy": {
+    "maxRetries": 3,
+    "baseDelayMs": 50,
+    "maxDelayMs": 800
+  },
+  "totalCases": 10,
+  "passed": 10,
+  "failed": 0,
+  "byOutcome": {
+    "success": 6,
+    "fallback": 4
+  },
+  "results": [
+    {
+      "name": "01-success-immediate",
+      "pass": true,
+      "outcome": "success",
+      "attempts": 1,
+      "totalWaitMs": 0
+    },
+    {
+      "name": "02-success-after-2-retries",
+      "pass": true,
+      "outcome": "success",
+      "attempts": 3,
+      "totalWaitMs": 151
+    },
+    {
+      "name": "03-success-on-last-retry",
+      "pass": true,
+      "outcome": "success",
+      "attempts": 4,
+      "totalWaitMs": 358
+    },
+    {
+      "name": "04-exhausted-5xx-fallback",
+      "pass": true,
+      "outcome": "fallback",
+      "attempts": 4,
+      "reason": "server_error",
+      "totalWaitMs": 358
+    },
+    {
+      "name": "05-rate-limited-429",
+      "pass": true,
+      "outcome": "success",
+      "attempts": 2,
+      "totalWaitMs": 50
+    },
+    {
+      "name": "06-network-error-then-ok",
+      "pass": true,
+      "outcome": "success",
+      "attempts": 2,
+      "totalWaitMs": 50
+    },
+    {
+      "name": "07-timeout-then-ok",
+      "pass": true,
+      "outcome": "success",
+      "attempts": 2,
+      "totalWaitMs": 50
+    },
+    {
+      "name": "08-client-error-4xx-no-retry",
+      "pass": true,
+      "outcome": "fallback",
+      "attempts": 1,
+      "reason": "client_error",
+      "totalWaitMs": 0
+    },
+    {
+      "name": "09-malformed-json-no-retry",
+      "pass": true,
+      "outcome": "fallback",
+      "attempts": 1,
+      "reason": "malformed_json",
+      "totalWaitMs": 0
+    },
+    {
+      "name": "10-total-network-down",
+      "pass": true,
+      "outcome": "fallback",
+      "attempts": 4,
+      "reason": "network_error",
+      "totalWaitMs": 358
+    }
+  ]
+}

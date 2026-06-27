@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { COMBAT_PROJECTION_LABELS } from '@/lib/xianxia/display';
 import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-registry';
+import { deriveCombatStance } from '@/lib/xianxia/engine';
+import type { CombatStance } from '@/lib/xianxia/types';
+import { COMBAT_STANCE_LABEL } from '@/lib/xianxia/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -281,6 +284,8 @@ export function CombatModal() {
 
   const recentLog: any[] = session ? (session.log || []).slice(-5) : [];
   const tacticalSituation: any = (session as any)?.tacticalSituation || recentLog[recentLog.length - 1]?.tacticalSituation || null;
+  // AI-81: derive a suggested combat stance from current combat snapshot (read-only projection)
+  const suggestedStance: CombatStance | null = session && character && isOngoing && !endResult ? deriveCombatStance(character as any, { hp: (session as any)?.enemyHp, maxHp: (session as any)?.enemyMaxHp, attack: (session as any)?.enemyAttack, defense: (session as any)?.enemyDefense, speed: (session as any)?.enemySpeed }) : null;
   const tempoLabels: Record<string, string> = { pressing: '乘势', stalemate: '僵持', opening: '破绽', danger: '危局', flee_window: '可遁', turning: '转机', chaos: '乱战' };
   const advantageLabels: Record<string, string> = { player: '我方占势', enemy: '敌势逼人', even: '难分高下', unclear: '胜负未明' };
 
@@ -658,6 +663,13 @@ export function CombatModal() {
 
           {session && !endResult && tacticalSituation && (
             <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-2 space-y-1.5">
+              {suggestedStance && (
+                <div className="flex items-center gap-1.5 pb-1.5 border-b border-purple-500/20">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-600 font-serif-cn font-semibold">态</span>
+                  <span className="text-xs font-serif-cn font-semibold text-foreground">{COMBAT_STANCE_LABEL[suggestedStance]}</span>
+                  <span className="text-[10px] text-muted-foreground font-serif-cn">。此乃依当前战局所推态势，仅作参考。</span>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-600 font-serif-cn font-semibold">战势</span>

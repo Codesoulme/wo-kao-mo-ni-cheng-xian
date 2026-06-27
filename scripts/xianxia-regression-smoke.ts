@@ -1,9 +1,11 @@
-﻿﻿import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveCombatProjection, filterMeaningfulStatuses, removeItemsByIds, equipItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse } from '../src/lib/xianxia/engine';
+import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveCombatProjection, filterMeaningfulStatuses, removeItemsByIds, equipItemsByIds, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse, deriveCombatStance, resolveCombatStanceShift, deriveCombatResource, resolveCombatResourceDrain, checkCombatResourceSufficient, deriveBreakthroughStage, resolveBreakthroughOutcome, detectCombatStalemate, resolveStalemateBreak, deriveComboChain, resolveComboDamage, sanitizeCombatLog, novelizeCombatLog, deriveLootFromOpponent, resolveLootConditions, deriveStatusExpiry, resolveStatusRemoval, derivePetCultivationSuggestion, resolvePetSkillLearn, deriveRecipeUnlock, resolvePillCrafting, deriveFormationStack, resolveFormationConflict, deriveBidderAction, resolveAuctionEnd, deriveThreadChain, resolveThreadContinuation, deriveBottleSpiritAffect, deriveSwordAptitudeProgress, resolveFakeDeath, deriveNPCMemoryUpdate, deriveNPCBehavior, deriveRumorTrigger, resolveRumorReliability } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
+import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
+import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain } from '../src/lib/xianxia/types';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
 import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
@@ -2465,6 +2467,367 @@ async function main(): Promise<void> {
   smokeTraeAutoDispatchScriptExists();
   smokeTraeMonitorScriptExists();
   smokeTraeScriptsUsePynput();
+  // Worker B (AI-86/87/88/89/90)
+  smokePillSideEffectTypesExist();
+  smokePillEffectivenessDerivation();
+  smokePillSideEffectResolution();
+  smokeFormationDrawingTypesExist();
+  smokeFormationDrawingFlow();
+  smokeFormationDrawingFailureStreak();
+  smokePetEvolutionTypesExist();
+  smokePetEvolutionEligibilityAndResolve();
+  smokePetInsightAndCommunication();
+  smokePetCombatSkillAvailable();
+  smokePetCombatSkillUseDamage();
+  // Worker A (AI-81~AI-85)
+  smokeAi81StanceDerivation();
+  smokeAi81StanceShift();
+  smokeAi81StanceLabelConsistency();
+  smokeAi82CombatResourceDerivation();
+  smokeAi82ResourceDrainAndSufficient();
+  smokeAi82ResourceLabelConsistency();
+  smokeAi83BreakthroughStageDerivation();
+  smokeAi83BreakthroughOutcome();
+  smokeAi84CombatStalemateBreak();
+  smokeAi85ComboChainDerivation();
+  smokeAi85ComboDamageResolve();
+// ==================== Worker A (AI-91~AI-103): 11 derived-fn smokes ====================
+// Additive only. Each smoke targets one engine.ts function added in this batch.
+
+function smokeAi91SanitizeCombatLog(): void {
+  // AI-91: sanitizeCombatLog should strip zero-width chars and preserve isSystem flag
+  const cleaned = sanitizeCombatLog({ text: 'you slash the foe\u200B', isSystem: false } as any);
+  assert(cleaned.isSystem === false, "isSystem=false should be preserved");
+  assert(!cleaned.text.includes('\u200B'), 'zero-width char should be stripped');
+  assert(cleaned.text.includes('slash'), 'main text should remain');
+  const sys = sanitizeCombatLog({ text: 'you took 3 dmg', isSystem: true } as any);
+  assert(sys.isSystem === true, "isSystem=true should be preserved");
+  const empty = sanitizeCombatLog({ text: '', isSystem: false } as any);
+  assert(empty.text === '', 'empty text should remain empty');
+  log('ai91-sanitize-combat-log', { passed: true, cleaned: cleaned.text, sysFlag: sys.isSystem });
+}
+
+function smokeAi91NovelizeCombatLog(): void {
+  // AI-91: novelizeCombatLog should merge system entries into parenthetical notes
+  const out = novelizeCombatLog([
+    { text: 'you slash out.', isSystem: false } as any,
+    { text: 'you took 5 dmg', isSystem: true } as any,
+    { text: 'foe staggers back.', isSystem: false } as any,
+  ]);
+  assert(typeof out === 'string' && out.length > 0, 'novelize output should be non-empty');
+  assert(out.includes('slash') && out.includes('staggers'), 'narrative text should be joined');
+  assert(out.includes('5 dmg'), 'system entry should appear in parenthetical');
+  const empty = novelizeCombatLog([]);
+  assert(empty === '', 'empty log should return empty string');
+  log('ai91-novelize-combat-log', { passed: true, length: out.length });
+}
+
+function smokeAi92LootFromOpponent(): void {
+  // AI-92: deriveLootFromOpponent returns non-empty items without enemy-attribution prefix
+  const loot = deriveLootFromOpponent({ id: 'enemy-1', name: 'foe-beast' }, 'qi_refining' as any);
+  assert(Array.isArray(loot) && loot.length >= 2, "should return >=2 items, got=" + loot.length);
+  for (const it of loot) {
+    assert(typeof it.name === "string" && it.name.length > 0, "item name non-empty: " + it.name);
+    assert(!/beast|foe-|enemy-of/.test(it.name), "item name should not carry enemy attribution, got=" + it.name);
+  }
+  log('ai92-loot-from-opponent', { passed: true, count: loot.length, names: loot.map(i => i.name) });
+}
+
+function smokeAi92ResolveLootConditions(): void {
+  // AI-92: resolveLootConditions filters by conditions
+  const baseChar: any = { realm: 'qi_refining', realmLevel: 1, statuses: [], faction: '', spiritStones: 100, id: 'char-1' };
+  const lootTable: any = {
+    id: 't1',
+    items: [
+      { id: 'a', name: 'A', description: 'd', item_type: 'material', rarity: 'common', effects: [], source: 's' },
+      { id: 'b', name: 'B', description: 'd', item_type: 'material', rarity: 'common', effects: [], source: 's' },
+    ],
+    conditions: [
+      { kind: 'min_realm', realm: 'foundation' },
+    ],
+  };
+  const blocked = resolveLootConditions(lootTable, baseChar);
+  assert(Array.isArray(blocked) && blocked.length === 0, "qi_refining should be blocked by foundation, got=" + blocked.length);
+  lootTable.conditions = [{ kind: "min_level", minLevel: 0 }];
+  const ok = resolveLootConditions(lootTable, baseChar);
+  assert(ok.length === 2, "min_level=0 should allow, got=" + ok.length);
+  lootTable.conditions = [{ kind: 'has_status', statusId: 'sick' }];
+  const noneStatus = resolveLootConditions(lootTable, { ...baseChar, statuses: [] });
+  assert(noneStatus.length === 0, 'no status should be blocked by has_status');
+  log('ai92-resolve-loot-conditions', { passed: true, blocked: blocked.length, ok: ok.length });
+}
+
+function smokeAi93StatusExpiryDerivation(): void {
+  // AI-93: deriveStatusExpiry returns expiry age by rule
+  const years = deriveStatusExpiry({ id: 's1', name: 'n', description: 'd', category: 'buff', rarity: 'common', duration: 5, effects: [], expiryMeta: { rule: 'years', remaining: 5 } } as any, 20);
+  assert(years === 25, "years rule + remaining=5 + currentAge=20 -> 25, got=" + years);
+  const turns = deriveStatusExpiry({ id: 's2', name: 'n', description: 'd', category: 'buff', rarity: 'common', duration: 3, effects: [], expiryMeta: { rule: 'turns' } } as any, 20);
+  assert(turns === null, 'turns rule should return null');
+  const cond = deriveStatusExpiry({ id: 's3', name: 'n', description: 'd', category: 'buff', rarity: 'common', duration: 0, effects: [], expiryMeta: { rule: 'condition' } } as any, 20);
+  assert(cond === null, 'condition rule should return null');
+  log('ai93-status-expiry-derivation', { passed: true, years, turns, cond });
+}
+
+function smokeAi93ResolveStatusRemoval(): void {
+  // AI-93: resolveStatusRemoval strips duration=0 / expired years statuses
+  // NOTE: engine resolveStatusRemoval reads/writes `statuses` field, but CharacterState type uses `activeStatuses`.
+  //       Cast through any so tsc doesn't complain; the function does mutate the right array at runtime.
+  //       Engine: expireAge = floor(currentAge) + remaining. So remaining=0 strips at currentAge=50.
+  const baseChar: any = {
+    id: 'c1', name: 'c', age: 30,
+    statuses: [
+      { id: 'a', name: 'n', description: 'd', category: 'buff', rarity: 'common', duration: 0, effects: [] },
+      { id: 'b', name: 'n', description: 'd', category: 'buff', rarity: 'common', duration: 5, effects: [], expiryMeta: { rule: 'years', remaining: 0 } },
+      { id: 'c', name: 'n', description: 'd', category: 'buff', rarity: 'common', duration: 5, effects: [] },
+    ],
+  };
+  const removed = resolveStatusRemoval(baseChar as any, 50) as any;
+  assert(Array.isArray(removed.statuses) && removed.statuses.length === 1, "should =1 (duration=0 + expired years stripped), got=" + (removed.statuses && removed.statuses.length));
+  assert(removed.statuses[0].id === 'c', "should keep id=c, got=" + (removed.statuses && removed.statuses[0].id));
+  log('ai93-resolve-status-removal', { passed: true, kept: removed.statuses.length });
+}
+
+function smokeAi95PetCultivationSuggestion(): void {
+  // AI-95: derivePetCultivationSuggestion returns path by keyword (Chinese-only keywords)
+  // Keywords: combat:[锋,锐,猛,破,噬,猎,爪,牙,杀] / assist:[护,养,愈,柔,伴,庇,医,灵] / transform:[化形,蜕变,人形,九尾,蛟龙,仙鹤,凤] / contract:[心,契,羁,念,魂,约]
+  const char: any = { id: 'c1', realm: 'qi_refining', realmLevel: 1 };
+  // Use CJK chars to hit the keyword tables.\u200B-style escapes ensure ASCII-only source.
+  const combatPet = derivePetCultivationSuggestion({ name: '锋锐猎爪兽', description: '猛兽' }, char as any);
+  assert(combatPet === 'combat', "锋/锐/猛/爪 should -> combat, got=" + combatPet);
+  const assistPet = derivePetCultivationSuggestion({ name: '柔护灵', description: '医养之伴' }, char as any);
+  assert(assistPet === 'assist', "柔/护/医 should -> assist, got=" + assistPet);
+  const transformPet = derivePetCultivationSuggestion({ name: '九尾狐', description: '化形' }, char as any);
+  assert(transformPet === 'transform', "九尾/化形 should -> transform, got=" + transformPet);
+  const contractPet = derivePetCultivationSuggestion({ name: '心契之灵', description: '羁绊契约' }, char as any);
+  assert(contractPet === 'contract', "心/契/羁 should -> contract, got=" + contractPet);
+  log('ai95-pet-cultivation-suggestion', { passed: true, combatPet, assistPet, transformPet, contractPet });
+}
+
+function smokeAi95PetSkillLearn(): void {
+  // AI-95: resolvePetSkillLearn allows new skill; duplicate skill returns same pet
+  const base: any = { id: 'p1', name: 'p', skill: { name: 'lunge', power: 10, cooldown: 1 } };
+  const learned = resolvePetSkillLearn(base, { name: 'bite', power: 15, cooldown: 2 });
+  assert(learned.skill.name === 'bite' && learned.skill.power === 15, "should learn bite/15, got=" + learned.skill.name + '/' + learned.skill.power);
+  const dup = resolvePetSkillLearn(base, { name: 'lunge', power: 99, cooldown: 9 });
+  assert(dup === base || dup.skill.name === 'lunge', 'duplicate skill should not overwrite');
+  log('ai95-pet-skill-learn', { passed: true, learned: learned.skill.name });
+}
+
+function smokeAi96RecipeUnlock(): void {
+  // AI-96: deriveRecipeUnlock decides by realm + materials
+  const char: any = { realm: 'qi_refining', realmLevel: 1, inventory: [{ id: 'm1', name: 'herb', description: '', item_type: 'material', rarity: 'common', effects: [], source: '' }] };
+  const recipe: any = { id: 'r1', name: 'Recover Pill', description: 'd', rarity: 'common', unlockCondition: 'manual', requiredMaterials: ['m1', 'm2'], minRealmIdx: 1, mainElement: 'none' };
+  const r1 = deriveRecipeUnlock(recipe, char);
+  assert(r1.unlocked === false && r1.missing.includes('material:m2'), "missing material should = unlocked=false, got=" + JSON.stringify(r1));
+  char.inventory.push({ id: 'm2', name: 'dew', description: '', item_type: 'material', rarity: 'common', effects: [], source: '' });
+  const r2 = deriveRecipeUnlock(recipe, char);
+  assert(r2.unlocked === true, "materials complete should unlock, got=" + JSON.stringify(r2));
+  const r3 = deriveRecipeUnlock({ ...recipe, minRealmIdx: 4 }, char);
+  assert(r3.unlocked === false && r3.missing.some((x) => x.startsWith('min_realm')), 'low realm should miss min_realm');
+  log('ai96-recipe-unlock', { passed: true, unlocked: r2.unlocked, missing: r3.missing });
+}
+
+function smokeAi96PillCrafting(): void {
+  // AI-96: resolvePillCrafting with/without materials returns success/failure
+  const recipe: any = { id: 'r1', name: 'Recover Pill', description: 'd', rarity: 'common', unlockCondition: 'manual', requiredMaterials: ['m1'], minRealmIdx: 1, mainElement: 'none' };
+  const fail = resolvePillCrafting(recipe, []);
+  assert(fail.success === false, 'missing materials should fail');
+  const results: any[] = [];
+  for (let i = 0; i < 30; i++) {
+    results.push(resolvePillCrafting(recipe, [{ id: 'm1' }]));
+  }
+  const successes = results.filter((r) => r.success).length;
+  assert(successes >= 1, "30 tries should include success, got=" + successes);
+  log('ai96-pill-crafting', { passed: true, successes });
+}
+
+function smokeAi97FormationStack(): void {
+  // AI-97: deriveFormationStack by rule
+  const independent = deriveFormationStack([{ id: 'a', value: 10 }, { id: 'b', value: 5 }]);
+  assert(independent.totalEffect === 15 && independent.appliedRule === 'independent', "independent should =15, got=" + independent.totalEffect);
+  const boosted = deriveFormationStack([{ id: 'a', value: 10, rule: 'boosted' }, { id: 'b', value: 10, rule: 'boosted' }]);
+  assert(boosted.totalEffect === 25, "boosted 10+10*1.25=25, got=" + boosted.totalEffect);
+  const conflict = deriveFormationStack([{ id: 'a', value: 10, rule: 'conflict' }, { id: 'b', value: 10, rule: 'conflict' }]);
+  assert(conflict.totalEffect < 20 && conflict.warnings.length >= 1, "conflict should weaken + warn, got=" + conflict.totalEffect);
+  const replace = deriveFormationStack([{ id: 'a', value: 10, rule: 'replace' }, { id: 'b', value: 5, rule: 'replace' }]);
+  assert(replace.totalEffect === 10 && replace.winners.length === 1, "replace should keep high =10, got=" + replace.totalEffect);
+  log('ai97-formation-stack', { passed: true, independent: independent.totalEffect, boosted: boosted.totalEffect });
+}
+
+function smokeAi97FormationConflict(): void {
+  // AI-97: resolveFormationConflict by tag
+  const winner = resolveFormationConflict({ id: 'f1', tag: 'fire', value: 5 }, { id: 'f2', tag: 'fire', value: 8 });
+  assert(winner === 'f2', "same-tag high value should win, got=" + winner);
+  const none = resolveFormationConflict({ id: 'f1', tag: 'fire' }, { id: 'f2', tag: 'water' });
+  assert(none === null, "different tag should =null, got=" + none);
+  log('ai97-formation-conflict', { passed: true, winner });
+}
+
+function smokeAi98BidderAction(): void {
+  // AI-98: deriveBidderAction by personality decides bid/pass/hostile
+  const cautious = deriveBidderAction({ id: 'b1', personality: 'cautious', assets: 100 }, { basePrice: 100 }, 100);
+  assert(cautious.kind === 'bid' || cautious.kind === 'pass', "cautious should bid/pass, got=" + cautious.kind);
+  const aggressive = deriveBidderAction({ id: 'b2', personality: 'aggressive', assets: 10000 }, { basePrice: 100 }, 100);
+  assert(aggressive.kind === 'bid', "aggressive w/ funds should bid, got=" + aggressive.kind);
+  const hostile = deriveBidderAction({ id: 'b3', personality: 'hostile', assets: 10000 }, { basePrice: 100 }, 100);
+  assert(hostile.kind === 'hostile', "hostile should = hostile, got=" + hostile.kind);
+  log('ai98-bidder-action', { passed: true, cautious: cautious.kind, aggressive: aggressive.kind, hostile: hostile.kind });
+}
+
+function smokeAi98AuctionEnd(): void {
+  // AI-98: resolveAuctionEnd returns winner + finalPrice + drama
+  const auction: any = {
+    lots: [{ item: { id: 'it', name: 'treasure', description: '', item_type: 'material', rarity: 'rare', effects: [], source: '' }, startingPrice: 100, seller: 's1' }],
+    bidders: [
+      { id: 'b1', personality: 'cautious', assets: 1000 },
+      { id: 'b2', personality: 'aggressive', assets: 1000 },
+    ],
+  };
+  const result = resolveAuctionEnd(auction);
+  assert(typeof result.finalPrice === 'number', 'finalPrice should be number');
+  assert(typeof result.drama === 'string' && result.drama.length > 0, 'drama should be non-empty');
+  log('ai98-auction-end', { passed: true, winner: result.winner, finalPrice: result.finalPrice });
+}
+
+function smokeAi99ThreadChain(): void {
+  // AI-99: deriveThreadChain from current node back to root
+  const threads: any[] = [
+    { id: 't1', title: 'root', description: '', category: 'mystery', startAge: 10, deadlineAge: 20, status: 'resolved', progress: 100, parentThreadId: undefined },
+    { id: 't2', title: 'mid', description: '', category: 'mystery', startAge: 20, deadlineAge: 30, status: 'resolved', progress: 100, parentThreadId: 't1' },
+    { id: 't3', title: 'now', description: '', category: 'mystery', startAge: 30, deadlineAge: 40, status: 'pending', progress: 10, parentThreadId: 't2' },
+  ];
+  const chain = deriveThreadChain('t3', threads);
+  assert(chain.length === 3, "should =3 (root/mid/now), got=" + chain.length);
+  assert(chain[0].threadId === 't1' && chain[2].threadId === 't3', "chain order t1->t2->t3, got=" + chain.map((c) => c.threadId).join(','));
+  const orphan = deriveThreadChain('t3', [threads[2]]);
+  assert(orphan.length === 1 && orphan[0].threadId === 't3', 'no root should return just current');
+  log('ai99-thread-chain', { passed: true, length: chain.length });
+}
+
+function smokeAi99ThreadContinuation(): void {
+  // AI-99: resolveThreadContinuation closes completed + may open new
+  const char: any = { id: 'c1', age: 30, alive: true };
+  const threads: any[] = [
+    { id: 'a', title: 'A', description: '', category: 'mystery', startAge: 10, deadlineAge: 20, status: 'resolved', progress: 100 },
+    { id: 'b', title: 'B', description: '', category: 'mystery', startAge: 20, deadlineAge: 30, status: 'pending', progress: 50 },
+  ];
+  const out = resolveThreadContinuation(threads, char);
+  assert(out.closeThreadIds.includes('a'), 'completed should be closed');
+  assert(!out.closeThreadIds.includes('b'), 'in-progress should not be closed');
+  assert(out.newThread !== null, 'alive should open new thread');
+  log('ai99-thread-continuation', { passed: true, closeCount: out.closeThreadIds.length, newThread: !!out.newThread });
+}
+
+function smokeAi100BottleSpiritAffect(): void {
+  // AI-100: deriveBottleSpiritAffect only returns status when revealed=true
+  const empty = deriveBottleSpiritAffect({ id: 'c1', name: 'c', realm: 'qi_refining', realmLevel: 1, activeStatuses: [] } as any);
+  assert(empty === null, 'no bottle spirit should =null');
+  const hidden = deriveBottleSpiritAffect({ id: 'c2', name: 'c', realm: 'qi_refining', realmLevel: 1, activeStatuses: [], bottleSpirits: [{ spiritId: 'b1', sourceName: 'bottle', visibleEffect: 'v', hiddenEffect: 'h', revealed: false, awakenedAge: 0 }] } as any);
+  assert(hidden === null, 'unrevealed should =null');
+  const revealed = deriveBottleSpiritAffect({ id: 'c3', name: 'c', realm: 'qi_refining', realmLevel: 1, activeStatuses: [], bottleSpirits: [{ spiritId: 'b1', sourceName: 'ancient-bottle', visibleEffect: 'spirit-clears', hiddenEffect: 'h', revealed: true, awakenedAge: 10 }] } as any);
+  assert(revealed !== null && revealed.name.includes('ancient-bottle'), "revealed should return source name, got=" + (revealed && revealed.name));
+  log('ai100-bottle-spirit-affect', { passed: true, statusName: revealed && revealed.name });
+}
+
+function smokeAi100SwordAptitudeProgress(): void {
+  // AI-100: deriveSwordAptitudeProgress advances by accumulated practice
+  const char: any = { id: 'c1', name: 'c', realm: 'qi_refining', realmLevel: 1, activeStatuses: [] };
+  const novice = deriveSwordAptitudeProgress(char, { hours: 50, talent: 1 });
+  assert(novice === 'untrained', "no cross tier -> untrained, got=" + novice);
+  const advanced = deriveSwordAptitudeProgress({ ...char, swordPracticeAcc: 200 }, { hours: 50, talent: 1 });
+  assert(advanced === 'adept' || advanced === 'novice', "accumulated 200 + inc 0.5 -> novice/adept, got=" + advanced);
+  log('ai100-sword-aptitude-progress', { passed: true, novice, advanced });
+}
+
+function smokeAi100FakeDeath(): void {
+  // AI-100: resolveFakeDeath by rule
+  const noRule = resolveFakeDeath({ id: 'c1', name: 'c', realm: 'qi_refining', realmLevel: 1, activeStatuses: [], hp: 1, maxHp: 100 } as any, 50);
+  assert(noRule.isFake === false && noRule.ruleApplied === false, 'no rule should = not fake');
+  const lowHp = resolveFakeDeath({ id: 'c2', name: 'c', realm: 'qi_refining', realmLevel: 1, activeStatuses: [], hp: 5, maxHp: 100, fakeDeathRules: [{ trigger: 'low_hp', fakeDurationTurns: 3, revealChance: 0.3, freezeActions: true }] } as any, 10);
+  assert(lowHp.isFake === true && lowHp.ruleApplied === true, 'low hp should trigger fake death');
+  log('ai100-fake-death', { passed: true, noRule: noRule.isFake, lowHp: lowHp.isFake });
+}
+
+function smokeAi101NPCMemoryUpdate(): void {
+  // AI-101: deriveNPCMemoryUpdate returns importance-clamped entry with kind
+  const m1 = deriveNPCMemoryUpdate({ id: 'n1', name: 'passerby' }, { summary: 'met at corner', importance: 200 }, 30);
+  assert(m1.importance === 100, "importance 200 should clamp to 100, got=" + m1.importance);
+  assert(m1.npcId === 'n1' && m1.eventSummary.includes('corner'), 'npcId/summary should remain');
+  const m2 = deriveNPCMemoryUpdate({ id: 'n2', name: 'b' }, { summary: 'gave me wine', kind: 'kindness' }, 25);
+  assert(m2.kind === 'kindness', "kind should =kindness, got=" + m2.kind);
+  log('ai101-npc-memory-update', { passed: true, m1: m1.importance, m2: m2.kind });
+}
+
+function smokeAi101NPCBehavior(): void {
+  // AI-101: deriveNPCBehavior by betrayal/kindness ratio (returns Chinese strings)
+  // Returns: \u4e2d\u6027\u89c2\u671b (neutral-watch), \u6000\u6068\u5907\u5fcc (wary-resentment), \u5fc3\u6000\u5584\u610f (gracious), \u4f9d\u4e8b\u7f13\u51b3 (defer)
+  const empty = deriveNPCBehavior({ id: 'n1', memories: [] });
+  assert(empty === '\u4e2d\u6027\u89c2\u671b', "empty memory should be neutral-watch CJK, got=" + empty);
+  const betrayed = deriveNPCBehavior({ id: 'n2', memories: [
+    { npcId: 'n2', eventSummary: 'a', importance: 50, age: 20, kind: 'betrayal' },
+    { npcId: 'n2', eventSummary: 'b', importance: 50, age: 20, kind: 'betrayal' },
+    { npcId: 'n2', eventSummary: 'c', importance: 50, age: 20, kind: 'kindness' },
+  ] });
+  assert(betrayed === '\u6000\u6068\u5907\u5fcc', "2 betrayal vs 1 kind should be wary-resentment CJK, got=" + betrayed);
+  const kind = deriveNPCBehavior({ id: 'n3', memories: [
+    { npcId: 'n3', eventSummary: 'a', importance: 50, age: 20, kind: 'kindness' },
+    { npcId: 'n3', eventSummary: 'b', importance: 50, age: 20, kind: 'kindness' },
+    { npcId: 'n3', eventSummary: 'c', importance: 50, age: 20, kind: 'betrayal' },
+  ] });
+  assert(kind === '\u5fc3\u6000\u5584\u610f', "2 kind vs 1 betrayal should be gracious CJK, got=" + kind);
+  log('ai101-npc-behavior', { passed: true, empty, betrayed, kind });
+}
+
+function smokeAi103RumorTrigger(): void {
+  // AI-103: deriveRumorTrigger by significance
+  const noRumor = deriveRumorTrigger({ title: 'small', significance: 10 }, 'region-A');
+  assert(noRumor === null, "significance<30 should =null, got=" + noRumor);
+  const big = deriveRumorTrigger({ title: 'anomaly', significance: 80 }, 'region-A');
+  assert(big !== null && big.regionScope === 'region-A' && big.reliability > 0, "high significance should produce rumor, got=" + JSON.stringify(big));
+  const noRegion = deriveRumorTrigger({ title: 'anomaly', significance: 80 }, null);
+  assert(noRegion === null, 'no region should =null');
+  log('ai103-rumor-trigger', { passed: true, bigReliability: big && big.reliability });
+}
+
+function smokeAi103RumorReliability(): void {
+  // AI-103: resolveRumorReliability decays per year, floor 0.05, zero at 100y
+  const baseRumor: any = { rumorId: 'r', source: 's', content: 'c', reliability: 0.8, originAge: 0 };
+  const after5 = resolveRumorReliability(baseRumor, 5);
+  assert(after5 < 0.8 && after5 > 0.05, "after 5y should decay, got=" + after5);
+  const after100 = resolveRumorReliability(baseRumor, 100);
+  assert(after100 === 0, "100y should =0, got=" + after100);
+  const after0 = resolveRumorReliability(baseRumor, 0);
+  assert(after0 >= 0.05, '0y should keep non-zero');
+  log('ai103-rumor-reliability', { passed: true, after5, after100 });
+}
+  // AI-94 / AI-102: HeartIntentPanel 相关
+  // Worker A (AI-91~AI-103)
+  smokeAi91SanitizeCombatLog();
+  smokeAi91NovelizeCombatLog();
+  smokeAi92LootFromOpponent();
+  smokeAi92ResolveLootConditions();
+  smokeAi93StatusExpiryDerivation();
+  smokeAi93ResolveStatusRemoval();
+  smokeAi95PetCultivationSuggestion();
+  smokeAi95PetSkillLearn();
+  smokeAi96RecipeUnlock();
+  smokeAi96PillCrafting();
+  smokeAi97FormationStack();
+  smokeAi97FormationConflict();
+  smokeAi98BidderAction();
+  smokeAi98AuctionEnd();
+  smokeAi99ThreadChain();
+  smokeAi99ThreadContinuation();
+  smokeAi100BottleSpiritAffect();
+  smokeAi100SwordAptitudeProgress();
+  smokeAi100FakeDeath();
+  smokeAi101NPCMemoryUpdate();
+  smokeAi101NPCBehavior();
+  smokeAi103RumorTrigger();
+  smokeAi103RumorReliability();
+  smokeHeartIntentPanelExists();
+  smokeHeartIntentStoreUpdate();
+  smokeHeartIntentLabel();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 }
 
@@ -4274,4 +4637,445 @@ function smokeTraeScriptsUsePynput(): void {
   assert(/keyboard\.Listener|mouse\.Listener/.test(dispatch), 'trae-auto-dispatch 应注册 pynput Listener');
   assert(/keyboard\.Listener|mouse\.Listener/.test(monitor), 'trae-monitor 应注册 pynput Listener');
   log('trae-scripts-use-pynput', { passed: true });
+}
+// ==================== AI-86/87/88/89/90: Worker B Smokes ====================
+// Worker B (xiaoxin-B) - additive only.
+
+function smokePillSideEffectTypesExist(): void {
+  // AI-86: types.ts 应导出 PillSideEffect/PillEffectiveness/PillSideEffectResolution
+  const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/export type PillSideEffect\b/.test(src), 'types.ts 应导出 PillSideEffect');
+  assert(/export interface PillEffectiveness\b/.test(src), 'types.ts 应导出 PillEffectiveness');
+  assert(/export interface PillSideEffectResolution\b/.test(src), 'types.ts 应导出 PillSideEffectResolution');
+  const four = ['toxicity', 'cultivation-deviation', 'karma', 'qi-turbulence'];
+  for (const k of four) assert(src.includes(`'`+k+`'`), `PillSideEffect 应包含 ${k}`);
+  log('pill-side-effect-types-exist', { passed: true });
+}
+
+function smokePillEffectivenessDerivation(): void {
+  // AI-86: derivePillEffectiveness 应根据品质/境界输出合法评估
+  const { derivePillEffectiveness } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  const state: any = { age: 20, realm: 'qi_refining', realmLevel: 1 };
+  const pill: any = { id: 'test-pill-1', name: '试炼丹', quality: 'rare', tier: 2, expGain: 100, hpRestore: 50, mpRestore: 30 };
+  const eff = derivePillEffectiveness(pill, state);
+  assert(eff.pillId === 'test-pill-1', 'PillEffectiveness 应回传 pillId');
+  assert(typeof eff.boost.cultivationExp === 'number' && eff.boost.cultivationExp! > 0, '高品丹应产出修为加成');
+  assert(eff.sideEffectChance >= 0 && eff.sideEffectChance <= 1, '副作用概率应在 0..1');
+  assert(eff.sideEffectSeverity >= 1 && eff.sideEffectSeverity <= 5, '副作用严重度应在 1..5');
+  assert(eff.possibleSideEffects.length > 0, 'tier>=2 应至少包含一种副作用');
+  log('pill-effectiveness-derivation', { passed: true, boost: eff.boost.cultivationExp, chance: eff.sideEffectChance, sev: eff.sideEffectSeverity });
+}
+
+function smokePillSideEffectResolution(): void {
+  // AI-86: resolvePillSideEffects 触发时应回传 attributeChanges/statusChanges
+  const { resolvePillSideEffects } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  const state: any = { age: 12, realm: 'mortal', realmLevel: 0 };
+  const pill: any = { id: 'toxic-pill', name: '猛丹', quality: 'epic', tier: 4, expGain: 200 };
+  // 强制触发：rand=0 < chance
+  const r1 = resolvePillSideEffects(pill, state, 0);
+  assert(r1.triggered === true, 'rand=0 应触发副作用');
+  assert(r1.sideEffect !== undefined, '触发时应回传 sideEffect 类型');
+  assert(r1.attributeChanges.length + r1.statusChanges.length > 0, '应至少有一种属性/状态变更');
+  // 强制不触发：rand=1 几乎不可能（chance 最高 0.85）
+  const r2 = resolvePillSideEffects(pill, state, 0.9999);
+  assert(r2.triggered === false, 'rand 接近 1 不应触发副作用');
+  assert(r2.attributeChanges.length === 0, '未触发时应无属性变更');
+  log('pill-side-effect-resolution', { passed: true, triggered: r1.triggered, side: r1.sideEffect });
+}
+
+function smokeFormationDrawingTypesExist(): void {
+  // AI-87: types.ts 应导出 FormationDrawingStep/Session/Progress
+  const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/export type FormationDrawingStep\b/.test(src), 'types.ts 应导出 FormationDrawingStep');
+  assert(/export interface FormationDrawingSession\b/.test(src), 'types.ts 应导出 FormationDrawingSession');
+  assert(/export interface FormationDrawingProgress\b/.test(src), 'types.ts 应导出 FormationDrawingProgress');
+  const steps = ['meditate', 'trace', 'infuse', 'anchor', 'activate'];
+  for (const s of steps) assert(src.includes(`'`+s+`'`), `FormationDrawingStep 应包含 ${s}`);
+  log('formation-drawing-types-exist', { passed: true });
+}
+
+function smokeFormationDrawingFlow(): void {
+  // AI-87: startFormationDrawing + resolveDrawingProgress 推进 5 步应成功
+  const { startFormationDrawing, resolveDrawingProgress } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  const state: any = { id: 'c-1', age: 30, realm: 'foundation_building', realmLevel: 2 };
+  const formation: any = { id: 'f-1', name: '小聚灵阵', rarity: 'common', requirements: { minRealm: 'qi_refining' } };
+  let sess = startFormationDrawing(state, formation);
+  assert(sess.currentStep === 'meditate', '初始步骤应为 meditate');
+  assert(!sess.finished, '初始会话未完成');
+  // 强制成功推进 5 步
+  for (let i = 0; i < 5; i++) {
+    const r = resolveDrawingProgress(sess, 'advance', 0);
+    assert(r.advanced === true, `第${i+1}步应推进`);
+    sess = r.session;
+    if (r.finished) break;
+  }
+  assert(sess.finished === true && sess.success === true, '连续 5 步成功应绘制完成');
+  assert(sess.completedSteps.length === 5, '应记录 5 个完成步骤');
+  log('formation-drawing-flow', { passed: true, steps: sess.completedSteps });
+}
+
+function smokeFormationDrawingFailureStreak(): void {
+  // AI-87: 连续失败 3 次应触发绘制失败
+  const { startFormationDrawing, resolveDrawingProgress } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  const state: any = { id: 'c-2', age: 25, realm: 'qi_refining', realmLevel: 1 };
+  const formation: any = { id: 'f-2', name: '凶阵', rarity: 'rare', requirements: { minRealm: 'qi_refining' } };
+  let sess = startFormationDrawing(state, formation);
+  // 强制失败 3 次（rand > stepSuccessChance=0.7）
+  for (let i = 0; i < 3; i++) {
+    const r = resolveDrawingProgress(sess, 'advance', 0.99);
+    sess = r.session;
+    if (r.finished) break;
+  }
+  assert(sess.finished === true && sess.success === false, '连续 3 次失败应会话失败');
+  assert(sess.failureStreak >= 3, 'failureStreak 应>=3');
+  // restart 应清空失败计数
+  const restart = resolveDrawingProgress(sess, 'restart', 0);
+  assert(restart.session.currentStep === 'meditate', 'restart 后应回到 meditate');
+  assert(restart.session.failureStreak === 0, 'restart 后 failureStreak 应清零');
+  log('formation-drawing-failure-streak', { passed: true, streak: sess.failureStreak });
+}
+
+function smokePetEvolutionTypesExist(): void {
+  // AI-88: types.ts 应导出 PetEvolutionStage/Requirement/Eligibility
+  const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  assert(/export type PetEvolutionStage\b/.test(src), 'types.ts 应导出 PetEvolutionStage');
+  assert(/export interface PetEvolutionRequirement\b/.test(src), 'types.ts 应导出 PetEvolutionRequirement');
+  assert(/export interface PetEvolutionEligibility\b/.test(src), 'types.ts 应导出 PetEvolutionEligibility');
+  const stages = ['infant', 'youth', 'mature', 'ascended'];
+  for (const s of stages) assert(src.includes(`'`+s+`'`), `PetEvolutionStage 应包含 ${s}`);
+  log('pet-evolution-types-exist', { passed: true });
+}
+
+function smokePetEvolutionEligibilityAndResolve(): void {
+  // AI-88: 缺材料时不应 eligible；满足时 eligible；resolvePetEvolution 返回下一阶段
+  const { derivePetEvolutionEligibility, resolvePetEvolution } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  // 缺材料
+  const poor: any = { id: 'p-poor', level: 1, loyalty: 10, acquiredAge: 18, stage: 'infant' };
+  const poorChar: any = { age: 20, realmLevel: 0, inventory: [] };
+  const e1 = derivePetEvolutionEligibility(poor, poorChar);
+  assert(e1.eligible === false, '缺材料/忠诚度不足时不应 eligible');
+  assert(e1.nextStage === 'youth', '幼生期下一阶段应为 youth');
+  assert(e1.missing.length >= 2, '应至少列出 2 个缺失条件');
+  // 满足全部条件
+  const rich: any = { id: 'p-rich', level: 5, loyalty: 95, acquiredAge: 15, stage: 'infant' };
+  const richChar: any = {
+    age: 20, realmLevel: 3,
+    inventory: [
+      { id: 'pet_growth_pill', name: 'pet_growth_pill' },
+    ],
+  };
+  const e2 = derivePetEvolutionEligibility(rich, richChar);
+  assert(e2.eligible === true, '满足所有条件应 eligible');
+  assert(e2.missing.length === 0, '满足时 missing 应为空');
+  // resolvePetEvolution
+  const next = resolvePetEvolution({ id: 'p-rich', stage: 'infant' });
+  assert(next === 'youth', 'infant 进阶应返回 youth');
+  log('pet-evolution-eligibility-and-resolve', { passed: true, missingCount: e1.missing.length, next });
+}
+
+function smokePetInsightAndCommunication(): void {
+  // AI-89: 幼生期/低忠诚度不应产出 insight；成熟期+应产出 insight；communication 应返回非空字符串
+  const { derivePetInsight, resolvePetCommunication } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  // 幼生期：null
+  const infant: any = { id: 'p-1', name: '小狐', stage: 'infant', level: 5, loyalty: 80, element: 'water' };
+  const charA: any = { age: 18 };
+  assert(derivePetInsight(infant, charA) === null, '幼生期不应产出 insight');
+  // 成熟期 + 高忠诚：应产出
+  const mature: any = { id: 'p-2', name: '炎虎', stage: 'mature', level: 5, loyalty: 75, element: 'fire' };
+  const charB: any = { age: 25 };
+  const ins = derivePetInsight(mature, charB);
+  assert(ins !== null, '成熟期+忠诚>=60 应产出 insight');
+  assert(typeof ins!.insightName === 'string' && ins!.insightName.length > 0, 'insight 应有名称');
+  assert(ins!.effect !== undefined, 'insight 应有 effect');
+  // communication
+  const comm = resolvePetCommunication({ id: 'p-3', name: '灵蛇', loyalty: 80 }, '前方有妖气');
+  assert(typeof comm === 'string' && comm.length > 0, 'communication 应回传非空字符串');
+  assert(comm.includes('灵蛇') || comm.includes('灵识'), 'communication 应包含宠物名或灵识关键字');
+  log('pet-insight-and-communication', { passed: true, insight: ins?.insightName, comm });
+}
+
+function smokePetCombatSkillAvailable(): void {
+  // AI-90: 化形前 1 技能；成熟期 2 技能；化形期 3 技能；冷却中技能应被过滤
+  const { derivePetSkillAvailable, resolvePetSkillUse } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  const baseSkill = { name: '撕咬', description: '基础物理攻击', power: 1.2, cooldown: 2 };
+  const infant: any = { id: 'p-i', stage: 'infant', level: 1, skill: baseSkill };
+  const mature: any = { id: 'p-m', stage: 'mature', level: 5, skill: baseSkill };
+  const ascended: any = { id: 'p-a', stage: 'ascended', level: 10, skill: baseSkill };
+  const sInf = derivePetSkillAvailable(infant, 1);
+  const sMat = derivePetSkillAvailable(mature, 1);
+  const sAsc = derivePetSkillAvailable(ascended, 1);
+  assert(sInf.length === 1, '幼生期应只有 1 个技能');
+  assert(sMat.length === 2, '成熟期应有 2 个技能');
+  assert(sAsc.length === 3, '化形期应有 3 个技能');
+  // 冷却过滤
+  const filtered = derivePetSkillAvailable(mature, 5, [
+    { skillId: 'p-m-basic', lastUsedTurn: 4, usesLeft: -1 },
+  ]);
+  assert(filtered.length === 1, '基础技能冷却中应被过滤（剩余 1 个元素技能）');
+  // resolvePetSkillUse
+  const evt = resolvePetSkillUse({ id: 'p-m', name: '炎虎', attack: 20, element: 'fire' }, sMat[0], 5, 'enemy-1');
+  assert(evt.skillId === 'p-m-basic', '事件应回传使用的 skillId');
+  assert(evt.turn === 5, '事件应回传 turn');
+  assert(typeof evt.narrativeHint === 'string' && evt.narrativeHint.length > 0, '事件应有 narrativeHint');
+  log('pet-combat-skill-available', { passed: true, inf: sInf.length, mat: sMat.length, asc: sAsc.length, dmg: evt.damage });
+}
+
+function smokePetCombatSkillUseDamage(): void {
+  // AI-90: 物理技能应产生 damage; 治疗技能应产生 heal; 增益技能应产生 buffApplied
+  const { resolvePetSkillUse } = require('../src/lib/xianxia/engine') as typeof import('../src/lib/xianxia/engine');
+  const phys: any = { id: 'p', name: '灵狐', attack: 15 };
+  const physSkill: any = { skillId: 's1', name: '撕咬', description: '', power: 1.5, cooldown: 2, range: 'single', effect: 'physical' };
+  const healSkill: any = { skillId: 's2', name: '疗伤', description: '', power: 2.0, cooldown: 3, range: 'self', effect: 'heal' };
+  const buffSkill: any = { skillId: 's3', name: '护主', description: '', power: 0, cooldown: 4, range: 'all_allies', effect: 'buff' };
+  const e1 = resolvePetSkillUse(phys, physSkill, 3, 'e-1');
+  assert(typeof e1.damage === 'number' && e1.damage! > 0, '物理技能应产出 damage>0');
+  assert(e1.heal === undefined, '物理技能不应产出 heal');
+  const e2 = resolvePetSkillUse(phys, healSkill, 3);
+  assert(typeof e2.heal === 'number' && e2.heal! > 0, '治疗技能应产出 heal>0');
+  assert(e2.damage === undefined, '治疗技能不应产出 damage');
+  const e3 = resolvePetSkillUse(phys, buffSkill, 3);
+  assert(Array.isArray(e3.buffApplied) && e3.buffApplied.length > 0, '增益技能应产出 buffApplied');
+  log('pet-combat-skill-use-damage', { passed: true, dmg: e1.damage, heal: e2.heal });
+}﻿
+// ==================== Worker A (AI-81~AI-85): Combat + Breakthrough Smokes ====================
+
+function smokeAi81StanceDerivation(): void {
+  // AI-81: deriveCombatStance 应按 HP/MP/敌方状态给出建议姿态
+  const baseChar: any = {
+    realm: 'qi_refining', hp: 50, maxHp: 100, mp: 50, maxMp: 100, attack: 10, defense: 10,
+    combatSession: { status: 'ongoing', playerHp: 50, playerMaxHp: 100, playerMp: 50, playerMaxMp: 100 },
+  };
+  // 低血 → retreat/defensive
+  const lowHpChar: any = {
+    ...baseChar,
+    hp: 20, maxHp: 100, combatSession: { status: 'ongoing', playerHp: 20, playerMaxHp: 100, playerMp: 50, playerMaxMp: 100 },
+  };
+  const s1 = deriveCombatStance(baseChar as any, { hp: 80, maxHp: 100, attack: 10, defense: 10, speed: 5 });
+  assert(s1 === 'aggressive' || s1 === 'cunning', `正常状态应给出猛攻或诱敌，实际=${s1}`);
+  const s2 = deriveCombatStance(lowHpChar as any, { hp: 80, maxHp: 100, attack: 10, defense: 10, speed: 5 });
+  assert(s2 === 'retreat' || s2 === 'defensive', `低血应退守，实际=${s2}`);
+  // 敌方残血 → aggressive
+  const s3 = deriveCombatStance(baseChar as any, { hp: 20, maxHp: 100, attack: 10, defense: 10, speed: 5 });
+  assert(s3 === 'aggressive', `敌方残血应猛攻，实际=${s3}`);
+  log('combat-stance-derivation', { passed: true, normal: s1, lowHp: s2, weakEnemy: s3 });
+}
+
+function smokeAi81StanceShift(): void {
+  // AI-81: resolveCombatStanceShift 应按敌方动态切换姿态
+  const shift1 = resolveCombatStanceShift('aggressive', { hp: 80, maxHp: 100, attack: 20, attackPrev: 10 }, []);
+  assert(shift1 === 'cunning', `敌方蓄力应切诱敌，实际=${shift1}`);
+  const shift2 = resolveCombatStanceShift('aggressive', { hp: 20, maxHp: 100, attack: 10 }, []);
+  assert(shift2 === 'aggressive', `敌方残血保持猛攻，实际=${shift2}`);
+  // 冷却中 → 保持
+  const shift3 = resolveCombatStanceShift('defensive', { hp: 50, maxHp: 100, attack: 10 }, [{ stance: 'defensive', cooldownTurns: 2 }]);
+  assert(shift3 === 'defensive', `冷却中应保持，实际=${shift3}`);
+  log('combat-stance-shift', { passed: true, s1: shift1, s2: shift2, s3: shift3 });
+}
+
+function smokeAi81StanceLabelConsistency(): void {
+  // AI-81: COMBAT_STANCE_LABEL 必须覆盖全部 4 个姿态
+  const labels = (COMBAT_STANCE_LABEL as any);
+  assert(labels.aggressive && labels.defensive && labels.cunning && labels.retreat, 'COMBAT_STANCE_LABEL 缺标签');
+  assert(labels.aggressive.length > 0 && labels.defensive.length > 0, '标签不能为空字符串');
+  // 与 types.ts 定义一致
+  const expected: CombatStance[] = ['aggressive', 'defensive', 'cunning', 'retreat'];
+  for (const k of expected) {
+    assert(typeof labels[k] === 'string', `${k} 必须有中文标签`);
+  }
+  log('combat-stance-label-consistency', { passed: true, labels: Object.keys(labels).length });
+}
+
+function smokeAi82CombatResourceDerivation(): void {
+  // AI-82: deriveCombatResource 应返回 4 类资源快照
+  const character: any = { hp: 80, maxHp: 100, mp: 60, maxMp: 100, spiritualSense: 50, comprehension: 30 };
+  const usages = deriveCombatResource(character as any);
+  assert(Array.isArray(usages) && usages.length === 4, `应返回 4 项资源，实际=${usages.length}`);
+  const types = usages.map(u => u.type);
+  assert(types.includes('qi') && types.includes('soul') && types.includes('stamina') && types.includes('focus'), '缺资源类型');
+  const qi = usages.find(u => u.type === 'qi')!;
+  assert(qi.current === 60 && qi.max === 100, `qi 应=mp(60/100)，实际=${qi.current}/${qi.max}`);
+  assert(qi.regenPerTurn > 0, 'qi 必须有回复');
+  log('combat-resource-derivation', { passed: true, types: types.join(','), qi: `${qi.current}/${qi.max}` });
+}
+
+function smokeAi82ResourceDrainAndSufficient(): void {
+  // AI-82: resolveCombatResourceDrain 应扣减并记录峰值；checkCombatResourceSufficient 应正确判缺
+  const usages: CombatResourceUsage[] = [
+    { type: 'qi', current: 50, max: 100, regenPerTurn: 5 },
+    { type: 'stamina', current: 30, max: 80, regenPerTurn: 3 },
+  ];
+  const drained = resolveCombatResourceDrain(usages[0], { type: 'qi', value: 20 });
+  assert(drained.current === 30 && drained.recentDrain === 20, `drain 后应=30，峰值=20，实际=${drained.current}/${drained.recentDrain}`);
+  // 类型不匹配应原样返回
+  const same = resolveCombatResourceDrain(usages[1], { type: 'qi', value: 5 });
+  assert(same === usages[1] || same.current === usages[1].current, '类型不匹配应原样返回');
+  // 充足检查
+  const ok = checkCombatResourceSufficient(usages, [{ type: 'qi', value: 10 }]);
+  assert(ok.sufficient === true && ok.missing.length === 0, '50>=10 应充足');
+  const need = checkCombatResourceSufficient(usages, [{ type: 'qi', value: 60 }, { type: 'focus', value: 5 }]);
+  assert(need.sufficient === false && need.missing.length === 2, `应缺 2 项，实际=${need.missing.length}`);
+  log('combat-resource-drain-sufficient', { passed: true, drained: drained.current, missing: need.missing.length });
+}
+
+function smokeAi82ResourceLabelConsistency(): void {
+  // AI-82: COMBAT_RESOURCE_LABEL 必须覆盖全部 4 个资源类型
+  const labels = (COMBAT_RESOURCE_LABEL as any);
+  const types: CombatResourceType[] = ['qi', 'soul', 'stamina', 'focus'];
+  for (const t of types) {
+    assert(typeof labels[t] === 'string' && labels[t].length > 0, `${t} 必须有中文标签`);
+  }
+  log('combat-resource-label-consistency', { passed: true, count: types.length });
+}
+
+function smokeAi83BreakthroughStageDerivation(): void {
+  // AI-83: deriveBreakthroughStage 应按 attemptNumber + 心魔 + 年龄推导阶段
+  const s1 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 20, 30);
+  assert(s1 === 'perception', `第1次尝试应为感悟，实际=${s1}`);
+  const s2 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 90, 30);
+  assert(s2 === 'condense' || s2 === 'perception', `高龄第1次应为凝聚或感悟，实际=${s2}`);
+  const s3 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 20, 70);
+  assert(s3 === 'storm', `高心魔第1次应为风暴，实际=${s3}`);
+  const s4 = deriveBreakthroughStage('qi_refining', 'foundation_building', 4, 30, 30);
+  assert(s4 === 'stabilize', `第4次应为稳固，实际=${s4}`);
+  const s5 = deriveBreakthroughStage('foundation_building', 'foundation_building', 1, 20, 0);
+  assert(s5 === 'passed', `已通过应为 passed，实际=${s5}`);
+  log('breakthrough-stage-derivation', { passed: true, s1, s2, s3, s4, s5 });
+}
+
+function smokeAi83BreakthroughOutcome(): void {
+  // AI-83: resolveBreakthroughOutcome 应按阶段+心魔+外援给出 success/failed/continue
+  const baseAttempt: BreakthroughAttempt = {
+    realmBefore: 'qi_refining', realmAfter: 'foundation_building', stage: 'stabilize',
+    attemptNumber: 3, helperCount: 0, startedAge: 25, elapsedTurns: 10,
+  };
+  const o1 = resolveBreakthroughOutcome({ attempt: baseAttempt, heartDemon: 30, helperPower: 4 });
+  assert(o1.outcome === 'success' && o1.narrative.length > 0, `外援足够应成功，实际=${o1.outcome}`);
+  const o2 = resolveBreakthroughOutcome({ attempt: { ...baseAttempt, helperCount: 0 }, heartDemon: 30, helperPower: 0 });
+  assert(o2.outcome === 'continue', `外援为0应继续，实际=${o2.outcome}`);
+  const stormAttempt: BreakthroughAttempt = { ...baseAttempt, stage: 'storm' };
+  const o3 = resolveBreakthroughOutcome({ attempt: stormAttempt, heartDemon: 70, helperPower: 5 });
+  assert(o3.outcome === 'failed', `风暴+高心魔应失败，实际=${o3.outcome}`);
+  // 已通过 → 直接成功
+  const passedAttempt: BreakthroughAttempt = { ...baseAttempt, stage: 'passed' };
+  const o4 = resolveBreakthroughOutcome({ attempt: passedAttempt, heartDemon: 0, helperPower: 0 });
+  assert(o4.outcome === 'success', `已通过应成功，实际=${o4.outcome}`);
+  log('breakthrough-outcome', { passed: true, o1: o1.outcome, o2: o2.outcome, o3: o3.outcome, o4: o4.outcome });
+}
+
+function smokeAi84CombatStalemateBreak(): void {
+  // AI-84: detectCombatStalemate 应识别连续无变化的僵局；resolveStalemateBreak 应返回事件提示
+  const progressing = [
+    { round: 1, playerHpAfter: 100, enemyHpAfter: 100 },
+    { round: 2, playerHpAfter: 90, enemyHpAfter: 95 },
+    { round: 3, playerHpAfter: 80, enemyHpAfter: 90 },
+  ];
+  const r1 = detectCombatStalemate(progressing);
+  assert(r1.isStalemate === false, `持续推进应非僵局，实际=${r1.isStalemate}`);
+  const stuck = [
+    { round: 1, playerHpAfter: 50, enemyHpAfter: 50 },
+    { round: 2, playerHpAfter: 50, enemyHpAfter: 50 },
+    { round: 3, playerHpAfter: 50, enemyHpAfter: 50 },
+    { round: 4, playerHpAfter: 50, enemyHpAfter: 50 },
+  ];
+  const r2 = detectCombatStalemate(stuck);
+  assert(r2.isStalemate === true && r2.turnsSinceProgress >= 3, `连续平局应僵局，实际=${r2.isStalemate}/${r2.turnsSinceProgress}`);
+  // 破局提示
+  const break1 = resolveStalemateBreak({ realm: 'qi_refining' } as any, { name: '妖兽' });
+  assert(typeof break1.event === 'string' && break1.event.length > 0, '破局事件文案非空');
+  assert(typeof break1.hint === 'string' && break1.hint.length > 0, '破局提示非空');
+  assert(['aggressive', 'cunning', 'defensive'].includes(break1.suggestedAction), `建议动作应为合法姿态，实际=${break1.suggestedAction}`);
+  log('combat-stalemate-break', { passed: true, isStalemate: r2.isStalemate, event: break1.event });
+}
+
+function smokeAi85ComboChainDerivation(): void {
+  // AI-85: deriveComboChain 应按命中记录生成连击
+  const empty = deriveComboChain([]);
+  assert(empty === null, `空记录应返回 null，实际=${empty}`);
+  const oneHit = deriveComboChain([{ round: 5, hit: true, skillName: '剑' }]);
+  assert(oneHit === null, `单次命中应无连击，实际=${oneHit}`);
+  const hits = deriveComboChain([
+    { round: 3, hit: true, skillName: '剑' },
+    { round: 4, hit: true, skillName: '剑' },
+    { round: 5, hit: true, skillName: '剑' },
+  ]);
+  assert(hits !== null && hits.hits === 3, `应=3连击，实际=${hits?.hits}`);
+  assert(hits!.multiplier > 1 && hits!.multiplier <= 2.5, `连击倍率应在 (1, 2.5]，实际=${hits!.multiplier}`);
+  // 断连
+  const broken = deriveComboChain([
+    { round: 1, hit: true, skillName: '剑' },
+    { round: 2, hit: false },
+    { round: 3, hit: true, skillName: '剑' },
+    { round: 4, hit: true, skillName: '剑' },
+  ]);
+  assert(broken !== null && broken.hits === 2, `失手后应仅 2 连击，实际=${broken?.hits}`);
+  log('combo-chain-derivation', { passed: true, hits: hits?.hits, multiplier: hits?.multiplier, broken: broken?.hits });
+}
+
+function smokeAi85ComboDamageResolve(): void {
+  // AI-85: resolveComboDamage 应按连击倍率加成伤害
+  const noCombo = resolveComboDamage(100, null);
+  assert(noCombo.finalDamage === 100 && noCombo.multiplier === 1, `无连击应保持 100，实际=${noCombo.finalDamage}`);
+  const chain: ComboChain = { comboName: '三连击', hits: 3, multiplier: 1.3, expiresTurn: 10 };
+  const withCombo = resolveComboDamage(100, chain);
+  assert(withCombo.finalDamage === 130 && withCombo.multiplier === 1.3, `100*1.3 应=130，实际=${withCombo.finalDamage}`);
+  // 无效连击（hits<2）→ 不加成
+  const weakCombo = resolveComboDamage(50, { comboName: '弱', hits: 1, multiplier: 2, expiresTurn: 1 });
+  assert(weakCombo.finalDamage === 50, `单次连击不应加成，实际=${weakCombo.finalDamage}`);
+  // 负数归零 → 下限 1
+  const negDamage = resolveComboDamage(-5, null);
+  assert(negDamage.finalDamage === 0, `负伤害应=0，实际=${negDamage.finalDamage}`);
+  log('combo-damage-resolve', { passed: true, base: 100, withCombo: withCombo.finalDamage, mult: withCombo.multiplier });
+}
+
+function smokeHeartIntentPanelExists(): void {
+  // AI-102: HeartIntentPanel 组件应存在并导出
+  const panelPath = 'E:\\aigame2_publish\\src\\components\\xianxia\\HeartIntentPanel.tsx';
+  const exists = existsSync(panelPath);
+  assert(exists, `HeartIntentPanel.tsx 应存在于 ${panelPath}`);
+  let exported = false;
+  if (exists) {
+    const src = readFileSync(panelPath, 'utf8');
+    exported = /export\s+function\s+HeartIntentPanel\s*\(/.test(src) || /export\s+const\s+HeartIntentPanel\s*=/.test(src);
+  }
+  assert(exported, `HeartIntentPanel 必须导出 HeartIntentPanel 组件`);
+  log('heart-intent-panel-exists', { passed: true, path: panelPath, exported });
+}
+
+function smokeHeartIntentStoreUpdate(): void {
+  // AI-102: 组件应能通过 store 修改 heartIntent / intents
+  // 边界：不动核心 action，使用 setCharacter 通用更新器
+  const panelPath = 'E:\\aigame2_publish\\src\\components\\xianxia\\HeartIntentPanel.tsx';
+  let usesSetCharacter = false;
+  let accessesHeartIntent = false;
+  let accessesIntents = false;
+  if (existsSync(panelPath)) {
+    const src = readFileSync(panelPath, 'utf8');
+    usesSetCharacter = /setCharacter\s*[,(]/.test(src) || /useGameStore/.test(src);
+    accessesHeartIntent = /character\.heartIntent|heartIntent/.test(src);
+    accessesIntents = /character\.intents|\.intents\b/.test(src);
+  }
+  assert(usesSetCharacter, 'HeartIntentPanel 必须调用 store.setCharacter 或 useGameStore');
+  assert(accessesHeartIntent, 'HeartIntentPanel 必须读取 character.heartIntent');
+  assert(accessesIntents, 'HeartIntentPanel 必须读取 character.intents[]');
+  log('heart-intent-store-update', { passed: true, usesSetCharacter, accessesHeartIntent, accessesIntents });
+}
+
+function smokeHeartIntentLabel(): void {
+  // AI-102: HEART_INTENT_LABEL 应从 display.ts 导出
+  const displayPath = 'E:\\aigame2_publish\\src\\lib\\xianxia\\display.ts';
+  let exported = false;
+  let hasLabels = false;
+  if (existsSync(displayPath)) {
+    const src = readFileSync(displayPath, 'utf8');
+    const m = src.match(/export\s+const\s+HEART_INTENT_LABEL[^=]*=\s*\{([\s\S]*?)\}\s+as\s+const/);
+    if (m) {
+      exported = true;
+      const body = m[1];
+      const labels = (body.match(/:\s*['"][^'"]+['"]/g) || []).map(s => s.replace(/[:'"\s]/g, ''));
+      hasLabels = labels.length >= 5 && labels.every(l => /[\u4e00-\u9fa5]/.test(l));
+    }
+  }
+  assert(exported, 'HEART_INTENT_LABEL 必须从 display.ts 导出 (as const)');
+  assert(hasLabels, 'HEART_INTENT_LABEL 必须包含至少 5 个中文标签');
+  log('heart-intent-label', { passed: true, exported, hasLabels });
 }

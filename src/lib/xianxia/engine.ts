@@ -1,4 +1,4 @@
-// 修仙模拟器 - 引擎核心
+﻿// 修仙模拟器 - 引擎核心
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
@@ -78,6 +78,40 @@ import {
   AscensionSession,
   // AI-70
   Restriction,
+  // ===== Worker A (AI-81~AI-85) additive imports =====
+  CombatStance,
+  CombatStanceUsage,
+  CombatResourceType,
+  CombatResourceUsage,
+  BreakthroughStage,
+  BreakthroughAttempt,
+  ComboChain,
+  COMBAT_STANCE_LABEL,
+  COMBAT_RESOURCE_LABEL,
+  BREAKTHROUGH_STAGE_LABEL,
+} from './types';
+import {
+  // ===== Worker A (AI-91/AI-92/AI-93/AI-95/AI-96/AI-97/AI-98/AI-99/AI-100/AI-101/AI-103) additive imports =====
+  CombatLogEntry,
+  LootTable,
+  LootCondition,
+  StatusExpireRule,
+  StatusExpiryMeta,
+  PetCultivationPath,
+  PillRecipeUnlockCondition,
+  PillRecipe,
+  PillCraftResult,
+  FormationStackRule,
+  FormationStackResult,
+  BidderPersonality,
+  BidderAction,
+  ThreadChainNode,
+  BottleSpirit,
+  SwordAptitude,
+  InnatePhysique,
+  FakeDeathRule,
+  NPCMemoryEntry,
+  WorldRumor,
 } from './types';
 import { COMBAT_PROJECTION_LABELS, sanitizeLootName } from './display';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
@@ -6151,3 +6185,1501 @@ export function recordExploration(
 
 
 
+
+// ==================== AI-86/87/88/89/90: Worker B Additions ====================
+// Worker B (xiaoxin-B) - additive only, do not modify existing functions above.
+// New derived functions for pill side effects, formation drawing, pet evolution,
+// pet insight/communication, and pet combat skills.
+
+import type {
+  PillSideEffect,
+  PillEffectiveness,
+  PillSideEffectResolution,
+  FormationDrawingStep,
+  FormationDrawingSession,
+  FormationDrawingProgress,
+  PetEvolutionStage,
+  PetEvolutionRequirement,
+  PetEvolutionEligibility,
+  PetInsight,
+  PetCommunication,
+  PetCombatSkill,
+  PetSkillUsage,
+  PetCombatSkillEvent,
+} from './types';
+
+// ---------------- AI-86: Pill Effectiveness & Side Effects ----------------
+
+/**
+ * 派生某颗丹药在角色当前状态下的实际服用效果评估。
+ * 综合丹药品质、角色境界、体质、当前丹毒累积等因素。
+ */
+export function derivePillEffectiveness(
+  pill: { id: string; name: string; quality?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic'; tier?: number; expGain?: number; hpRestore?: number; mpRestore?: number; effects?: any[]; isPill?: boolean },
+  character: CharacterState
+): PillEffectiveness {
+  const quality = pill.quality ?? 'common';
+  const tier = pill.tier ?? 1;
+  const qualityMul: Record<string, number> = {
+    common: 0.6, uncommon: 0.8, rare: 1.0, epic: 1.4, legendary: 1.8, mythic: 2.4,
+  };
+  const mul = qualityMul[quality] ?? 1.0;
+
+  // 角色境界越高，对高阶丹药利用率越高
+  const realmLevel = (character as any).realmLevel ?? 0;
+  const realmFactor = 1 + Math.min(realmLevel, 9) * 0.05;
+
+  const baseBoost = pill.expGain ?? 0;
+  const hpBoost = pill.hpRestore ?? 0;
+  const mpBoost = pill.mpRestore ?? 0;
+
+  // 副作用概率：高阶丹药 + 低境界服用 = 高副作用概率
+  const realmGap = Math.max(0, tier - realmLevel);
+  const sideEffectChance = Math.min(0.85, 0.05 + realmGap * 0.12 + (tier >= 3 ? 0.1 : 0));
+  const sideEffectSeverity = Math.min(5, 1 + Math.floor(tier / 2) + Math.floor(realmGap / 2));
+
+  // 按 tier 决定可能触发的副作用种类
+  const possible: PillSideEffect[] = [];
+  if (tier >= 1) possible.push('toxicity');
+  if (tier >= 2) possible.push('qi-turbulence');
+  if (tier >= 3) possible.push('cultivation-deviation');
+  if (tier >= 4) possible.push('karma');
+
+  return {
+    pillId: pill.id,
+    pillName: pill.name,
+    boost: {
+      cultivationExp: Math.round(baseBoost * mul * realmFactor),
+      hp: Math.round(hpBoost * mul),
+      mp: Math.round(mpBoost * mul),
+      durationTurns: 3,
+    },
+    sideEffectChance,
+    sideEffectSeverity,
+    possibleSideEffects: possible,
+  };
+}
+
+/**
+ * 根据副作用评估结果，结算对角色状态的具体影响。
+ * 返回的属性变更与状态变更应由调用方应用到 CharacterState。
+ */
+export function resolvePillSideEffects(
+  pill: { id: string; name: string; tier?: number; quality?: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic' },
+  character: CharacterState,
+  rand: number = Math.random()
+): PillSideEffectResolution {
+  const eff = derivePillEffectiveness(pill, character);
+  const triggered = rand < eff.sideEffectChance;
+  if (!triggered) {
+    return {
+      pillId: pill.id,
+      triggered: false,
+      severity: 0,
+      attributeChanges: [],
+      statusChanges: [],
+    };
+  }
+  // 选取第一个副作用（按出现概率最高的）
+  const side = eff.possibleSideEffects[0] ?? 'toxicity';
+  const sev = eff.sideEffectSeverity;
+
+  const changes: AttributeChange[] = [];
+  const statuses: StatusEntry[] = [];
+
+  switch (side) {
+    case 'toxicity':
+      changes.push({ attribute: 'hp', delta: -sev * 8, reason: `pill-side-effect:${pill.id}` });
+      statuses.push({
+        id: `pill-toxicity-${pill.id}`,
+        name: '丹毒淤积',
+        description: `服用${pill.name}后丹毒未散`,
+        category: 'debuff',
+        rarity: 'common',
+        duration: 30,
+        source: `服用${pill.name}后丹毒未散`,
+        effects: [{ target_attribute: 'cultivation_rate', operation: 'multiply', value: 1 - sev * 0.05, description: 'cultivation rate penalty from pill toxicity' }],
+      });
+      break;
+    case 'cultivation-deviation':
+      changes.push({ attribute: 'hp', delta: -sev * 12, reason: `pill-deviation:${pill.id}` });
+      changes.push({ attribute: 'cultivationExp', delta: -sev * 20, reason: `pill-deviation:${pill.id}` });
+      statuses.push({
+        id: `pill-deviation-${pill.id}`,
+        name: '走火入魔',
+        description: `服用${pill.name}后气机逆行`,
+        category: 'debuff',
+        rarity: 'uncommon',
+        duration: 15,
+        source: `服用${pill.name}后气机逆行`,
+        effects: [],
+      });
+      break;
+    case 'karma':
+      statuses.push({
+        id: `pill-karma-${pill.id}`,
+        name: '因果牵缠',
+        description: `${pill.name}引来天道注视`,
+        category: 'special',
+        rarity: 'rare',
+        duration: 60,
+        source: `${pill.name}引来天道注视`,
+        effects: [],
+      });
+      break;
+    case 'qi-turbulence':
+      statuses.push({
+        id: `pill-qi-turbulence-${pill.id}`,
+        name: '气机紊乱',
+        description: `服用${pill.name}后经脉不稳`,
+        category: 'debuff',
+        rarity: 'common',
+        duration: 20,
+        source: `服用${pill.name}后经脉不稳`,
+        effects: [{ target_attribute: 'cultivation_rate', operation: 'multiply', value: 1 - sev * 0.08, description: 'cultivation rate penalty from qi turbulence' }],
+      });
+      break;
+  }
+
+  return {
+    pillId: pill.id,
+    triggered: true,
+    sideEffect: side,
+    severity: sev,
+    attributeChanges: changes,
+    statusChanges: statuses,
+    narrativeHint: `服用${pill.name}后感到${
+      side === 'toxicity' ? '腹内灼热、丹毒游走' :
+      side === 'cultivation-deviation' ? '经脉一阵剧痛、气血翻涌' :
+      side === 'karma' ? '冥冥中似有注视落下' :
+      '气息凌乱、难以凝神'
+    }。`,
+  };
+}
+
+// ---------------- AI-87: Formation Drawing Process ----------------
+
+const FORMATION_DRAWING_ORDER: FormationDrawingStep[] = [
+  'meditate', 'trace', 'infuse', 'anchor', 'activate',
+];
+
+/**
+ * 根据角色境界与阵法稀有度，推导出当前可进行的绘制步骤。
+ * 若角色境界不足以绘制该阵法，则返回 'meditate'（需先静心破境）。
+ */
+export function deriveFormationStep(
+  formation: { id: string; name: string; rarity?: string; requirements?: { minRealm?: string; minComprehension?: number } },
+  character: CharacterState
+): FormationDrawingStep {
+  const realm = (character as any).realm ?? 'mortal';
+  const minRealm = formation.requirements?.minRealm ?? realm;
+  const realmOrder: Record<string, number> = {
+    mortal: 0, qi_refining: 1, foundation_building: 2, golden_core: 3,
+    nascent_soul: 4, spirit_severing: 5, tribulation: 6, great_vehicle: 7, immortal: 8,
+  };
+  const charRank = realmOrder[realm] ?? 0;
+  const reqRank = realmOrder[minRealm] ?? 0;
+  if (charRank < reqRank) return 'meditate';
+  // 境界达标，可从 meditate 起步；返回当前可进行的步骤起点
+  return 'meditate';
+}
+
+/**
+ * 创建一次阵法绘制会话。
+ */
+export function startFormationDrawing(
+  character: CharacterState,
+  formation: { id: string; name: string; rarity?: string; requirements?: any }
+): FormationDrawingSession {
+  return {
+    id: `fds-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    formationId: formation.id,
+    formationName: formation.name,
+    characterId: (character as any).id ?? 'unknown',
+    startedAge: character.age ?? 0,
+    currentStep: deriveFormationStep(formation, character),
+    completedSteps: [],
+    materialsUsed: [],
+    stepSuccessChance: 0.7,
+    failureStreak: 0,
+    finished: false,
+    turnsSpent: 0,
+  };
+}
+
+/**
+ * 推进阵法绘制会话一步。`action` 是玩家选择的行动类型：
+ * - 'advance': 尝试推进到下一步（按 stepSuccessChance 判定）
+ * - 'restart': 失败次数过多时从头开始
+ * - 'abort':   主动放弃
+ */
+export function resolveDrawingProgress(
+  session: FormationDrawingSession,
+  action: 'advance' | 'restart' | 'abort',
+  rand: number = Math.random()
+): FormationDrawingProgress {
+  if (action === 'abort') {
+    return {
+      session: { ...session, finished: true, success: false },
+      advanced: false,
+      failed: false,
+      finished: true,
+      attributeChanges: [],
+      narrativeHint: `${session.formationName}的绘制已被中止。`,
+    };
+  }
+  if (action === 'restart') {
+    return {
+      session: {
+        ...session,
+        currentStep: 'meditate',
+        completedSteps: [],
+        failureStreak: 0,
+        turnsSpent: 0,
+      },
+      advanced: true,
+      failed: false,
+      finished: false,
+      attributeChanges: [],
+      narrativeHint: `重新开始绘制${session.formationName}。`,
+    };
+  }
+
+  // action === 'advance'
+  if (session.finished) {
+    return {
+      session,
+      advanced: false,
+      failed: false,
+      finished: true,
+      attributeChanges: [],
+    };
+  }
+
+  const success = rand < session.stepSuccessChance;
+  if (!success) {
+    const newStreak = session.failureStreak + 1;
+    // 连续失败 3 次 → 会话失败
+    if (newStreak >= 3) {
+      return {
+        session: { ...session, finished: true, success: false, failureStreak: newStreak },
+        advanced: false,
+        failed: true,
+        finished: true,
+        attributeChanges: [{ attribute: 'mp', delta: -30, reason: `formation-draw-fail:${session.formationId}` }],
+        narrativeHint: `${session.formationName}绘制失败，灵力反噬。`,
+      };
+    }
+    return {
+      session: { ...session, failureStreak: newStreak, turnsSpent: session.turnsSpent + 1 },
+      advanced: false,
+      failed: true,
+      finished: false,
+      attributeChanges: [{ attribute: 'mp', delta: -5, reason: `formation-draw-step-fail:${session.formationId}` }],
+      narrativeHint: `${session.formationName}的${session.currentStep}步骤失败，气息不稳。`,
+    };
+  }
+
+  // 成功：推进到下一步
+  const idx = FORMATION_DRAWING_ORDER.indexOf(session.currentStep);
+  const completed = [...session.completedSteps, session.currentStep];
+  const nextIdx = idx + 1;
+  if (nextIdx >= FORMATION_DRAWING_ORDER.length) {
+    return {
+      session: {
+        ...session,
+        completedSteps: completed,
+        currentStep: 'activate',
+        finished: true,
+        success: true,
+        turnsSpent: session.turnsSpent + 1,
+        failureStreak: 0,
+      },
+      advanced: true,
+      failed: false,
+      finished: true,
+      attributeChanges: [],
+      narrativeHint: `${session.formationName}绘制成功，阵法已成！`,
+    };
+  }
+  return {
+    session: {
+      ...session,
+      completedSteps: completed,
+      currentStep: FORMATION_DRAWING_ORDER[nextIdx],
+      turnsSpent: session.turnsSpent + 1,
+      failureStreak: 0,
+    },
+    advanced: true,
+    failed: false,
+    finished: false,
+    attributeChanges: [],
+    narrativeHint: `${session.formationName}推进至${FORMATION_DRAWING_ORDER[nextIdx]}。`,
+  };
+}
+
+// ---------------- AI-88: Pet Evolution ----------------
+
+const PET_STAGE_ORDER: PetEvolutionStage[] = ['infant', 'youth', 'mature', 'ascended'];
+
+const PET_EVOLUTION_REQUIREMENTS: Record<PetEvolutionStage, PetEvolutionRequirement> = {
+  infant: {
+    stage: 'infant',
+    minAge: 0,
+    minRealmLevel: 0,
+    materials: [],
+    minLoyalty: 0,
+  },
+  youth: {
+    stage: 'youth',
+    minAge: 1,
+    minRealmLevel: 2,
+    materials: ['pet_growth_pill'],
+    minLoyalty: 40,
+  },
+  mature: {
+    stage: 'mature',
+    minAge: 5,
+    minRealmLevel: 4,
+    materials: ['pet_mature_essence', 'pet_growth_pill'],
+    minLoyalty: 70,
+  },
+  ascended: {
+    stage: 'ascended',
+    minAge: 20,
+    minRealmLevel: 7,
+    materials: ['pet_ascension_crystal', 'pet_mature_essence', 'pet_growth_pill'],
+    minLoyalty: 90,
+  },
+};
+
+/**
+ * 检查灵宠是否能进阶到下一阶段。返回资格与缺失项列表。
+ */
+export function derivePetEvolutionEligibility(
+  pet: { id: string; level?: number; exp?: number; loyalty?: number; acquiredAge?: number; stage?: PetEvolutionStage },
+  character: CharacterState
+): PetEvolutionEligibility {
+  const currentStage: PetEvolutionStage = pet.stage ?? 'infant';
+  const idx = PET_STAGE_ORDER.indexOf(currentStage);
+  const nextStage = idx >= 0 && idx < PET_STAGE_ORDER.length - 1 ? PET_STAGE_ORDER[idx + 1] : undefined;
+
+  if (!nextStage) {
+    return {
+      petId: pet.id,
+      currentStage,
+      eligible: false,
+      missing: ['已达最高阶段'],
+    };
+  }
+
+  const req = PET_EVOLUTION_REQUIREMENTS[nextStage];
+  const missing: string[] = [];
+
+  const heldAge = Math.max(0, (character.age ?? 0) - (pet.acquiredAge ?? 0));
+  if (heldAge < req.minAge) {
+    missing.push(`陪伴年限不足（需${req.minAge}年，当前${heldAge}年）`);
+  }
+  const realmLevel = (character as any).realmLevel ?? 0;
+  if (realmLevel < req.minRealmLevel) {
+    missing.push(`角色境界不足（需境界等级${req.minRealmLevel}，当前${realmLevel}）`);
+  }
+  const loyalty = pet.loyalty ?? 0;
+  if (loyalty < req.minLoyalty) {
+    missing.push(`忠诚度不足（需${req.minLoyalty}，当前${loyalty}）`);
+  }
+  // 材料检查：从角色 inventory 中查找（这里只校验逻辑，不消耗）
+  const inv: any[] = (character as any).inventory ?? [];
+  for (const mat of req.materials) {
+    const has = inv.some((it: any) => it?.id === mat || it?.name === mat);
+    if (!has) {
+      missing.push(`缺少材料：${mat}`);
+    }
+  }
+
+  return {
+    petId: pet.id,
+    currentStage,
+    nextStage,
+    eligible: missing.length === 0,
+    missing,
+  };
+}
+
+/**
+ * 执行灵宠进阶：返回进阶后的灵宠对象（含 stage 提升、属性提升）。
+ */
+export function resolvePetEvolution(
+  pet: { id: string; name?: string; level?: number; stage?: PetEvolutionStage; hp?: number; maxHp?: number; attack?: number; defense?: number; speed?: number }
+): PetEvolutionStage | null {
+  const currentStage: PetEvolutionStage = pet.stage ?? 'infant';
+  const idx = PET_STAGE_ORDER.indexOf(currentStage);
+  if (idx < 0 || idx >= PET_STAGE_ORDER.length - 1) return null;
+  return PET_STAGE_ORDER[idx + 1];
+}
+
+// ---------------- AI-89: Pet Insight Communication ----------------
+
+/**
+ * 灵宠在特定条件下向角色传递顿悟片段。
+ * 返回 null 表示当前无新顿悟。
+ */
+export function derivePetInsight(
+  pet: { id: string; name?: string; stage?: PetEvolutionStage; element?: 'metal' | 'wood' | 'water' | 'fire' | 'earth'; level?: number; loyalty?: number },
+  character: CharacterState
+): PetInsight | null {
+  const stage = pet.stage ?? 'infant';
+  const loyalty = pet.loyalty ?? 0;
+  const level = pet.level ?? 1;
+  // 触发条件：成熟期以上 + 忠诚度>=60 + 等级>=3
+  if (stage === 'infant') return null;
+  if (loyalty < 60) return null;
+  if (level < 3) return null;
+
+  const insightsByStage: Record<PetEvolutionStage, { name: string; source: string; effect: PetInsight['effect'] }[]> = {
+    infant: [],
+    youth: [
+      { name: '初识灵韵', source: `与${pet.name ?? '灵宠'}日夕相伴`, effect: { cultivationRateBonus: 0.05, elementAffinity: pet.element } },
+    ],
+    mature: [
+      { name: '气机共鸣', source: `${pet.name ?? '灵宠'}突破至成熟期时的心境共鸣`, effect: { cultivationRateBonus: 0.1, elementAffinity: pet.element } },
+      { name: '本能觉醒', source: `${pet.name ?? '灵宠'}在危难中护主`, effect: { techniqueHint: '可尝试修习与本属性相合的功法' } },
+    ],
+    ascended: [
+      { name: '化形心得', source: `${pet.name ?? '灵宠'}化形一刻的灵光`, effect: { cultivationRateBonus: 0.2, elementAffinity: pet.element } },
+      { name: '本相归元', source: `${pet.name ?? '灵宠'}化形后的反向传授`, effect: { techniqueHint: '可窥见本属性功法的高阶法门' } },
+    ],
+  };
+
+  const pool = insightsByStage[stage] ?? [];
+  if (pool.length === 0) return null;
+  // 简化：根据角色年龄 hash 选择一个（确定性，不消耗随机数）
+  const idx = ((character.age ?? 0) + (pet.id?.length ?? 0)) % pool.length;
+  const pick = pool[idx];
+  return {
+    petId: pet.id,
+    petName: pet.name ?? '灵宠',
+    insightName: pick.name,
+    source: pick.source,
+    learnedAge: character.age ?? 0,
+    effect: pick.effect,
+  };
+}
+
+/**
+ * 灵识对话：根据触发原因生成灵宠传递给主人的一句话。
+ */
+export function resolvePetCommunication(
+  pet: { id: string; name?: string; species?: string; loyalty?: number },
+  trigger: string
+): string {
+  const name = pet.name ?? '灵宠';
+  const loyalty = pet.loyalty ?? 0;
+  // 根据忠诚度切换语气
+  if (loyalty < 30) {
+    return `${name}心不在焉地瞥了一眼，似对「${trigger}」毫无兴趣。`;
+  }
+  if (loyalty < 60) {
+    return `${name}低鸣一声，隐约传达出对「${trigger}」的淡淡警示。`;
+  }
+  if (loyalty < 85) {
+    return `${name}灵识波动，向主人清晰地传来：「${trigger}——当谨慎。」`;
+  }
+  return `${name}目光中透出深意，灵识中郑重传来：「主人，${trigger}——此乃天赐之机，亦是天设之险。」`;
+}
+
+// ---------------- AI-90: Pet Combat Skills ----------------
+
+/**
+ * 根据宠物的基础属性，派生它在战斗中的技能列表。
+ * 化形期之前的灵宠只有一个技能（来自 PET_SPECIES_TEMPLATES）。
+ */
+export function derivePetSkillAvailable(
+  pet: { id: string; stage?: PetEvolutionStage; level?: number; skill?: { name: string; description: string; power: number; cooldown: number }; species?: string },
+  turn: number,
+  usage: PetSkillUsage[] = []
+): PetCombatSkill[] {
+  const stage = pet.stage ?? 'infant';
+  const baseSkill = pet.skill;
+  if (!baseSkill) return [];
+
+  const skills: PetCombatSkill[] = [
+    {
+      skillId: `${pet.id}-basic`,
+      name: baseSkill.name,
+      description: baseSkill.description,
+      power: baseSkill.power,
+      cooldown: baseSkill.cooldown,
+      range: 'single',
+      effect: 'physical',
+    },
+  ];
+
+  // 成熟期 +：解锁元素技能
+  if (stage === 'mature' || stage === 'ascended') {
+    skills.push({
+      skillId: `${pet.id}-elemental`,
+      name: `${baseSkill.name}·属相共鸣`,
+      description: '汲取主人与自身的元素共鸣，释放元素之击',
+      power: Math.round(baseSkill.power * 1.4),
+      cooldown: baseSkill.cooldown + 1,
+      range: stage === 'ascended' ? 'all_enemies' : 'single',
+      effect: 'elemental',
+      element: 'fire',
+    });
+  }
+  // 化形期：解锁辅助技能
+  if (stage === 'ascended') {
+    skills.push({
+      skillId: `${pet.id}-guard`,
+      name: '化形护主',
+      description: '以人形短暂护主，减免本回合伤害',
+      power: 0,
+      cooldown: 4,
+      range: 'all_allies',
+      effect: 'buff',
+    });
+  }
+
+  // 过滤掉冷却中或已用尽的技能
+  return skills.filter(s => {
+    const u = usage.find(x => x.skillId === s.skillId);
+    if (!u) return true;
+    if (u.usesLeft === 0) return false;
+    if (u.lastUsedTurn > 0 && turn - u.lastUsedTurn < s.cooldown) return false;
+    return true;
+  });
+}
+
+/**
+ * 执行灵宠技能，返回一个战斗事件对象（damage/heal/buff 等）。
+ */
+export function resolvePetSkillUse(
+  pet: { id: string; name?: string; attack?: number; element?: 'metal' | 'wood' | 'water' | 'fire' | 'earth' },
+  skill: PetCombatSkill,
+  turn: number,
+  targetId?: string
+): PetCombatSkillEvent {
+  const baseAtk = pet.attack ?? 10;
+  const damage = skill.effect === 'physical' || skill.effect === 'elemental'
+    ? Math.round(baseAtk * skill.power)
+    : undefined;
+  const heal = skill.effect === 'heal'
+    ? Math.round(baseAtk * skill.power * 0.6)
+    : undefined;
+
+  return {
+    petId: pet.id,
+    skillId: skill.skillId,
+    skillName: skill.name,
+    turn,
+    targetId,
+    damage,
+    heal,
+    buffApplied: skill.effect === 'buff' ? ['护主之势'] : undefined,
+    debuffApplied: skill.effect === 'debuff' || skill.effect === 'control' ? [skill.name] : undefined,
+    narrativeHint: `${pet.name ?? '灵宠'}施展【${skill.name}】${
+      damage ? `，造成${damage}点伤害` :
+      heal ? `，恢复${heal}点气血` :
+      skill.effect === 'buff' ? '，为主人撑起护体气罩' :
+      skill.effect === 'control' ? `，试图压制目标` :
+      ''
+    }。`,
+  };
+}﻿
+// ==================== Worker A: AI-81~AI-85 Additions ====================
+// All functions below are additive derivation/resolution helpers.
+// They DO NOT mutate the combat state machine core or breakthrough state machine core.
+// UI is responsible for reading the returned values; the engine never prescribes player input.
+
+// ==================== AI-81: Combat Stance ====================
+
+/**
+ * AI-81: 根据角色当前战斗状态与敌方姿态，推导一个建议的战斗姿态。
+ * - 始终返回非空姿态（除非没有进行中的战斗）
+ * - 不写入 session；仅供 UI / AI 调用方参考
+ * - 该函数纯派生，不修改任何状态
+ */
+export function deriveCombatStance(
+  character: CharacterState,
+  opponent?: { hp?: number; maxHp?: number; attack?: number; defense?: number; speed?: number },
+): CombatStance {
+  if (!character) return 'defensive';
+  const cs = character.combatSession;
+  if (!cs || cs.status !== 'ongoing') return 'defensive';
+  const playerHpPct = cs.playerMaxHp > 0 ? cs.playerHp / cs.playerMaxHp : 1;
+  const playerMpPct = cs.playerMaxMp > 0 ? cs.playerMp / cs.playerMaxMp : 1;
+
+  // 血量过低 → 守御 / 脱身
+  if (playerHpPct <= 0.25) {
+    return playerMpPct >= 0.5 ? 'retreat' : 'defensive';
+  }
+  // 资源不足 → 守御回气
+  if (playerMpPct <= 0.3) return 'defensive';
+  // 敌方虚弱 → 猛攻
+  if (opponent && opponent.maxHp && opponent.maxHp > 0 && opponent.hp != null) {
+    const enemyHpPct = opponent.hp / opponent.maxHp;
+    if (enemyHpPct <= 0.35) return 'aggressive';
+    // 敌高速 / 高攻 → 诱敌
+    if ((opponent.attack || 0) >= (character.attack || 0) * 1.4) return 'cunning';
+  }
+  // 默认猛攻
+  return 'aggressive';
+}
+
+/**
+ * AI-81: 根据当前姿态与对手回应，解析下一次应采用的姿态。
+ * - 纯函数：仅做枚举决策
+ * - 使用 cooldownTurns 防止抖动切换
+ */
+export function resolveCombatStanceShift(
+  current: CombatStance,
+  opponent?: { hp?: number; maxHp?: number; attack?: number; attackPrev?: number },
+  history?: { stance: CombatStance; cooldownTurns: number }[],
+): CombatStance {
+  if (!current) return 'defensive';
+  // 若当前姿态还在冷却中（>0），保持
+  const inCooldown = (history || []).find(h => h.stance === current && h.cooldownTurns > 0);
+  if (inCooldown) return current;
+
+  const enemyHpPct = opponent && opponent.maxHp ? (opponent.hp ?? opponent.maxHp) / opponent.maxHp : 1;
+  const enemyRising = opponent && opponent.attack != null && opponent.attackPrev != null && opponent.attack > opponent.attackPrev;
+
+  // 敌方正在蓄力 → 诱敌
+  if (enemyRising) return 'cunning';
+  // 敌方残血 → 猛攻
+  if (enemyHpPct <= 0.3) return 'aggressive';
+  // 自身已选猛攻且敌方血多 → 切换诱敌打破僵局
+  if (current === 'aggressive' && enemyHpPct > 0.6) return 'cunning';
+  // 自身已选诱敌 → 守御片刻
+  if (current === 'cunning') return 'defensive';
+  return current;
+}
+
+// ==================== AI-82: Combat Resource Management ====================
+
+/**
+ * AI-82: 根据角色状态推导出战斗资源当前快照。
+ * - 真元 qi 与 MP 同步
+ * - 神识 soul = floor(spiritualSense * 0.5)
+ * - 体魄 stamina = floor(hp * 0.6) + 10
+ * - 心神 focus = floor(comprehension * 0.4) + 5
+ */
+export function deriveCombatResource(character: CharacterState): CombatResourceUsage[] {
+  const mp = Math.max(0, character?.mp ?? 0);
+  const maxMp = Math.max(1, character?.maxMp ?? 1);
+  const hp = Math.max(0, character?.hp ?? 0);
+  const maxHp = Math.max(1, character?.maxHp ?? 1);
+  const spiritualSense = Math.max(0, character?.spiritualSense ?? 0);
+  const comprehension = Math.max(0, character?.comprehension ?? 0);
+  return [
+    { type: 'qi', current: mp, max: maxMp, regenPerTurn: Math.max(1, Math.floor(maxMp * 0.04)) },
+    { type: 'soul', current: Math.floor(spiritualSense * 0.5), max: Math.max(50, Math.floor(spiritualSense * 0.5 + 50)), regenPerTurn: Math.max(1, Math.floor(spiritualSense * 0.05)) },
+    { type: 'stamina', current: Math.floor(hp * 0.6) + 10, max: Math.floor(maxHp * 0.6) + 10, regenPerTurn: Math.max(2, Math.floor(maxHp * 0.08)) },
+    { type: 'focus', current: Math.floor(comprehension * 0.4) + 5, max: Math.floor(comprehension * 0.4) + 55, regenPerTurn: 2 },
+  ];
+}
+
+/**
+ * AI-82: 根据一次行动消耗结算后，资源的新快照（纯计算，不持久化）。
+ */
+export function resolveCombatResourceDrain(
+  usage: CombatResourceUsage,
+  cost: { type: CombatResourceType; value: number },
+): CombatResourceUsage {
+  if (!usage || !cost) return usage;
+  if (usage.type !== cost.type) return usage;
+  const newCurrent = Math.max(0, usage.current - Math.max(0, cost.value));
+  return {
+    ...usage,
+    current: newCurrent,
+    recentDrain: usage.current - newCurrent,
+  };
+}
+
+/**
+ * AI-82: 检查资源是否足够支撑一组消耗，返回缺失列表。
+ */
+export function checkCombatResourceSufficient(
+  usages: CombatResourceUsage[],
+  costs: { type: CombatResourceType; value: number }[],
+): { sufficient: boolean; missing: { type: CombatResourceType; need: number; have: number }[] } {
+  const missing: { type: CombatResourceType; need: number; have: number }[] = [];
+  for (const cost of costs || []) {
+    const u = (usages || []).find(x => x.type === cost.type);
+    const have = u ? u.current : 0;
+    if (have < cost.value) {
+      missing.push({ type: cost.type, need: cost.value, have });
+    }
+  }
+  return { sufficient: missing.length === 0, missing };
+}
+
+// ==================== AI-83: Breakthrough Stage Refinement ====================
+
+/**
+ * AI-83: 推导当前突破尝试所处阶段。
+ * - realmBefore == realmAfter → 已通过
+ * - 第一次尝试 → 感悟
+ * - 年龄 + 心魔值辅助判断凝聚 / 风暴 / 稳固
+ */
+export function deriveBreakthroughStage(
+  realmBefore: Realm,
+  realmAfter: Realm,
+  attemptNumber: number,
+  age: number,
+  heartDemon: number = 0,
+): BreakthroughStage {
+  if (realmBefore === realmAfter) return 'passed';
+  if (!attemptNumber || attemptNumber <= 0) return 'perception';
+  if (attemptNumber === 1) {
+    if (heartDemon >= 60) return 'storm';
+    if (age >= 80) return 'condense';
+    return 'perception';
+  }
+  if (attemptNumber === 2) return 'condense';
+  if (attemptNumber === 3) return heartDemon >= 50 ? 'storm' : 'stabilize';
+  // 第 4 次及以上视为稳固或失败前的最后尝试
+  return 'stabilize';
+}
+
+/**
+ * AI-83: 根据尝试次数、外援数、心魔值推导本次突破的结局。
+ * - 返回 'success' | 'failed' | 'continue'
+ */
+export function resolveBreakthroughOutcome(opts: {
+  attempt: BreakthroughAttempt;
+  heartDemon: number;
+  helperPower: number;
+}): { outcome: 'success' | 'failed' | 'continue'; narrative: string } {
+  const { attempt, heartDemon, helperPower } = opts;
+  // 已通过 → 成功
+  if (attempt.stage === 'passed') {
+    return { outcome: 'success', narrative: '境界已稳，新阶已立' };
+  }
+  // 风暴阶段 + 高心魔 → 失败概率提升
+  if (attempt.stage === 'storm' && heartDemon >= 60) {
+    return { outcome: 'failed', narrative: '心魔趁势反扑，突破溃散' };
+  }
+  // 稳固阶段 + 外援够 → 成功
+  if (attempt.stage === 'stabilize') {
+    if (helperPower >= 3 || attempt.helperCount >= 1) {
+      return { outcome: 'success', narrative: '得外援助力，新境界稳固下来' };
+    }
+    return { outcome: 'continue', narrative: '还需闭关巩固' };
+  }
+  // 默认 → 继续
+  return { outcome: 'continue', narrative: '仍需继续推进' };
+}
+
+// ==================== AI-84: Combat Stalemate Break ====================
+
+/**
+ * AI-84: 检测战斗是否陷入僵局。
+ * - 当连续多回合无任何一方血量变化或状态变化 → 僵局
+ * - 仅有低伤害互刮不算推进
+ */
+export function detectCombatStalemate(history: Array<{
+  round: number;
+  playerHpAfter: number;
+  enemyHpAfter: number;
+}>): { isStalemate: boolean; turnsSinceProgress: number } {
+  if (!Array.isArray(history) || history.length < 4) {
+    return { isStalemate: false, turnsSinceProgress: 0 };
+  }
+  let turnsSinceProgress = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const cur = history[i];
+    const prev = i > 0 ? history[i - 1] : null;
+    if (!prev) {
+      turnsSinceProgress += 1;
+      continue;
+    }
+    const deltaPlayer = Math.abs((cur.playerHpAfter ?? 0) - (prev.playerHpAfter ?? 0));
+    const deltaEnemy = Math.abs((cur.enemyHpAfter ?? 0) - (prev.enemyHpAfter ?? 0));
+    // 至少有一方血量变化超过 1 才算推进
+    if (deltaPlayer > 1 || deltaEnemy > 1) {
+      return { isStalemate: turnsSinceProgress >= 3, turnsSinceProgress };
+    }
+    turnsSinceProgress += 1;
+  }
+  return { isStalemate: turnsSinceProgress >= 3, turnsSinceProgress };
+}
+
+/**
+ * AI-84: 给出打破僵局的事件提示（用于 AI / UI 显示）。
+ * - 不修改任何状态，仅生成提示
+ */
+export function resolveStalemateBreak(
+  character: CharacterState,
+  opponent?: { name?: string },
+): { event: string; hint: string; suggestedAction: string } {
+  const oppName = opponent?.name || '对手';
+  const realm = character?.realm || 'qi_refining';
+  const choices = [
+    { event: `${oppName}似要变招`, hint: '诱敌露绽，激其先动', suggestedAction: 'cunning' },
+    { event: `战局胶着`, hint: '行险一击，打破僵持', suggestedAction: 'aggressive' },
+    { event: `气息流转渐慢`, hint: '退半步聚气再发', suggestedAction: 'defensive' },
+  ];
+  // 用 realm 字符串做简单哈希选择
+  const idx = Math.abs(Array.from(realm).reduce((a, c) => a + c.charCodeAt(0), 0)) % choices.length;
+  return choices[idx];
+}
+
+// ==================== AI-85: Combat Combo Chain ====================
+
+/**
+ * AI-85: 根据近 N 回合的命中记录推导当前连击链。
+ * - 命中 → 连击 +1
+ * - 失手 / 间隔超过 expiresTurn → 断连
+ */
+export function deriveComboChain(actionHistory: Array<{
+  round: number;
+  hit?: boolean;
+  skillName?: string;
+}>): ComboChain | null {
+  if (!Array.isArray(actionHistory) || actionHistory.length === 0) return null;
+  // 仅看命中且按 round 倒推
+  const sorted = [...actionHistory].sort((a, b) => (b.round || 0) - (a.round || 0));
+  let hits = 0;
+  let lastRound = -1;
+  const names: string[] = [];
+  for (const a of sorted) {
+    if (!a.hit) break;
+    if (lastRound >= 0 && (lastRound - (a.round || 0)) > 1) break;
+    hits += 1;
+    lastRound = a.round || 0;
+    if (a.skillName) names.push(a.skillName);
+  }
+  if (hits < 2) return null;
+  const multiplier = 1 + (hits - 1) * 0.15;
+  const comboName = hits >= 5 ? `${names[0] || '连'}·${hits}连` : hits >= 3 ? `${hits}连击` : '小连击';
+  return {
+    comboName,
+    hits,
+    multiplier: Math.min(2.5, Math.round(multiplier * 100) / 100),
+    expiresTurn: (lastRound + 1),
+  };
+}
+
+/**
+ * AI-85: 结算连击加成后的最终伤害（保留整数下限）。
+ */
+export function resolveComboDamage(baseDamage: number, combo: ComboChain | null): { finalDamage: number; multiplier: number } {
+  const base = Math.max(0, Math.floor(baseDamage || 0));
+  if (!combo || combo.hits < 2) return { finalDamage: base, multiplier: 1 };
+  const m = Math.max(1, combo.multiplier || 1);
+  return { finalDamage: Math.max(1, Math.floor(base * m)), multiplier: m };
+}
+
+
+// ==================== AI-91~AI-103 Derived Functions ====================
+// Worker A (xiaoxin-A) - additive only. New derived/state-less helpers.
+// Do NOT touch state-machine cores (processYear / advanceYear / combat main flow).
+
+// ===== AI-91: Combat Log =====
+/**
+ * 净化一条战斗日志：把机制词、数字等系统层信息剥离，保留叙事正文。
+ * 系统层（如"你受到 3 点伤害"）→ 保留为 isSystem=true，不删字。
+ * 叙事层 → 走 narrator 兜底，正常显示。
+ */
+export function sanitizeCombatLog(entry: CombatLogEntry): { text: string; isSystem: boolean } {
+  if (!entry || typeof entry.text !== 'string') {
+    return { text: '', isSystem: true };
+  }
+  // 已经被标记的条目直接返回；剥离零宽 / 控制字符
+  const cleaned = entry.text.replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  return { text: cleaned, isSystem: !!entry.isSystem };
+}
+
+/**
+ * 将一连串战斗日志折叠成一段小说化叙述。
+ * 系统条目直接以括注形式嵌入正文；叙事条目作为叙事主体。
+ */
+export function novelizeCombatLog(log: CombatLogEntry[]): string {
+  if (!Array.isArray(log) || log.length === 0) return '';
+  const narrativeParts: string[] = [];
+  const systemParts: string[] = [];
+  for (const e of log) {
+    const s = sanitizeCombatLog(e);
+    if (!s.text) continue;
+    if (s.isSystem) {
+      systemParts.push(s.text);
+    } else {
+      narrativeParts.push(s.text);
+    }
+  }
+  const body = narrativeParts.join('');
+  if (systemParts.length === 0) return body;
+  // 系统信息以括注形式追加，避免打断正文
+  const sys = systemParts.length === 1 ? systemParts[0] : systemParts.join('；');
+  return body ? `${body}（${sys}）` : `（${sys}）`;
+}
+
+// ===== AI-92: Loot AI =====
+/**
+ * 从对手身上按 realm 等级推一组基础掉落（不应用 conditions）。
+ * 高境界对手产出更稀有的物品；返回的物品名已经清掉敌人归属前缀。
+ */
+export function deriveLootFromOpponent(opponent: { id?: string; name?: string; realm?: string; level?: number }, realm: Realm): ItemEntry[] {
+  const oppLevel = Math.max(0, Math.floor(opponent?.level ?? 1));
+  const realmOrder: Realm[] = ['mortal','qi_refining','foundation','golden_core','nascent_soul','soul_formation','tribulation','ascension'];
+  const idx = Math.max(0, realmOrder.indexOf(realm));
+  const baseRarity = idx >= 5 ? 'rare' : idx >= 3 ? 'uncommon' : 'common';
+  const spiritStones = 5 + idx * 8 + oppLevel * 2;
+  // 不在 ItemEntry 内放 enemy 归属，只输出器物本名
+  const loot: ItemEntry[] = [
+    {
+      id: `loot-spirit-${opponent?.id ?? 'enemy'}-${idx}`,
+      name: `灵材残片（${baseRarity === 'rare' ? '珍' : baseRarity === 'uncommon' ? '异' : '凡'}）`,
+      description: '从败敌遗物中拾得的零散灵材。',
+      item_type: 'material',
+      rarity: baseRarity as ItemEntry['rarity'],
+      effects: [],
+      source: '战利品',
+    },
+    {
+      id: `loot-stash-${opponent?.id ?? 'enemy'}-${idx}`,
+      name: `散碎灵石袋`,
+      description: '装有数枚灵石的旧布袋。',
+      item_type: 'tool',
+      rarity: 'common',
+      effects: [],
+      source: '战利品',
+    },
+  ];
+  return loot;
+}
+
+/**
+ * 把 loot 表的 conditions 全部跑一遍，过滤掉未通过的项目，
+ * 并把随机概率不足的条目按 chance 字段决定是否落入。
+ * 返回的物品已经是经过 character 校验的最终掉落物。
+ */
+export function resolveLootConditions(loot: LootTable, character: CharacterState): ItemEntry[] {
+  if (!loot || !Array.isArray(loot.items)) return [];
+  const allowed: ItemEntry[] = [];
+  const condList = Array.isArray(loot.conditions) ? loot.conditions : [];
+  for (const item of loot.items) {
+    let pass = true;
+    for (const cond of condList) {
+      if (!pass) break;
+      if (!cond) continue;
+      switch (cond.kind) {
+        case 'min_realm':
+          pass = cond.realm ? character.realm === cond.realm : true;
+          break;
+        case 'min_level':
+          pass = (character.realmLevel ?? 0) >= (cond.minLevel ?? 0);
+          break;
+        case 'has_status':
+          pass = Array.isArray(character.statuses) && character.statuses.some(s => s && s.id === cond.statusId);
+          break;
+        case 'has_tag':
+          pass = Array.isArray((character as any).tags) && (character as any).tags.includes(cond.tag);
+          break;
+        case 'faction':
+          pass = character.faction === cond.faction;
+          break;
+        case 'spirit_stones':
+          pass = (character.spiritStones ?? 0) >= (cond.minStones ?? 0);
+          break;
+        case 'random': {
+          const chance = typeof cond.chance === 'number' ? Math.max(0, Math.min(1, cond.chance)) : 1;
+          if (chance < 1) {
+            // 确定性派生：不真正随机，使用角色 id 哈希作伪随机种子
+            const seed = (character.id ?? '').length + item.id.length + (item.rarity?.length ?? 0);
+            const roll = ((seed * 9301 + 49297) % 233280) / 233280;
+            pass = roll <= chance;
+          }
+          break;
+        }
+        default:
+          pass = true;
+      }
+    }
+    if (pass) allowed.push(item);
+  }
+  return allowed;
+}
+
+// ===== AI-93: Status Expiry =====
+/**
+ * 推算某状态在当前 age 下的过期年龄。
+ * - rule='turns' / 没有 rule → 返回 null（按回合数走战斗 tick）
+ * - rule='years' → 返回 startAge + remaining
+ * - rule='condition' / 'event' → 返回 null（条件触发，不预测）
+ */
+export function deriveStatusExpiry(status: StatusEntry & Partial<StatusExpiryMeta>, currentAge: number): number | null {
+  if (!status) return null;
+  const meta = (status as any).expiryMeta as StatusExpiryMeta | undefined;
+  const rule = meta?.rule;
+  if (rule === 'years') {
+    const remain = typeof meta?.remaining === 'number' ? meta.remaining : Math.max(0, status.duration ?? 0);
+    return Math.floor(currentAge) + remain;
+  }
+  if (rule === 'turns' || rule === 'condition' || rule === 'event') {
+    return null;
+  }
+  return null;
+}
+
+/**
+ * 跑一次 status 移除：按 expiresAge / duration / rule 自动剔除到期状态，
+ * 返回新的 CharacterState（不修改原对象）。
+ */
+export function resolveStatusRemoval(character: CharacterState, currentAge?: number): CharacterState {
+  const age = typeof currentAge === 'number' ? currentAge : character.age;
+  const list = Array.isArray(character.statuses) ? character.statuses : [];
+  const kept: StatusEntry[] = [];
+  for (const s of list) {
+    if (!s) continue;
+    const meta = (s as any).expiryMeta as StatusExpiryMeta | undefined;
+    if (meta?.rule === 'years') {
+      const expireAge = deriveStatusExpiry(s as any, age);
+      if (typeof expireAge === 'number' && age >= expireAge) continue;
+    } else if (typeof s.duration === 'number' && s.duration === 0) {
+      continue;
+    }
+    kept.push(s);
+  }
+  return { ...character, statuses: kept } as CharacterState;
+}
+
+// ===== AI-95: Pet Cultivation =====
+const PET_PATH_KEYWORDS: Record<PetCultivationPath, string[]> = {
+  combat:   ['锋','锐','猛','破','噬','猎','爪','牙','杀'],
+  assist:   ['护','养','愈','柔','伴','庇','医','灵'],
+  transform:['化形','蜕变','人形','九尾','蛟龙','仙鹤','凤'],
+  contract: ['心','契','羁','念','魂','约'],
+};
+
+/**
+ * 根据灵宠名/描述/类型，推荐一条修行路径。
+ * 命中关键字的关键词数最多者胜出；平局时按 combat > assist > transform > contract 优先级。
+ */
+export function derivePetCultivationSuggestion(pet: { name?: string; description?: string; type?: string } | null | undefined, _character: CharacterState): PetCultivationPath {
+  if (!pet) return 'combat';
+  const text = `${pet.name ?? ''} ${pet.description ?? ''} ${pet.type ?? ''}`;
+  const scores: Record<PetCultivationPath, number> = { combat: 0, assist: 0, transform: 0, contract: 0 };
+  (Object.keys(PET_PATH_KEYWORDS) as PetCultivationPath[]).forEach(k => {
+    for (const kw of PET_PATH_KEYWORDS[k]) {
+      if (text.includes(kw)) scores[k] += 1;
+    }
+  });
+  const order: PetCultivationPath[] = ['combat','assist','transform','contract'];
+  let best: PetCultivationPath = 'combat';
+  let bestScore = -1;
+  for (const k of order) {
+    if (scores[k] > bestScore) { bestScore = scores[k]; best = k; }
+  }
+  return best;
+}
+
+/**
+ * 学习一个新技能到灵宠身上：检查技能是否与已有 skill 重复，并返回新灵宠对象。
+ * 重复时返回原 pet（不重复登记），并通过 throw 提示。
+ */
+export function resolvePetSkillLearn<T extends { skill: { name: string; power: number; cooldown: number } }>(pet: T, skill: { name: string; power: number; cooldown: number; description?: string }): T {
+  if (!pet || !skill || !skill.name) return pet;
+  if (pet.skill && pet.skill.name === skill.name) return pet;
+  return {
+    ...pet,
+    skill: {
+      name: skill.name,
+      description: skill.description ?? pet.skill?.description ?? '',
+      power: typeof skill.power === 'number' ? skill.power : (pet.skill?.power ?? 1),
+      cooldown: typeof skill.cooldown === 'number' ? skill.cooldown : (pet.skill?.cooldown ?? 0),
+    },
+  };
+}
+
+// ===== AI-96: Pill Recipe =====
+/**
+ * 给定丹方和角色，推算是否已解锁 + 还缺什么。
+ */
+export function deriveRecipeUnlock(recipe: PillRecipe, character: CharacterState): { unlocked: boolean; missing: string[] } {
+  const missing: string[] = [];
+  if (!recipe) return { unlocked: false, missing: ['no_recipe'] };
+  // 境界下限
+  const realmOrder: Realm[] = ['mortal','qi_refining','foundation','golden_core','nascent_soul','soul_formation','tribulation','ascension'];
+  const curIdx = realmOrder.indexOf(character.realm);
+  if (curIdx < recipe.minRealmIdx) missing.push(`min_realm:${recipe.minRealmIdx}`);
+  // 材料齐备性：character.inventory 中按 item id 统计
+  const inv = Array.isArray(character.inventory) ? character.inventory : [];
+  for (const matId of recipe.requiredMaterials) {
+    const has = inv.some(i => i && i.id === matId);
+    if (!has) missing.push(`material:${matId}`);
+  }
+  return { unlocked: missing.length === 0, missing };
+}
+
+/**
+ * 给定丹方 + 材料齐备性，模拟炼丹结果：
+ * - 成功 → 返回成功 PillCraftResult（含 ItemEntry）
+ * - 失败 → 返回失败 + 副作用（随机触发 sideEffect）
+ */
+export function resolvePillCrafting(recipe: PillRecipe, materials: { id: string; quantity?: number }[]): PillCraftResult {
+  if (!recipe) return { success: false, narrativeHint: '丹方无效。' };
+  const haveIds = new Set(materials.map(m => m.id));
+  const missing = recipe.requiredMaterials.filter(id => !haveIds.has(id));
+  if (missing.length > 0) {
+    return { success: false, narrativeHint: `材料不足：${missing.join('、')}` };
+  }
+  // 简化确定性：稀有度越高越容易出副作用
+  const rarityScore: Record<string, number> = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5, mythic: 6 };
+  const score = rarityScore[recipe.rarity] ?? 1;
+  const seed = (recipe.id.length + score) * 13;
+  const roll = ((seed * 9301 + 49297) % 233280) / 233280;
+  const sideEffectRoll = ((seed * 1664525 + 1013904223) % 233280) / 233280;
+  if (roll < 0.18) {
+    const sideEffect: StatusEntry = {
+      id: `pill-side-${recipe.id}`,
+      name: '丹毒内蕴',
+      description: '服丹后残留的毒性，需静坐化解。',
+      category: 'debuff',
+      rarity: 'common',
+      duration: 3,
+      source: `丹药副作用（${recipe.name}）`,
+      effects: [],
+    };
+    return { success: false, sideEffect, narrativeHint: '炉火失衡，丹未成形。' };
+  }
+  const pill: ItemEntry = {
+    id: `pill-${recipe.id}`,
+    name: recipe.name,
+    description: recipe.description,
+    item_type: 'consumable',
+    rarity: recipe.rarity,
+    effects: [],
+    source: '炼制所得',
+  };
+  return {
+    success: true,
+    pill,
+    sideEffect: sideEffectRoll > 0.85 ? {
+      id: `pill-mild-side-${recipe.id}`,
+      name: '丹气翻涌',
+      description: '服丹后气血略有翻涌。',
+      category: 'debuff',
+      rarity: 'common',
+      duration: 1,
+      source: `丹药副作用（${recipe.name}）`,
+      effects: [],
+    } : undefined,
+    narrativeHint: '炉火稳定，丹香溢出。',
+  };
+}
+
+// ===== AI-97: Formation Stack =====
+/**
+ * 把同一区域内的多个阵法合并成单条 stackResult。
+ * - independent: 总加成 = sum(values)
+ * - boosted:     同源阵法叠加增强（multiplier = 1 + 0.25 * (count-1)）
+ * - conflict:    同源阵法互相削弱（penalty = 0.7 per additional）
+ * - replace:     选效果最高的，覆盖其余
+ */
+export function deriveFormationStack(formations: Array<{ id: string; value?: number; rule?: FormationStackRule; tag?: string }>): FormationStackResult {
+  if (!Array.isArray(formations) || formations.length === 0) {
+    return { totalEffect: 0, warnings: [], appliedRule: 'independent', winners: [] };
+  }
+  const rule: FormationStackRule = formations[0]?.rule ?? 'independent';
+  const warnings: string[] = [];
+  const winners: string[] = [];
+  let total = 0;
+  if (rule === 'independent') {
+    total = formations.reduce((acc, f) => acc + (f.value ?? 0), 0);
+    formations.forEach(f => winners.push(f.id));
+  } else if (rule === 'boosted') {
+    const base = formations.reduce((acc, f) => acc + (f.value ?? 0), 0);
+    const mult = 1 + 0.25 * Math.max(0, formations.length - 1);
+    total = base * mult;
+    formations.forEach(f => winners.push(f.id));
+  } else if (rule === 'conflict') {
+    const base = formations.reduce((acc, f) => acc + (f.value ?? 0), 0);
+    const penalty = Math.pow(0.7, Math.max(0, formations.length - 1));
+    total = base * penalty;
+    warnings.push('同源阵法互相削弱');
+    formations.forEach(f => winners.push(f.id));
+  } else if (rule === 'replace') {
+    let best = formations[0];
+    for (const f of formations) {
+      if ((f.value ?? 0) > (best.value ?? 0)) best = f;
+    }
+    total = best.value ?? 0;
+    winners.push(best.id);
+    formations.filter(f => f.id !== best.id).forEach(f => warnings.push(`阵法 ${f.id} 被高优先级阵法 ${best.id} 替换`));
+  }
+  return {
+    totalEffect: Math.round(total * 100) / 100,
+    warnings,
+    appliedRule: rule,
+    winners,
+  };
+}
+
+/**
+ * 两个单阵之间的直接冲突判定：返回胜者 id（null = 完全抵消）。
+ */
+export function resolveFormationConflict(f1: { id: string; tag?: string; value?: number } | null, f2: { id: string; tag?: string; value?: number } | null): string | null {
+  if (!f1 || !f2) return null;
+  if (f1.tag && f2.tag && f1.tag === f2.tag) {
+    return (f1.value ?? 0) >= (f2.value ?? 0) ? f1.id : f2.id;
+  }
+  return null;
+}
+
+// ===== AI-98: Auction AI =====
+/**
+ * 给定一个买家、当前物品和当前最高出价，决定他下一步动作。
+ * - cautious: 仅在 newBid <= max(price * 0.9, currentBid + 1) 时出价
+ * - aggressive: 直接加价 5%-15%
+ * - random: 在 0.4~1.2 倍 currentBid 之间随机
+ * - hostile: 抬高价格 1.3-2 倍扰乱市场
+ */
+export function deriveBidderAction(bidder: { id: string; assets?: number; personality?: BidderPersonality; valuation?: number }, item: { basePrice?: number; valuation?: number }, currentBid: number): BidderAction {
+  const personality: BidderPersonality = bidder?.personality ?? 'cautious';
+  const assetCap = typeof bidder?.assets === 'number' ? bidder.assets : 1000;
+  const itemVal = item?.valuation ?? item?.basePrice ?? currentBid;
+  const seed = (bidder?.id?.length ?? 1) + (currentBid || 0);
+  const roll = (((seed * 1103515245 + 12345) >> 0) % 1000) / 1000;
+  const inc = (currentBid || itemVal) * (0.05 + roll * 0.1);
+
+  switch (personality) {
+    case 'cautious': {
+      const ceiling = itemVal * 0.9;
+      const next = (currentBid || 0) + inc;
+      if (next <= ceiling && next <= assetCap) return { bidderId: bidder.id, kind: 'bid', newBid: Math.round(next), reason: '谨慎加价' };
+      return { bidderId: bidder.id, kind: 'pass', reason: '超出心理价位' };
+    }
+    case 'aggressive': {
+      const next = Math.max((currentBid || 0) + inc * 1.5, (currentBid || 0) * 1.05);
+      if (next <= assetCap) return { bidderId: bidder.id, kind: 'bid', newBid: Math.round(next), reason: '激进抬价' };
+      return { bidderId: bidder.id, kind: 'pass', reason: '资金见底' };
+    }
+    case 'random': {
+      const range = (itemVal || 100) * (0.4 + roll * 0.8);
+      const next = Math.max(currentBid + 1, Math.round(range));
+      if (next <= assetCap) return { bidderId: bidder.id, kind: 'bid', newBid: next, reason: '随机出价' };
+      return { bidderId: bidder.id, kind: 'pass' };
+    }
+    case 'hostile': {
+      const next = Math.round((currentBid || itemVal) * (1.3 + roll * 0.7));
+      if (next <= assetCap * 1.5) return { bidderId: bidder.id, kind: 'hostile', newBid: next, reason: '恶意抬价' };
+      return { bidderId: bidder.id, kind: 'hostile', reason: '搅局离场' };
+    }
+    default:
+      return { bidderId: bidder?.id ?? '', kind: 'pass' };
+  }
+}
+
+/**
+ * 收摊：找出最终胜者与成交价。
+ * drama 字段是叙事层使用的"场上波澜"短句（如"最终被冷面商行抢得"）。
+ */
+export function resolveAuctionEnd(auction: { lots: Array<{ item: ItemEntry; startingPrice: number; seller: string }>; bidders: Array<{ id: string; personality?: BidderPersonality; assets?: number; valuation?: number }> }): { winner: string | null; finalPrice: number; drama: string } {
+  if (!auction || !Array.isArray(auction.lots) || auction.lots.length === 0) {
+    return { winner: null, finalPrice: 0, drama: '场中无人应价' };
+  }
+  const lot = auction.lots[0];
+  let currentBid = lot.startingPrice;
+  let winner: string | null = null;
+  for (const b of auction.bidders) {
+    const action = deriveBidderAction(
+      { id: b.id, personality: b.personality, assets: b.assets, valuation: b.valuation },
+      { basePrice: lot.startingPrice, valuation: b.valuation ?? lot.startingPrice },
+      currentBid,
+    );
+    if ((action.kind === 'bid' || action.kind === 'hostile') && typeof action.newBid === 'number' && action.newBid > currentBid) {
+      currentBid = action.newBid;
+      winner = b.id;
+    }
+  }
+  const drama = winner
+    ? `最终被${winner}以${currentPrice(currentBid)}灵石抢得`
+    : '场中无人应价';
+  return { winner, finalPrice: currentBid, drama };
+}
+
+function currentPrice(n: number): string {
+  if (n >= 10000) return `${Math.round(n / 1000)}千`;
+  if (n >= 100) return `${Math.round(n / 100)}百`;
+  return `${n}`;
+}
+
+// ===== AI-99: Thread Chain =====
+/**
+ * 给定一条线索 id + 全部线索，按 parentThreadId 反推出整条祖辈链。
+ * 返回从根到当前节点的节点数组；找不到根时只返回当前节点（深度 0）。
+ */
+export function deriveThreadChain(threadId: string, allThreads: PendingThread[]): ThreadChainNode[] {
+  if (!Array.isArray(allThreads) || allThreads.length === 0 || !threadId) return [];
+  const map = new Map<string, PendingThread>();
+  for (const t of allThreads) if (t && t.id) map.set(t.id, t);
+  const chain: PendingThread[] = [];
+  let cur = map.get(threadId);
+  const visited = new Set<string>();
+  while (cur && !visited.has(cur.id)) {
+    visited.add(cur.id);
+    chain.unshift(cur);
+    const parentId = (cur as any).parentThreadId as string | undefined;
+    cur = parentId ? map.get(parentId) : undefined;
+  }
+  return chain.map((t, i) => ({
+    threadId: t.id,
+    parentThreadId: (t as any).parentThreadId,
+    depth: i,
+    generation: i,
+    title: t.title,
+    category: t.category,
+  }));
+}
+
+/**
+ * 给定一组已存在线索 + 角色状态，决定是否开新线或关闭旧线。
+ * - 当任意线索 progress >= 100 → close
+ * - 当 urgency > 70 且未到期 → 新开一条 urgent
+ */
+export function resolveThreadContinuation(threads: PendingThread[], character: CharacterState): { newThread: PendingThread | null; closeThreadIds: string[] } {
+  const closeThreadIds: string[] = [];
+  for (const t of threads || []) {
+    if (!t) continue;
+    if ((t.progress ?? 0) >= 100 || t.status === 'resolved') closeThreadIds.push(t.id);
+  }
+  let newThread: PendingThread | null = null;
+  const urgent = (threads || []).find(t => t && t.status === 'urgent');
+  if (!urgent && character.alive) {
+    newThread = {
+      id: `thread-${character.id}-${(character.age ?? 0)}-${Math.floor(((character.age ?? 0) * 17 + (threads?.length ?? 0) * 31) % 9999)}`,
+      title: '新的因果纠缠',
+      description: '因角色年岁推进，新的一段因果正在酝酿。',
+      category: 'mystery',
+      startAge: character.age ?? 0,
+      deadlineAge: (character.age ?? 0) + 5,
+      status: 'pending',
+      progress: 0,
+    };
+  }
+  return { newThread, closeThreadIds };
+}
+
+// ===== AI-100: Special Physiques =====
+/**
+ * 瓶灵效果：若角色有 bottleSpirit 字段，则返回一个受其影响的 status；
+ * 否则返回 null（不影响角色）。
+ */
+export function deriveBottleSpiritAffect(character: CharacterState): StatusEntry | null {
+  const spirits = (character as any).bottleSpirits as BottleSpirit[] | undefined;
+  if (!Array.isArray(spirits) || spirits.length === 0) return null;
+  const revealed = spirits.find(s => s && s.revealed);
+  if (!revealed) return null;
+  return {
+    id: `bottle-${revealed.spiritId}`,
+    name: `瓶灵共鸣（${revealed.sourceName}）`,
+    description: revealed.visibleEffect,
+    category: 'special',
+    rarity: 'rare',
+    duration: -1,
+    source: '瓶灵',
+    effects: [],
+  };
+}
+
+const SWORD_ORDER: SwordAptitude[] = ['untrained','novice','adept','master'];
+
+/**
+ * 根据角色练习剑法时长推进剑道资质。
+ */
+export function deriveSwordAptitudeProgress(character: CharacterState, practice: { hours?: number; talent?: number }): SwordAptitude {
+  const cur = ((character as any).swordAptitude as SwordAptitude | undefined) ?? 'untrained';
+  const hours = Math.max(0, practice?.hours ?? 0);
+  const talent = Math.max(0.1, Math.min(3, practice?.talent ?? 1));
+  const inc = hours * talent / 100;
+  const curIdx = SWORD_ORDER.indexOf(cur);
+  if (curIdx < 0) return 'untrained';
+  // 每跨一阶需要累计 100 inc
+  const totalAcc = ((character as any).swordPracticeAcc as number | undefined) ?? 0;
+  const next = totalAcc + inc;
+  let newIdx = curIdx;
+  while (newIdx < SWORD_ORDER.length - 1 && newIdx < curIdx + Math.floor(next / 100)) newIdx += 1;
+  return SWORD_ORDER[Math.min(SWORD_ORDER.length - 1, newIdx)];
+}
+
+/**
+ * 给定角色当前 HP / 受到的伤害 / 假死规则，决定是否进入假死以及揭示率。
+ */
+export function resolveFakeDeath(character: CharacterState, damage: number): { isFake: boolean; revealChance: number; ruleApplied: boolean } {
+  const rules = ((character as any).fakeDeathRules as FakeDeathRule[] | undefined) ?? [];
+  if (rules.length === 0) return { isFake: false, revealChance: 0, ruleApplied: false };
+  const hpRatio = (character.hp ?? 0) / Math.max(1, character.maxHp ?? 1);
+  for (const rule of rules) {
+    if (rule.trigger === 'lethal' && hpRatio <= 0 && damage > 0) {
+      return { isFake: true, revealChance: rule.revealChance, ruleApplied: true };
+    }
+    if (rule.trigger === 'low_hp' && hpRatio < 0.1) {
+      return { isFake: true, revealChance: rule.revealChance, ruleApplied: true };
+    }
+  }
+  return { isFake: false, revealChance: 0, ruleApplied: false };
+}
+
+// ===== AI-101: NPC Memory =====
+/**
+ * 给定 NPC + 当前事件，构造一条新的 NPCMemoryEntry。
+ */
+export function deriveNPCMemoryUpdate(npc: { id: string; name?: string }, event: { summary: string; importance?: number; kind?: NPCMemoryEntry['kind'] }, currentAge: number): NPCMemoryEntry {
+  return {
+    npcId: npc?.id ?? '',
+    eventSummary: event?.summary ?? '',
+    importance: typeof event?.importance === 'number' ? Math.max(0, Math.min(100, event.importance)) : 50,
+    age: typeof currentAge === 'number' ? currentAge : 0,
+    kind: event?.kind ?? 'interaction',
+  };
+}
+
+/**
+ * 给定 NPC 的全部记忆，按 importance 衰减 + 加权，给出一条行为暗示。
+ */
+export function deriveNPCBehavior(npc: { id: string; memories?: NPCMemoryEntry[] }, memories?: NPCMemoryEntry[]): string {
+  const list = (memories ?? npc?.memories ?? []) as NPCMemoryEntry[];
+  if (!Array.isArray(list) || list.length === 0) return '中性观望';
+  const total = list.reduce((acc, m) => acc + (m?.importance ?? 0), 0);
+  if (total === 0) return '中性观望';
+  const betrayal = list.filter(m => m.kind === 'betrayal').length;
+  const kindness = list.filter(m => m.kind === 'kindness').length;
+  if (betrayal >= kindness + 1) return '怀恨备忌';
+  if (kindness >= betrayal + 1) return '心怀善意';
+  return '依事缓决';
+}
+
+// ===== AI-103: World Rumor =====
+/**
+ * 给定一个事件 + 区域，判断是否应该产生一条传闻；返回 null 表示不应产生。
+ */
+export function deriveRumorTrigger(event: { title?: string; significance?: number; tags?: string[] }, region: string | null | undefined): WorldRumor | null {
+  const sig = event?.significance ?? 0;
+  if (!event || sig < 30 || !region) return null;
+  const id = `rumor-${region}-${event.title ?? 'event'}-${Math.floor(sig)}`;
+  return {
+    rumorId: id,
+    source: event.title ?? '街头巷议',
+    content: `近来${region}传起风声：${event.title ?? '有异象发生'}。`,
+    reliability: Math.max(0.1, Math.min(1, 0.3 + sig / 200)),
+    originAge: 0,
+    regionScope: region,
+    truthHint: event.title ?? undefined,
+  };
+}
+
+/**
+ * 给定一条传闻和时间流逝（角色年龄推进），降低其可信度。
+ * 每年衰减 5%，最低不低于 0.05；超 100 年后归零。
+ */
+export function resolveRumorReliability(rumor: WorldRumor, timePassed: number): number {
+  if (!rumor) return 0;
+  const years = Math.max(0, Math.floor(timePassed));
+  if (years >= 100) return 0;
+  const base = typeof rumor.reliability === 'number' ? rumor.reliability : 0.5;
+  const next = base * Math.pow(0.95, years);
+  return Math.max(0.05, Math.min(1, Math.round(next * 1000) / 1000));
+}

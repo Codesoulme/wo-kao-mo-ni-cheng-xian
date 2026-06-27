@@ -1,0 +1,59 @@
+{
+  "suite": "e2e-player-journey",
+  "date": "2026-06-27T02:42:11.168Z",
+  "scales": [
+    {
+      "scale": 1,
+      "totalMs": 1.8,
+      "perCharMs": 1.799,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 6,
+      "failed": 0,
+      "failureBreakdown": {}
+    },
+    {
+      "scale": 30,
+      "totalMs": 5.27,
+      "perCharMs": 0.176,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 180,
+      "failed": 0,
+      "failureBreakdown": {}
+    },
+    {
+      "scale": 100,
+      "totalMs": 3.44,
+      "perCharMs": 0.034,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 600,
+      "failed": 0,
+      "failureBreakdown": {}
+    },
+    {
+      "scale": 500,
+      "totalMs": 9.58,
+      "perCharMs": 0.019,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 3000,
+      "failed": 0,
+      "failureBreakdown": {}
+    },
+    {
+      "scale": 1000,
+      "totalMs": 11.94,
+      "perCharMs": 0.012,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 6000,
+      "failed": 0,
+      "failureBreakdown": {}
+    }
+  ],
+  "totalPhases": 9786,
+  "totalFailed": 0,
+  "passRate": 100
+}

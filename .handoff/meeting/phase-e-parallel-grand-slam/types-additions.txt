@@ -1,0 +1,102 @@
+﻿// ==================== AI-81: Combat Action Stance ====================
+// Worker A (xiaoxin-A) - additive only, do not modify existing enums/interfaces.
+
+// 战斗姿态枚举（角色在战斗中选择的主攻/防守/诱敌/脱身态度）
+export type CombatStance =
+  | 'aggressive'  // 猛攻：连打连击，放手抢攻
+  | 'defensive'   // 守御：缩紧防圈，等待破绽
+  | 'cunning'     // 诱敌：佯攻露绽，诱敌深入
+  | 'retreat';    // 脱身：保留撤退余力
+
+// 单次战斗姿态的使用记录（剩余回合 + 冷却）
+export interface CombatStanceUsage {
+  stance: CombatStance;
+  // 当前姿态剩余回合数（0 = 已失效）
+  usesLeft: number;
+  // 切换到其他姿态后，本姿态的冷却回合
+  cooldownTurns: number;
+  // 该姿态在战斗中已经生效的回合
+  turnsActive: number;
+}
+
+// ==================== AI-82: Combat Resource Management ====================
+// Worker A (xiaoxin-A) - additive only.
+
+// 战斗资源类型（行动消耗的不同维度）
+export type CombatResourceType =
+  | 'qi'        // 真元：功法/法术消耗
+  | 'soul'      // 神识：神识类技能消耗
+  | 'stamina'   // 体魄：硬功/体力消耗
+  | 'focus';    // 心神：读心/识破/走神消耗
+
+// 战斗资源当前快照（供 UI 显示与引擎决策使用）
+export interface CombatResourceUsage {
+  type: CombatResourceType;
+  current: number;
+  max: number;
+  // 每回合自然回复（休整/调息等可临时调整）
+  regenPerTurn: number;
+  // 该资源在上一回合的消耗峰值（用于告警）
+  recentDrain?: number;
+}
+
+// ==================== AI-83: Breakthrough Stage Refinement ====================
+// Worker A (xiaoxin-A) - additive only.
+
+// 突破阶段（一次大境界突破内部可拆分的微观步骤）
+export type BreakthroughStage =
+  | 'perception'  // 感悟：感知境界门槛
+  | 'condense'    // 凝聚：凝聚真元冲击关隘
+  | 'storm'       // 风暴：内景风雷动
+  | 'stabilize'   // 稳固：稳定新境界
+  | 'passed';     // 已通过
+
+// 单次突破尝试的状态（多次尝试/外援/时间累计）
+export interface BreakthroughAttempt {
+  realmBefore: Realm;
+  realmAfter: Realm;
+  stage: BreakthroughStage;
+  attemptNumber: number;       // 第几次尝试（>=1）
+  helperCount: number;         // 护法/外援人数
+  startedAge: number;          // 开始时的角色年龄
+  // 当前阶段已消耗的回合/天数
+  elapsedTurns: number;
+}
+
+// ==================== AI-85: Combat Combo Chain ====================
+// Worker A (xiaoxin-A) - additive only.
+
+// 连击记录（一串连续命中/连招产生的连击链）
+export interface ComboChain {
+  comboName: string;     // 连击名（如"三连刺""寒霜七击"）
+  hits: number;          // 当前连击段数
+  multiplier: number;    // 连击伤害乘数（>=1.0）
+  expiresTurn: number;   // 在哪个回合号之后失效（不接续则断连）
+}
+
+// ==================== AI-81/AI-82/AI-83/AI-85 Helpers ====================
+
+// 战斗姿态的中文标签（UI 显示用；引擎只关心枚举值）
+export const COMBAT_STANCE_LABEL: Record<CombatStance, string> = {
+  aggressive: '猛攻',
+  defensive: '守御',
+  cunning: '诱敌',
+  retreat: '脱身',
+};
+
+// 战斗资源的中文标签
+export const COMBAT_RESOURCE_LABEL: Record<CombatResourceType, string> = {
+  qi: '真元',
+  soul: '神识',
+  stamina: '体魄',
+  focus: '心神',
+};
+
+// 突破阶段的中文标签
+export const BREAKTHROUGH_STAGE_LABEL: Record<BreakthroughStage, string> = {
+  perception: '感悟',
+  condense: '凝聚',
+  storm: '风暴',
+  stabilize: '稳固',
+  passed: '已过',
+};

@@ -1,4 +1,4 @@
-// 修仙模拟器 - 核心引擎类型定义
+﻿// 修仙模拟器 - 核心引擎类型定义
 // 基于"引擎权威 + AI 提议"混合架构
 // Task 20: 事件蓝图 / 角色意图 / 未决线索 / 战斗系统
 
@@ -1864,3 +1864,458 @@ export interface ExplorationRecord {
   bestReward?: string;         // 最佳奖励描述（AI 给出）
 }
 
+
+// ==================== AI-86: Pill Side Effect System ====================
+// Worker B (xiaoxin-B) - additive only, do not modify existing enums/interfaces above.
+
+// 丹药副作用分类（仅指玩家服用丹药后可能产生的负面效果）
+export type PillSideEffect =
+  | 'toxicity'              // 丹毒累积，损耗根骨/寿元
+  | 'cultivation-deviation' // 走火入魔，损伤经脉/修为
+  | 'karma'                 // 因果牵缠，招来敌意或天道注视
+  | 'qi-turbulence';        // 气机紊乱，下一段时间修炼效率下降
+
+// 丹药服用效果评估（结合丹药品质 + 角色当前状态）
+export interface PillEffectiveness {
+  pillId: string;
+  pillName: string;
+  // 增益效果：服用后实际生效的修炼/属性加成
+  boost: {
+    cultivationExp?: number;       // 修为加成
+    hp?: number;                   // 生命回复
+    mp?: number;                   // 灵力回复
+    attack?: number;               // 临时攻击
+    defense?: number;              // 临时防御
+    durationTurns?: number;        // 增益持续回合数（战斗/修炼）
+  };
+  // 副作用概率 0..1
+  sideEffectChance: number;
+  // 副作用严重程度 1..5（1=轻微，5=危及修行）
+  sideEffectSeverity: number;
+  // 可能触发的副作用类型列表（按概率排序）
+  possibleSideEffects: PillSideEffect[];
+}
+
+// 服用丹药后的状态变更摘要（用于审计与 UI 展示）
+export interface PillSideEffectResolution {
+  pillId: string;
+  triggered: boolean;             // 本次是否触发副作用
+  sideEffect?: PillSideEffect;    // 触发的具体副作用
+  severity: number;               // 1..5
+  attributeChanges: AttributeChange[]; // 由副作用导致的属性变化
+  statusChanges: StatusEntry[];   // 附带的状态变更（如"丹毒淤积"）
+  narrativeHint?: string;         // 给 AI 渲染的剧情提示
+}
+
+// ==================== AI-87: Formation Drawing Process ====================
+// Worker B (xiaoxin-B) - additive only.
+
+// 阵法绘制的连续步骤（必须按顺序完成才能激活阵法）
+export type FormationDrawingStep =
+  | 'meditate'    // 入定：心神沉入阵眼所在位置
+  | 'trace'       // 走线：以灵力勾勒阵纹走向
+  | 'infuse'      // 注灵：将材料灵气注入阵纹节点
+  | 'anchor'      // 定锚：锁定阵法根基，防止走线崩溃
+  | 'activate';   // 启阵：阵法生效
+
+// 单次阵法绘制会话（玩家在战斗中或闭关中尝试刻画一道阵法）
+export interface FormationDrawingSession {
+  id: string;
+  formationId: string;
+  formationName: string;
+  characterId: string;
+  startedAge: number;             // 开始的角色年龄
+  currentStep: FormationDrawingStep;
+  completedSteps: FormationDrawingStep[];
+  // 已消耗的材料 item id 列表（防止重复消耗）
+  materialsUsed: string[];
+  // 每一步的成功率 0..1，由引擎派生
+  stepSuccessChance: number;
+  // 累计失败次数（达到阈值则绘制失败，需从头开始）
+  failureStreak: number;
+  // 是否已完成（成功/失败）
+  finished: boolean;
+  success?: boolean;
+  // 已消耗回合数（用于战斗内节奏控制）
+  turnsSpent: number;
+}
+
+// 绘制进度推进结果
+export interface FormationDrawingProgress {
+  session: FormationDrawingSession;
+  advanced: boolean;              // 是否推进到下一步
+  failed: boolean;                // 本步是否失败
+  finished: boolean;              // 整个会话是否结束
+  attributeChanges: AttributeChange[];
+  narrativeHint?: string;
+}
+
+// ==================== AI-88: Pet Evolution ====================
+// Worker B (xiaoxin-B) - additive only.
+
+// 灵宠进阶阶段（不同阶段解锁不同技能/属性上限）
+export type PetEvolutionStage =
+  | 'infant'    // 幼生期：初始捕获阶段
+  | 'youth'     // 成长期：基础技能解锁
+  | 'mature'    // 成熟期：属性大幅提升
+  | 'ascended'; // 化形期：解锁化形与高阶技能
+
+// 单阶段进阶条件
+export interface PetEvolutionRequirement {
+  stage: PetEvolutionStage;
+  // 最低年龄（角色持有该宠物的年限）
+  minAge: number;
+  // 最低境界（角色境界等级）
+  minRealmLevel: number;
+  // 必备材料 item id 列表
+  materials: string[];
+  // 最低忠诚度要求 0..100
+  minLoyalty: number;
+}
+
+// 进阶资格校验结果
+export interface PetEvolutionEligibility {
+  petId: string;
+  currentStage: PetEvolutionStage;
+  nextStage?: PetEvolutionStage;
+  eligible: boolean;
+  missing: string[]; // 缺少的条件（如材料名/属性不足原因）
+}
+
+// ==================== AI-89: Pet Insight Communication ====================
+// Worker B (xiaoxin-B) - additive only.
+
+// 灵宠通过灵识传递给主人的顿悟片段
+export interface PetInsight {
+  petId: string;
+  petName: string;
+  insightName: string;     // 顿悟名称（如"风之呼吸""潮汐律动"）
+  source: string;           // 顿悟来源（如"观海七日""与主人共同闭关"）
+  learnedAge: number;       // 角色学习时的年龄
+  // 顿悟可解锁的能力描述
+  effect: {
+    cultivationRateBonus?: number;   // 修炼速率加成（倍率）
+    elementAffinity?: 'metal' | 'wood' | 'water' | 'fire' | 'earth';
+    techniqueHint?: string;          // 提示可修习的功法
+  };
+}
+
+// 灵识对话的请求与响应
+export interface PetCommunication {
+  petId: string;
+  messageType: 'idle' | 'combat' | 'mood' | 'discovery' | 'danger';
+  trigger: string;          // 触发原因（世界内事件）
+  response: string;         // 灵识传递的内容（角色可感知的一句话）
+  learnedAge: number;
+  // 可能附带的顿悟片段（不一定每次都有）
+  insight?: PetInsight;
+}
+
+// ==================== AI-90: Pet Combat Skills ====================
+// Worker B (xiaoxin-B) - additive only.
+
+// 灵宠在战斗中可使用的技能定义
+export interface PetCombatSkill {
+  skillId: string;
+  name: string;
+  description: string;
+  // 技能威力系数（相对基础攻击）
+  power: number;
+  // 冷却回合数
+  cooldown: number;
+  // 作用范围（单体/群体）
+  range: 'single' | 'all_enemies' | 'all_allies' | 'self';
+  // 技能效果类型
+  effect: 'physical' | 'elemental' | 'heal' | 'buff' | 'debuff' | 'control';
+  // 关联元素（用于元素克制计算）
+  element?: 'metal' | 'wood' | 'water' | 'fire' | 'earth';
+}
+
+// 技能在战斗中的使用记录（用于冷却与次数控制）
+export interface PetSkillUsage {
+  skillId: string;
+  lastUsedTurn: number;     // 上次使用的回合序号
+  usesLeft: number;         // 剩余可用次数（-1 表示无限制）
+}
+
+// 单次技能使用产生的战斗事件
+export interface PetCombatSkillEvent {
+  petId: string;
+  skillId: string;
+  skillName: string;
+  turn: number;
+  targetId?: string;
+  damage?: number;
+  heal?: number;
+  buffApplied?: string[];
+  debuffApplied?: string[];
+  narrativeHint: string;
+}// ==================== AI-81: Combat Action Stance ====================
+// Worker A (xiaoxin-A) - additive only, do not modify existing enums/interfaces.
+
+// 战斗姿态枚举（角色在战斗中选择的主攻/防守/诱敌/脱身态度）
+export type CombatStance =
+  | 'aggressive'  // 猛攻：连打连击，放手抢攻
+  | 'defensive'   // 守御：缩紧防圈，等待破绽
+  | 'cunning'     // 诱敌：佯攻露绽，诱敌深入
+  | 'retreat';    // 脱身：保留撤退余力
+
+// 单次战斗姿态的使用记录（剩余回合 + 冷却）
+export interface CombatStanceUsage {
+  stance: CombatStance;
+  // 当前姿态剩余回合数（0 = 已失效）
+  usesLeft: number;
+  // 切换到其他姿态后，本姿态的冷却回合
+  cooldownTurns: number;
+  // 该姿态在战斗中已经生效的回合
+  turnsActive: number;
+}
+
+// ==================== AI-82: Combat Resource Management ====================
+// Worker A (xiaoxin-A) - additive only.
+
+// 战斗资源类型（行动消耗的不同维度）
+export type CombatResourceType =
+  | 'qi'        // 真元：功法/法术消耗
+  | 'soul'      // 神识：神识类技能消耗
+  | 'stamina'   // 体魄：硬功/体力消耗
+  | 'focus';    // 心神：读心/识破/走神消耗
+
+// 战斗资源当前快照（供 UI 显示与引擎决策使用）
+export interface CombatResourceUsage {
+  type: CombatResourceType;
+  current: number;
+  max: number;
+  // 每回合自然回复（休整/调息等可临时调整）
+  regenPerTurn: number;
+  // 该资源在上一回合的消耗峰值（用于告警）
+  recentDrain?: number;
+}
+
+// ==================== AI-83: Breakthrough Stage Refinement ====================
+// Worker A (xiaoxin-A) - additive only.
+
+// 突破阶段（一次大境界突破内部可拆分的微观步骤）
+export type BreakthroughStage =
+  | 'perception'  // 感悟：感知境界门槛
+  | 'condense'    // 凝聚：凝聚真元冲击关隘
+  | 'storm'       // 风暴：内景风雷动
+  | 'stabilize'   // 稳固：稳定新境界
+  | 'passed';     // 已通过
+
+// 单次突破尝试的状态（多次尝试/外援/时间累计）
+export interface BreakthroughAttempt {
+  realmBefore: Realm;
+  realmAfter: Realm;
+  stage: BreakthroughStage;
+  attemptNumber: number;       // 第几次尝试（>=1）
+  helperCount: number;         // 护法/外援人数
+  startedAge: number;          // 开始时的角色年龄
+  // 当前阶段已消耗的回合/天数
+  elapsedTurns: number;
+}
+
+// ==================== AI-85: Combat Combo Chain ====================
+// Worker A (xiaoxin-A) - additive only.
+
+// 连击记录（一串连续命中/连招产生的连击链）
+export interface ComboChain {
+  comboName: string;     // 连击名（如"三连刺""寒霜七击"）
+  hits: number;          // 当前连击段数
+  multiplier: number;    // 连击伤害乘数（>=1.0）
+  expiresTurn: number;   // 在哪个回合号之后失效（不接续则断连）
+}
+
+// ==================== AI-81/AI-82/AI-83/AI-85 Helpers ====================
+
+// 战斗姿态的中文标签（UI 显示用；引擎只关心枚举值）
+export const COMBAT_STANCE_LABEL: Record<CombatStance, string> = {
+  aggressive: '猛攻',
+  defensive: '守御',
+  cunning: '诱敌',
+  retreat: '脱身',
+};
+
+// 战斗资源的中文标签
+export const COMBAT_RESOURCE_LABEL: Record<CombatResourceType, string> = {
+  qi: '真元',
+  soul: '神识',
+  stamina: '体魄',
+  focus: '心神',
+};
+
+// 突破阶段的中文标签
+export const BREAKTHROUGH_STAGE_LABEL: Record<BreakthroughStage, string> = {
+  perception: '感悟',
+  condense: '凝聚',
+  storm: '风暴',
+  stabilize: '稳固',
+  passed: '已过',
+};
+
+
+
+// ==================== AI-91/AI-92/AI-93/AI-95/AI-96/AI-97/AI-98/AI-99/AI-100/AI-101/AI-103 Types ====================
+// Worker A (xiaoxin-A) - additive only. Do not modify existing enums/interfaces.
+
+// ===== AI-91: Combat Log System =====
+export interface CombatLogEntry {
+  text: string;
+  isSystem: boolean;
+  round?: number;
+  speaker?: string;
+  timestamp?: number;
+}
+
+// ===== AI-92: Loot AI System =====
+export interface LootTable {
+  id: string;
+  items: ItemEntry[];
+  conditions: LootCondition[];
+}
+
+export interface LootCondition {
+  kind: 'min_realm' | 'min_level' | 'has_status' | 'has_tag' | 'random' | 'faction' | 'spirit_stones';
+  realm?: Realm;
+  minLevel?: number;
+  statusId?: string;
+  tag?: string;
+  chance?: number;
+  faction?: string;
+  minStones?: number;
+}
+
+// ===== AI-93: Status Expiry =====
+export type StatusExpireRule =
+  | 'turns'
+  | 'years'
+  | 'condition'
+  | 'event';
+
+export interface StatusExpiryMeta {
+  rule: StatusExpireRule;
+  remaining?: number;
+  trigger?: string;
+}
+
+// ===== AI-95: Pet Cultivation Path =====
+export type PetCultivationPath =
+  | 'combat'
+  | 'assist'
+  | 'transform'
+  | 'contract';
+
+// ===== AI-96: Pill Recipe Unlock =====
+export type PillRecipeUnlockCondition =
+  | 'manual'
+  | 'discover'
+  | 'inherit'
+  | 'buy';
+
+export interface PillRecipe {
+  id: string;
+  name: string;
+  description: string;
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  unlockCondition: PillRecipeUnlockCondition;
+  requiredMaterials: string[];
+  minRealmIdx: number;
+  requiredCauldronTier?: number;
+  mainElement: 'fire' | 'water' | 'wood' | 'metal' | 'earth' | 'none';
+}
+
+export interface PillCraftResult {
+  success: boolean;
+  pill?: ItemEntry;
+  sideEffect?: StatusEntry;
+  narrativeHint?: string;
+}
+
+// ===== AI-97: Formation Stack =====
+export type FormationStackRule =
+  | 'independent'
+  | 'boosted'
+  | 'conflict'
+  | 'replace';
+
+export interface FormationStackResult {
+  totalEffect: number;
+  warnings: string[];
+  appliedRule: FormationStackRule;
+  winners: string[];
+}
+
+// ===== AI-98: Auction AI =====
+export type BidderPersonality =
+  | 'cautious'
+  | 'aggressive'
+  | 'random'
+  | 'hostile';
+
+export interface BidderAction {
+  bidderId: string;
+  kind: 'bid' | 'pass' | 'hostile';
+  newBid?: number;
+  reason?: string;
+}
+
+// ===== AI-99: Thread Chain =====
+export interface ThreadChainNode {
+  threadId: string;
+  parentThreadId?: string;
+  depth: number;
+  generation: number;
+  title?: string;
+  category?: PendingThread['category'];
+}
+
+// ===== AI-100: Special Physiques (6 kinds) =====
+export interface BottleSpirit {
+  spiritId: string;
+  sourceName: string;
+  visibleEffect: string;
+  hiddenEffect: string;
+  revealed: boolean;
+  awakenedAge: number;
+}
+
+export type SwordAptitude =
+  | 'untrained'
+  | 'novice'
+  | 'adept'
+  | 'master';
+
+export type InnatePhysique =
+  | 'waste_body'
+  | 'spirit_vein'
+  | 'frozen_blood'
+  | 'flame_heart'
+  | 'dao_bone'
+  | 'chaos_eye';
+
+export interface FakeDeathRule {
+  trigger: string;
+  fakeDurationTurns: number;
+  revealChance: number;
+  freezeActions: boolean;
+}
+
+// ===== AI-101: NPC Memory =====
+export interface NPCMemoryEntry {
+  npcId: string;
+  eventSummary: string;
+  importance: number;
+  age: number;
+  kind: 'witness' | 'rumor' | 'interaction' | 'betrayal' | 'kindness';
+}
+
+// ===== AI-103: World Rumor =====
+export interface WorldRumor {
+  rumorId: string;
+  source: string;
+  content: string;
+  reliability: number;
+  originAge: number;
+  regionScope?: string;
+  truthHint?: string;
+}

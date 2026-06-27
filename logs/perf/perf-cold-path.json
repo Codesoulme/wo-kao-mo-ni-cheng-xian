@@ -1,0 +1,359 @@
+{
+  "date": "2026-06-27T02:35:32.102Z",
+  "iterations": 10000,
+  "hotThresholdUs": 100,
+  "totalBenchmarks": 50,
+  "hotCount": 0,
+  "results": [
+    {
+      "name": "computeEffectiveCultivationRate",
+      "iters": 10000,
+      "totalMs": 12.797,
+      "perOpUs": 1.28,
+      "hot": false
+    },
+    {
+      "name": "normalizeCultivationState",
+      "iters": 10000,
+      "totalMs": 23.353,
+      "perOpUs": 2.335,
+      "hot": false
+    },
+    {
+      "name": "deriveCultivationAttributes",
+      "iters": 10000,
+      "totalMs": 47.214,
+      "perOpUs": 4.721,
+      "hot": false
+    },
+    {
+      "name": "deriveCoreCultivationAttributes",
+      "iters": 10000,
+      "totalMs": 12.825,
+      "perOpUs": 1.282,
+      "hot": false
+    },
+    {
+      "name": "recalcCultivationMultiplier",
+      "iters": 10000,
+      "totalMs": 11.071,
+      "perOpUs": 1.107,
+      "hot": false
+    },
+    {
+      "name": "computeCultivationFactors",
+      "iters": 10000,
+      "totalMs": 9.978,
+      "perOpUs": 0.998,
+      "hot": false
+    },
+    {
+      "name": "tryBreakthrough",
+      "iters": 10000,
+      "totalMs": 2.875,
+      "perOpUs": 0.287,
+      "hot": false
+    },
+    {
+      "name": "tryMinorBreakthrough",
+      "iters": 10000,
+      "totalMs": 6.494,
+      "perOpUs": 0.649,
+      "hot": false
+    },
+    {
+      "name": "deriveTribulationTrigger",
+      "iters": 10000,
+      "totalMs": 1.118,
+      "perOpUs": 0.112,
+      "hot": false
+    },
+    {
+      "name": "resolveTribulationBolt",
+      "iters": 10000,
+      "totalMs": 2.141,
+      "perOpUs": 0.214,
+      "hot": false
+    },
+    {
+      "name": "resolveHeartDemon",
+      "iters": 10000,
+      "totalMs": 1.618,
+      "perOpUs": 0.162,
+      "hot": false
+    },
+    {
+      "name": "adjustHeartDemon",
+      "iters": 10000,
+      "totalMs": 6.95,
+      "perOpUs": 0.695,
+      "hot": false
+    },
+    {
+      "name": "tickHeartDemon",
+      "iters": 10000,
+      "totalMs": 6.3,
+      "perOpUs": 0.63,
+      "hot": false
+    },
+    {
+      "name": "tryHeartDemonTrial",
+      "iters": 10000,
+      "totalMs": 4.517,
+      "perOpUs": 0.452,
+      "hot": false
+    },
+    {
+      "name": "resolveHeartDemonTrial",
+      "iters": 10000,
+      "totalMs": 4.438,
+      "perOpUs": 0.444,
+      "hot": false
+    },
+    {
+      "name": "deriveAscensionRequirements",
+      "iters": 10000,
+      "totalMs": 0.414,
+      "perOpUs": 0.041,
+      "hot": false
+    },
+    {
+      "name": "checkAscensionEligibility",
+      "iters": 10000,
+      "totalMs": 2.579,
+      "perOpUs": 0.258,
+      "hot": false
+    },
+    {
+      "name": "deriveAscensionTrigger",
+      "iters": 10000,
+      "totalMs": 0.549,
+      "perOpUs": 0.055,
+      "hot": false
+    },
+    {
+      "name": "resolveAscensionOutcome",
+      "iters": 10000,
+      "totalMs": 1.243,
+      "perOpUs": 0.124,
+      "hot": false
+    },
+    {
+      "name": "deriveCrossRealmPaths",
+      "iters": 10000,
+      "totalMs": 2.339,
+      "perOpUs": 0.234,
+      "hot": false
+    },
+    {
+      "name": "checkRestrictionAccess",
+      "iters": 10000,
+      "totalMs": 1.568,
+      "perOpUs": 0.157,
+      "hot": false
+    },
+    {
+      "name": "deriveRestrictionTrigger",
+      "iters": 10000,
+      "totalMs": 0.574,
+      "perOpUs": 0.057,
+      "hot": false
+    },
+    {
+      "name": "resolveRestrictionInteraction",
+      "iters": 10000,
+      "totalMs": 2.983,
+      "perOpUs": 0.298,
+      "hot": false
+    },
+    {
+      "name": "deriveRealmRestrictionCheck",
+      "iters": 10000,
+      "totalMs": 2.188,
+      "perOpUs": 0.219,
+      "hot": false
+    },
+    {
+      "name": "equipItem",
+      "iters": 10000,
+      "totalMs": 3.993,
+      "perOpUs": 0.399,
+      "hot": false
+    },
+    {
+      "name": "unequipItem",
+      "iters": 10000,
+      "totalMs": 11.887,
+      "perOpUs": 1.189,
+      "hot": false
+    },
+    {
+      "name": "addItems",
+      "iters": 10000,
+      "totalMs": 18.608,
+      "perOpUs": 1.861,
+      "hot": false
+    },
+    {
+      "name": "removeItemsByIds",
+      "iters": 10000,
+      "totalMs": 26.121,
+      "perOpUs": 2.612,
+      "hot": false
+    },
+    {
+      "name": "applyItemEffects",
+      "iters": 10000,
+      "totalMs": 7.367,
+      "perOpUs": 0.737,
+      "hot": false
+    },
+    {
+      "name": "addThreads",
+      "iters": 10000,
+      "totalMs": 22.192,
+      "perOpUs": 2.219,
+      "hot": false
+    },
+    {
+      "name": "advanceThread",
+      "iters": 10000,
+      "totalMs": 6.139,
+      "perOpUs": 0.614,
+      "hot": false
+    },
+    {
+      "name": "completeThread",
+      "iters": 10000,
+      "totalMs": 5.701,
+      "perOpUs": 0.57,
+      "hot": false
+    },
+    {
+      "name": "failThread",
+      "iters": 10000,
+      "totalMs": 4.042,
+      "perOpUs": 0.404,
+      "hot": false
+    },
+    {
+      "name": "checkThreadDeadlines",
+      "iters": 10000,
+      "totalMs": 6.223,
+      "perOpUs": 0.622,
+      "hot": false
+    },
+    {
+      "name": "refreshWorldFacts",
+      "iters": 10000,
+      "totalMs": 72.477,
+      "perOpUs": 7.248,
+      "hot": false
+    },
+    {
+      "name": "deriveWorldFactsFromState",
+      "iters": 10000,
+      "totalMs": 27.38,
+      "perOpUs": 2.738,
+      "hot": false
+    },
+    {
+      "name": "deriveWorldEventConsequences",
+      "iters": 10000,
+      "totalMs": 17.614,
+      "perOpUs": 1.761,
+      "hot": false
+    },
+    {
+      "name": "applyAgeBasedBodyGrowth-25",
+      "iters": 10000,
+      "totalMs": 11.627,
+      "perOpUs": 1.163,
+      "hot": false
+    },
+    {
+      "name": "applyAgeBasedBodyGrowth-100",
+      "iters": 10000,
+      "totalMs": 10.421,
+      "perOpUs": 1.042,
+      "hot": false
+    },
+    {
+      "name": "filterMeaningfulStatuses",
+      "iters": 10000,
+      "totalMs": 8.99,
+      "perOpUs": 0.899,
+      "hot": false
+    },
+    {
+      "name": "buildQuestEntriesFromThreads",
+      "iters": 10000,
+      "totalMs": 8.911,
+      "perOpUs": 0.891,
+      "hot": false
+    },
+    {
+      "name": "buildCombatActionPalette",
+      "iters": 10000,
+      "totalMs": 43.345,
+      "perOpUs": 4.334,
+      "hot": false
+    },
+    {
+      "name": "startCombat",
+      "iters": 10000,
+      "totalMs": 73.802,
+      "perOpUs": 7.38,
+      "hot": false
+    },
+    {
+      "name": "executeCombatRound",
+      "iters": 10000,
+      "totalMs": 72.173,
+      "perOpUs": 7.217,
+      "hot": false
+    },
+    {
+      "name": "endCombat",
+      "iters": 10000,
+      "totalMs": 63.119,
+      "perOpUs": 6.312,
+      "hot": false
+    },
+    {
+      "name": "deriveCombatProjection",
+      "iters": 10000,
+      "totalMs": 62.023,
+      "perOpUs": 6.202,
+      "hot": false
+    },
+    {
+      "name": "buildStateContext",
+      "iters": 10000,
+      "totalMs": 391.365,
+      "perOpUs": 39.136,
+      "hot": false
+    },
+    {
+      "name": "pickEventBlueprint",
+      "iters": 10000,
+      "totalMs": 47.462,
+      "perOpUs": 4.746,
+      "hot": false
+    },
+    {
+      "name": "tickPets",
+      "iters": 10000,
+      "totalMs": 22.897,
+      "perOpUs": 2.29,
+      "hot": false
+    },
+    {
+      "name": "computePetPassiveBonus",
+      "iters": 10000,
+      "totalMs": 5.055,
+      "perOpUs": 0.505,
+      "hot": false
+    }
+  ]
+}

@@ -1,0 +1,1055 @@
+{
+  "suite": "audit-smoke-coverage",
+  "date": "2026-06-27T02:39:32.902Z",
+  "scriptCount": 11,
+  "srcCount": 150,
+  "displayRegImports": 6,
+  "slotCoverage": [
+    {
+      "slot": "topTags",
+      "displayRegistryHits": 0,
+      "reactComponentHits": 0,
+      "smokeHits": 0,
+      "covered": false
+    },
+    {
+      "slot": "characterDetail",
+      "displayRegistryHits": 0,
+      "reactComponentHits": 0,
+      "smokeHits": 0,
+      "covered": false
+    },
+    {
+      "slot": "statusPage",
+      "displayRegistryHits": 0,
+      "reactComponentHits": 0,
+      "smokeHits": 0,
+      "covered": false
+    },
+    {
+      "slot": "threadPage",
+      "displayRegistryHits": 0,
+      "reactComponentHits": 0,
+      "smokeHits": 0,
+      "covered": false
+    },
+    {
+      "slot": "combatPanel",
+      "displayRegistryHits": 0,
+      "reactComponentHits": 0,
+      "smokeHits": 0,
+      "covered": false
+    },
+    {
+      "slot": "inventoryPanel",
+      "displayRegistryHits": 0,
+      "reactComponentHits": 0,
+      "smokeHits": 0,
+      "covered": false
+    },
+    {
+      "slot": "worldLegacy",
+      "displayRegistryHits": 0,
+      "reactComponentHits": 0,
+      "smokeHits": 0,
+      "covered": false
+    }
+  ],
+  "slotCoveragePct": 0,
+  "fnCoverage": [
+    {
+      "name": "isStorageBag",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "dbToState",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveCultivationAttributes",
+      "importHits": 2,
+      "callHits": 3,
+      "covered": true
+    },
+    {
+      "name": "deriveCoreCultivationAttributes",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveSoulRealm",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "deriveRealmTraits",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "deriveCombatProjection",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "getRealmProfile",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "applyChanges",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "resolveItemEffects",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "applyItemEffects",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "recalcCultivationMultiplier",
+      "importHits": 2,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "isConstitutionStatus",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "computeCultivationFactors",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "computeEffectiveCultivationRate",
+      "importHits": 2,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "normalizeCultivationState",
+      "importHits": 2,
+      "callHits": 11,
+      "covered": true
+    },
+    {
+      "name": "summarizeConstitutionProfiles",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "evaluateTechniqueCompatibility",
+      "importHits": 1,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "buildLearnedCombatArts",
+      "importHits": 1,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "buildCombatVictorySpoils",
+      "importHits": 1,
+      "callHits": 3,
+      "covered": true
+    },
+    {
+      "name": "equipItem",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "unequipItem",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "consumeItem",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "removeItemsByIds",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "equipItemsByIds",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "unequipItemsByIds",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "alchemy",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "computeAlchemyHints",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "tryBreakthrough",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "tryMinorBreakthrough",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "applySpiritualRootChange",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "checkLifespan",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "checkFateNode",
+      "importHits": 1,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "isMeaningfulStatus",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "filterMeaningfulStatuses",
+      "importHits": 2,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "normalizeIdentityStatuses",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "addStatuses",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "tickStatusDurations",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "tickNaturalRecovery",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "addItems",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "addMemory",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "markFateNodeDone",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "buildQuestEntriesFromThreads",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "buildStateContext",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "pickEventBlueprint",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "generateCharacterIntents",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "causalId",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "normalizeCausalGraph",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "appendCausalGraph",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "recordActionCausality",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "worldFactId",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveWorldEventConsequences",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "upsertWorldFacts",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveWorldFactsFromState",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "refreshWorldFacts",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "upsertNpcs",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "addThreads",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "advanceThread",
+      "importHits": 1,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "completeThread",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "failThread",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "checkThreadDeadlines",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "startCombat",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "buildCombatActionPalette",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "executeCombatRound",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "executeCombatRoundWithProposal",
+      "importHits": 1,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "endCombat",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "executeAIEvent",
+      "importHits": 1,
+      "callHits": 5,
+      "covered": true
+    },
+    {
+      "name": "stateToResponse",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "ensureUniqueIds",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "activateFormation",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deactivateFormation",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "tickFormations",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "adjustHeartDemon",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "tickHeartDemon",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "tryHeartDemonTrial",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolveHeartDemonTrial",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "createPet",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "addPet",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "dismissPet",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "feedPet",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "tickPets",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "computePetPassiveBonus",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "getTalismanType",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "isPillItem",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "getAvailableTalismans",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "getDiscoveredStoryRealms",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "getSameYearThreads",
+      "importHits": 1,
+      "callHits": 7,
+      "covered": true
+    },
+    {
+      "name": "buildThreadContinuationEvent",
+      "importHits": 1,
+      "callHits": 6,
+      "covered": true
+    },
+    {
+      "name": "getAvailableRealms",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "canExploreRealm",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "startExploration",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveAscensionRequirements",
+      "importHits": 3,
+      "callHits": 6,
+      "covered": true
+    },
+    {
+      "name": "checkAscensionEligibility",
+      "importHits": 2,
+      "callHits": 3,
+      "covered": true
+    },
+    {
+      "name": "deriveAscensionTrigger",
+      "importHits": 2,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "resolveAscensionOutcome",
+      "importHits": 2,
+      "callHits": 3,
+      "covered": true
+    },
+    {
+      "name": "deriveCrossRealmPaths",
+      "importHits": 2,
+      "callHits": 5,
+      "covered": true
+    },
+    {
+      "name": "checkRestrictionAccess",
+      "importHits": 2,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "deriveRestrictionTrigger",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "resolveRestrictionInteraction",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "deriveRealmRestrictionCheck",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "deriveTribulationTrigger",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "resolveTribulationBolt",
+      "importHits": 2,
+      "callHits": 3,
+      "covered": true
+    },
+    {
+      "name": "resolveHeartDemon",
+      "importHits": 2,
+      "callHits": 3,
+      "covered": true
+    },
+    {
+      "name": "recordExploration",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "derivePillEffectiveness",
+      "importHits": 0,
+      "callHits": 1,
+      "covered": false
+    },
+    {
+      "name": "resolvePillSideEffects",
+      "importHits": 0,
+      "callHits": 2,
+      "covered": false
+    },
+    {
+      "name": "deriveFormationStep",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "startFormationDrawing",
+      "importHits": 0,
+      "callHits": 2,
+      "covered": false
+    },
+    {
+      "name": "resolveDrawingProgress",
+      "importHits": 0,
+      "callHits": 3,
+      "covered": false
+    },
+    {
+      "name": "derivePetEvolutionEligibility",
+      "importHits": 0,
+      "callHits": 2,
+      "covered": false
+    },
+    {
+      "name": "resolvePetEvolution",
+      "importHits": 0,
+      "callHits": 1,
+      "covered": false
+    },
+    {
+      "name": "derivePetInsight",
+      "importHits": 0,
+      "callHits": 2,
+      "covered": false
+    },
+    {
+      "name": "resolvePetCommunication",
+      "importHits": 0,
+      "callHits": 1,
+      "covered": false
+    },
+    {
+      "name": "derivePetSkillAvailable",
+      "importHits": 0,
+      "callHits": 4,
+      "covered": false
+    },
+    {
+      "name": "resolvePetSkillUse",
+      "importHits": 0,
+      "callHits": 4,
+      "covered": false
+    },
+    {
+      "name": "deriveCombatStance",
+      "importHits": 1,
+      "callHits": 3,
+      "covered": true
+    },
+    {
+      "name": "resolveCombatStanceShift",
+      "importHits": 1,
+      "callHits": 3,
+      "covered": true
+    },
+    {
+      "name": "deriveCombatResource",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "resolveCombatResourceDrain",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "checkCombatResourceSufficient",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "deriveBreakthroughStage",
+      "importHits": 1,
+      "callHits": 5,
+      "covered": true
+    },
+    {
+      "name": "resolveBreakthroughOutcome",
+      "importHits": 1,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "detectCombatStalemate",
+      "importHits": 1,
+      "callHits": 2,
+      "covered": true
+    },
+    {
+      "name": "resolveStalemateBreak",
+      "importHits": 1,
+      "callHits": 1,
+      "covered": true
+    },
+    {
+      "name": "deriveComboChain",
+      "importHits": 1,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "resolveComboDamage",
+      "importHits": 1,
+      "callHits": 4,
+      "covered": true
+    },
+    {
+      "name": "sanitizeCombatLog",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "novelizeCombatLog",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveLootFromOpponent",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolveLootConditions",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveStatusExpiry",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolveStatusRemoval",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "derivePetCultivationSuggestion",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolvePetSkillLearn",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveRecipeUnlock",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolvePillCrafting",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveFormationStack",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolveFormationConflict",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveBidderAction",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolveAuctionEnd",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveThreadChain",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolveThreadContinuation",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveBottleSpiritAffect",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveSwordAptitudeProgress",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolveFakeDeath",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveNPCMemoryUpdate",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveNPCBehavior",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "deriveRumorTrigger",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    },
+    {
+      "name": "resolveRumorReliability",
+      "importHits": 0,
+      "callHits": 0,
+      "covered": false
+    }
+  ],
+  "fnCoveragePct": 40.9,
+  "uncoveredSlots": [
+    "topTags",
+    "characterDetail",
+    "statusPage",
+    "threadPage",
+    "combatPanel",
+    "inventoryPanel",
+    "worldLegacy"
+  ],
+  "uncoveredFns": [
+    "isStorageBag",
+    "dbToState",
+    "deriveCoreCultivationAttributes",
+    "getRealmProfile",
+    "resolveItemEffects",
+    "applyItemEffects",
+    "summarizeConstitutionProfiles",
+    "equipItem",
+    "unequipItem",
+    "consumeItem",
+    "unequipItemsByIds",
+    "alchemy",
+    "computeAlchemyHints",
+    "tryMinorBreakthrough",
+    "applySpiritualRootChange",
+    "checkLifespan",
+    "checkFateNode",
+    "addStatuses",
+    "addItems",
+    "addMemory",
+    "markFateNodeDone",
+    "buildQuestEntriesFromThreads",
+    "pickEventBlueprint",
+    "generateCharacterIntents",
+    "causalId",
+    "normalizeCausalGraph",
+    "appendCausalGraph",
+    "worldFactId",
+    "upsertWorldFacts",
+    "upsertNpcs",
+    "addThreads",
+    "checkThreadDeadlines",
+    "executeCombatRound",
+    "activateFormation",
+    "deactivateFormation",
+    "tickFormations",
+    "adjustHeartDemon",
+    "tickHeartDemon",
+    "tryHeartDemonTrial",
+    "resolveHeartDemonTrial",
+    "createPet",
+    "addPet",
+    "dismissPet",
+    "feedPet",
+    "tickPets",
+    "computePetPassiveBonus",
+    "getTalismanType",
+    "isPillItem",
+    "getAvailableTalismans",
+    "getDiscoveredStoryRealms",
+    "getAvailableRealms",
+    "canExploreRealm",
+    "startExploration",
+    "recordExploration",
+    "derivePillEffectiveness",
+    "resolvePillSideEffects",
+    "deriveFormationStep",
+    "startFormationDrawing",
+    "resolveDrawingProgress",
+    "derivePetEvolutionEligibility",
+    "resolvePetEvolution",
+    "derivePetInsight",
+    "resolvePetCommunication",
+    "derivePetSkillAvailable",
+    "resolvePetSkillUse",
+    "sanitizeCombatLog",
+    "novelizeCombatLog",
+    "deriveLootFromOpponent",
+    "resolveLootConditions",
+    "deriveStatusExpiry",
+    "resolveStatusRemoval",
+    "derivePetCultivationSuggestion",
+    "resolvePetSkillLearn",
+    "deriveRecipeUnlock",
+    "resolvePillCrafting",
+    "deriveFormationStack",
+    "resolveFormationConflict",
+    "deriveBidderAction",
+    "resolveAuctionEnd",
+    "deriveThreadChain",
+    "resolveThreadContinuation",
+    "deriveBottleSpiritAffect",
+    "deriveSwordAptitudeProgress",
+    "resolveFakeDeath",
+    "deriveNPCMemoryUpdate",
+    "deriveNPCBehavior",
+    "deriveRumorTrigger",
+    "resolveRumorReliability"
+  ]
+}

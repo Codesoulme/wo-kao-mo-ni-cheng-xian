@@ -1,0 +1,149 @@
+{
+  "archive": {},
+  "attrs-phase2-and-ui-rules": {
+    "action-items.md": {
+      "size": 3934,
+      "mtime": 1782431968.7405677
+    },
+    "agenda.md": {
+      "size": 2290,
+      "mtime": 1782431269.137363
+    },
+    "decisions.md": {
+      "size": 4244,
+      "mtime": 1782431948.6475456
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 4275,
+      "mtime": 1782431836.7056575
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 26499,
+      "mtime": 1782507054.2628348
+    }
+  },
+  "kickoff-and-handover": {
+    "action-items.md": {
+      "size": 1206,
+      "mtime": 1782484214.2264488
+    },
+    "agenda.md": {
+      "size": 984,
+      "mtime": 1782427596.9211633
+    },
+    "decisions.md": {
+      "size": 2235,
+      "mtime": 1782484214.3021724
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 10371,
+      "mtime": 1782428048.625511
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 12167,
+      "mtime": 1782484217.657326
+    }
+  },
+  "p1-cleanup-and-design-docs": {
+    "agenda.md": {
+      "size": 1435,
+      "mtime": 1782507675.9133782
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 1902,
+      "mtime": 1782507690.1243548
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 3599,
+      "mtime": 1782508298.9021547
+    }
+  },
+  "p1-fixups-p2-pilot": {
+    "agenda.md": {
+      "size": 2056,
+      "mtime": 1782509186.7594256
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 1279,
+      "mtime": 1782509186.7605581
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 3645,
+      "mtime": 1782509625.491892
+    }
+  },
+  "p2-and-p3-grand-slam": {
+    "agenda.md": {
+      "size": 2102,
+      "mtime": 1782510207.751502
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 1927,
+      "mtime": 1782510218.187796
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 3495,
+      "mtime": 1782511014.4941332
+    }
+  },
+  "p3-archival-and-slot-coverage-plus-l1-worldview": {
+    "agenda.md": {
+      "size": 3251,
+      "mtime": 1782511579.1949308
+    },
+    "followup-pending.md": {
+      "size": 1292,
+      "mtime": 1782512356.372897
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 3094,
+      "mtime": 1782511593.8887956
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 3620,
+      "mtime": 1782512659.2564337
+    }
+  },
+  "phase-a-l2-contracts-plus-l3-tribulation": {
+    "agenda.md": {
+      "size": 4063,
+      "mtime": 1782512941.0714269
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 3133,
+      "mtime": 1782512956.1252851
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 5065,
+      "mtime": 1782518203.6265843
+    }
+  },
+  "phase-b-l3-full-grand-slam": {
+    "agenda.md": {
+      "size": 4886,
+      "mtime": 1782518576.785465
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 3013,
+      "mtime": 1782518590.0491092
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 5523,
+      "mtime": 1782519224.9481053
+    }
+  },
+  "phase-c-schema-migration-and-tribulation-integration": {
+    "agenda.md": {
+      "size": 3607,
+      "mtime": 1782519620.1151786
+    },
+    "xiaoxia-to-xiaoxin.md": {
+      "size": 2711,
+      "mtime": 1782519636.30502
+    },
+    "xiaoxin-to-xiaoxia.md": {
+      "size": 5113,
+      "mtime": 1782520580.0633852
+    }
+  }
+}

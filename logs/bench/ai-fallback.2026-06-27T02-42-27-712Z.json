@@ -1,0 +1,18 @@
+{
+  "suite": "test-ai-fallback",
+  "date": "2026-06-27T02:42:27.712Z",
+  "passed": 28,
+  "failed": 5,
+  "failures": [
+    "enriched_template: fallbackStrategy=enriched_template: failed",
+    "enriched_template: narrative 长度 > 30: failed",
+    "route: success=false: failed",
+    "route: error 提示明确: failed",
+    "route: 错误信息覆盖基础校验: actual error: undefined"
+  ],
+  "notes": [
+    "未发起真实 AI 请求, 不消耗 AutoGLM 配额",
+    "fallback 业务层 (buildFallbackAgeEvent) 是 AI 失败的兜底, route 层不内置 retry",
+    "建议在调用方做有限次 retry (例如 2-3 次) + 最终走 fallback"
+  ]
+}

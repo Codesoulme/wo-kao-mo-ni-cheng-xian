@@ -1,0 +1,74 @@
+{
+  "suite": "e2e-player-journey",
+  "date": "2026-06-27T02:40:53.940Z",
+  "scales": [
+    {
+      "scale": 1,
+      "totalMs": 1.41,
+      "perCharMs": 1.408,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 4,
+      "failed": 2,
+      "failureBreakdown": {
+        "cultivate": 1,
+        "checkEligibility": 1
+      }
+    },
+    {
+      "scale": 30,
+      "totalMs": 3.91,
+      "perCharMs": 0.13,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 120,
+      "failed": 60,
+      "failureBreakdown": {
+        "cultivate": 30,
+        "checkEligibility": 30
+      }
+    },
+    {
+      "scale": 100,
+      "totalMs": 2.16,
+      "perCharMs": 0.022,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 400,
+      "failed": 200,
+      "failureBreakdown": {
+        "cultivate": 100,
+        "checkEligibility": 100
+      }
+    },
+    {
+      "scale": 500,
+      "totalMs": 6.11,
+      "perCharMs": 0.012,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 2000,
+      "failed": 1000,
+      "failureBreakdown": {
+        "cultivate": 500,
+        "checkEligibility": 500
+      }
+    },
+    {
+      "scale": 1000,
+      "totalMs": 10.95,
+      "perCharMs": 0.011,
+      "memBeforeMb": 1,
+      "memAfterMb": 1,
+      "passed": 4000,
+      "failed": 2000,
+      "failureBreakdown": {
+        "cultivate": 1000,
+        "checkEligibility": 1000
+      }
+    }
+  ],
+  "totalPhases": 9786,
+  "totalFailed": 3262,
+  "passRate": 66.67
+}

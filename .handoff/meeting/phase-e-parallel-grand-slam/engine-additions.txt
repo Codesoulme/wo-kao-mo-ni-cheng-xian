@@ -1,0 +1,285 @@
+﻿
+// ==================== Worker A: AI-81~AI-85 Additions ====================
+// All functions below are additive derivation/resolution helpers.
+// They DO NOT mutate the combat state machine core or breakthrough state machine core.
+// UI is responsible for reading the returned values; the engine never prescribes player input.
+
+// ==================== AI-81: Combat Stance ====================
+
+/**
+ * AI-81: 根据角色当前战斗状态与敌方姿态，推导一个建议的战斗姿态。
+ * - 始终返回非空姿态（除非没有进行中的战斗）
+ * - 不写入 session；仅供 UI / AI 调用方参考
+ * - 该函数纯派生，不修改任何状态
+ */
+export function deriveCombatStance(
+  character: CharacterState,
+  opponent?: { hp?: number; maxHp?: number; attack?: number; defense?: number; speed?: number },
+): CombatStance {
+  if (!character) return 'defensive';
+  const cs = character.combatSession;
+  if (!cs || cs.status !== 'ongoing') return 'defensive';
+  const playerHpPct = cs.playerMaxHp > 0 ? cs.playerHp / cs.playerMaxHp : 1;
+  const playerMpPct = cs.playerMaxMp > 0 ? cs.playerMp / cs.playerMaxMp : 1;
+
+  // 血量过低 → 守御 / 脱身
+  if (playerHpPct <= 0.25) {
+    return playerMpPct >= 0.5 ? 'retreat' : 'defensive';
+  }
+  // 资源不足 → 守御回气
+  if (playerMpPct <= 0.3) return 'defensive';
+  // 敌方虚弱 → 猛攻
+  if (opponent && opponent.maxHp && opponent.maxHp > 0 && opponent.hp != null) {
+    const enemyHpPct = opponent.hp / opponent.maxHp;
+    if (enemyHpPct <= 0.35) return 'aggressive';
+    // 敌高速 / 高攻 → 诱敌
+    if ((opponent.attack || 0) >= (character.attack || 0) * 1.4) return 'cunning';
+  }
+  // 默认猛攻
+  return 'aggressive';
+}
+
+/**
+ * AI-81: 根据当前姿态与对手回应，解析下一次应采用的姿态。
+ * - 纯函数：仅做枚举决策
+ * - 使用 cooldownTurns 防止抖动切换
+ */
+export function resolveCombatStanceShift(
+  current: CombatStance,
+  opponent?: { hp?: number; maxHp?: number; attack?: number; attackPrev?: number },
+  history?: { stance: CombatStance; cooldownTurns: number }[],
+): CombatStance {
+  if (!current) return 'defensive';
+  // 若当前姿态还在冷却中（>0），保持
+  const inCooldown = (history || []).find(h => h.stance === current && h.cooldownTurns > 0);
+  if (inCooldown) return current;
+
+  const enemyHpPct = opponent && opponent.maxHp ? (opponent.hp ?? opponent.maxHp) / opponent.maxHp : 1;
+  const enemyRising = opponent && opponent.attack != null && opponent.attackPrev != null && opponent.attack > opponent.attackPrev;
+
+  // 敌方正在蓄力 → 诱敌
+  if (enemyRising) return 'cunning';
+  // 敌方残血 → 猛攻
+  if (enemyHpPct <= 0.3) return 'aggressive';
+  // 自身已选猛攻且敌方血多 → 切换诱敌打破僵局
+  if (current === 'aggressive' && enemyHpPct > 0.6) return 'cunning';
+  // 自身已选诱敌 → 守御片刻
+  if (current === 'cunning') return 'defensive';
+  return current;
+}
+
+// ==================== AI-82: Combat Resource Management ====================
+
+/**
+ * AI-82: 根据角色状态推导出战斗资源当前快照。
+ * - 真元 qi 与 MP 同步
+ * - 神识 soul = floor(spiritualSense * 0.5)
+ * - 体魄 stamina = floor(hp * 0.6) + 10
+ * - 心神 focus = floor(comprehension * 0.4) + 5
+ */
+export function deriveCombatResource(character: CharacterState): CombatResourceUsage[] {
+  const mp = Math.max(0, character?.mp ?? 0);
+  const maxMp = Math.max(1, character?.maxMp ?? 1);
+  const hp = Math.max(0, character?.hp ?? 0);
+  const maxHp = Math.max(1, character?.maxHp ?? 1);
+  const spiritualSense = Math.max(0, character?.spiritualSense ?? 0);
+  const comprehension = Math.max(0, character?.comprehension ?? 0);
+  return [
+    { type: 'qi', current: mp, max: maxMp, regenPerTurn: Math.max(1, Math.floor(maxMp * 0.04)) },
+    { type: 'soul', current: Math.floor(spiritualSense * 0.5), max: Math.max(50, Math.floor(spiritualSense * 0.5 + 50)), regenPerTurn: Math.max(1, Math.floor(spiritualSense * 0.05)) },
+    { type: 'stamina', current: Math.floor(hp * 0.6) + 10, max: Math.floor(maxHp * 0.6) + 10, regenPerTurn: Math.max(2, Math.floor(maxHp * 0.08)) },
+    { type: 'focus', current: Math.floor(comprehension * 0.4) + 5, max: Math.floor(comprehension * 0.4) + 55, regenPerTurn: 2 },
+  ];
+}
+
+/**
+ * AI-82: 根据一次行动消耗结算后，资源的新快照（纯计算，不持久化）。
+ */
+export function resolveCombatResourceDrain(
+  usage: CombatResourceUsage,
+  cost: { type: CombatResourceType; value: number },
+): CombatResourceUsage {
+  if (!usage || !cost) return usage;
+  if (usage.type !== cost.type) return usage;
+  const newCurrent = Math.max(0, usage.current - Math.max(0, cost.value));
+  return {
+    ...usage,
+    current: newCurrent,
+    recentDrain: usage.current - newCurrent,
+  };
+}
+
+/**
+ * AI-82: 检查资源是否足够支撑一组消耗，返回缺失列表。
+ */
+export function checkCombatResourceSufficient(
+  usages: CombatResourceUsage[],
+  costs: { type: CombatResourceType; value: number }[],
+): { sufficient: boolean; missing: { type: CombatResourceType; need: number; have: number }[] } {
+  const missing: { type: CombatResourceType; need: number; have: number }[] = [];
+  for (const cost of costs || []) {
+    const u = (usages || []).find(x => x.type === cost.type);
+    const have = u ? u.current : 0;
+    if (have < cost.value) {
+      missing.push({ type: cost.type, need: cost.value, have });
+    }
+  }
+  return { sufficient: missing.length === 0, missing };
+}
+
+// ==================== AI-83: Breakthrough Stage Refinement ====================
+
+/**
+ * AI-83: 推导当前突破尝试所处阶段。
+ * - realmBefore == realmAfter → 已通过
+ * - 第一次尝试 → 感悟
+ * - 年龄 + 心魔值辅助判断凝聚 / 风暴 / 稳固
+ */
+export function deriveBreakthroughStage(
+  realmBefore: Realm,
+  realmAfter: Realm,
+  attemptNumber: number,
+  age: number,
+  heartDemon: number = 0,
+): BreakthroughStage {
+  if (realmBefore === realmAfter) return 'passed';
+  if (!attemptNumber || attemptNumber <= 0) return 'perception';
+  if (attemptNumber === 1) {
+    if (heartDemon >= 60) return 'storm';
+    if (age >= 80) return 'condense';
+    return 'perception';
+  }
+  if (attemptNumber === 2) return 'condense';
+  if (attemptNumber === 3) return heartDemon >= 50 ? 'storm' : 'stabilize';
+  // 第 4 次及以上视为稳固或失败前的最后尝试
+  return 'stabilize';
+}
+
+/**
+ * AI-83: 根据尝试次数、外援数、心魔值推导本次突破的结局。
+ * - 返回 'success' | 'failed' | 'continue'
+ */
+export function resolveBreakthroughOutcome(opts: {
+  attempt: BreakthroughAttempt;
+  heartDemon: number;
+  helperPower: number;
+}): { outcome: 'success' | 'failed' | 'continue'; narrative: string } {
+  const { attempt, heartDemon, helperPower } = opts;
+  // 已通过 → 成功
+  if (attempt.stage === 'passed') {
+    return { outcome: 'success', narrative: '境界已稳，新阶已立' };
+  }
+  // 风暴阶段 + 高心魔 → 失败概率提升
+  if (attempt.stage === 'storm' && heartDemon >= 60) {
+    return { outcome: 'failed', narrative: '心魔趁势反扑，突破溃散' };
+  }
+  // 稳固阶段 + 外援够 → 成功
+  if (attempt.stage === 'stabilize') {
+    if (helperPower >= 3 || attempt.helperCount >= 1) {
+      return { outcome: 'success', narrative: '得外援助力，新境界稳固下来' };
+    }
+    return { outcome: 'continue', narrative: '还需闭关巩固' };
+  }
+  // 默认 → 继续
+  return { outcome: 'continue', narrative: '仍需继续推进' };
+}
+
+// ==================== AI-84: Combat Stalemate Break ====================
+
+/**
+ * AI-84: 检测战斗是否陷入僵局。
+ * - 当连续多回合无任何一方血量变化或状态变化 → 僵局
+ * - 仅有低伤害互刮不算推进
+ */
+export function detectCombatStalemate(history: Array<{
+  round: number;
+  playerHpAfter: number;
+  enemyHpAfter: number;
+}>): { isStalemate: boolean; turnsSinceProgress: number } {
+  if (!Array.isArray(history) || history.length < 4) {
+    return { isStalemate: false, turnsSinceProgress: 0 };
+  }
+  let turnsSinceProgress = 0;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const cur = history[i];
+    const prev = i > 0 ? history[i - 1] : null;
+    if (!prev) {
+      turnsSinceProgress += 1;
+      continue;
+    }
+    const deltaPlayer = Math.abs((cur.playerHpAfter ?? 0) - (prev.playerHpAfter ?? 0));
+    const deltaEnemy = Math.abs((cur.enemyHpAfter ?? 0) - (prev.enemyHpAfter ?? 0));
+    // 至少有一方血量变化超过 1 才算推进
+    if (deltaPlayer > 1 || deltaEnemy > 1) {
+      return { isStalemate: turnsSinceProgress >= 3, turnsSinceProgress };
+    }
+    turnsSinceProgress += 1;
+  }
+  return { isStalemate: turnsSinceProgress >= 3, turnsSinceProgress };
+}
+
+/**
+ * AI-84: 给出打破僵局的事件提示（用于 AI / UI 显示）。
+ * - 不修改任何状态，仅生成提示
+ */
+export function resolveStalemateBreak(
+  character: CharacterState,
+  opponent?: { name?: string },
+): { event: string; hint: string; suggestedAction: string } {
+  const oppName = opponent?.name || '对手';
+  const realm = character?.realm || 'qi_refining';
+  const choices = [
+    { event: `${oppName}似要变招`, hint: '诱敌露绽，激其先动', suggestedAction: 'cunning' },
+    { event: `战局胶着`, hint: '行险一击，打破僵持', suggestedAction: 'aggressive' },
+    { event: `气息流转渐慢`, hint: '退半步聚气再发', suggestedAction: 'defensive' },
+  ];
+  // 用 realm 字符串做简单哈希选择
+  const idx = Math.abs(Array.from(realm).reduce((a, c) => a + c.charCodeAt(0), 0)) % choices.length;
+  return choices[idx];
+}
+
+// ==================== AI-85: Combat Combo Chain ====================
+
+/**
+ * AI-85: 根据近 N 回合的命中记录推导当前连击链。
+ * - 命中 → 连击 +1
+ * - 失手 / 间隔超过 expiresTurn → 断连
+ */
+export function deriveComboChain(actionHistory: Array<{
+  round: number;
+  hit?: boolean;
+  skillName?: string;
+}>): ComboChain | null {
+  if (!Array.isArray(actionHistory) || actionHistory.length === 0) return null;
+  // 仅看命中且按 round 倒推
+  const sorted = [...actionHistory].sort((a, b) => (b.round || 0) - (a.round || 0));
+  let hits = 0;
+  let lastRound = -1;
+  const names: string[] = [];
+  for (const a of sorted) {
+    if (!a.hit) break;
+    if (lastRound >= 0 && (lastRound - (a.round || 0)) > 1) break;
+    hits += 1;
+    lastRound = a.round || 0;
+    if (a.skillName) names.push(a.skillName);
+  }
+  if (hits < 2) return null;
+  const multiplier = 1 + (hits - 1) * 0.15;
+  const comboName = hits >= 5 ? `${names[0] || '连'}·${hits}连` : hits >= 3 ? `${hits}连击` : '小连击';
+  return {
+    comboName,
+    hits,
+    multiplier: Math.min(2.5, Math.round(multiplier * 100) / 100),
+    expiresTurn: (lastRound + 1),
+  };
+}
+
+/**
+ * AI-85: 结算连击加成后的最终伤害（保留整数下限）。
+ */
+export function resolveComboDamage(baseDamage: number, combo: ComboChain | null): { finalDamage: number; multiplier: number } {
+  const base = Math.max(0, Math.floor(baseDamage || 0));
+  if (!combo || combo.hits < 2) return { finalDamage: base, multiplier: 1 };
+  const m = Math.max(1, combo.multiplier || 1);
+  return { finalDamage: Math.max(1, Math.floor(base * m)), multiplier: m };
+}

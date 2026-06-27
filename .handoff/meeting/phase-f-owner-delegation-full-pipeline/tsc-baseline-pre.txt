@@ -1,0 +1,157 @@
+﻿scripts/auto-test-l3-mechanisms.ts(30,72): error TS2367: This comparison appears to be unintentional because the types 'Realm' and '"mahayana"' have no overlap.
+scripts/auto-test-l3-mechanisms.ts(34,59): error TS2345: Argument of type '{ realm: "mahayana"; cultivationExp: number; lifespan: number; reputation: number; daoHeart: number; }' is not assignable to parameter of type '{ realm: Realm; cultivationExp: number; lifespan: number; reputation: number; daoHeart?: number | undefined; }'.
+  Types of property 'realm' are incompatible.
+    Type '"mahayana"' is not assignable to type 'Realm'.
+scripts/auto-test-l3-mechanisms.ts(35,64): error TS2345: Argument of type '{ realm: "mahayana"; cultivationExp: number; lifespan: number; reputation: number; daoHeart: number; }' is not assignable to parameter of type '{ realm: Realm; cultivationExp: number; lifespan: number; reputation: number; daoHeart?: number | undefined; }'.
+  Types of property 'realm' are incompatible.
+    Type '"mahayana"' is not assignable to type 'Realm'.
+scripts/auto-test-l3-mechanisms.ts(37,70): error TS2345: Argument of type '"mahayana"' is not assignable to parameter of type 'Realm'.
+scripts/auto-test-l3-mechanisms.ts(38,62): error TS2345: Argument of type '"mahayana"' is not assignable to parameter of type 'Realm'.
+scripts/auto-test-l3-mechanisms.ts(52,77): error TS2345: Argument of type '"deity_transformation"' is not assignable to parameter of type 'Realm'.
+scripts/hourly-review.ts(60,53): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.
+scripts/xianxia-regression-smoke.ts(2591,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3024,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3040,12): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3077,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3086,78): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.
+scripts/xianxia-regression-smoke.ts(3113,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3162,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3187,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3197,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3219,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3229,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3238,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3285,12): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3310,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3412,12): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3418,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3459,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3460,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3507,12): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3516,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3517,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3571,12): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3755,12): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3808,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3860,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3902,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3942,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(3952,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4014,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4050,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4105,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4121,12): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4257,7): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4272,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4284,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4294,10): error TS2867: Cannot find name 'Bun'. Do you need to install type definitions for Bun? Try `npm i --save-dev @types/bun`.
+scripts/xianxia-regression-smoke.ts(4599,53): error TS2345: Argument of type '"foundation_building"' is not assignable to parameter of type 'Realm'.
+scripts/xianxia-regression-smoke.ts(4601,53): error TS2345: Argument of type '"foundation_building"' is not assignable to parameter of type 'Realm'.
+scripts/xianxia-regression-smoke.ts(4603,53): error TS2345: Argument of type '"foundation_building"' is not assignable to parameter of type 'Realm'.
+scripts/xianxia-regression-smoke.ts(4605,53): error TS2345: Argument of type '"foundation_building"' is not assignable to parameter of type 'Realm'.
+scripts/xianxia-regression-smoke.ts(4607,38): error TS2345: Argument of type '"foundation_building"' is not assignable to parameter of type 'Realm'.
+scripts/xianxia-regression-smoke.ts(4614,22): error TS2304: Cannot find name 'BreakthroughAttempt'.
+scripts/xianxia-regression-smoke.ts(4622,23): error TS2304: Cannot find name 'BreakthroughAttempt'.
+scripts/xianxia-regression-smoke.ts(4626,24): error TS2304: Cannot find name 'BreakthroughAttempt'.
+src/app/api/game/advance-sse/route.ts(145,90): error TS2554: Expected 2 arguments, but got 3.
+src/app/api/game/advance-sse/route.ts(353,23): error TS2304: Cannot find name 'heartbeat'.
+src/app/api/game/advance/route.ts(54,35): error TS18047: 'preload' is possibly 'null'.
+src/app/api/game/advance/route.ts(55,31): error TS18047: 'preload' is possibly 'null'.
+src/app/api/game/advance/route.ts(56,30): error TS18047: 'preload' is possibly 'null'.
+src/app/api/game/advance/stream/route.ts(174,22): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(175,24): error TS2304: Cannot find name 'execResult'.
+src/app/api/game/advance/stream/route.ts(180,73): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(181,32): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(182,15): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(183,16): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(184,16): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(191,26): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(192,31): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(193,28): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(194,36): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(195,33): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(196,33): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(197,37): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(198,33): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(199,25): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(200,28): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(201,25): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(202,28): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(203,29): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(204,30): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(205,28): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(206,27): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(207,36): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(208,35): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(209,28): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(210,31): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(211,33): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(212,38): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(213,35): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(214,36): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(214,72): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(226,22): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(226,51): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(229,29): error TS2304: Cannot find name 'execResult'.
+src/app/api/game/advance/stream/route.ts(229,76): error TS2304: Cannot find name 'execResult'.
+src/app/api/game/advance/stream/route.ts(229,104): error TS2304: Cannot find name 'execResult'.
+src/app/api/game/advance/stream/route.ts(238,17): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(238,38): error TS2304: Cannot find name 'finalState'.
+src/app/api/game/advance/stream/route.ts(246,57): error TS2304: Cannot find name 'execResult'.
+src/app/api/game/advance/stream/route.ts(246,109): error TS2304: Cannot find name 'execResult'.
+src/app/api/game/combat/action/route.ts(270,32): error TS2322: Type 'PendingThread | { id: string; title: string; description: string; category: string; startAge: number; deadlineAge: number; status: string; progress: number; reward: string; failureCost: string; dueInSameYear: boolean; followUpHint: string; }' is not assignable to type 'PendingThread'.
+  Type '{ id: string; title: string; description: string; category: string; startAge: number; deadlineAge: number; status: string; progress: number; reward: string; failureCost: string; dueInSameYear: boolean; followUpHint: string; }' is not assignable to type 'PendingThread'.
+    Types of property 'category' are incompatible.
+      Type 'string' is not assignable to type '"quest" | "competition" | "enemy" | "promise" | "mystery" | "romance" | "debt" | "inheritance" | "exploration"'.
+src/app/api/game/combat/action/route.ts(270,65): error TS2322: Type '{ id: string; title: string; description: string; category: string; startAge: number; deadlineAge: number; status: string; progress: number; reward: string; failureCost: string; dueInSameYear: boolean; followUpHint: string; }' is not assignable to type 'PendingThread'.
+  Types of property 'category' are incompatible.
+    Type 'string' is not assignable to type '"quest" | "competition" | "enemy" | "promise" | "mystery" | "romance" | "debt" | "inheritance" | "exploration"'.
+src/app/page.tsx(210,24): error TS2339: Property 'ascensionPending' does not exist on type 'CharacterState'.
+src/app/page.tsx(213,38): error TS2339: Property 'ascensionPending' does not exist on type 'CharacterState'.
+src/app/page.tsx(219,24): error TS2339: Property 'restrictionPending' does not exist on type 'CharacterState'.
+src/app/page.tsx(222,42): error TS2339: Property 'restrictionPending' does not exist on type 'CharacterState'.
+src/app/page.tsx(229,24): error TS2339: Property 'tribulationPending' does not exist on type 'CharacterState'.
+src/app/page.tsx(232,38): error TS2339: Property 'tribulationPending' does not exist on type 'CharacterState'.
+src/app/page.tsx(253,46): error TS2339: Property 'tribulationPending' does not exist on type 'CharacterState'.
+src/app/page.tsx(255,51): error TS2339: Property 'tribulationPending' does not exist on type 'CharacterState'.
+src/components/dev/L3Tester.tsx(35,49): error TS2367: This comparison appears to be unintentional because the types 'Realm' and '"mahayana"' have no overlap.
+src/components/dev/L3Tester.tsx(40,11): error TS2322: Type '"mahayana"' is not assignable to type 'Realm'.
+src/components/dev/L3Tester.tsx(58,57): error TS2345: Argument of type '"deity_transformation"' is not assignable to parameter of type 'Realm'.
+src/components/xianxia/ActionButtons.tsx(176,31): error TS2551: Property 'setSettlingHint' does not exist on type 'GameState'. Did you mean 'settlingHint'?
+src/components/xianxia/ActionButtons.tsx(181,55): error TS2551: Property 'setSettlingHint' does not exist on type 'GameState'. Did you mean 'settlingHint'?
+src/components/xianxia/ActionButtons.tsx(301,44): error TS2353: Object literal may only specify known properties, and 'worldCalendar' does not exist in type 'CharacterState'.
+src/components/xianxia/ActionButtons.tsx(363,55): error TS2345: Argument of type 'CharacterState | null' is not assignable to parameter of type 'CharacterState'.
+  Type 'null' is not assignable to type 'CharacterState'.
+src/components/xianxia/ActionButtons.tsx(381,25): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+src/components/xianxia/CombatModal.tsx(437,20): error TS2339: Property 'combatProjection' does not exist on type 'CharacterState'.
+src/components/xianxia/CombatModal.tsx(441,43): error TS2339: Property 'combatProjection' does not exist on type 'CharacterState'.
+src/components/xianxia/CombatModal.tsx(442,43): error TS2339: Property 'combatProjection' does not exist on type 'CharacterState'.
+src/components/xianxia/CombatModal.tsx(443,45): error TS2339: Property 'combatProjection' does not exist on type 'CharacterState'.
+src/components/xianxia/CombatModal.tsx(444,56): error TS2339: Property 'combatProjection' does not exist on type 'CharacterState'.
+src/components/xianxia/CombatModal.tsx(445,51): error TS2339: Property 'combatProjection' does not exist on type 'CharacterState'.
+src/components/xianxia/CombatModal.tsx(446,50): error TS2339: Property 'combatProjection' does not exist on type 'CharacterState'.
+src/components/xianxia/PendingThreadsCard.tsx(266,20): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.
+src/components/xianxia/StartScreen.tsx(52,9): error TS2304: Cannot find name 'setWorldCalendar'.
+src/lib/xianxia/advance-preload.ts(207,7): error TS2339: Property 'styleAnchorsPrompt' does not exist on type 'EngineStateContext'.
+src/lib/xianxia/advance-preload.ts(208,7): error TS2339: Property 'entityEntriesPrompt' does not exist on type 'EngineStateContext'.
+src/lib/xianxia/advance-preload.ts(238,7): error TS2322: Type 'null' is not assignable to type 'EventBlueprint'.
+src/lib/xianxia/engine.ts(5835,5): error TS2322: Type '"mahayana"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(5881,20): error TS2322: Type '"foundation_building"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(5882,5): error TS2322: Type '"deity_transformation"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(5882,29): error TS2322: Type '"void_refinement"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(5882,48): error TS2322: Type '"unity"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(5883,5): error TS2322: Type '"mahayana"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(5900,7): error TS2367: This comparison appears to be unintentional because the types 'Realm' and '"mahayana"' have no overlap.
+src/lib/xianxia/engine.ts(6083,5): error TS2322: Type '"deity_transformation"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(6083,29): error TS2322: Type '"void_refinement"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(6083,48): error TS2322: Type '"unity"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(6084,5): error TS2322: Type '"mahayana"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(7126,97): error TS2322: Type '"soul_formation"' is not assignable to type 'Realm'.
+src/lib/xianxia/engine.ts(7176,42): error TS2339: Property 'statuses' does not exist on type 'CharacterState'.
+src/lib/xianxia/engine.ts(7176,65): error TS2339: Property 'statuses' does not exist on type 'CharacterState'.
+src/lib/xianxia/engine.ts(7233,40): error TS2339: Property 'statuses' does not exist on type 'CharacterState'.
+src/lib/xianxia/engine.ts(7233,62): error TS2339: Property 'statuses' does not exist on type 'CharacterState'.
+src/lib/xianxia/engine.ts(7290,52): error TS2339: Property 'description' does not exist on type '{ name: string; power: number; cooldown: number; }'.
+src/lib/xianxia/engine.ts(7305,97): error TS2322: Type '"soul_formation"' is not assignable to type 'Realm'.
+src/lib/xianxia/llm.ts(1700,15): error TS2339: Property 'isFallbackGenerated' does not exist on type 'AIEventOutput'.

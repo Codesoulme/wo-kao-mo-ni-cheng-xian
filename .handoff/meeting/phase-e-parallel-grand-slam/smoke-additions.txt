@@ -1,0 +1,190 @@
+﻿
+// ==================== Worker A (AI-81~AI-85): Combat + Breakthrough Smokes ====================
+
+function smokeAi81StanceDerivation(): void {
+  // AI-81: deriveCombatStance 应按 HP/MP/敌方状态给出建议姿态
+  const baseChar: any = {
+    realm: 'qi_refining', hp: 50, maxHp: 100, mp: 50, maxMp: 100, attack: 10, defense: 10,
+    combatSession: { status: 'ongoing', playerHp: 50, playerMaxHp: 100, playerMp: 50, playerMaxMp: 100 },
+  };
+  // 低血 → retreat/defensive
+  const lowHpChar: any = {
+    ...baseChar,
+    hp: 20, maxHp: 100, combatSession: { status: 'ongoing', playerHp: 20, playerMaxHp: 100, playerMp: 50, playerMaxMp: 100 },
+  };
+  const s1 = deriveCombatStance(baseChar as any, { hp: 80, maxHp: 100, attack: 10, defense: 10, speed: 5 });
+  assert(s1 === 'aggressive' || s1 === 'cunning', `正常状态应给出猛攻或诱敌，实际=${s1}`);
+  const s2 = deriveCombatStance(lowHpChar as any, { hp: 80, maxHp: 100, attack: 10, defense: 10, speed: 5 });
+  assert(s2 === 'retreat' || s2 === 'defensive', `低血应退守，实际=${s2}`);
+  // 敌方残血 → aggressive
+  const s3 = deriveCombatStance(baseChar as any, { hp: 20, maxHp: 100, attack: 10, defense: 10, speed: 5 });
+  assert(s3 === 'aggressive', `敌方残血应猛攻，实际=${s3}`);
+  log('combat-stance-derivation', { passed: true, normal: s1, lowHp: s2, weakEnemy: s3 });
+}
+
+function smokeAi81StanceShift(): void {
+  // AI-81: resolveCombatStanceShift 应按敌方动态切换姿态
+  const shift1 = resolveCombatStanceShift('aggressive', { hp: 80, maxHp: 100, attack: 20, attackPrev: 10 }, []);
+  assert(shift1 === 'cunning', `敌方蓄力应切诱敌，实际=${shift1}`);
+  const shift2 = resolveCombatStanceShift('aggressive', { hp: 20, maxHp: 100, attack: 10 }, []);
+  assert(shift2 === 'aggressive', `敌方残血保持猛攻，实际=${shift2}`);
+  // 冷却中 → 保持
+  const shift3 = resolveCombatStanceShift('defensive', { hp: 50, maxHp: 100, attack: 10 }, [{ stance: 'defensive', cooldownTurns: 2 }]);
+  assert(shift3 === 'defensive', `冷却中应保持，实际=${shift3}`);
+  log('combat-stance-shift', { passed: true, s1: shift1, s2: shift2, s3: shift3 });
+}
+
+function smokeAi81StanceLabelConsistency(): void {
+  // AI-81: COMBAT_STANCE_LABEL 必须覆盖全部 4 个姿态
+  const labels = (COMBAT_STANCE_LABEL as any);
+  assert(labels.aggressive && labels.defensive && labels.cunning && labels.retreat, 'COMBAT_STANCE_LABEL 缺标签');
+  assert(labels.aggressive.length > 0 && labels.defensive.length > 0, '标签不能为空字符串');
+  // 与 types.ts 定义一致
+  const expected: CombatStance[] = ['aggressive', 'defensive', 'cunning', 'retreat'];
+  for (const k of expected) {
+    assert(typeof labels[k] === 'string', `${k} 必须有中文标签`);
+  }
+  log('combat-stance-label-consistency', { passed: true, labels: Object.keys(labels).length });
+}
+
+function smokeAi82CombatResourceDerivation(): void {
+  // AI-82: deriveCombatResource 应返回 4 类资源快照
+  const character: any = { hp: 80, maxHp: 100, mp: 60, maxMp: 100, spiritualSense: 50, comprehension: 30 };
+  const usages = deriveCombatResource(character as any);
+  assert(Array.isArray(usages) && usages.length === 4, `应返回 4 项资源，实际=${usages.length}`);
+  const types = usages.map(u => u.type);
+  assert(types.includes('qi') && types.includes('soul') && types.includes('stamina') && types.includes('focus'), '缺资源类型');
+  const qi = usages.find(u => u.type === 'qi')!;
+  assert(qi.current === 60 && qi.max === 100, `qi 应=mp(60/100)，实际=${qi.current}/${qi.max}`);
+  assert(qi.regenPerTurn > 0, 'qi 必须有回复');
+  log('combat-resource-derivation', { passed: true, types: types.join(','), qi: `${qi.current}/${qi.max}` });
+}
+
+function smokeAi82ResourceDrainAndSufficient(): void {
+  // AI-82: resolveCombatResourceDrain 应扣减并记录峰值；checkCombatResourceSufficient 应正确判缺
+  const usages: CombatResourceUsage[] = [
+    { type: 'qi', current: 50, max: 100, regenPerTurn: 5 },
+    { type: 'stamina', current: 30, max: 80, regenPerTurn: 3 },
+  ];
+  const drained = resolveCombatResourceDrain(usages[0], { type: 'qi', value: 20 });
+  assert(drained.current === 30 && drained.recentDrain === 20, `drain 后应=30，峰值=20，实际=${drained.current}/${drained.recentDrain}`);
+  // 类型不匹配应原样返回
+  const same = resolveCombatResourceDrain(usages[1], { type: 'qi', value: 5 });
+  assert(same === usages[1] || same.current === usages[1].current, '类型不匹配应原样返回');
+  // 充足检查
+  const ok = checkCombatResourceSufficient(usages, [{ type: 'qi', value: 10 }]);
+  assert(ok.sufficient === true && ok.missing.length === 0, '50>=10 应充足');
+  const need = checkCombatResourceSufficient(usages, [{ type: 'qi', value: 60 }, { type: 'focus', value: 5 }]);
+  assert(need.sufficient === false && need.missing.length === 2, `应缺 2 项，实际=${need.missing.length}`);
+  log('combat-resource-drain-sufficient', { passed: true, drained: drained.current, missing: need.missing.length });
+}
+
+function smokeAi82ResourceLabelConsistency(): void {
+  // AI-82: COMBAT_RESOURCE_LABEL 必须覆盖全部 4 个资源类型
+  const labels = (COMBAT_RESOURCE_LABEL as any);
+  const types: CombatResourceType[] = ['qi', 'soul', 'stamina', 'focus'];
+  for (const t of types) {
+    assert(typeof labels[t] === 'string' && labels[t].length > 0, `${t} 必须有中文标签`);
+  }
+  log('combat-resource-label-consistency', { passed: true, count: types.length });
+}
+
+function smokeAi83BreakthroughStageDerivation(): void {
+  // AI-83: deriveBreakthroughStage 应按 attemptNumber + 心魔 + 年龄推导阶段
+  const s1 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 20, 30);
+  assert(s1 === 'perception', `第1次尝试应为感悟，实际=${s1}`);
+  const s2 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 90, 30);
+  assert(s2 === 'condense' || s2 === 'perception', `高龄第1次应为凝聚或感悟，实际=${s2}`);
+  const s3 = deriveBreakthroughStage('qi_refining', 'foundation_building', 1, 20, 70);
+  assert(s3 === 'storm', `高心魔第1次应为风暴，实际=${s3}`);
+  const s4 = deriveBreakthroughStage('qi_refining', 'foundation_building', 4, 30, 30);
+  assert(s4 === 'stabilize', `第4次应为稳固，实际=${s4}`);
+  const s5 = deriveBreakthroughStage('foundation_building', 'foundation_building', 1, 20, 0);
+  assert(s5 === 'passed', `已通过应为 passed，实际=${s5}`);
+  log('breakthrough-stage-derivation', { passed: true, s1, s2, s3, s4, s5 });
+}
+
+function smokeAi83BreakthroughOutcome(): void {
+  // AI-83: resolveBreakthroughOutcome 应按阶段+心魔+外援给出 success/failed/continue
+  const baseAttempt: BreakthroughAttempt = {
+    realmBefore: 'qi_refining', realmAfter: 'foundation_building', stage: 'stabilize',
+    attemptNumber: 3, helperCount: 0, startedAge: 25, elapsedTurns: 10,
+  };
+  const o1 = resolveBreakthroughOutcome({ attempt: baseAttempt, heartDemon: 30, helperPower: 4 });
+  assert(o1.outcome === 'success' && o1.narrative.length > 0, `外援足够应成功，实际=${o1.outcome}`);
+  const o2 = resolveBreakthroughOutcome({ attempt: { ...baseAttempt, helperCount: 0 }, heartDemon: 30, helperPower: 0 });
+  assert(o2.outcome === 'continue', `外援为0应继续，实际=${o2.outcome}`);
+  const stormAttempt: BreakthroughAttempt = { ...baseAttempt, stage: 'storm' };
+  const o3 = resolveBreakthroughOutcome({ attempt: stormAttempt, heartDemon: 70, helperPower: 5 });
+  assert(o3.outcome === 'failed', `风暴+高心魔应失败，实际=${o3.outcome}`);
+  // 已通过 → 直接成功
+  const passedAttempt: BreakthroughAttempt = { ...baseAttempt, stage: 'passed' };
+  const o4 = resolveBreakthroughOutcome({ attempt: passedAttempt, heartDemon: 0, helperPower: 0 });
+  assert(o4.outcome === 'success', `已通过应成功，实际=${o4.outcome}`);
+  log('breakthrough-outcome', { passed: true, o1: o1.outcome, o2: o2.outcome, o3: o3.outcome, o4: o4.outcome });
+}
+
+function smokeAi84CombatStalemateBreak(): void {
+  // AI-84: detectCombatStalemate 应识别连续无变化的僵局；resolveStalemateBreak 应返回事件提示
+  const progressing = [
+    { round: 1, playerHpAfter: 100, enemyHpAfter: 100 },
+    { round: 2, playerHpAfter: 90, enemyHpAfter: 95 },
+    { round: 3, playerHpAfter: 80, enemyHpAfter: 90 },
+  ];
+  const r1 = detectCombatStalemate(progressing);
+  assert(r1.isStalemate === false, `持续推进应非僵局，实际=${r1.isStalemate}`);
+  const stuck = [
+    { round: 1, playerHpAfter: 50, enemyHpAfter: 50 },
+    { round: 2, playerHpAfter: 50, enemyHpAfter: 50 },
+    { round: 3, playerHpAfter: 50, enemyHpAfter: 50 },
+    { round: 4, playerHpAfter: 50, enemyHpAfter: 50 },
+  ];
+  const r2 = detectCombatStalemate(stuck);
+  assert(r2.isStalemate === true && r2.turnsSinceProgress >= 3, `连续平局应僵局，实际=${r2.isStalemate}/${r2.turnsSinceProgress}`);
+  // 破局提示
+  const break1 = resolveStalemateBreak({ realm: 'qi_refining' } as any, { name: '妖兽' });
+  assert(typeof break1.event === 'string' && break1.event.length > 0, '破局事件文案非空');
+  assert(typeof break1.hint === 'string' && break1.hint.length > 0, '破局提示非空');
+  assert(['aggressive', 'cunning', 'defensive'].includes(break1.suggestedAction), `建议动作应为合法姿态，实际=${break1.suggestedAction}`);
+  log('combat-stalemate-break', { passed: true, isStalemate: r2.isStalemate, event: break1.event });
+}
+
+function smokeAi85ComboChainDerivation(): void {
+  // AI-85: deriveComboChain 应按命中记录生成连击
+  const empty = deriveComboChain([]);
+  assert(empty === null, `空记录应返回 null，实际=${empty}`);
+  const oneHit = deriveComboChain([{ round: 5, hit: true, skillName: '剑' }]);
+  assert(oneHit === null, `单次命中应无连击，实际=${oneHit}`);
+  const hits = deriveComboChain([
+    { round: 3, hit: true, skillName: '剑' },
+    { round: 4, hit: true, skillName: '剑' },
+    { round: 5, hit: true, skillName: '剑' },
+  ]);
+  assert(hits !== null && hits.hits === 3, `应=3连击，实际=${hits?.hits}`);
+  assert(hits!.multiplier > 1 && hits!.multiplier <= 2.5, `连击倍率应在 (1, 2.5]，实际=${hits!.multiplier}`);
+  // 断连
+  const broken = deriveComboChain([
+    { round: 1, hit: true, skillName: '剑' },
+    { round: 2, hit: false },
+    { round: 3, hit: true, skillName: '剑' },
+    { round: 4, hit: true, skillName: '剑' },
+  ]);
+  assert(broken !== null && broken.hits === 2, `失手后应仅 2 连击，实际=${broken?.hits}`);
+  log('combo-chain-derivation', { passed: true, hits: hits?.hits, multiplier: hits?.multiplier, broken: broken?.hits });
+}
+
+function smokeAi85ComboDamageResolve(): void {
+  // AI-85: resolveComboDamage 应按连击倍率加成伤害
+  const noCombo = resolveComboDamage(100, null);
+  assert(noCombo.finalDamage === 100 && noCombo.multiplier === 1, `无连击应保持 100，实际=${noCombo.finalDamage}`);
+  const chain: ComboChain = { comboName: '三连击', hits: 3, multiplier: 1.3, expiresTurn: 10 };
+  const withCombo = resolveComboDamage(100, chain);
+  assert(withCombo.finalDamage === 130 && withCombo.multiplier === 1.3, `100*1.3 应=130，实际=${withCombo.finalDamage}`);
+  // 无效连击（hits<2）→ 不加成
+  const weakCombo = resolveComboDamage(50, { comboName: '弱', hits: 1, multiplier: 2, expiresTurn: 1 });
+  assert(weakCombo.finalDamage === 50, `单次连击不应加成，实际=${weakCombo.finalDamage}`);
+  // 负数归零 → 下限 1
+  const negDamage = resolveComboDamage(-5, null);
+  assert(negDamage.finalDamage === 0, `负伤害应=0，实际=${negDamage.finalDamage}`);
+  log('combo-damage-resolve', { passed: true, base: 100, withCombo: withCombo.finalDamage, mult: withCombo.multiplier });
+}

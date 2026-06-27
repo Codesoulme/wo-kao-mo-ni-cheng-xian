@@ -1,0 +1,100 @@
+{
+  "suite": "perf-engine-cold-path",
+  "date": "2026-06-27T02:39:19.052Z",
+  "iterations": 10000,
+  "thresholdUs": 100,
+  "results": [
+    {
+      "name": "isMeaningfulStatus",
+      "iterations": 10000,
+      "totalMs": 15.13,
+      "perOpUs": 1.51,
+      "hotPath": false
+    },
+    {
+      "name": "filterMeaningfulStatuses",
+      "iterations": 10000,
+      "totalMs": 27.16,
+      "perOpUs": 2.72,
+      "hotPath": false
+    },
+    {
+      "name": "normalizeIdentityStatuses",
+      "iterations": 10000,
+      "totalMs": 67.75,
+      "perOpUs": 6.78,
+      "hotPath": false
+    },
+    {
+      "name": "ensureUniqueIds",
+      "iterations": 10000,
+      "totalMs": 66.32,
+      "perOpUs": 6.63,
+      "hotPath": false
+    },
+    {
+      "name": "tickStatusDurations",
+      "iterations": 10000,
+      "totalMs": 91.3,
+      "perOpUs": 9.13,
+      "hotPath": false
+    },
+    {
+      "name": "tickNaturalRecovery",
+      "iterations": 10000,
+      "totalMs": 2.56,
+      "perOpUs": 0.26,
+      "hotPath": false
+    },
+    {
+      "name": "recalcCultivationMultiplier",
+      "iterations": 10000,
+      "totalMs": 117.38,
+      "perOpUs": 11.74,
+      "hotPath": false
+    },
+    {
+      "name": "computeEffectiveCultivationRate",
+      "iterations": 10000,
+      "totalMs": 64.85,
+      "perOpUs": 6.49,
+      "hotPath": false
+    },
+    {
+      "name": "computeCultivationFactors",
+      "iterations": 10000,
+      "totalMs": 68.49,
+      "perOpUs": 6.85,
+      "hotPath": false
+    },
+    {
+      "name": "normalizeCultivationState",
+      "iterations": 10000,
+      "totalMs": 421.09,
+      "perOpUs": 42.11,
+      "hotPath": false
+    },
+    {
+      "name": "applyChanges",
+      "iterations": 10000,
+      "totalMs": 12.29,
+      "perOpUs": 1.23,
+      "hotPath": false
+    },
+    {
+      "name": "isConstitutionStatus",
+      "iterations": 10000,
+      "totalMs": 1.92,
+      "perOpUs": 0.19,
+      "hotPath": false
+    },
+    {
+      "name": "deriveCultivationAttributes",
+      "iterations": 10000,
+      "totalMs": 200.64,
+      "perOpUs": 20.06,
+      "hotPath": false
+    }
+  ],
+  "hotPaths": []
+}

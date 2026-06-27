@@ -1,35 +1,35 @@
 {
-  "date": "2026-06-27T00:50:34.577Z",
+  "date": "2026-06-27T02:32:07.075Z",
   "iterations": 10000,
   "results": [
     {
       "name": "resolveTribulationBolt",
       "iters": 10000,
-      "totalMs": 9.8,
-      "perOpUs": 0.98
+      "totalMs": 9.27,
+      "perOpUs": 0.93
     },
     {
       "name": "resolveHeartDemon",
       "iters": 10000,
-      "totalMs": 4.16,
-      "perOpUs": 0.42
+      "totalMs": 4.73,
+      "perOpUs": 0.47
     },
     {
       "name": "deriveCrossRealmPaths",
       "iters": 10000,
-      "totalMs": 36.57,
-      "perOpUs": 3.66
+      "totalMs": 10.97,
+      "perOpUs": 1.1
     },
     {
       "name": "checkRestrictionAccess",
       "iters": 10000,
-      "totalMs": 4.62,
-      "perOpUs": 0.46
+      "totalMs": 6.16,
+      "perOpUs": 0.62
     },
     {
       "name": "deriveAscensionRequirements",
       "iters": 10000,
-      "totalMs": 1.04,
+      "totalMs": 1.01,
       "perOpUs": 0.1
     }
   ]

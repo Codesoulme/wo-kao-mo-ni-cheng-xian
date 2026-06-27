@@ -1,0 +1,16 @@
+{
+  "suite": "test-ai-fallback",
+  "date": "2026-06-27T02:43:02.528Z",
+  "passed": 28,
+  "failed": 2,
+  "failures": [
+    "enriched_template: fallbackStrategy=enriched_template: failed",
+    "inject: 含 npc 名: failed"
+  ],
+  "notes": [
+    "未发起真实 AI 请求, 不消耗 AutoGLM 配额",
+    "fallback 业务层 (buildFallbackAgeEvent) 是 AI 失败的兜底, route 层不内置 retry",
+    "建议在调用方做有限次 retry (例如 2-3 次) + 最终走 fallback",
+    "空 body 触发的是真实接口调用 (saved config 兜底), 不在本次 smoke 范围"
+  ]
+}
