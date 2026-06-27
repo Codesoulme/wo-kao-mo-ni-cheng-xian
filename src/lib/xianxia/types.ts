@@ -1,4 +1,4 @@
-﻿// 修仙模拟器 - 核心引擎类型定义
+// 修仙模拟器 - 核心引擎类型定义
 // 基于"引擎权威 + AI 提议"混合架构
 // Task 20: 事件蓝图 / 角色意图 / 未决线索 / 战斗系统
 
@@ -2390,3 +2390,301 @@ export type StalemateExit =
   | 'disengage'         // 抽身脱离
   | 'ally-intervention' // 同门/盟友介入
   | 'terrain-shift';    // 地利变化（地形/灵气潮）
+
+// ==================== Phase-H Worker B: NPC Long-Term Memory ====================
+// AI-H3xx: Structured NPC memory layer with tiered importance, emotional valence,
+// involved characters/facts/threads, decay rules, and prompt summarization.
+// Distinct from AI-101 NPCMemoryEntry (raw witness list) — this layer stores
+// normalized memories suitable for AI prompt injection and behavior derivation.
+
+export type NPCMemoryTier = 'trivial' | 'notable' | 'significant' | 'core' | 'defining';
+
+export interface NPCMemory {
+  id: string;
+  npcId: string;
+  age: number;
+  summary: string;
+  tier: NPCMemoryTier;
+  // -1 = hostile, 0 = neutral, +1 = warm. Validated/clamped to [-1, 1].
+  emotionalValence: number;
+  involvedCharacterIds: string[];
+  worldFactIds: string[];
+  evidenceThreadIds: string[];
+}
+
+export interface NPCMemoryCluster {
+  npcId: string;
+  memories: NPCMemory[];
+  dominantTier: NPCMemoryTier;
+  definingTrait: string;
+  lastInteractionAge: number;
+}
+
+export interface NPCBehaviorInfluence {
+  friendlyWeight: number;
+  hostileWeight: number;
+  neutralWeight: number;
+  actionHint: string;
+}
+
+
+// ==================== Worker C (phase-h-p2-mid): 完整世界地图与世界地点 ====================
+// 说明：
+// - 这些类型是 phase-h-p2-mid 第 3 期世界地点扩展的类型与最小可落库契约；
+// - 不动既有 engine / types 任何函数；只在文件末尾追加。
+// - 命名沿用英文 id + 中文注释，便于 AI 在生成世界/剧情时直接复用现有 import。
+// ============================================================================
+
+/**
+ * AI-H321 世界八大区域。
+ * - central-plains:    中原腹地（人族与正统仙门核心）
+ * - eastern-sea:       东海仙岛（散修、海族、海外宗门）
+ * - northern-waste:    北境荒原（妖兽、苦寒散修）
+ * - southern-jungle:   南疆密林（蛊修、毒瘴、异族）
+ * - western-desert:    西域大漠（佛门、佛修、沙海秘传）
+ * - sky-citadel:       天外仙宫（飞升者、上界投影）
+ * - underworld-court:  幽冥地府（鬼修、轮回、残魂）
+ * - outer-realm-rift:  域外裂隙（魔修、虚空、上古遗种）
+ */
+export type WorldRegion =
+  | 'central-plains'
+  | 'eastern-sea'
+  | 'northern-waste'
+  | 'southern-jungle'
+  | 'western-desert'
+  | 'sky-citadel'
+  | 'underworld-court'
+  | 'outer-realm-rift';
+
+/**
+ * AI-H322 地点层级 / 危险度大致划分。
+ * - mortal-village:    凡尘村镇（凡人聚居、低灵气）
+ * - cultivation-town:  修行坊市（散修与商会汇聚）
+ * - immortal-city:     仙门大城（宗门外门、内门分坛）
+ * - sacred-ground:     灵山福地（宗门外景、师长道场）
+ * - forbidden-zone:    禁地秘境（高危险度、高回报）
+ * - outer-realm:       域外之境（跨界或飞升者所至）
+ */
+export type RegionTier =
+  | 'mortal-village'
+  | 'cultivation-town'
+  | 'immortal-city'
+  | 'sacred-ground'
+  | 'forbidden-zone'
+  | 'outer-realm';
+
+/**
+ * AI-H323 单个世界地点。
+ * - id:                 唯一 id（建议用拼音或中文 hash，如 "luoyu-village"）
+ * - name:               玩家可见的世界内地点名（如"落羽村""流云坊"）
+ * - region:             所属八大区域
+ * - tier:               地点层级（村镇/坊市/大城/灵山/禁地/域外）
+ * - dangerLevel:        危险度 0-100；>70 时应有相关因缘提示
+ * - spiritualDensity:   灵气浓度 0-100；与修炼速度、产出品质相关
+ * - resources:          主要特产标签（如 "灵石矿""灵草""妖兽材料"）
+ * - controllingFaction: 掌控宗门/家族（无则空串）
+ * - hiddenEntrance:     是否存在隐藏入口（用于支线、秘境、隐藏 NPC）
+ */
+export interface LocationNode {
+  id: string;
+  name: string;
+  region: WorldRegion;
+  tier: RegionTier;
+  dangerLevel: number;
+  spiritualDensity: number;
+  resources: string[];
+  controllingFaction: string;
+  hiddenEntrance: boolean;
+}
+
+/**
+ * AI-H324 两个地点之间的可通行路径。
+ * - from / to:            起点 / 终点 LocationNode.id
+ * - distanceDays:         凡人脚程所需天数（修士可缩短）
+ * - dangerLevel:          路上危险度 0-100
+ * - requiredRealm:        最低境界（Realm id 字符串，如 "mortal"/"qi_refining"）
+ * - hiddenRequirements:   其它隐藏条件（如"需持某宗门令牌""需通过某任务"），可空数组
+ */
+export interface TravelRoute {
+  from: string;
+  to: string;
+  distanceDays: number;
+  dangerLevel: number;
+  requiredRealm: string;
+  hiddenRequirements: string[];
+}
+
+/**
+ * AI-H325 当前世界地图。
+ * - nodes:                已注册的全部地点（含未发现的）
+ * - routes:               全部可通行路径
+ * - currentLocationId:    角色当前所在地点 id
+ * - discoveredLocationIds: 玩家已发现/已踏足过的地点 id 集合
+ */
+export interface WorldMap {
+  nodes: LocationNode[];
+  routes: TravelRoute[];
+  currentLocationId: string;
+  discoveredLocationIds: string[];
+}
+
+// ==================== Phase-H Worker A: Sect Relation Graph Types ====================
+// AI-H301~H304: Sect faction relations and player affinity (additive only).
+// ----------------------------------------------------------------------------
+
+/**
+ * AI-H301 宗门阵营。
+ * 修仙界主要阵营/势力分类；用于 SectNode.alignment 与玩家宗门亲缘。
+ */
+export type SectFaction =
+  | 'qingyun-pavilion'      // 青云阁：正道剑修名门
+  | 'blood-saber-sect'      // 血刀宗：魔道刀修
+  | 'heavenly-talisman-sect'// 天符宗：符箓正宗
+  | 'ten-thousand-sword-sect' // 万剑宗：剑道圣地
+  | 'wandering-cultivator'  // 散修：自由人
+  | 'demonic-ways'          // 魔道：旁门左道
+  | 'royal-court'           // 王庭：世俗王朝与皇族
+  | 'merchant-guild';       // 商盟：修士商贾
+
+/**
+ * AI-H302 宗门关系类型。
+ * 描述两个宗门阵营之间的关系性质，强度由 SectRelationEdge.intensity 决定。
+ */
+export type SectRelation =
+  | 'ally'         // 同盟
+  | 'rival'        // 竞争/宿敌但未全面开战
+  | 'enemy'        // 死敌
+  | 'neutral'      // 中立
+  | 'vassal'       // 附庸
+  | 'subordinate'  // 下属/支脉
+  | 'wary-respect';// 警惕中互敬
+
+/**
+ * AI-H303 宗门节点。
+ * 一个宗门或势力的具体画像。
+ */
+export interface SectNode {
+  id: string;
+  name: string;
+  /** 阵营归属：与 SectFaction 对齐，用于关系图与玩家亲缘推导 */
+  alignment: SectFaction;
+  /** 阵营最低境界 tier（0=mortal, 1=qi_refining ...） */
+  realmTierMin: number;
+  /** 阵营最高境界 tier */
+  realmTierMax: number;
+  /** 综合实力排名（数字越小越强） */
+  powerRank: number;
+  /** 当代掌门/领袖名号（世界内可读名） */
+  currentLeader: string;
+  /** 山门/总部所在地理位置（世界内文本） */
+  seatLocation: string;
+  /** 对外公开立场摘要（一句话） */
+  publicStance: string;
+}
+
+/**
+ * AI-H304 宗门关系有向边。
+ * 表达 from -> to 的关系性质与强度；强度 0-1。
+ */
+export interface SectRelationEdge {
+  from: string;        // 源 SectNode.id
+  to: string;          // 目标 SectNode.id
+  relation: SectRelation;
+  /** 关系强度 0..1（数字越大关系越紧密/激烈） */
+  intensity: number;
+  /** 该关系自角色哪一年龄起生效（用于时间线） */
+  sinceAge: number;
+  /** 世界内叙事注解（AI 生成） */
+  narrativeNote: string;
+}
+
+/**
+ * AI-H304 宗门关系图（不可变快照）。
+ * - nodes: 图中所有宗门节点
+ * - edges: 全部有向关系边
+ * - lastUpdatedAge: 上次更新时间（角色年龄）
+ * - currentAge: 当前角色年龄快照
+ */
+export interface SectRelationGraph {
+  nodes: SectNode[];
+  edges: SectRelationEdge[];
+  lastUpdatedAge: number;
+  currentAge: number;
+}
+
+// ==================== Phase-H Worker D: Crafting / Cultivation Study Skeleton ====================
+// AI-H3xx additive types: 鐗╁搧鍚堟垚/鐐煎埗/淇範绯荤粺鐨勬渶灏忛鏋躲€?// 瑙勫垯锛?//  - 浠呰拷鍔狅紙additive only锛夛紝涓嶅姩鏃㈡湁 type/interface/function銆?//  - engine.ts 閰嶅 5 涓?engine 鍑芥暟浼氭秷璐硅繖浜涚被鍨嬨€?//  - CraftingSideEffect 鐢ㄤ綔 CraftingResult.sideEffects 鐨勫厓绱犵被鍨嬶紝閬垮厤 any銆?
+/**
+ * AI-H311: 鐐煎埗/鍚堟垚/淇範鐨勭绫绘灇涓俱€? *  - pill-refining:            鐐间腹
+ *  - weapon-forging:           鐐煎櫒/閾稿叺
+ *  - formation-drawing:        缁樺埗闃垫硶
+ *  - technique-comprehension:  淇範鍔熸硶/鏈硶
+ *  - item-synthesis:           鐗╁搧鍚堟垚锛堣嵂鏉愭嫾鍚堛€佺鏂欓厤姣旂瓑锛? *  - talisman-making:          绗︾畵鍒朵綔
+ */
+export type CraftingKind =
+  | 'pill-refining'
+  | 'weapon-forging'
+  | 'formation-drawing'
+  | 'technique-comprehension'
+  | 'item-synthesis'
+  | 'talisman-making';
+
+/**
+ * AI-H312: 鐐煎埗/鍚堟垚閰嶆柟瀹氫箟銆? *  - requiredRealm:    鏈€浣庡鐣岋紙Realm id 瀛楃涓诧紝濡?"mortal" / "qi_refining"锛夈€? *  - requiredElements: 鑷冲皯闇€瑕佸摢鍑犻」鍏冪礌浜插拰锛圥artial<Record<ElementType, number>>锛夈€? *  - materials:        鎵€闇€鏉愭枡鏉＄洰锛堟寜 id 鍛戒腑搴撳瓨锛夈€? *  - toolIds:          闇€瑕佺殑宸ュ叿/涓圭倝/绗︾瑪绛?id 鍒楄〃锛堜换涓€缂哄け鍗充笉鍙偧锛夈€? *  - successRate:      鍩虹鎴愬姛鐜?0-1銆? *  - sideEffectChance: 鍓綔鐢ㄨЕ鍙戞鐜?0-1銆? */
+export interface CraftingRecipe {
+  id: string;
+  name: string;
+  kind: CraftingKind;
+  requiredRealm: string;
+  requiredElements: Partial<Record<ElementType, number>>;
+  materials: ItemEntry[];
+  toolIds: string[];
+  successRate: number;        // 0-1
+  sideEffectChance: number;   // 0-1
+}
+
+/**
+ * AI-H313: 涓€娆＄偧鍒?鍚堟垚浼氳瘽鐨勭姸鎬併€? *  - recipeId:          寮曠敤鐨勯厤鏂?id銆? *  - startedAge:        浼氳瘽寮€濮嬫椂鐨勮鑹插勾榫勩€? *  - currentStep/totalSteps: 澶氭鐐煎埗杩涘害銆? *  - materialsConsumed: 宸叉秷鑰楃殑鏉愭枡 id 鍒楄〃銆? *  - attempts:          褰撳墠浼氳瘽鍐呭皾璇曟鏁帮紙鐐煎簾閲嶅紑锛夈€? *  - currentSuccess:    褰撳墠绱鎴愬姛鐜囷紙鍙?realm/comprehension/elements 褰卞搷锛夈€? */
+export interface CraftingSession {
+  recipeId: string;
+  startedAge: number;
+  currentStep: number;
+  totalSteps: number;
+  materialsConsumed: string[];
+  attempts: number;
+  currentSuccess: number;   // 0-1
+}
+
+/**
+ * AI-H314: 鐐煎埗/鍚堟垚鍓綔鐢ㄦ潯鐩紙閬垮厤 CraftingResult 鐩存帴鍚?any锛夈€? *  - kind:              鍓綔鐢ㄧ被鍨嬶紙鐘舵€?灞炴€?鍙椾激/璧扮伀鍏ラ瓟锛夈€? *  - severity:          涓ラ噸绋嬪害 0-1銆? *  - description:       鐜╁鍙鎻忚堪锛堜繚鎸佷慨浠欎笘鐣屽唴鍙欎簨锛夈€? *  - expiresAfterDays:  鍙€夛紝鑷姩娑堝け澶╂暟銆? */
+export interface CraftingSideEffect {
+  kind: 'status' | 'attribute' | 'injury' | 'qi-deviation';
+  severity: number;             // 0-1
+  description: string;
+  expiresAfterDays?: number;
+}
+
+/**
+ * AI-H315: 涓€娆＄偧鍒?鍚堟垚姝ラ鐨勭粨鏋溿€? *  - success:            鏈鏄惁鎴愬姛銆? *  - outputItems:        浜у嚭鐗╁搧锛堝彲鑳戒负绌鸿〃绀烘湭鎴愪腹/鐐煎簾锛夈€? *  - consumedMaterials:  鏈娑堣€楃殑鏉愭枡 id 鍒楄〃銆? *  - sideEffects:        鏈瑙﹀彂鐨勫壇浣滅敤銆? *  - attributeChanges:   鏈瀵硅鑹插睘鎬х殑褰卞搷锛堜笌 AttributeChange 瀵归綈锛夈€? *  - experienceGained:   鏈鑾峰緱鐨勭粡楠?鐔熺粌搴︺€? */
+export interface CraftingResult {
+  success: boolean;
+  outputItems: ItemEntry[];
+  consumedMaterials: string[];
+  sideEffects: CraftingSideEffect[];
+  attributeChanges: AttributeChange[];
+  experienceGained: number;
+}
+
+/**
+ * AI-H316: 鍔熸硶/鏈硶淇範杩涘害銆? *  - techniqueId:          鐩爣鍔熸硶 id銆? *  - currentProgress:      0-1 鐨勮繘搴︺€? *  - comprehensionEvents:  绱鐨勯】鎮?鐞嗚В浜嬩欢瀛楃涓插垪琛紙鎸夋椂闂撮『搴忚拷鍔狅級銆? *  - breakthroughs:        绱鐨勭獊鐮翠簨浠讹紙age/杩涘害璺冲彉/insight锛夈€? */
+export interface TechniqueStudy {
+  techniqueId: string;
+  currentProgress: number;                  // 0-1
+  comprehensionEvents: string[];
+  breakthroughs: Array<{
+    age: number;
+    fromProgress: number;
+    toProgress: number;
+    insight: string;
+  }>;
+}

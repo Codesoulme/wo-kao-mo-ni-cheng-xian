@@ -1,0 +1,226 @@
+
+
+// ==================== Phase-H Worker A: Sect Relation Graph ====================
+// AI-H301~H304: 5 export functions, additive only.
+// ---------------------------------------------------------------------------
+
+/**
+ * AI-H301 buildEmptySectGraph
+ * 构造一个空的 SectRelationGraph 快照。
+ * 默认 lastUpdatedAge === currentAge === 0；不持有外部状态。
+ */
+export function buildEmptySectGraph(): SectRelationGraph {
+  return {
+    nodes: [],
+    edges: [],
+    lastUpdatedAge: 0,
+    currentAge: 0,
+  };
+}
+
+/**
+ * AI-H301 addSectNode
+ * 不可变地往图中追加一个宗门节点（同 id 视为覆盖）。
+ * 返回新 graph；不修改入参 graph。
+ */
+export function addSectNode(
+  graph: SectRelationGraph,
+  node: SectNode,
+): SectRelationGraph {
+  const base: SectRelationGraph = graph || buildEmptySectGraph();
+  const existing = Array.isArray(base.nodes) ? base.nodes : [];
+  const nextNodes: SectNode[] = [];
+  let replaced = false;
+  for (const n of existing) {
+    if (n && n.id === node.id) {
+      nextNodes.push({ ...node });
+      replaced = true;
+    } else {
+      nextNodes.push(n);
+    }
+  }
+  if (!replaced) nextNodes.push({ ...node });
+  return {
+    ...base,
+    nodes: nextNodes,
+    lastUpdatedAge: typeof base.currentAge === 'number' ? base.currentAge : base.lastUpdatedAge,
+  };
+}
+
+/**
+ * AI-H302 setSectRelation
+ * 不可变地重写 from -> to 关系；若不存在则追加。
+ * intensity 被 clamp 到 [0, 1]；narrativeNote 缺失则补默认提示。
+ */
+export function setSectRelation(
+  graph: SectRelationGraph,
+  from: string,
+  to: string,
+  relation: SectRelation,
+  intensity: number,
+): SectRelationGraph {
+  const base: SectRelationGraph = graph || buildEmptySectGraph();
+  const existing = Array.isArray(base.edges) ? base.edges : [];
+  const clamp = (v: unknown): number => {
+    const n = typeof v === 'number' && isFinite(v) ? v : 0;
+    if (n < 0) return 0;
+    if (n > 1) return 1;
+    return n;
+  };
+  const safeIntensity = clamp(intensity);
+  const sinceAge = typeof base.currentAge === 'number' ? base.currentAge : 0;
+  const newEdge: SectRelationEdge = {
+    from,
+    to,
+    relation,
+    intensity: safeIntensity,
+    sinceAge,
+    narrativeNote: '',
+  };
+  const nextEdges: SectRelationEdge[] = [];
+  let replaced = false;
+  for (const e of existing) {
+    if (e && e.from === from && e.to === to) {
+      nextEdges.push({ ...newEdge, narrativeNote: e.narrativeNote || '' });
+      replaced = true;
+    } else {
+      nextEdges.push(e);
+    }
+  }
+  if (!replaced) nextEdges.push(newEdge);
+  return {
+    ...base,
+    edges: nextEdges,
+    lastUpdatedAge: sinceAge,
+  };
+}
+
+/**
+ * AI-H303 derivePlayerSectAffinity
+ * 根据角色当前状态 + 关系图推导其宗门阵营亲缘度（-1..1 含义的 affinity 数值，0=中立）。
+ *
+ * 推导规则（按优先级叠加，单项裁剪到 [-1, 1]）：
+ *   1. character.faction 直接匹配图中的 SectNode.alignment  → 基础 +0.6
+ *   2. character.master 与某 node.currentLeader 文本相同 → +0.2
+ *   3. character.reputation > 60 且在 'wandering-cultivator'/'merchant-guild'
+ *      中任一出现 → +0.1
+ *   4. 否则 → 'wandering-cultivator'，基础 0
+ *   5. 与 edges 中 aligned 节点存在 ally/wary-respect 关系 → 每条 +0.1
+ *      与 aligned 节点存在 enemy/rival 关系 → 每条 -0.1
+ *
+ * 输出：
+ *   - aligned: 推得的 SectFaction
+ *   - affinity: -1..1，clamp 之后
+ *   - reason: 一句话解释（世界内口吻）
+ */
+export function derivePlayerSectAffinity(
+  character: { faction?: string; master?: string; reputation?: number; realm?: string; realmLevel?: number } | null | undefined,
+  graph: SectRelationGraph,
+): { aligned: SectFaction; affinity: number; reason: string } {
+  const base: SectRelationGraph = graph || buildEmptySectGraph();
+  const nodes = Array.isArray(base.nodes) ? base.nodes : [];
+  const edges = Array.isArray(base.edges) ? base.edges : [];
+
+  const charFaction = (character && typeof character.faction === 'string') ? character.faction : '';
+  const charMaster = (character && typeof character.master === 'string') ? character.master : '';
+  const charRep = (character && typeof character.reputation === 'number') ? character.reputation : 0;
+
+  // 1. 直接匹配 alignment
+  let aligned: SectFaction = 'wandering-cultivator';
+  let affinity = 0;
+  let reasonParts: string[] = [];
+
+  if (charFaction) {
+    for (const n of nodes) {
+      if (n && n.alignment === charFaction) {
+        aligned = n.alignment;
+        affinity = 0.6;
+        reasonParts.push('出身宗门 ' + n.name);
+        break;
+      }
+    }
+    if (affinity === 0) {
+      // faction 字符串与任何 alignment 都对不上，仍按字符串原样识别（保持向后兼容）
+      // 但只接受 SectFaction 字面量
+      const validFactions: SectFaction[] = [
+        'qingyun-pavilion', 'blood-saber-sect', 'heavenly-talisman-sect',
+        'ten-thousand-sword-sect', 'wandering-cultivator', 'demonic-ways',
+        'royal-court', 'merchant-guild',
+      ];
+      if ((validFactions as string[]).includes(charFaction)) {
+        aligned = charFaction as SectFaction;
+        affinity = 0.3;
+        reasonParts.push('虽无宗门背书，已属 ' + charFaction);
+      } else {
+        reasonParts.push('尚未归属明确宗门');
+      }
+    }
+  } else {
+    reasonParts.push('尚未归属明确宗门');
+  }
+
+  // 2. master 匹配 currentLeader
+  if (charMaster) {
+    for (const n of nodes) {
+      if (n && n.currentLeader && n.currentLeader === charMaster) {
+        affinity += 0.2;
+        reasonParts.push('师从 ' + n.name + ' 当家');
+        break;
+      }
+    }
+  }
+
+  // 3. 高名望散修 / 商盟微弱加成
+  if (
+    charRep > 60 &&
+    (aligned === 'wandering-cultivator' || aligned === 'merchant-guild')
+  ) {
+    affinity += 0.1;
+    reasonParts.push('名望颇高，' + aligned + ' 之辈亦另眼相看');
+  }
+
+  // 4. 关系图加权
+  const alignedNodeIds = new Set<string>();
+  for (const n of nodes) {
+    if (n && n.alignment === aligned) alignedNodeIds.add(n.id);
+  }
+  for (const e of edges) {
+    if (!e || !e.from || !e.to) continue;
+    const fromAligned = alignedNodeIds.has(e.from);
+    const toAligned = alignedNodeIds.has(e.to);
+    if (!fromAligned && !toAligned) continue;
+    const w = typeof e.intensity === 'number' ? Math.max(0, Math.min(1, e.intensity)) : 0;
+    if (e.relation === 'ally' || e.relation === 'wary-respect') {
+      affinity += 0.1 * w;
+    } else if (e.relation === 'enemy' || e.relation === 'rival') {
+      affinity -= 0.1 * w;
+    }
+  }
+
+  // clamp
+  if (affinity > 1) affinity = 1;
+  if (affinity < -1) affinity = -1;
+
+  const reason = reasonParts.length > 0 ? reasonParts.join('；') : '尚未与任何宗门发生瓜葛';
+  return { aligned, affinity, reason };
+}
+
+/**
+ * AI-H304 queryRelationsTowards
+ * 返回所有指向 target 的关系边（from -> target 方向）。
+ * edges 为空或 target 未命中时返回空数组。
+ */
+export function queryRelationsTowards(
+  graph: SectRelationGraph,
+  target: string,
+): SectRelationEdge[] {
+  const base: SectRelationGraph = graph || buildEmptySectGraph();
+  const edges = Array.isArray(base.edges) ? base.edges : [];
+  if (!target) return [];
+  const out: SectRelationEdge[] = [];
+  for (const e of edges) {
+    if (e && e.to === target) out.push({ ...e });
+  }
+  return out;
+}
+

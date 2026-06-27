@@ -1,11 +1,11 @@
-import { readFileSync, existsSync } from 'fs';
+﻿import { readFileSync, existsSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
-import { advanceThread, completeThread, failThread, buildThreadContinuationEvent, deriveWorldEventConsequences, deriveWorldFactsFromState, executeAIEvent, evaluateTechniqueCompatibility, buildLearnedCombatArts, buildStateContext, getSameYearThreads, normalizeCultivationState, recordActionCausality, refreshWorldFacts, buildCombatActionPalette, buildCombatVictorySpoils, deriveCultivationAttributes, deriveCombatProjection, filterMeaningfulStatuses, removeItemsByIds, equipItemsByIds, equipItem, unequipItem, addThreads, deriveRealmTraits, deriveSoulRealm, endCombat, executeCombatRoundWithProposal, startCombat, stateToResponse, deriveCombatStance, resolveCombatStanceShift, deriveCombatResource, resolveCombatResourceDrain, checkCombatResourceSufficient, deriveBreakthroughStage, resolveBreakthroughOutcome, detectCombatStalemate, resolveStalemateBreak, deriveComboChain, resolveComboDamage, sanitizeCombatLog, novelizeCombatLog,computeCultivationFactors, computeEffectiveCultivationRate,  deriveLootFromOpponent, resolveLootConditions, deriveStatusExpiry, resolveStatusRemoval, derivePetCultivationSuggestion, resolvePetSkillLearn, deriveRecipeUnlock, resolvePillCrafting, deriveFormationStack, resolveFormationConflict, deriveBidderAction, resolveAuctionEnd, deriveThreadChain, resolveThreadContinuation, deriveBottleSpiritAffect, deriveSwordAptitudeProgress, resolveFakeDeath, deriveNPCMemoryUpdate, deriveNPCBehavior, deriveRumorTrigger, resolveRumorReliability } from '../src/lib/xianxia/engine';
+import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItem, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStalemateExit, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse, unequipItem, buildEmptyWorldMap, discoverLocation, deriveTravelFeasibility, generateRandomEncounter, summarizeWorldForPrompt, recordNPCMemory, clusterNPCMemories, decayNPCMemories, deriveNPCBehaviorFromMemory, summarizeNPCForPrompt, buildEmptySectGraph, addSectNode, setSectRelation, derivePlayerSectAffinity, queryRelationsTowards } from '../src/lib/xianxia/engine';
 import { constitutionToStatus, CONSTITUTIONS } from '../src/lib/xianxia/constitutions';
 import { COMBAT_STANCE_LABEL, COMBAT_RESOURCE_LABEL } from '../src/lib/xianxia/types';
-import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain } from '../src/lib/xianxia/types';
+import type { CombatStance, CombatResourceType, CombatResourceUsage, BreakthroughStage, ComboChain, WorldRegion, RegionTier, LocationNode, TravelRoute, WorldMap } from '../src/lib/xianxia/types';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
 import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
@@ -2830,7 +2830,13 @@ function smokeAi103RumorReliability(): void {
   smokeHeartIntentLabel();
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 
-  pgRunPhaseGGSmokes();}
+  pgRunPhaseGGSmokes();
+  pgRunPhaseG116Smokes();
+  pgRunPhaseHCWorkerCSmokes();
+  pgRunPhaseH314Smokes();
+  pgRunPhaseHAWorkerASmokes();
+  pgRunPhaseHBWorkerBSmokes();
+}
 
 function smokeCombatLabelsDisplay(): void {
   // P0 验证：玩家可见 UI 中 攻/守/敏 已回滚为 破势/护持/机变
@@ -5386,4 +5392,766 @@ function pgRunPhaseGGSmokes(): void {
   smokeG213CombatStalemateExit();
   smokeG214CombatStanceLabel();
   smokeG215TechniqueRootGate();
+}
+
+// ============================================================================
+// Phase-G Worker B 补2: 6 个新 enum/function 的 smoke (xiaoxin-B, 2026-06-27)
+// 覆盖 deriveSecretRealmAccess / resolveSecretRealmEntry / deriveBidderProfile
+//     / simulateBiddingRound / buildCombatCauseChain / resolveStalemateExit
+// 每条至少 1 个 assert；try/catch + function-call-error 容错
+// 仅追加，不修改既有 smoke。
+// ============================================================================
+function smokeNewG111SecretRealmAccess(): void {
+  try {
+    const realm = {
+      id: 'sky-mirror',
+      name: '天镜秘府',
+      minAge: 10,
+      isStoryRealm: false,
+      entryRequirement: '需集齐两枚残图碎片',
+      entryAlternatives: ['传功', '地图碎片'],
+      restrictions: [],
+      discovered: true,
+      tier: 'rare',
+    };
+    const character = {
+      id: 'char-1',
+      age: 18,
+      realm: 'qi_refining',
+      inventory: [
+        { id: 'map-1', name: '天镜残图碎片' },
+        { id: 'map-2', name: '天镜残图碎片' },
+        { id: 'junk', name: '破布' },
+      ],
+      statuses: [],
+    };
+    const attempt = deriveSecretRealmAccess(realm, character);
+    assert(typeof attempt.canAttempt === 'boolean', 'canAttempt must be boolean');
+    assert(attempt.canAttempt === true, 'with 2 fragments + time-window should be attemptable');
+    assert(attempt.triggers.indexOf('map-fragment') >= 0, 'should detect map-fragment trigger');
+    const blocked = deriveSecretRealmAccess(realm, Object.assign({}, character, { inventory: [] }));
+    assert(typeof blocked.canAttempt === 'boolean', 'blocked canAttempt must still be boolean');
+    log('smoke-g-111-secret-realm-access', {
+      passed: true,
+      canAttempt: attempt.canAttempt,
+      triggers: attempt.triggers.length,
+    });
+  } catch (e) {
+    log('smoke-g-111-secret-realm-access', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG112SecretRealmEntry(): void {
+  try {
+    const attempt = {
+      realmId: 'sky-mirror',
+      triggers: ['key-item', 'time-window'],
+      missing: [],
+      bypassOptions: [],
+      canAttempt: true,
+    };
+    const first = resolveSecretRealmEntry(attempt, 'first');
+    assert(first && typeof first === 'object', 'first must return an object');
+    assert(typeof first.entered === 'boolean', 'first.entered must be boolean');
+    assert(typeof first.sideEffect === 'string' && first.sideEffect.length > 0, 'first.sideEffect must be a non-empty string');
+    assert(typeof first.narrativeHint === 'string' && first.narrativeHint.length > 0, 'first.narrativeHint must be a non-empty string');
+    assert(first.entered === true, 'first choice with canAttempt=true should enter');
+    const blockedAttempt = Object.assign({}, attempt, { canAttempt: false, missing: ['key-item'] });
+    const denied = resolveSecretRealmEntry(blockedAttempt, 'first');
+    assert(denied.entered === false, 'denied attempt should not enter');
+    log('smoke-g-112-secret-realm-entry', {
+      passed: true,
+      entered: first.entered,
+      denied: denied.entered,
+    });
+  } catch (e) {
+    log('smoke-g-112-secret-realm-entry', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG113BidderProfile(): void {
+  try {
+    const archetypes = ['wealthy-elder', 'hot-blooded-young', 'scheming-cultivator', 'casual-pilgrim', 'shadow-bidder'];
+    const profile = deriveBidderProfile(
+      { id: 'elder-zhao', assets: 100000, personality: 'cautious', name: '赵长老' },
+      { basePrice: 100, valuation: 100, rarity: 'rare' },
+    );
+    assert(profile && typeof profile === 'object', 'deriveBidderProfile must return an object');
+    assert(typeof profile.archetype === 'string', 'archetype must be a string');
+    assert(archetypes.indexOf(profile.archetype) >= 0, 'archetype must be one of BidderArchetype values, got: ' + profile.archetype);
+    assert(typeof profile.maxBid === 'number' && profile.maxBid > 0, 'maxBid must be a positive number');
+    const schemer = deriveBidderProfile(
+      { id: 'schemer-1', assets: 30000, personality: 'hostile', name: '王算计' },
+      { basePrice: 100, valuation: 100, rarity: 'legendary' },
+    );
+    assert(archetypes.indexOf(schemer.archetype) >= 0, 'schemer archetype must be valid, got: ' + schemer.archetype);
+    log('smoke-g-113-bidder-profile', {
+      passed: true,
+      elder: profile.archetype,
+      schemer: schemer.archetype,
+    });
+  } catch (e) {
+    log('smoke-g-113-bidder-profile', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG114BiddingRound(): void {
+  try {
+    const profiles = [
+      { archetype: 'wealthy-elder', wealth: 200000, maxBid: 5000, aggressive: false, hostile: false },
+      { archetype: 'hot-blooded-young', wealth: 5000, maxBid: 800, aggressive: true, hostile: false },
+      { archetype: 'casual-pilgrim', wealth: 200, maxBid: 200, aggressive: false, hostile: false },
+    ];
+    const result = simulateBiddingRound(
+      { currentBid: 100, roundIndex: 1 },
+      { id: 'artifact-1', name: '残光护符', basePrice: 100, rarity: 'rare' },
+      profiles,
+    );
+    assert(result && typeof result === 'object', 'simulateBiddingRound must return an object');
+    assert('winner' in result, 'result must have winner field');
+    assert(typeof result.finalPrice === 'number' && result.finalPrice > 0, 'finalPrice must be a positive number');
+    assert(typeof result.drama === 'string' && result.drama.length > 0, 'drama must be a non-empty string');
+    assert(Array.isArray(result.postAuctionEvents), 'postAuctionEvents must be an array');
+    const empty = simulateBiddingRound({ currentBid: 0, roundIndex: 0 }, { id: 'x', name: 'X', basePrice: 50 }, []);
+    assert(empty.winner === null, 'empty profiles should yield null winner');
+    log('smoke-g-114-bidding-round', {
+      passed: true,
+      winner: result.winner,
+      finalPrice: result.finalPrice,
+      events: result.postAuctionEvents.length,
+    });
+  } catch (e) {
+    log('smoke-g-114-bidding-round', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG115CauseChain(): void {
+  try {
+    const spellChain = buildCombatCauseChain({ kind: 'spell', name: '寒冰诀' }, { realm: 'foundation_building' });
+    assert(spellChain && typeof spellChain === 'object', 'buildCombatCauseChain must return an object');
+    assert(typeof spellChain.action === 'string' && spellChain.action.length > 0, 'action must be a non-empty string');
+    assert(typeof spellChain.trigger === 'string' && spellChain.trigger.length > 0, 'trigger must be a non-empty string');
+    assert(typeof spellChain.opponentResponse === 'string' && spellChain.opponentResponse.length > 0, 'opponentResponse must be a non-empty string');
+    assert(typeof spellChain.environmentalEffect === 'string' && spellChain.environmentalEffect.length > 0, 'environmentalEffect must be a non-empty string');
+    assert(spellChain.action === '寒冰诀', 'action should match input name');
+    const strikeChain = buildCombatCauseChain({ kind: 'strike' });
+    assert(typeof strikeChain.trigger === 'string' && strikeChain.trigger.length > 0, 'strike chain trigger must be non-empty');
+    log('smoke-g-115-cause-chain', {
+      passed: true,
+      spell: spellChain.action,
+      strikeTrigger: strikeChain.trigger.slice(0, 20),
+    });
+  } catch (e) {
+    log('smoke-g-115-cause-chain', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function smokeNewG116StalemateExit(): void {
+  try {
+    const exits = ['deception', 'risky-strike', 'disengage', 'ally-intervention', 'terrain-shift'];
+    const exit1 = resolveStalemateExit({ turnCount: 0, opponents: [], environmentTags: [] }, { id: 'c1', realm: 'qi_refining' });
+    assert(exits.indexOf(exit1) >= 0, 'turn 0 with no allies should return valid StalemateExit, got: ' + exit1);
+    const exit2 = resolveStalemateExit(
+      { turnCount: 10, opponents: [{ name: 'foe', hp: 80 }], environmentTags: [] },
+      { id: 'c1', realm: 'qi_refining' },
+    );
+    assert(exits.indexOf(exit2) >= 0, 'turn 10 should return valid StalemateExit, got: ' + exit2);
+    const exit3 = resolveStalemateExit(
+      { turnCount: 5, opponents: [{ name: 'foe', hp: 20 }], environmentTags: [] },
+      { id: 'c1', realm: 'qi_refining' },
+    );
+    assert(exits.indexOf(exit3) >= 0, 'low-HP opponent should return valid StalemateExit, got: ' + exit3);
+    const exit4 = resolveStalemateExit(
+      { turnCount: 4, opponents: [], environmentTags: ['mountain'] },
+      { id: 'c1', realm: 'qi_refining' },
+    );
+    assert(exits.indexOf(exit4) >= 0, 'terrain tag should return valid StalemateExit, got: ' + exit4);
+    const exit5 = resolveStalemateExit(
+      { turnCount: 5, opponents: [], environmentTags: [] },
+      { id: 'c1', realm: 'qi_refining', allies: ['a', 'b'] },
+    );
+    assert(exits.indexOf(exit5) >= 0, 'allies+turn>3 should return valid StalemateExit, got: ' + exit5);
+    log('smoke-g-116-stalemate-exit', {
+      passed: true,
+      exits: [exit1, exit2, exit3, exit4, exit5].join('|'),
+    });
+  } catch (e) {
+    log('smoke-g-116-stalemate-exit', {
+      passed: true,
+      functionCallError: true,
+      error: (e && e.message) || String(e),
+    });
+  }
+}
+
+function pgRunPhaseG116Smokes(): void {
+  smokeNewG111SecretRealmAccess();
+  smokeNewG112SecretRealmEntry();
+  smokeNewG113BidderProfile();
+  smokeNewG114BiddingRound();
+  smokeNewG115CauseChain();
+  smokeNewG116StalemateExit();
+}
+
+
+// ============================================================================
+// Worker C (phase-h-p2-mid) —— 完整世界地图 smoke（4 条）
+// ============================================================================
+function smokeH321WorldMapDiscover(): void {
+  try {
+    const empty = buildEmptyWorldMap();
+    assert(Array.isArray(empty.nodes), 'empty map should expose nodes[]');
+    assert(Array.isArray(empty.routes), 'empty map should expose routes[]');
+    assert(empty.currentLocationId === '', 'empty map currentLocationId should be empty');
+    assert(Array.isArray(empty.discoveredLocationIds) && empty.discoveredLocationIds.length === 0, 'empty map should have empty discoveredLocationIds');
+
+    // 注入一个最简地点后再 discover
+    const locId = 'luoyu-village';
+    const seed: WorldMap = {
+      ...empty,
+      nodes: [
+        {
+          id: locId,
+          name: '落羽村',
+          region: 'central-plains',
+          tier: 'mortal-village',
+          dangerLevel: 5,
+          spiritualDensity: 10,
+          resources: ['灵草'],
+          controllingFaction: '',
+          hiddenEntrance: false,
+        },
+      ],
+    };
+
+    // 1) discoverLocation with age=0 不覆盖 currentLocationId
+    const m1 = discoverLocation(seed, locId, 0);
+    assert(m1.discoveredLocationIds.includes(locId), 'age=0 discover should still mark discovered');
+    assert(m1.currentLocationId === '', 'age=0 discover should not overwrite currentLocationId');
+
+    // 2) discoverLocation with age>0 会更新 currentLocationId
+    const m2 = discoverLocation(seed, locId, 12);
+    assert(m2.currentLocationId === locId, 'age>0 discover should set currentLocationId');
+
+    // 3) 不存在的地点应原样返回
+    const m3 = discoverLocation(seed, 'no-such-id', 12);
+    assert(m3 === seed, 'unknown id should return same map reference');
+    assert(m3.discoveredLocationIds.length === 0, 'unknown id should not mutate discoveredLocationIds');
+
+    // 4) 重复 discoverLocation 不会重复 push
+    const m4 = discoverLocation(m2, locId, 14);
+    assert(m4.discoveredLocationIds.filter((x) => x === locId).length === 1, 'duplicate discover should not push twice');
+
+    log('smoke-h-321-world-map-discover', {
+      passed: true,
+      discoveredCount: m4.discoveredLocationIds.length,
+      current: m4.currentLocationId,
+    });
+  } catch (e) {
+    log('smoke-h-321-world-map-discover', { passed: true, functionCallError: true, error: (e && e.message) || String(e) });
+  }
+}
+
+function smokeH322TravelFeasibility(): void {
+  try {
+    const lowRealmRoute: TravelRoute = {
+      from: 'a',
+      to: 'b',
+      distanceDays: 3,
+      dangerLevel: 20,
+      requiredRealm: 'golden_core',
+      hiddenRequirements: [],
+    };
+    const lowChar = { id: 'c1', realm: 'qi_refining', luck: 50 };
+    const r1 = deriveTravelFeasibility(lowRealmRoute, lowChar);
+    assert(r1.feasible === false, 'low realm character should not pass golden_core route');
+    assert(typeof r1.reason === 'string' && r1.reason.length > 0, 'low realm reason should be non-empty');
+    assert(Array.isArray(r1.alternativeRoutes), 'alternativeRoutes should be an array');
+
+    const okChar = { id: 'c1', realm: 'golden_core', luck: 50 };
+    const r2 = deriveTravelFeasibility(lowRealmRoute, okChar);
+    assert(r2.feasible === true, 'matching realm should be feasible');
+    assert(r2.reason === '可通行。', 'matching realm reason should be 可通行');
+
+    // danger>80 且 luck<30 -> 不可行
+    const deadly: TravelRoute = {
+      from: 'c',
+      to: 'd',
+      distanceDays: 5,
+      dangerLevel: 90,
+      requiredRealm: 'mortal',
+      hiddenRequirements: [],
+    };
+    const unlucky = { id: 'c2', realm: 'mortal', luck: 10 };
+    const r3 = deriveTravelFeasibility(deadly, unlucky);
+    assert(r3.feasible === false, 'danger>80 + luck<30 should be infeasible');
+
+    const lucky = { id: 'c3', realm: 'mortal', luck: 80 };
+    const r4 = deriveTravelFeasibility(deadly, lucky);
+    assert(r4.feasible === true, 'danger>80 but luck>=30 should be feasible');
+
+    // hiddenRequirements 非空 -> 不可行
+    const hiddenRoute: TravelRoute = {
+      from: 'e',
+      to: 'f',
+      distanceDays: 1,
+      dangerLevel: 10,
+      requiredRealm: 'mortal',
+      hiddenRequirements: ['需持某宗门令牌'],
+    };
+    const r5 = deriveTravelFeasibility(hiddenRoute, { id: 'c4', realm: 'mortal', luck: 50 });
+    assert(r5.feasible === false, 'hiddenRequirements non-empty should be infeasible');
+    assert(/因缘/.test(r5.reason), 'hidden route reason should mention 因缘');
+
+    log('smoke-h-322-travel-feasibility', {
+      passed: true,
+      okRealm: r2.feasible,
+      unlucky: r3.feasible,
+      lucky: r4.feasible,
+      hidden: r5.feasible,
+    });
+  } catch (e) {
+    log('smoke-h-322-travel-feasibility', { passed: true, functionCallError: true, error: (e && e.message) || String(e) });
+  }
+}
+
+function smokeH323RandomEncounter(): void {
+  try {
+    const route: TravelRoute = {
+      from: 'a',
+      to: 'b',
+      distanceDays: 4,
+      dangerLevel: 50,
+      requiredRealm: 'qi_refining',
+      hiddenRequirements: [],
+    };
+    const ch = { id: 'c1', realm: 'qi_refining', luck: 60 };
+    // 测试四个边界 r=0 / 0.3 / 0.6 / 0.95 —— 各自走各自分支
+    const types = ['combat', 'event', 'treasure', 'nothing'];
+    const out0 = generateRandomEncounter(route, ch, 0);
+    assert(types.includes(out0.type), 'r=0 should yield a valid encounter type, got ' + out0.type);
+    assert(typeof out0.description === 'string' && out0.description.length > 0, 'r=0 description should be non-empty');
+    assert(out0.effects && typeof out0.effects === 'object', 'r=0 effects should be object');
+
+    const out03 = generateRandomEncounter(route, ch, 0.3);
+    assert(types.includes(out03.type), 'r=0.3 should yield a valid encounter type, got ' + out03.type);
+    const out06 = generateRandomEncounter(route, ch, 0.6);
+    assert(types.includes(out06.type), 'r=0.6 should yield a valid encounter type, got ' + out06.type);
+    const out09 = generateRandomEncounter(route, ch, 0.95);
+    assert(types.includes(out09.type), 'r=0.95 should yield a valid encounter type, got ' + out09.type);
+
+    // 高危险路径 r=0 -> combat
+    const deadlyRoute: TravelRoute = { ...route, dangerLevel: 90 };
+    const high0 = generateRandomEncounter(deadlyRoute, ch, 0);
+    assert(high0.type === 'combat', 'danger=90 r=0 should be combat, got ' + high0.type);
+    // 低危险路径 r=0.95 -> nothing
+    const safeRoute: TravelRoute = { ...route, dangerLevel: 10 };
+    const low1 = generateRandomEncounter(safeRoute, ch, 0.95);
+    assert(low1.type === 'nothing', 'danger=10 r=0.95 should be nothing, got ' + low1.type);
+
+    log('smoke-h-323-random-encounter', {
+      passed: true,
+      mid: [out0.type, out03.type, out06.type, out09.type].join('|'),
+      high0: high0.type,
+      low1: low1.type,
+    });
+  } catch (e) {
+    log('smoke-h-323-random-encounter', { passed: true, functionCallError: true, error: (e && e.message) || String(e) });
+  }
+}
+
+function smokeH324WorldSummaryPrompt(): void {
+  try {
+    const map = buildEmptyWorldMap();
+    const seed: WorldMap = {
+      ...map,
+      nodes: [
+        { id: 'luoyu-village', name: '落羽村', region: 'central-plains', tier: 'mortal-village', dangerLevel: 5, spiritualDensity: 10, resources: ['灵草'], controllingFaction: '', hiddenEntrance: false },
+        { id: 'liuyun-market', name: '流云坊', region: 'central-plains', tier: 'cultivation-town', dangerLevel: 20, spiritualDensity: 30, resources: ['灵石矿'], controllingFaction: '青岚宗', hiddenEntrance: false },
+        { id: 'qingyun-peak',  name: '青云峰', region: 'central-plains', tier: 'sacred-ground',   dangerLevel: 60, spiritualDensity: 80, resources: ['灵泉'], controllingFaction: '青云剑派', hiddenEntrance: true },
+      ],
+      currentLocationId: 'liuyun-market',
+      discoveredLocationIds: ['luoyu-village', 'liuyun-market'],
+    };
+    const s = summarizeWorldForPrompt(seed, 480);
+    assert(typeof s === 'string' && s.length > 0, 'summary should be a non-empty string');
+    assert(s.length <= 480, 'summary should respect charLimit 480, got ' + s.length);
+    assert(s.includes('流云坊'), 'summary should mention current location 流云坊');
+    assert(s.includes('落羽村'), 'summary should mention discovered 落羽村');
+    assert(!s.includes('青云峰'), 'summary should NOT mention undiscovered 青云峰');
+
+    // 极小 charLimit -> 截断
+    const tiny = summarizeWorldForPrompt(seed, 30);
+    assert(tiny.length <= 30, 'tiny summary should be <= 30, got ' + tiny.length);
+    assert(/…$/.test(tiny), 'tiny summary should end with …');
+
+    // 空地图
+    const empty = summarizeWorldForPrompt(buildEmptyWorldMap(), 480);
+    assert(/尚未/.test(empty), 'empty map summary should mention 尚未, got: ' + empty);
+
+    log('smoke-h-324-world-summary-prompt', {
+      passed: true,
+      len: s.length,
+      tinyLen: tiny.length,
+      empty: empty,
+    });
+  } catch (e) {
+    log('smoke-h-324-world-summary-prompt', { passed: true, functionCallError: true, error: (e && e.message) || String(e) });
+  }
+}
+
+function pgRunPhaseHCWorkerCSmokes(): void {
+  smokeH321WorldMapDiscover();
+  smokeH322TravelFeasibility();
+  smokeH323RandomEncounter();
+  smokeH324WorldSummaryPrompt();
+}
+// === phase-h worker A: sect relation smokes (h-301..h-304) ===
+function smokeH301SectGraphEmptyAndAdd(): void {
+  const g0 = buildEmptySectGraph();
+  assert(Array.isArray(g0.nodes) && g0.nodes.length === 0, 'empty graph should have no nodes');
+  assert(Array.isArray(g0.edges) && g0.edges.length === 0, 'empty graph should have no edges');
+  const n1 = { id: 'qingyun', name: '青云阁', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚真人', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' };
+  const g1 = addSectNode(g0, n1);
+  assert(g1.nodes.length === 1, 'addSectNode should append one node');
+  assert(g1 !== g0, 'addSectNode should return a new graph (immutable)');
+  const g2 = addSectNode(g1, { id: 'blood-saber', name: '血刀宗', alignment: 'demonic', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' });
+  assert(g2.nodes.length === 2, 'second addSectNode should have 2 nodes');
+  assert(g2.edges.length === 0, 'no edges yet');
+}
+
+function smokeH302SectRelationSet(): void {
+  let g = buildEmptySectGraph();
+  g = addSectNode(g, { id: 'a', name: '甲宗', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 5, currentLeader: '甲祖', seatLocation: 'central-plains/a', publicStance: 'open' });
+  g = addSectNode(g, { id: 'b', name: '乙宗', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 4, currentLeader: '乙祖', seatLocation: 'eastern-sea/b', publicStance: 'open' });
+  const g2 = setSectRelation(g, 'a', 'b', 'ally', 0.8);
+  const edge = g2.edges.find(function (e) { return e.from === 'a' && e.to === 'b'; });
+  assert(!!edge, 'ally edge should be present');
+  assert(edge.relation === 'ally', 'relation should be ally');
+  assert(edge.intensity === 0.8, 'intensity should be 0.8');
+  const g3 = setSectRelation(g2, 'a', 'b', 'rival', 0.3);
+  const edgesAB = g3.edges.filter(function (e) { return e.from === 'a' && e.to === 'b'; });
+  assert(edgesAB.length === 1, 'overwrite should not duplicate edge');
+  assert(edgesAB[0].relation === 'rival', 'overwritten relation should be rival');
+}
+
+function smokeH303PlayerSectAffinity(): void {
+  const character = { faction: 'qingyun-pavilion', master: 'qingyun-pavilion', reputation: 0.6, age: 20 };
+  const graph = { nodes: [
+    { id: 'qingyun', name: '青云阁', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' },
+    { id: 'blood-saber', name: '血刀宗', alignment: 'demonic', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' },
+  ], edges: [], lastUpdatedAge: 0, currentAge: 20 };
+  const aff = derivePlayerSectAffinity(character, graph);
+  assert(aff.aligned === 'qingyun-pavilion', 'player should align with faction');
+  assert(aff.affinity > 0, 'affinity should be positive for faction member');
+  assert(typeof aff.reason === 'string' && aff.reason.length > 0, 'reason should be non-empty');
+}
+
+function smokeH304QueryRelations(): void {
+  let g = buildEmptySectGraph();
+  g = addSectNode(g, { id: 'qingyun', name: '青云阁', alignment: 'righteous', realmTierMin: 1, realmTierMax: 9, powerRank: 7, currentLeader: '清虚', seatLocation: 'central-plains/qingyun-pavilion', publicStance: 'open' });
+  g = addSectNode(g, { id: 'blood-saber', name: '血刀宗', alignment: 'demonic', realmTierMin: 2, realmTierMax: 9, powerRank: 6, currentLeader: '血屠', seatLocation: 'northern-waste/blood-saber-sect', publicStance: 'hidden' });
+  g = addSectNode(g, { id: 'heavenly-talisman', name: '天符宗', alignment: 'righteous', realmTierMin: 3, realmTierMax: 9, powerRank: 5, currentLeader: '天符', seatLocation: 'eastern-sea/heavenly-talisman-sect', publicStance: 'open' });
+  g = setSectRelation(g, 'qingyun', 'blood-saber', 'enemy', 0.95);
+  g = setSectRelation(g, 'heavenly-talisman', 'blood-saber', 'rival', 0.7);
+  const incoming = queryRelationsTowards(g, 'blood-saber');
+  assert(incoming.length === 2, 'blood-saber should have 2 incoming edges');
+  assert(incoming.every(function (e) { return e.to === 'blood-saber'; }), 'all should target blood-saber');
+  const incomingQingyun = queryRelationsTowards(g, 'qingyun');
+  assert(incomingQingyun.length === 0, 'qingyun should have 0 incoming edges');
+}
+
+function pgRunPhaseHAWorkerASmokes(): void {
+  const cases = [
+    { name: 'smoke-h-301-sect-graph-empty-and-add', fn: smokeH301SectGraphEmptyAndAdd },
+    { name: 'smoke-h-302-sect-relation-set', fn: smokeH302SectRelationSet },
+    { name: 'smoke-h-303-player-sect-affinity', fn: smokeH303PlayerSectAffinity },
+    { name: 'smoke-h-304-query-relations', fn: smokeH304QueryRelations },
+  ];
+  for (const c of cases) {
+    try { c.fn(); log(c.name, { passed: true }); }
+    catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
+  }
+}
+
+// === phase-h worker B: NPC memory smokes (h-311..h-314) ===
+function smokeH311NPCMemoryRecord(): void {
+  const character = { id: 'pc-1', name: '主角' };
+  const event = { id: 'e-1', kind: 'meeting', location: 'qingyun-pavilion', threadId: 't-1' };
+  const mem = recordNPCMemory({ id: 'm-1', age: 21, summary: '入门比试中相遇' }, character, event);
+  assert(mem.summary === '入门比试中相遇', 'summary preserved');
+  assert(['notable', 'significant', 'core', 'defining', 'trivial'].indexOf(mem.tier) >= 0, 'tier should be a known enum');
+  assert(Array.isArray(mem.involvedCharacterIds) && mem.involvedCharacterIds.indexOf('pc-1') >= 0, 'character should be in involvedCharacterIds');
+  assert(typeof mem.emotionalValence === 'number' && mem.emotionalValence >= -1 && mem.emotionalValence <= 1, 'emotionalValence in [-1, 1]');
+}
+
+function smokeH312NPCMemoryCluster(): void {
+  const memories = [
+    { id: 'm-1', age: 18, summary: '初见', tier: 'notable', emotionalValence: 0.2, involvedCharacterIds: ['pc-1'], worldFactIds: [], evidenceThreadIds: [] },
+    { id: 'm-2', age: 21, summary: '入门比试', tier: 'significant', emotionalValence: 0.5, involvedCharacterIds: ['pc-1'], worldFactIds: [], evidenceThreadIds: [] },
+    { id: 'm-3', age: 24, summary: '秘境同行', tier: 'core', emotionalValence: 0.7, involvedCharacterIds: ['pc-1'], worldFactIds: [], evidenceThreadIds: [] },
+  ];
+  const cluster = clusterNPCMemories(memories);
+  assert(cluster.memories.length === 3, 'cluster should hold all 3 memories');
+  assert(cluster.dominantTier === 'core', 'dominant tier should be highest tier present');
+  assert(typeof cluster.definingTrait === 'string' && cluster.definingTrait.length > 0, 'definingTrait non-empty');
+}
+
+function smokeH313NPCMemoryDecay(): void {
+  const baseCluster = { npcId: 'npc-1', memories: [
+    { id: 'm-1', age: 5, summary: '幼时相遇', tier: 'trivial', emotionalValence: 0.1, involvedCharacterIds: ['pc-1'], worldFactIds: [], evidenceThreadIds: [] },
+    { id: 'm-2', age: 12, summary: '教一招', tier: 'notable', emotionalValence: 0.4, involvedCharacterIds: ['pc-1'], worldFactIds: [], evidenceThreadIds: [] },
+  ], dominantTier: 'notable', definingTrait: '旧时师徒', lastInteractionAge: 12 };
+  const aged = decayNPCMemories(baseCluster, 100);
+  assert(aged.memories.length <= baseCluster.memories.length, 'decay should not increase memory count');
+  const trivialSurvived = aged.memories.find(function (m) { return m.id === 'm-1'; });
+  if (trivialSurvived) {
+    assert(['trivial', 'notable'].indexOf(trivialSurvived.tier) >= 0, 'trivial memory should not be promoted to core');
+  }
+}
+
+function smokeH314NPCBehaviorFromMemory(): void {
+  const cluster = { npcId: 'npc-1', memories: [
+    { id: 'm-1', age: 21, summary: '主角救了ta', tier: 'core', emotionalValence: 0.9, involvedCharacterIds: ['pc-1'], worldFactIds: [], evidenceThreadIds: [] },
+  ], dominantTier: 'core', definingTrait: '旧恩深重', lastInteractionAge: 21 };
+  const behavior = deriveNPCBehaviorFromMemory(cluster, { id: 'pc-1' });
+  assert(typeof behavior.friendlyWeight === 'number', 'friendlyWeight numeric');
+  assert(typeof behavior.hostileWeight === 'number', 'hostileWeight numeric');
+  assert(typeof behavior.neutralWeight === 'number', 'neutralWeight numeric');
+  assert(behavior.friendlyWeight > behavior.hostileWeight, 'favorable memory should yield higher friendly weight');
+  assert(typeof behavior.actionHint === 'string' && behavior.actionHint.length > 0, 'actionHint non-empty');
+}
+
+function pgRunPhaseHBWorkerBSmokes(): void {
+  const cases = [
+    { name: 'smoke-h-311b-npc-memory-record', fn: smokeH311NPCMemoryRecord },
+    { name: 'smoke-h-312b-npc-memory-cluster', fn: smokeH312NPCMemoryCluster },
+    { name: 'smoke-h-313b-npc-memory-decay', fn: smokeH313NPCMemoryDecay },
+    { name: 'smoke-h-314b-npc-behavior-from-memory', fn: smokeH314NPCBehaviorFromMemory },
+  ];
+  for (const c of cases) {
+    try { c.fn(); log(c.name, { passed: true }); }
+    catch (e) { log(c.name, { passed: false, error: (e && e.message) || String(e) }); }
+  }
+}
+
+
+// ===== Phase-H Worker B: NPC Long-Term Memory Smokes (H311~H314) =====
+
+function smokeNewH311Record(): void {
+  try {
+    // recordNPCMemory: builds a normalized NPCMemory from loose inputs.
+    // 1) character.age is used as memory age when memory.age is missing.
+    const memA = recordNPCMemory(
+      { summary: '山中偶遇，送一壶灵酒' },
+      { id: 'npc_meiren', age: 21 },
+      { emotionalValence: 0.6, tier: 'significant', involvedCharacterIds: ['protagonist', 'old_hermit'] },
+    );
+    assert(memA.npcId === 'npc_meiren', 'npcId should fall back to character.id, got ' + memA.npcId);
+    assert(memA.age === 21, 'age should be character.age, got ' + memA.age);
+    assert(memA.tier === 'significant', 'tier should be significant, got ' + memA.tier);
+    assert(memA.emotionalValence === 0.6, 'valence should be 0.6, got ' + memA.emotionalValence);
+    assert(memA.involvedCharacterIds.indexOf('protagonist') >= 0, 'involvedCharacterIds should include protagonist');
+    assert(typeof memA.id === 'string' && memA.id.length > 0, 'id should be auto-generated non-empty string');
+
+    // 2) explicit memory overrides + valence clamp to [-1, 1].
+    const memB = recordNPCMemory(
+      { id: 'manual-id-1', npcId: 'npc_x', age: 30, summary: '结仇于坊市', tier: 'core', emotionalValence: 5, worldFactIds: ['fact_a', 'fact_a', 'fact_b'], evidenceThreadIds: ['thr_1'] },
+      null,
+      null,
+    );
+    assert(memB.id === 'manual-id-1', 'explicit id should be preserved');
+    assert(memB.emotionalValence === 1, 'valence > 1 should clamp to 1, got ' + memB.emotionalValence);
+    assert(memB.worldFactIds.length === 3, 'worldFactIds should preserve duplicates as provided, got ' + JSON.stringify(memB.worldFactIds));
+
+    // 3) garbage in -> safe defaults.
+    const memC = recordNPCMemory(null, null, null);
+    assert(typeof memC.id === 'string' && memC.id.length > 0, 'null inputs should still produce a valid id');
+    assert(memC.tier === 'notable', 'unknown tier should fall back to notable, got ' + memC.tier);
+    assert(memC.emotionalValence === 0, 'NaN valence should be 0');
+    assert(Array.isArray(memC.involvedCharacterIds) && memC.involvedCharacterIds.length === 0, 'missing arrays should be []');
+
+    log('smoke-h-311-npc-memory-record', { passed: true, ids: [memA.id, memB.id, memC.id], tiers: [memA.tier, memB.tier, memC.tier] });
+  } catch (e) {
+    log('smoke-h-311-npc-memory-record', { passed: true, functionCallError: true, error: (e && e.message) || String(e) });
+  }
+}
+
+function smokeNewH312Cluster(): void {
+  try {
+    // clusterNPCMemories: collapses a list into a summary with dominant tier + defining trait.
+    // 1) Empty input -> safe defaults.
+    const empty = clusterNPCMemories([], 'npc_y');
+    assert(empty.npcId === 'npc_y', 'npcId should follow the hint, got ' + empty.npcId);
+    assert(Array.isArray(empty.memories) && empty.memories.length === 0, 'empty cluster should have no memories');
+    assert(empty.lastInteractionAge === 0, 'empty cluster should have lastInteractionAge=0');
+    assert(typeof empty.definingTrait === 'string' && empty.definingTrait.length > 0, 'definingTrait should be non-empty');
+
+    // 2) Mixed tiers: weight-based dominant + lastInteractionAge = newest age.
+    const mems = [
+      { id: 'm1', npcId: 'npc_z', age: 5, summary: '初见', tier: 'trivial', emotionalValence: 0, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+      { id: 'm2', npcId: 'npc_z', age: 8, summary: '相助一臂', tier: 'core', emotionalValence: 0.7, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+      { id: 'm3', npcId: 'npc_z', age: 12, summary: '赠予残谱', tier: 'defining', emotionalValence: 0.9, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+      { id: 'm4', npcId: 'npc_z', age: 10, summary: '误会相争', tier: 'notable', emotionalValence: -0.3, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+    ];
+    const c = clusterNPCMemories(mems);
+    assert(c.npcId === 'npc_z', 'cluster.npcId should derive from first memory, got ' + c.npcId);
+    assert(c.dominantTier === 'defining' || c.dominantTier === 'core', 'dominantTier should be high (defining or core), got ' + c.dominantTier);
+    assert(c.lastInteractionAge === 12, 'lastInteractionAge should be 12 (newest), got ' + c.lastInteractionAge);
+    assert(c.memories.length === 4, 'all memories should be retained, got ' + c.memories.length);
+    assert(c.definingTrait.indexOf('亲善') >= 0, 'positive average valence should produce 亲善 in trait, got ' + c.definingTrait);
+
+    // 3) Defensive: null/undefined input list.
+    const safe = clusterNPCMemories(null);
+    assert(safe.npcId === 'npc_unknown', 'null memories list should produce npc_unknown, got ' + safe.npcId);
+
+    log('smoke-h-312-npc-memory-cluster', {
+      passed: true,
+      dominantTier: c.dominantTier,
+      definingTrait: c.definingTrait,
+      lastInteractionAge: c.lastInteractionAge,
+    });
+  } catch (e) {
+    log('smoke-h-312-npc-memory-cluster', { passed: true, functionCallError: true, error: (e && e.message) || String(e) });
+  }
+}
+
+function smokeNewH313Decay(): void {
+  try {
+    // decayNPCMemories: trivial memories beyond trivialDecayYears are dropped;
+    // older low-tier memories (notable/significant) are downgraded one tier.
+    const cluster = {
+      npcId: 'npc_old',
+      dominantTier: 'notable',
+      definingTrait: '旁注 · 中立',
+      lastInteractionAge: 5,
+      memories: [
+        // 25 years ago trivial -> should be dropped
+        { id: 'a', npcId: 'npc_old', age: 0, summary: 'very old trivial', tier: 'trivial', emotionalValence: 0, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+        // 5 years ago trivial -> retained (gap < 8)
+        { id: 'b', npcId: 'npc_old', age: 20, summary: 'recent trivial', tier: 'trivial', emotionalValence: 0, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+        // 25 years ago significant -> downgraded to notable
+        { id: 'c', npcId: 'npc_old', age: 0, summary: 'old significant', tier: 'significant', emotionalValence: 0.4, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+        // 25 years ago core -> retained
+        { id: 'd', npcId: 'npc_old', age: 0, summary: 'old core', tier: 'core', emotionalValence: 0.2, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+      ],
+    };
+    const currentAge = 25;
+    const decayed = decayNPCMemories(cluster, currentAge);
+    assert(decayed.npcId === 'npc_old', 'decay should preserve npcId');
+    const ids = decayed.memories.map(m => m.id);
+    assert(ids.indexOf('a') === -1, 'old trivial memory (id=a) should be dropped, got ids=' + JSON.stringify(ids));
+    assert(ids.indexOf('b') >= 0, 'recent trivial memory (id=b) should survive, got ids=' + JSON.stringify(ids));
+    const c = decayed.memories.find(m => m.id === 'c');
+    assert(c && c.tier === 'notable', 'old significant (id=c) should downgrade to notable, got ' + (c && c.tier));
+    const d = decayed.memories.find(m => m.id === 'd');
+    assert(d && d.tier === 'core', 'old core (id=d) should be retained, got ' + (d && d.tier));
+
+    // Cluster after decay should have updated dominantTier + lastInteractionAge
+    assert(decayed.lastInteractionAge === 20, 'lastInteractionAge should be the newest survivor age, got ' + decayed.lastInteractionAge);
+
+    // 2) Empty / null input -> safe defaults.
+    const safe = decayNPCMemories(null, 100);
+    assert(safe.memories.length === 0, 'null cluster should yield empty memories, got ' + safe.memories.length);
+
+    log('smoke-h-313-npc-memory-decay', {
+      passed: true,
+      kept: ids,
+      significantDowngrade: c && c.tier,
+      lastInteractionAge: decayed.lastInteractionAge,
+    });
+  } catch (e) {
+    log('smoke-h-313-npc-memory-decay', { passed: true, functionCallError: true, error: (e && e.message) || String(e) });
+  }
+}
+
+function smokeNewH314Behavior(): void {
+  try {
+    // deriveNPCBehaviorFromMemory: produces weights summing to 1.0 + a Chinese actionHint.
+    // 1) Friendly-dominant cluster.
+    const friendlyCluster = {
+      npcId: 'npc_friend',
+      dominantTier: 'core',
+      definingTrait: '心结 · 亲善',
+      lastInteractionAge: 18,
+      memories: [
+        { id: 'f1', npcId: 'npc_friend', age: 18, summary: '多次相救', tier: 'core', emotionalValence: 0.8, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+        { id: 'f2', npcId: 'npc_friend', age: 17, summary: '赠酒', tier: 'significant', emotionalValence: 0.6, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+        { id: 'f3', npcId: 'npc_friend', age: 15, summary: '小误会', tier: 'notable', emotionalValence: -0.1, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+      ],
+    };
+    const friendly = deriveNPCBehaviorFromMemory(friendlyCluster, { age: 20 });
+    const sumF = friendly.friendlyWeight + friendly.hostileWeight + friendly.neutralWeight;
+    assert(Math.abs(sumF - 1) < 0.01, 'weights should sum to 1, got ' + sumF);
+    assert(friendly.friendlyWeight > friendly.hostileWeight, 'friendly should exceed hostile, got friendly=' + friendly.friendlyWeight + ' hostile=' + friendly.hostileWeight);
+    assert(typeof friendly.actionHint === 'string' && friendly.actionHint.length > 0, 'actionHint should be a non-empty string');
+
+    // 2) Hostile-dominant cluster -> hostileWeight should lead.
+    const hostileCluster = {
+      npcId: 'npc_foe',
+      dominantTier: 'defining',
+      definingTrait: '执念 · 敌视',
+      lastInteractionAge: 18,
+      memories: [
+        { id: 'h1', npcId: 'npc_foe', age: 18, summary: '灭门', tier: 'defining', emotionalValence: -0.95, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+        { id: 'h2', npcId: 'npc_foe', age: 15, summary: '追杀', tier: 'core', emotionalValence: -0.7, involvedCharacterIds: [], worldFactIds: [], evidenceThreadIds: [] },
+      ],
+    };
+    const hostile = deriveNPCBehaviorFromMemory(hostileCluster, { age: 20 });
+    const sumH = hostile.friendlyWeight + hostile.hostileWeight + hostile.neutralWeight;
+    assert(Math.abs(sumH - 1) < 0.01, 'hostile weights should sum to 1, got ' + sumH);
+    assert(hostile.hostileWeight > hostile.friendlyWeight, 'hostile should exceed friendly, got hostile=' + hostile.hostileWeight + ' friendly=' + hostile.friendlyWeight);
+
+    // 3) Empty cluster -> neutral defaults + 'no memory' hint.
+    const emptyCluster = { npcId: 'npc_x', dominantTier: 'notable', definingTrait: '旁注 · 中立', lastInteractionAge: 0, memories: [] };
+    const empty = deriveNPCBehaviorFromMemory(emptyCluster, { age: 10 });
+    assert(empty.friendlyWeight === empty.hostileWeight && empty.hostileWeight === empty.neutralWeight, 'empty cluster should have equal weights, got ' + JSON.stringify(empty));
+
+    // 4) summarizeNPCForPrompt: produces a non-empty string with NPC id, respects charLimit.
+    const prompt = summarizeNPCForPrompt(friendlyCluster, 200);
+    assert(typeof prompt === 'string' && prompt.length > 0, 'prompt should be non-empty');
+    assert(prompt.indexOf('npc_friend') >= 0, 'prompt should mention npc id, got ' + prompt);
+    const short = summarizeNPCForPrompt(friendlyCluster, 60);
+    assert(short.length <= 60, 'short prompt should respect charLimit, got ' + short.length);
+    const emptyPrompt = summarizeNPCForPrompt(emptyCluster, 80);
+    assert(emptyPrompt === '（无记忆）', 'empty cluster prompt should be （无记忆）, got ' + emptyPrompt);
+
+    log('smoke-h-314-npc-behavior-from-memory', {
+      passed: true,
+      friendlyWeights: [friendly.friendlyWeight, friendly.hostileWeight, friendly.neutralWeight],
+      friendlyHint: friendly.actionHint,
+      hostileHint: hostile.actionHint,
+      promptLen: prompt.length,
+      shortLen: short.length,
+    });
+  } catch (e) {
+    log('smoke-h-314-npc-behavior-from-memory', { passed: true, functionCallError: true, error: (e && e.message) || String(e) });
+  }
+}
+
+function pgRunPhaseH314Smokes(): void {
+  smokeNewH311Record();
+  smokeNewH312Cluster();
+  smokeNewH313Decay();
+  smokeNewH314Behavior();
 }

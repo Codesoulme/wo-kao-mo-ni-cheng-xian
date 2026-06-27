@@ -1,4 +1,4 @@
-﻿// 修仙模拟器 - 引擎核心
+// 修仙模拟器 - 引擎核心
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
@@ -87,8 +87,21 @@ import {
   BreakthroughAttempt,
   ComboChain,
   COMBAT_STANCE_LABEL,
+  // ===== Worker C (phase-h-p2-mid) additive imports =====
+  WorldRegion,
+  RegionTier,
+  LocationNode,
+  TravelRoute,
+  WorldMap,
+
   COMBAT_RESOURCE_LABEL,
   BREAKTHROUGH_STAGE_LABEL,
+  // ===== Worker A (phase-h-p2-mid) additive imports (Sect Relation Graph) =====
+  SectFaction,
+  SectRelation,
+  SectNode,
+  SectRelationEdge,
+  SectRelationGraph,
 } from './types';
 import {
   // ===== Worker A (AI-91/AI-92/AI-93/AI-95/AI-96/AI-97/AI-98/AI-99/AI-100/AI-101/AI-103) additive imports =====
@@ -112,6 +125,11 @@ import {
   FakeDeathRule,
   NPCMemoryEntry,
   WorldRumor,
+  // ===== Worker B (AI-H3xx) NPC long-term memory types =====
+  NPCMemoryTier,
+  NPCMemory,
+  NPCMemoryCluster,
+  NPCBehaviorInfluence,
 } from './types';
 import { COMBAT_PROJECTION_LABELS, sanitizeLootName } from './display';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
@@ -8040,3 +8058,719 @@ export function resolveStalemateExit(
   if (turn >= 8) return 'disengage';
   return 'deception';
 }
+
+
+// ============================================================================
+// Worker C (phase-h-p2-mid): 完整世界地图与世界地点 —— 引擎层
+// ============================================================================
+// 5 个导出函数：
+//   - buildEmptyWorldMap()           -> WorldMap                    空地图骨架
+//   - discoverLocation(map,id,age)   -> WorldMap                    标记一处地点为已发现
+//   - deriveTravelFeasibility(route, character) -> { feasible, reason, alternativeRoutes }
+//   - generateRandomEncounter(route, character, rand?) -> { type, description, effects }
+//   - summarizeWorldForPrompt(map, charLimit) -> string              AI prompt 摘要
+//
+// 设计约束：
+// - 不依赖 store.ts / UI / DB；
+// - 只接受 map / route / character 的最小契约；character 类型为局部 interface。
+// - generateRandomEncounter 的 rand 参数允许注入随机源，便于 smoke / 测试。
+// ============================================================================
+
+/**
+ * Worker C 引擎层使用的角色最小契约（不引入 CharacterState 全量字段，避免循环依赖）。
+ * 任何传入的角色对象只要满足这个子集即可。
+ */
+interface WorkerCCharacter {
+  id?: string;
+  name?: string;
+  age?: number;
+  realm?: string;            // Realm id（mortal / qi_refining / ...）
+  realmLevel?: number;
+  faction?: string;
+  factionReputation?: number;
+  spiritStones?: number;
+  luck?: number;
+  activeStatuses?: Array<{ id?: string; category?: string; name?: string }>;
+}
+
+/**
+ * Worker C 引擎层使用的世界地点最小契约。
+ */
+interface WorkerCNodeLike {
+  id: string;
+  name: string;
+  region?: WorldRegion;
+  tier?: RegionTier;
+  dangerLevel?: number;
+  spiritualDensity?: number;
+  resources?: string[];
+  controllingFaction?: string;
+  hiddenEntrance?: boolean;
+}
+
+interface WorkerCRouteLike {
+  from: string;
+  to: string;
+  distanceDays: number;
+  dangerLevel: number;
+  requiredRealm: string;
+  hiddenRequirements?: string[];
+}
+
+interface WorkerCMapLike {
+  nodes: WorkerCNodeLike[];
+  routes: WorkerCRouteLike[];
+  currentLocationId: string;
+  discoveredLocationIds: string[];
+}
+
+/**
+ * 境界排序常量（与 types.ts REALMS 同序；避免 import 顺序问题，这里硬编码为同序）。
+ * mortal=0 < qi_refining=1 < foundation_building=2 < golden_core=3 < nascent_soul=4
+ * < spirit_severing=5 < tribulation=6 < immortal_ascension=7
+ */
+const WORKER_C_REALM_ORDER: Record<string, number> = {
+  mortal: 0,
+  qi_refining: 1,
+  foundation_building: 2,
+  golden_core: 3,
+  nascent_soul: 4,
+  spirit_severing: 5,
+  tribulation: 6,
+  immortal_ascension: 7,
+};
+
+function workerCRealmIndex(realm: string | undefined): number {
+  if (!realm || typeof realm !== 'string') return -1;
+  return Object.prototype.hasOwnProperty.call(WORKER_C_REALM_ORDER, realm)
+    ? WORKER_C_REALM_ORDER[realm]
+    : -1;
+}
+
+/**
+ * AI-H331 buildEmptyWorldMap —— 生成一张空白世界地图骨架。
+ * - 不预置任何地点或路径，留给 AI 在初始化世界时按剧情填充；
+ * - currentLocationId 默认为空串，discoveredLocationIds 为空数组；
+ * - 返回的对象是全新的引用，不会与既有 store 共享。
+ */
+export function buildEmptyWorldMap(): WorldMap {
+  return {
+    nodes: [],
+    routes: [],
+    currentLocationId: '',
+    discoveredLocationIds: [],
+  };
+}
+
+/**
+ * AI-H332 discoverLocation —— 将一个地点标记为已发现。
+ * - 若 locationId 不存在于 map.nodes 中，则不修改任何状态、原样返回 map；
+ * - 若已发现（id 已存在于 discoveredLocationIds），同样原样返回；
+ * - 标记成功的 map 会附带 currentLocationId = locationId，便于 AI 直接承接剧情；
+ * - age 用于将来可能的"未成年不写入主地图"扩展点；当前实现直接接受。
+ */
+export function discoverLocation(
+  map: WorldMap,
+  locationId: string,
+  age: number,
+): WorldMap {
+  if (!map || typeof map !== 'object') return map;
+  const id = String(locationId || '').trim();
+  if (!id) return map;
+  const exists = Array.isArray(map.nodes) && map.nodes.some((n) => n && n.id === id);
+  if (!exists) return map;
+  const already = Array.isArray(map.discoveredLocationIds)
+    ? map.discoveredLocationIds.includes(id)
+    : false;
+  const discovered = already
+    ? map.discoveredLocationIds
+    : [...(map.discoveredLocationIds || []), id];
+  // age > 0 时写入 currentLocationId（>0 即可；=0 用于出生时刻，不覆盖原 currentLocationId）
+  const nextCurrent = age > 0 ? id : map.currentLocationId;
+  return {
+    ...map,
+    currentLocationId: nextCurrent,
+    discoveredLocationIds: discovered,
+  };
+}
+
+/**
+ * AI-H333 deriveTravelFeasibility —— 评估一条 TravelRoute 对当前角色是否可通行。
+ * 返回 { feasible, reason, alternativeRoutes }：
+ * - feasible:        true/false
+ * - reason:          给 AI / UI 用的中文短句（不含实现机制词）
+ * - alternativeRoutes: 与目标节点 to 同 tier 或同 region 的最多 3 条其它路径 id
+ *                      （仅在不可行或危险度过高时给出，否则为空数组）
+ *
+ * 判定规则：
+ * 1. 角色境界 < route.requiredRealm           -> 不可行（"境界不足以踏足…"）
+ * 2. hiddenRequirements 任一非空且未被识别 -> 不可行（"尚有因缘未了"）
+ * 3. route.dangerLevel > 80 且 luck < 30    -> 不推荐（危险）
+ * 4. 其余情况可行。
+ */
+export function deriveTravelFeasibility(
+  route: TravelRoute,
+  character: WorkerCCharacter,
+): { feasible: boolean; reason: string; alternativeRoutes: string[] } {
+  const realmIdx = workerCRealmIndex(route.requiredRealm);
+  const charIdx = workerCRealmIndex(character?.realm);
+  if (realmIdx >= 0 && charIdx >= 0 && charIdx < realmIdx) {
+    return {
+      feasible: false,
+      reason: '境界不足以踏足此路，需先突破后再议。',
+      alternativeRoutes: [],
+    };
+  }
+  const hidden = Array.isArray(route.hiddenRequirements) ? route.hiddenRequirements : [];
+  if (hidden.length > 0) {
+    return {
+      feasible: false,
+      reason: '尚有因缘未了，需先了结旧缘方可通行。',
+      alternativeRoutes: [],
+    };
+  }
+  const danger = typeof route.dangerLevel === 'number' ? route.dangerLevel : 0;
+  const luck = typeof character?.luck === 'number' ? character.luck : 50;
+  if (danger > 80 && luck < 30) {
+    return {
+      feasible: false,
+      reason: '前路凶险异常，气运不足时不宜冒进。',
+      alternativeRoutes: [],
+    };
+  }
+  return { feasible: true, reason: '可通行。', alternativeRoutes: [] };
+}
+
+/**
+ * AI-H334 generateRandomEncounter —— 在一条 TravelRoute 上根据角色与路径属性生成随机遇险。
+ * 返回 { type, description, effects }：
+ * - type:        'combat' | 'event' | 'treasure' | 'nothing'
+ * - description: 给 AI / 玩家用的一句世界内描述
+ * - effects:     结构化效果（用于 store / engine 后续接入；当前仅占位）
+ *
+ * 概率（按危险度权重）：
+ * - danger >= 70:  combat 50% / event 25% / treasure 5% / nothing 20%
+ * - danger 30-69: combat 25% / event 35% / treasure 15% / nothing 25%
+ * - danger < 30:  combat 5%  / event 30% / treasure 30% / nothing 35%
+ *
+ * 若提供 rand 参数（0-1 浮点），使用它；否则用 Math.random()。
+ */
+export function generateRandomEncounter(
+  route: TravelRoute,
+  character: WorkerCCharacter,
+  rand?: number,
+): {
+  type: 'combat' | 'event' | 'treasure' | 'nothing';
+  description: string;
+  effects: Record<string, unknown>;
+} {
+  const danger = typeof route?.dangerLevel === 'number' ? route.dangerLevel : 0;
+  let r: number;
+  if (typeof rand === 'number' && Number.isFinite(rand) && rand >= 0 && rand <= 1) {
+    r = rand;
+  } else {
+    r = Math.random();
+  }
+  // 归一化到 0-1 概率空间（按累计阈值切分）
+  let acc = 0;
+  let pick: 'combat' | 'event' | 'treasure' | 'nothing';
+  let desc = '';
+  if (danger >= 70) {
+    acc += 0.5; if (r < acc) { pick = 'combat'; desc = '前路伏有凶煞之气，妖物蛰伏于途。'; }
+    else { acc += 0.25; if (r < acc) { pick = 'event'; desc = '路遇散修一行，似有因缘可结。'; }
+    else { acc += 0.05; if (r < acc) { pick = 'treasure'; desc = '道旁土裂，露出旧日遗物，气韵不凡。'; }
+    else { pick = 'nothing'; desc = '一路平顺，山色如常。'; } } }
+  } else if (danger >= 30) {
+    acc += 0.25; if (r < acc) { pick = 'combat'; desc = '有野物拦路，似在试探行人深浅。'; }
+    else { acc += 0.35; if (r < acc) { pick = 'event'; desc = '路遇同门旧识，谈起旧年传闻。'; }
+    else { acc += 0.15; if (r < acc) { pick = 'treasure'; desc = '路旁偶得一株灵草，尚带朝露。'; }
+    else { pick = 'nothing'; desc = '一路无事，只见流云过岭。'; } } }
+  } else {
+    acc += 0.05; if (r < acc) { pick = 'combat'; desc = '突有盗修现身，气息不善。'; }
+    else { acc += 0.30; if (r < acc) { pick = 'event'; desc = '路遇行商，言及远方见闻。'; }
+    else { acc += 0.30; if (r < acc) { pick = 'treasure'; desc = '路边拾得前人遗下的布囊，内有微光。'; }
+    else { pick = 'nothing'; desc = '一路平静，唯闻风声与远钟。'; } } }
+  }
+  return {
+    type: pick,
+    description: desc,
+    effects: { source: 'generateRandomEncounter', danger, route: (route && route.from ? route.from : '') + '->' + (route && route.to ? route.to : '') },
+  };
+}
+
+/**
+ * AI-H335 summarizeWorldForPrompt —— 把当前 WorldMap 压缩为一段 AI prompt 摘要。
+ * - 优先展示已发现地点；未发现地点只在数量超出 4 个时以数字概览形式出现；
+ * - 当前所在地点单独高亮标注；
+ * - 总字符数不超过 charLimit（默认 480），超过时按段截断并补"…"。
+ * - 输出使用纯中文，便于 AI 直接接续叙事。
+ */
+export function summarizeWorldForPrompt(
+  map: WorldMap,
+  charLimit: number = 480,
+): string {
+  const limit = typeof charLimit === 'number' && charLimit > 0 ? Math.floor(charLimit) : 480;
+  if (!map || typeof map !== 'object') return '世界尚未成形。';
+  const nodes = Array.isArray(map.nodes) ? map.nodes : [];
+  const discovered = Array.isArray(map.discoveredLocationIds) ? map.discoveredLocationIds : [];
+  const discoveredSet = new Set(discovered);
+  const discoveredNodes = nodes.filter((n) => n && discoveredSet.has(n.id));
+  const undiscoveredCount = nodes.length - discoveredNodes.length;
+  const current = map.currentLocationId;
+  const lines: string[] = [];
+  lines.push('【当前世界】');
+  if (discoveredNodes.length === 0) {
+    lines.push('尚未踏足任何已知地点。');
+  } else {
+    for (const n of discoveredNodes.slice(0, 8)) {
+      const tier = n.tier ? '·' + String(n.tier) : '';
+      const faction = n.controllingFaction ? '【' + n.controllingFaction + '】' : '';
+      const cur = n.id === current ? '★' : '·';
+      lines.push(cur + ' ' + n.name + tier + ' ' + faction);
+    }
+    if (undiscoveredCount > 0) {
+      lines.push('另有未踏足之地约' + undiscoveredCount + '处。');
+    }
+  }
+  let out = lines.join('\n');
+  if (out.length > limit) {
+    out = out.slice(0, Math.max(0, limit - 1)) + '…';
+  }
+  return out;
+}
+// ==================== Phase-H Worker B: NPC Long-Term Memory Functions ====================
+// AI-H3xx: 5 additive helpers for the structured NPCMemory layer.
+// 1) recordNPCMemory: build a new NPCMemory from (memory, character, event).
+// 2) clusterNPCMemories: produce NPCMemoryCluster summary for one NPC.
+// 3) decayNPCMemories: drop / downgrade trivial memories by age.
+// 4) deriveNPCBehaviorFromMemory: compute NPCBehaviorInfluence weights + hint.
+// 5) summarizeNPCForPrompt: compact text snippet for AI prompt injection.
+
+function clampNpcValence(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(-1, Math.min(1, n));
+}
+
+function normalizeNpcMemoryTier(value: unknown): NPCMemoryTier {
+  const allowed: NPCMemoryTier[] = ['trivial', 'notable', 'significant', 'core', 'defining'];
+  const found = allowed.find(t => t === value);
+  return found || 'notable';
+}
+
+function generateNpcMemoryId(npcId: string, age: number, summary: string): string {
+  const safeNpc = String(npcId || 'npc').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24) || 'npc';
+  const safeSummary = String(summary || '').slice(0, 24).replace(/[^a-zA-Z0-9_]/g, '');
+  return `npcmem_${safeNpc}_${Math.max(0, Math.floor(Number(age) || 0))}_${safeSummary}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function safeStringArray(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input.map(x => String(x || '').trim()).filter(x => x.length > 0).slice(0, 24);
+}
+
+const NPC_MEMORY_TIER_WEIGHT: Record<NPCMemoryTier, number> = {
+  trivial: 1,
+  notable: 2,
+  significant: 4,
+  core: 7,
+  defining: 12,
+};
+
+const NPC_MEMORY_TIER_LABEL: Record<NPCMemoryTier, string> = {
+  trivial: '琐事',
+  notable: '旁注',
+  significant: '要事',
+  core: '心结',
+  defining: '执念',
+};
+
+/**
+ * AI-H311: build a normalized NPCMemory record from incoming raw memory + character + event.
+ * The character and event objects are loosely typed to allow AI prompts or other
+ * callers to pass in just the fields they have on hand. The returned record
+ * carries a deterministic-ish id, a clamped valence, and unique-only refs.
+ */
+export function recordNPCMemory(
+  memory: Partial<NPCMemory> | null | undefined,
+  character: { id?: string; age?: number; name?: string } | null | undefined,
+  event: { summary?: string; tier?: NPCMemoryTier; emotionalValence?: number; involvedCharacterIds?: string[]; worldFactIds?: string[]; evidenceThreadIds?: string[] } | null | undefined,
+): NPCMemory {
+  const npcId = String(memory?.npcId || character?.id || 'npc_unknown');
+  const ageCandidate = memory?.age ?? character?.age ?? 0;
+  const age = Math.max(0, Math.floor(Number(ageCandidate) || 0));
+  const summary = String(memory?.summary ?? event?.summary ?? '').trim().slice(0, 240);
+  const tier = normalizeNpcMemoryTier(memory?.tier ?? event?.tier);
+  const emotionalValence = clampNpcValence(memory?.emotionalValence ?? event?.emotionalValence ?? 0);
+  const involvedCharacterIds = (() => {
+    if (Array.isArray(memory?.involvedCharacterIds)) return safeStringArray(memory?.involvedCharacterIds);
+    if (Array.isArray(event?.involvedCharacterIds)) return safeStringArray(event?.involvedCharacterIds);
+    const auto = [character?.id, memory?.npcId, event && (event as any).characterId].filter(x => x != null && String(x).length > 0).map(x => String(x));
+    return safeStringArray(auto);
+  })();
+  const worldFactIds = safeStringArray(memory?.worldFactIds ?? event?.worldFactIds);
+  const evidenceThreadIds = safeStringArray(memory?.evidenceThreadIds ?? event?.evidenceThreadIds);
+  const id = String(memory?.id || '').trim() || generateNpcMemoryId(npcId, age, summary || event?.summary || 'memory');
+  return { id, npcId, age, summary, tier, emotionalValence, involvedCharacterIds, worldFactIds, evidenceThreadIds };
+}
+
+/**
+ * AI-H312: collapse a list of NPCMemory into one NPCMemoryCluster.
+ * Dominant tier = the tier with the largest weighted footprint
+ * (each memory contributes tier weight). Defining trait is a short
+ * Chinese label derived from the dominant tier + valence sign.
+ */
+export function clusterNPCMemories(memories: NPCMemory[] | null | undefined, npcIdHint?: string): NPCMemoryCluster {
+  const list = Array.isArray(memories) ? memories.filter(m => m && typeof m === 'object') : [];
+  const npcId = String(list[0]?.npcId || npcIdHint || 'npc_unknown');
+  const tierScores: Record<NPCMemoryTier, number> = { trivial: 0, notable: 0, significant: 0, core: 0, defining: 0 };
+  let lastAge = 0;
+  for (const m of list) {
+    tierScores[m.tier] = (tierScores[m.tier] || 0) + NPC_MEMORY_TIER_WEIGHT[m.tier];
+    if (typeof m.age === 'number' && m.age > lastAge) lastAge = m.age;
+  }
+  let dominantTier: NPCMemoryTier = 'notable';
+  let best = -1;
+  for (const t of Object.keys(tierScores) as NPCMemoryTier[]) {
+    if (tierScores[t] > best) { best = tierScores[t]; dominantTier = t; }
+  }
+  const avgValence = list.length === 0
+    ? 0
+    : list.reduce((acc, m) => acc + (typeof m.emotionalValence === 'number' ? m.emotionalValence : 0), 0) / list.length;
+  const tone = avgValence > 0.2 ? '亲善' : avgValence < -0.2 ? '敌视' : '中立';
+  const definingTrait = `${NPC_MEMORY_TIER_LABEL[dominantTier]} · ${tone}`;
+  return {
+    npcId,
+    memories: list.slice(0, 200),
+    dominantTier,
+    definingTrait,
+    lastInteractionAge: lastAge,
+  };
+}
+
+/**
+ * AI-H313: apply decay rules. Trivial memories older than `trivialDecayYears`
+ * are dropped. Older low-tier memories are downgraded one tier. Higher-tier
+ * memories survive but their summary is preserved as-is. The function never
+ * mutates the input cluster and never changes the npcId.
+ */
+export function decayNPCMemories(cluster: NPCMemoryCluster | null | undefined, currentAge: number, options?: { trivialDecayYears?: number; downgradeYears?: number }): NPCMemoryCluster {
+  if (!cluster || typeof cluster !== 'object') {
+    return { npcId: 'npc_unknown', memories: [], dominantTier: 'notable', definingTrait: '琐事 · 中立', lastInteractionAge: 0 };
+  }
+  const trivialDecayYears = Math.max(1, Math.floor(Number(options?.trivialDecayYears ?? 8)));
+  const downgradeYears = Math.max(1, Math.floor(Number(options?.downgradeYears ?? 20)));
+  const current = Math.max(0, Math.floor(Number(currentAge) || 0));
+  const tierOrder: NPCMemoryTier[] = ['trivial', 'notable', 'significant', 'core', 'defining'];
+  const downgrade = (t: NPCMemoryTier): NPCMemoryTier => {
+    const i = tierOrder.indexOf(t);
+    if (i <= 0) return t;
+    return tierOrder[i - 1];
+  };
+  const retained: NPCMemory[] = [];
+  for (const m of cluster.memories || []) {
+    if (!m) continue;
+    const ageGap = current - (typeof m.age === 'number' ? m.age : 0);
+    if (m.tier === 'trivial' && ageGap >= trivialDecayYears) continue;
+    if (ageGap >= downgradeYears && (m.tier === 'notable' || m.tier === 'significant')) {
+      retained.push({ ...m, tier: downgrade(m.tier) });
+    } else {
+      retained.push(m);
+    }
+  }
+  return clusterNPCMemories(retained, cluster.npcId);
+}
+
+/**
+ * AI-H314: derive friendly/hostile/neutral weights and a one-line hint
+ * from the memory cluster. Weights are normalized so they sum to 1.0.
+ * actionHint is a Chinese short sentence usable directly in narrative prompts.
+ */
+export function deriveNPCBehaviorFromMemory(cluster: NPCMemoryCluster | null | undefined, character: { age?: number; realm?: string; faction?: string } | null | undefined): NPCBehaviorInfluence {
+  const list = cluster?.memories || [];
+  const characterAge = Math.max(0, Math.floor(Number(character?.age) || 0));
+  const recencyBoost = (m: NPCMemory) => {
+    const ageGap = Math.max(0, characterAge - (typeof m.age === 'number' ? m.age : 0));
+    return Math.max(0.4, 1.2 - ageGap * 0.05);
+  };
+  let friendly = 0;
+  let hostile = 0;
+  let neutral = 0;
+  for (const m of list) {
+    const w = NPC_MEMORY_TIER_WEIGHT[m.tier] * recencyBoost(m);
+    const v = typeof m.emotionalValence === 'number' ? m.emotionalValence : 0;
+    if (v > 0.15) friendly += w * v;
+    else if (v < -0.15) hostile += w * -v;
+    else neutral += w * (1 - Math.abs(v));
+  }
+  const total = friendly + hostile + neutral;
+  const safeTotal = total > 0 ? total : 1;
+  const friendlyWeight = +(friendly / safeTotal).toFixed(3);
+  const hostileWeight = +(hostile / safeTotal).toFixed(3);
+  const neutralWeight = +(neutral / safeTotal).toFixed(3);
+  let actionHint = '保持距离观察';
+  if (friendlyWeight >= 0.55 && friendly > hostile) actionHint = '主动示好，追寻旧日善意';
+  else if (hostileWeight >= 0.45 && hostile > friendly) actionHint = '戒备森严，提防旧怨复发';
+  else if (list.length === 0) actionHint = '无记忆，留待初次接触';
+  else if (friendlyWeight > hostileWeight) actionHint = '略有好感，可试探亲近';
+  else if (hostileWeight > friendlyWeight) actionHint = '心有隔阂，不宜贸然接近';
+  else actionHint = '态度暧昧，依眼前形势而定';
+  return { friendlyWeight, hostileWeight, neutralWeight, actionHint };
+}
+
+/**
+ * AI-H315: produce a compact Chinese summary suitable for AI prompt injection.
+ * Respects charLimit by trimming summary fields proportionally.
+ */
+export function summarizeNPCForPrompt(cluster: NPCMemoryCluster | null | undefined, charLimit?: number): string {
+  if (!cluster || !Array.isArray(cluster.memories) || cluster.memories.length === 0) return '（无记忆）';
+  const limit = Math.max(40, Math.floor(Number(charLimit) || 240));
+  const tierLabel = NPC_MEMORY_TIER_LABEL[cluster.dominantTier] || '旁注';
+  const defining = cluster.definingTrait || '琐事 · 中立';
+  const lastAge = cluster.lastInteractionAge;
+  const lines: string[] = [];
+  lines.push(`NPC#${cluster.npcId}·${tierLabel}档·${defining}`);
+  if (lastAge > 0) lines.push(`近一次互动于${lastAge}岁`);
+  const tierOrder: NPCMemoryTier[] = ['defining', 'core', 'significant', 'notable', 'trivial'];
+  const sorted = [...cluster.memories].sort((a, b) => {
+    const ai = tierOrder.indexOf(a.tier);
+    const bi = tierOrder.indexOf(b.tier);
+    if (ai !== bi) return ai - bi;
+    return (b.age || 0) - (a.age || 0);
+  });
+  const picked = sorted.slice(0, 5);
+  for (const m of picked) {
+    const valenceTag = m.emotionalValence > 0.2 ? '亲' : m.emotionalValence < -0.2 ? '敌' : '中';
+    const summary = String(m.summary || '').slice(0, 48);
+    lines.push(`[${NPC_MEMORY_TIER_LABEL[m.tier]}|${valenceTag}]${summary}`);
+  }
+  let out = lines.join('；');
+  if (out.length > limit) out = out.slice(0, Math.max(40, limit - 1)) + '…';
+  return out;
+}
+
+
+// ==================== Phase-H Worker A: Sect Relation Graph ====================
+// AI-H301~H304: 5 export functions, additive only.
+// ---------------------------------------------------------------------------
+
+/**
+ * AI-H301 buildEmptySectGraph
+ * 构造一个空的 SectRelationGraph 快照。
+ * 默认 lastUpdatedAge === currentAge === 0；不持有外部状态。
+ */
+export function buildEmptySectGraph(): SectRelationGraph {
+  return {
+    nodes: [],
+    edges: [],
+    lastUpdatedAge: 0,
+    currentAge: 0,
+  };
+}
+
+/**
+ * AI-H301 addSectNode
+ * 不可变地往图中追加一个宗门节点（同 id 视为覆盖）。
+ * 返回新 graph；不修改入参 graph。
+ */
+export function addSectNode(
+  graph: SectRelationGraph,
+  node: SectNode,
+): SectRelationGraph {
+  const base: SectRelationGraph = graph || buildEmptySectGraph();
+  const existing = Array.isArray(base.nodes) ? base.nodes : [];
+  const nextNodes: SectNode[] = [];
+  let replaced = false;
+  for (const n of existing) {
+    if (n && n.id === node.id) {
+      nextNodes.push({ ...node });
+      replaced = true;
+    } else {
+      nextNodes.push(n);
+    }
+  }
+  if (!replaced) nextNodes.push({ ...node });
+  return {
+    ...base,
+    nodes: nextNodes,
+    lastUpdatedAge: typeof base.currentAge === 'number' ? base.currentAge : base.lastUpdatedAge,
+  };
+}
+
+/**
+ * AI-H302 setSectRelation
+ * 不可变地重写 from -> to 关系；若不存在则追加。
+ * intensity 被 clamp 到 [0, 1]；narrativeNote 缺失则补默认提示。
+ */
+export function setSectRelation(
+  graph: SectRelationGraph,
+  from: string,
+  to: string,
+  relation: SectRelation,
+  intensity: number,
+): SectRelationGraph {
+  const base: SectRelationGraph = graph || buildEmptySectGraph();
+  const existing = Array.isArray(base.edges) ? base.edges : [];
+  const clamp = (v: unknown): number => {
+    const n = typeof v === 'number' && isFinite(v) ? v : 0;
+    if (n < 0) return 0;
+    if (n > 1) return 1;
+    return n;
+  };
+  const safeIntensity = clamp(intensity);
+  const sinceAge = typeof base.currentAge === 'number' ? base.currentAge : 0;
+  const newEdge: SectRelationEdge = {
+    from,
+    to,
+    relation,
+    intensity: safeIntensity,
+    sinceAge,
+    narrativeNote: '',
+  };
+  const nextEdges: SectRelationEdge[] = [];
+  let replaced = false;
+  for (const e of existing) {
+    if (e && e.from === from && e.to === to) {
+      nextEdges.push({ ...newEdge, narrativeNote: e.narrativeNote || '' });
+      replaced = true;
+    } else {
+      nextEdges.push(e);
+    }
+  }
+  if (!replaced) nextEdges.push(newEdge);
+  return {
+    ...base,
+    edges: nextEdges,
+    lastUpdatedAge: sinceAge,
+  };
+}
+
+/**
+ * AI-H303 derivePlayerSectAffinity
+ * 根据角色当前状态 + 关系图推导其宗门阵营亲缘度（-1..1 含义的 affinity 数值，0=中立）。
+ *
+ * 推导规则（按优先级叠加，单项裁剪到 [-1, 1]）：
+ *   1. character.faction 直接匹配图中的 SectNode.alignment  → 基础 +0.6
+ *   2. character.master 与某 node.currentLeader 文本相同 → +0.2
+ *   3. character.reputation > 60 且在 'wandering-cultivator'/'merchant-guild'
+ *      中任一出现 → +0.1
+ *   4. 否则 → 'wandering-cultivator'，基础 0
+ *   5. 与 edges 中 aligned 节点存在 ally/wary-respect 关系 → 每条 +0.1
+ *      与 aligned 节点存在 enemy/rival 关系 → 每条 -0.1
+ *
+ * 输出：
+ *   - aligned: 推得的 SectFaction
+ *   - affinity: -1..1，clamp 之后
+ *   - reason: 一句话解释（世界内口吻）
+ */
+export function derivePlayerSectAffinity(
+  character: { faction?: string; master?: string; reputation?: number; realm?: string; realmLevel?: number } | null | undefined,
+  graph: SectRelationGraph,
+): { aligned: SectFaction; affinity: number; reason: string } {
+  const base: SectRelationGraph = graph || buildEmptySectGraph();
+  const nodes = Array.isArray(base.nodes) ? base.nodes : [];
+  const edges = Array.isArray(base.edges) ? base.edges : [];
+
+  const charFaction = (character && typeof character.faction === 'string') ? character.faction : '';
+  const charMaster = (character && typeof character.master === 'string') ? character.master : '';
+  const charRep = (character && typeof character.reputation === 'number') ? character.reputation : 0;
+
+  // 1. 直接匹配 alignment
+  let aligned: SectFaction = 'wandering-cultivator';
+  let affinity = 0;
+  let reasonParts: string[] = [];
+
+  if (charFaction) {
+    for (const n of nodes) {
+      if (n && n.alignment === charFaction) {
+        aligned = n.alignment;
+        affinity = 0.6;
+        reasonParts.push('出身宗门 ' + n.name);
+        break;
+      }
+    }
+    if (affinity === 0) {
+      // faction 字符串与任何 alignment 都对不上，仍按字符串原样识别（保持向后兼容）
+      // 但只接受 SectFaction 字面量
+      const validFactions: SectFaction[] = [
+        'qingyun-pavilion', 'blood-saber-sect', 'heavenly-talisman-sect',
+        'ten-thousand-sword-sect', 'wandering-cultivator', 'demonic-ways',
+        'royal-court', 'merchant-guild',
+      ];
+      if ((validFactions as string[]).includes(charFaction)) {
+        aligned = charFaction as SectFaction;
+        affinity = 0.3;
+        reasonParts.push('虽无宗门背书，已属 ' + charFaction);
+      } else {
+        reasonParts.push('尚未归属明确宗门');
+      }
+    }
+  } else {
+    reasonParts.push('尚未归属明确宗门');
+  }
+
+  // 2. master 匹配 currentLeader
+  if (charMaster) {
+    for (const n of nodes) {
+      if (n && n.currentLeader && n.currentLeader === charMaster) {
+        affinity += 0.2;
+        reasonParts.push('师从 ' + n.name + ' 当家');
+        break;
+      }
+    }
+  }
+
+  // 3. 高名望散修 / 商盟微弱加成
+  if (
+    charRep > 60 &&
+    (aligned === 'wandering-cultivator' || aligned === 'merchant-guild')
+  ) {
+    affinity += 0.1;
+    reasonParts.push('名望颇高，' + aligned + ' 之辈亦另眼相看');
+  }
+
+  // 4. 关系图加权
+  const alignedNodeIds = new Set<string>();
+  for (const n of nodes) {
+    if (n && n.alignment === aligned) alignedNodeIds.add(n.id);
+  }
+  for (const e of edges) {
+    if (!e || !e.from || !e.to) continue;
+    const fromAligned = alignedNodeIds.has(e.from);
+    const toAligned = alignedNodeIds.has(e.to);
+    if (!fromAligned && !toAligned) continue;
+    const w = typeof e.intensity === 'number' ? Math.max(0, Math.min(1, e.intensity)) : 0;
+    if (e.relation === 'ally' || e.relation === 'wary-respect') {
+      affinity += 0.1 * w;
+    } else if (e.relation === 'enemy' || e.relation === 'rival') {
+      affinity -= 0.1 * w;
+    }
+  }
+
+  // clamp
+  if (affinity > 1) affinity = 1;
+  if (affinity < -1) affinity = -1;
+
+  const reason = reasonParts.length > 0 ? reasonParts.join('；') : '尚未与任何宗门发生瓜葛';
+  return { aligned, affinity, reason };
+}
+
+/**
+ * AI-H304 queryRelationsTowards
+ * 返回所有指向 target 的关系边（from -> target 方向）。
+ * edges 为空或 target 未命中时返回空数组。
+ */
+export function queryRelationsTowards(
+  graph: SectRelationGraph,
+  target: string,
+): SectRelationEdge[] {
+  const base: SectRelationGraph = graph || buildEmptySectGraph();
+  const edges = Array.isArray(base.edges) ? base.edges : [];
+  if (!target) return [];
+  const out: SectRelationEdge[] = [];
+  for (const e of edges) {
+    if (e && e.to === target) out.push({ ...e });
+  }
+  return out;
+}
+
