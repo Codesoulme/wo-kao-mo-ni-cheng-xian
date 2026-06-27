@@ -1,4 +1,5 @@
 # ??????
 
-> ????: phase-c-schema-migration-and-tribulation-integration [ARCHIVED commit 6946e86]
-> ????: phase-d-tribulation-callbacks-and-db-migration [AGENDA]
+> ????: phase-d-tribulation-callbacks-and-db-migration [ARCHIVED commit 1c213c7]
+> ????: phase-e-parallel-grand-slam [AGENDA]
+> ??: 2 subagent ?? (worker-A + worker-B)
