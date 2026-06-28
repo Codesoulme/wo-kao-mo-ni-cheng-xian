@@ -283,3 +283,24 @@ model Event {
   @@index([characterId, timestamp])         // 时间范围
   @@index([previousEventId])                // 因果链反向查找
 }
+
+// 批 21: Projector 物化快照（双层缓存的 DB 层）
+// - projector.ts 写时双写：内存 cache + DB upsert
+// - projector.ts 读时：先查 DB 快照，再 replay 增量事件
+// - invalidate 时：清内存 cache + 删 DB 快照
+model ProjectionSnapshot {
+  id               String   @id @default(cuid())
+  characterId      String   @unique
+
+  // 物化 state（reducer 输出）
+  state            Json
+
+  // 最新已应用的 event aggregateVersion（用于 replay 增量起点判定）
+  lastEventVersion Int
+
+  // 元数据
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([characterId])
+}

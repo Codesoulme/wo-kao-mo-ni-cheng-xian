@@ -6,6 +6,12 @@
 // - 缓存命中条件：cache 内 lastEventVersion === 当前最新事件 version 且 TTL 未过
 // - 失效：事件写入侧（store.ts）应在 appendEvent 后调 invalidateProjection(characterId)
 //
+// 批 21: 双层缓存（内存 Map + SQLite via Prisma）
+// - 写：双写——内存 cache + DB upsert（ProjectionSnapshot model）
+// - 读：先查内存（TTL 内）；miss/TTL 过 → 查 DB；DB 有 → 装回内存；DB 无 → replay 全部
+// - invalidate：清内存 + 删 DB
+// - clear：清全部
+//
 // PoC 阶段：
 // - 内存 Map cache（生产应换 Redis / LRU）
 // - inventory 走 Character.inventoryJson（PoC 简化）
@@ -43,12 +49,27 @@ export function resetCacheStats(): void {
   cacheMisses = 0;
 }
 
-export function invalidateProjection(characterId: string): void {
+// 批 21: 异步 invalidateProjection——同时清内存 cache + DB 快照
+// 设计选择：fire-and-forget 风格。store.ts 的 invalidateAfterAppend 路径
+// 通常在事务外调用，DB 写失败不该阻塞事件流。但为了让上层能看到错误，
+// 这里返回 Promise：调用方可以选择 await 或 fire-and-forget。
+export async function invalidateProjection(characterId: string): Promise<void> {
   projectionCache.delete(characterId);
+  try {
+    await db.projectionSnapshot.deleteMany({ where: { characterId } });
+  } catch (e) {
+    // 内存已清；DB 失败仅记日志，不抛（幂等性 + 不阻塞事件流）
+    console.error(`[projector] invalidateProjection DB delete failed for ${characterId}:`, e);
+  }
 }
 
-export function clearProjectionCache(): void {
+export async function clearProjectionCache(): Promise<void> {
   projectionCache.clear();
+  try {
+    await db.projectionSnapshot.deleteMany({});
+  } catch (e) {
+    console.error('[projector] clearProjectionCache DB delete failed:', e);
+  }
 }
 
 export function getProjectionCacheStats(): {
@@ -69,8 +90,9 @@ export function getProjectionCacheStats(): {
 }
 
 // 事件 append 后立即失效缓存（store.ts 在 appendEvent 成功后调用）
-export function invalidateAfterAppend(characterId: string): void {
-  invalidateProjection(characterId);
+// 批 21: 返回 Promise（底层 invalidate 已是 async），调用方按需 await
+export function invalidateAfterAppend(characterId: string): Promise<void> {
+  return invalidateProjection(characterId);
 }
 
 // 测试 helper：直接注入缓存项（用于 smoke 验证 hit/miss）
@@ -85,6 +107,62 @@ export function _seedProjectionCacheForTest(
     updatedAt: Date.now(),
   });
 }
+
+// 批 21: ProjectionStore——双层（内存 + DB）封装
+// 内部使用，外部仍走 projectionCache + invalidate/clear 顶层 API。
+class ProjectionStore {
+  // 仅暴露给同模块的 getProjectedState 使用
+  async get(characterId: string): Promise<CacheEntry | null> {
+    // 1. 内存 cache（TTL 内）
+    const mem = projectionCache.get(characterId);
+    if (mem && Date.now() - mem.updatedAt < CACHE_TTL_MS) {
+      return mem;
+    }
+    // 2. DB snapshot
+    try {
+      const dbSnap = await db.projectionSnapshot.findUnique({ where: { characterId } });
+      if (dbSnap) {
+        const entry: CacheEntry = {
+          state: dbSnap.state as unknown as CharacterStateSnapshot,
+          lastEventVersion: dbSnap.lastEventVersion,
+          updatedAt: Date.now(),
+        };
+        // 装回内存 cache，下次直接走内存路径
+        projectionCache.set(characterId, entry);
+        return entry;
+      }
+    } catch (e) {
+      console.error(`[projector] ProjectionStore.get DB read failed for ${characterId}:`, e);
+    }
+    return null;
+  }
+
+  async set(characterId: string, state: CharacterStateSnapshot, lastEventVersion: number): Promise<void> {
+    const now = Date.now();
+    // 1. 内存 cache
+    projectionCache.set(characterId, { state, lastEventVersion, updatedAt: now });
+    // 2. DB upsert
+    try {
+      await db.projectionSnapshot.upsert({
+        where: { characterId },
+        create: {
+          characterId,
+          state: state as unknown as object,
+          lastEventVersion,
+        },
+        update: {
+          state: state as unknown as object,
+          lastEventVersion,
+          updatedAt: new Date(),
+        },
+      });
+    } catch (e) {
+      console.error(`[projector] ProjectionStore.set DB upsert failed for ${characterId}:`, e);
+    }
+  }
+}
+
+const projectionStore = new ProjectionStore();
 
 // =============== 物化视图 ===============
 
@@ -122,16 +200,22 @@ function charRowToBaseSnapshot(row: {
 /**
  * 加载并 reduce character 的事件链，返回最终 state snapshot。
  * 事件链为空 → 直接返回 base snapshot（无 reducer 调用）。
+ *
+ * 批 21: 双层缓存读路径：
+ *   1. projectionStore.get(characterId) → 内存 TTL 内 → 直接返回；否则查 DB
+ *   2. cache 命中且 lastEventVersion === events 最新 version → 直接返回
+ *   3. cache stale（DB 有但 version 旧）→ 从 cache.state 增量 replay
+ *   4. cache miss（DB 也没有）→ 从 Character 行 baseSnapshot 全量 replay
  */
 export async function getProjectedState(characterId: string): Promise<CharacterStateSnapshot> {
-  const cached = projectionCache.get(characterId);
-  const now = Date.now();
+  // 批 21: 先查 projectionStore（内存 + DB）
+  const cached = await projectionStore.get(characterId);
 
   // 1. base snapshot from Character table
   const char = await db.character.findUnique({ where: { id: characterId } });
   if (!char) throw new Error(`Character ${characterId} not found`);
 
-  const baseSnapshot = charRowToBaseSnapshot({
+  const baseFromDb = charRowToBaseSnapshot({
     id: char.id,
     name: char.name,
     age: char.age,
@@ -159,49 +243,53 @@ export async function getProjectedState(characterId: string): Promise<CharacterS
     events = [];
   }
 
+  // 3. 事件链为空
   if (events.length === 0) {
-    // 没事件也写入缓存（version = 0），下次同 characterId 直接命中
     if (!cached) cacheMisses++;
-    projectionCache.set(characterId, {
-      state: baseSnapshot,
-      lastEventVersion: 0,
-      updatedAt: now,
-    });
-    return baseSnapshot;
+    await projectionStore.set(characterId, baseFromDb, 0);
+    return baseFromDb;
   }
 
   const latestVersion = events[events.length - 1].aggregateVersion;
 
-  // 3. cache hit
-  if (
-    cached &&
-    cached.lastEventVersion === latestVersion &&
-    now - cached.updatedAt < CACHE_TTL_MS
-  ) {
+  // 4. cache hit（内存 TTL 内或 DB 快照）且 version 一致
+  if (cached && cached.lastEventVersion === latestVersion) {
     cacheHits++;
     return cached.state;
   }
   cacheMisses++;
 
-  // 4. cache miss / stale → replay
+  // 5. cache stale / miss → 决定 replay 起点
+  let baseSnapshot: CharacterStateSnapshot;
+  let fromVersion: number;
+  if (cached) {
+    // 增量：cache.state + cached.lastEventVersion 之后的 events
+    baseSnapshot = cached.state;
+    fromVersion = cached.lastEventVersion + 1;
+  } else {
+    // 全量：base snapshot + 全部 events
+    baseSnapshot = baseFromDb;
+    fromVersion = 0;
+  }
+
+  // 6. replay（增量或全量）
+  const incrementalEvents = events.filter((e) => e.aggregateVersion >= fromVersion);
   let projectedState: CharacterStateSnapshot = baseSnapshot;
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const reducerMod = require('./reducer');
     if (typeof reducerMod.reduceCharacterState === 'function') {
-      projectedState = reducerMod.reduceCharacterState(baseSnapshot, events) as CharacterStateSnapshot;
+      projectedState = reducerMod.reduceCharacterState(
+        baseSnapshot,
+        incrementalEvents
+      ) as CharacterStateSnapshot;
     }
   } catch {
     // X1 reducer 未就绪 → 回退到 base snapshot（PoC 兜底）
     projectedState = baseSnapshot;
   }
 
-  projectionCache.set(characterId, {
-    state: projectedState,
-    lastEventVersion: latestVersion,
-    updatedAt: now,
-  });
-
+  await projectionStore.set(characterId, projectedState, latestVersion);
   return projectedState;
 }
 

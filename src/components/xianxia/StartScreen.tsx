@@ -23,7 +23,7 @@ export function StartScreen({
   onContinueCurrent?: () => void;
   onEnterGame?: () => void;
 } = {}) {
-  const { setCharacter, setEvents, setChoices, setFateNodes, setLoading, selectedHeritage, worldCalendar, worldLegacies } = useGameStore();
+  const { setCharacter, setEvents, setChoices, setFateNodes, setLoading, selectedHeritage, worldCalendar, worldLegacies, setWorldCalendar } = useGameStore();
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const start = async () => {

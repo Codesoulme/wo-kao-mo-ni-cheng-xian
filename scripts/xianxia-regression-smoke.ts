@@ -5364,6 +5364,8 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhasePetFormationAscensionEventSmokes();
       // 批 17: Projector 增强（projection rules + 缓存统计 + invalidate）— 5 个静态 smoke
       pgRunPhaseProjectionRuleSmokes();
+      // 批 21: Projector 持久化（内存 → SQLite via Prisma）— 4 个 smoke（默认 skip，需 --db）
+      pgRunPhaseEsProjectorPersistSmokes();
       // 批 18: event-timeline 工具增强（filter / format / aggregate / causal chain）— 4 个静态 smoke
       pgRunPhaseTimelineSmokes();
       // 批 17: event-replay 工具增强（diff / export / range / type 过滤）— 4 个静态 smoke
@@ -13272,4 +13274,228 @@ function smokeEcsAdvance004FailureNonFatal(): void {
   assert(sseSrc.includes('appendEvent('), 'advance-sse route should keep appendEvent call');
 
   log('smoke-ecs-advance-004-failure-non-fatal', { passed: true });
+}
+
+// ===== 批 21: Projector 持久化（内存 → SQLite via Prisma）— 4 个 smoke =====
+//
+// 策略：DB 相关 smoke 需 --db flag；默认 skip。
+// 用 require('../src/lib/db') + db.projectionSnapshot 验证 model 存在 + 双层 cache 行为。
+
+const PROJECTION_PERSIST_REQUIRED_FLAGS = ['--db'] as const;
+
+function isProjectionPersistEnabled(): boolean {
+  const args = process.argv.slice(2);
+  return PROJECTION_PERSIST_REQUIRED_FLAGS.some((f) => args.includes(f));
+}
+
+function smokeProjectionPersist001ModelAndExports(): void {
+  // 1. Prisma model 存在
+  const { db } = require('../src/lib/db');
+  assert(db.projectionSnapshot !== undefined, 'db.projectionSnapshot should be defined');
+  assert(typeof db.projectionSnapshot.upsert === 'function', 'projectionSnapshot.upsert should be a function');
+  assert(typeof db.projectionSnapshot.findUnique === 'function', 'projectionSnapshot.findUnique should be a function');
+  assert(typeof db.projectionSnapshot.deleteMany === 'function', 'projectionSnapshot.deleteMany should be a function');
+
+  // 2. projector 模块导出
+  const projMod = require('../src/lib/xianxia/events/projector');
+  assert(typeof projMod.getProjectedState === 'function', 'should export getProjectedState');
+  assert(typeof projMod.invalidateProjection === 'function', 'should export invalidateProjection');
+  assert(typeof projMod.clearProjectionCache === 'function', 'should export clearProjectionCache');
+  assert(typeof projMod.getProjectionCacheStats === 'function', 'should export getProjectionCacheStats');
+
+  // 3. 顶层 API 已是 async（双层写后必须 await）
+  assert(projMod.invalidateProjection.constructor.name === 'AsyncFunction', 'invalidateProjection should be async');
+  assert(projMod.clearProjectionCache.constructor.name === 'AsyncFunction', 'clearProjectionCache should be async');
+
+  log('smoke-projection-persist-001-model-and-exports', { passed: true });
+}
+
+function smokeProjectionPersist002DualLayerWrite(): void {
+  // 双层写验证：getProjectedState 后内存 cache + DB ProjectionSnapshot 都应有数据
+  const { db } = require('../src/lib/db');
+  const projMod = require('../src/lib/xianxia/events/projector');
+
+  const testCharId = `pp2-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  (async () => {
+    // 1. 创建测试 character
+    const char = await db.character.create({
+      data: {
+        id: testCharId,
+        name: 'projection-persist-002',
+        age: 18,
+        realm: 'mortal',
+        cultivationExp: 0,
+        hp: 100,
+        maxHp: 100,
+        spiritStones: 0,
+        alive: true,
+        lifespan: 80,
+      },
+    });
+
+    // 2. 清干净起点
+    await projMod.clearProjectionCache();
+
+    // 3. 调 getProjectedState（无事件 → 写 base snapshot + lastEventVersion=0）
+    const snap = await projMod.getProjectedState(char.id);
+    assert(snap.characterId === char.id, `snapshot.characterId should be ${char.id}, got ${snap.characterId}`);
+    assert(snap.age === 18, `snapshot.age should be 18, got ${snap.age}`);
+
+    // 4. 验证 DB 有快照（双层写）
+    const dbSnap = await db.projectionSnapshot.findUnique({ where: { characterId: char.id } });
+    assert(dbSnap !== null, 'DB ProjectionSnapshot should exist after getProjectedState');
+    assert(dbSnap!.characterId === char.id, 'DB snapshot.characterId should match');
+    assert(dbSnap!.lastEventVersion === 0, `DB lastEventVersion should be 0 (no events), got ${dbSnap!.lastEventVersion}`);
+
+    // 5. 内存 cache 也有（size >= 1）
+    const stats = projMod.getProjectionCacheStats();
+    assert(stats.size >= 1, `mem cache size should be >= 1, got ${stats.size}`);
+
+    // 清理
+    await db.projectionSnapshot.deleteMany({ where: { characterId: char.id } });
+    await db.character.delete({ where: { id: char.id } });
+  })();
+
+  log('smoke-projection-persist-002-dual-layer-write', { passed: true });
+}
+
+function smokeProjectionPersist003InvalidateClearsDb(): void {
+  // invalidateProjection 清 DB 验证
+  const { db } = require('../src/lib/db');
+  const projMod = require('../src/lib/xianxia/events/projector');
+
+  const testCharId = `pp3-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  (async () => {
+    // 1. 创建 character + 触发 projection
+    const char = await db.character.create({
+      data: {
+        id: testCharId,
+        name: 'projection-persist-003',
+        age: 25,
+        realm: 'mortal',
+        cultivationExp: 0,
+        hp: 100,
+        maxHp: 100,
+        spiritStones: 0,
+        alive: true,
+        lifespan: 80,
+      },
+    });
+
+    await projMod.clearProjectionCache();
+    await projMod.getProjectedState(char.id);
+
+    // 2. 验证 DB 已有
+    let dbSnap = await db.projectionSnapshot.findUnique({ where: { characterId: char.id } });
+    assert(dbSnap !== null, 'DB snapshot should exist after first getProjectedState');
+
+    // 3. invalidate → DB 应清
+    await projMod.invalidateProjection(char.id);
+    dbSnap = await db.projectionSnapshot.findUnique({ where: { characterId: char.id } });
+    assert(dbSnap === null, 'DB snapshot should be deleted after invalidateProjection');
+
+    // 4. 幂等：再次 invalidate 不抛
+    await projMod.invalidateProjection(char.id);
+    await projMod.invalidateProjection('non-existent-id');
+
+    // 5. invalidate 后再调 getProjectedState → 应能恢复（base snapshot + DB upsert）
+    const recovered = await projMod.getProjectedState(char.id);
+    assert(recovered.characterId === char.id, 'recovered snapshot.characterId should match');
+    dbSnap = await db.projectionSnapshot.findUnique({ where: { characterId: char.id } });
+    assert(dbSnap !== null, 'DB snapshot should be re-created after second getProjectedState');
+
+    // 清理
+    await db.projectionSnapshot.deleteMany({ where: { characterId: char.id } });
+    await db.character.delete({ where: { id: char.id } });
+  })();
+
+  log('smoke-projection-persist-003-invalidate-clears-db', { passed: true });
+}
+
+function smokeProjectionPersist004ClearProjectionClearsDb(): void {
+  // clearProjectionCache 清全部验证
+  const { db } = require('../src/lib/db');
+  const projMod = require('../src/lib/xianxia/events/projector');
+
+  const ids: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    ids.push(`pp4-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`);
+  }
+
+  (async () => {
+    // 1. 创建 3 个 character + 各自 projection
+    for (const id of ids) {
+      await db.character.create({
+        data: {
+          id,
+          name: `projection-persist-004-${id}`,
+          age: 20,
+          realm: 'mortal',
+          cultivationExp: 0,
+          hp: 100,
+          maxHp: 100,
+          spiritStones: 0,
+          alive: true,
+          lifespan: 80,
+        },
+      });
+    }
+
+    await projMod.clearProjectionCache();
+    for (const id of ids) {
+      await projMod.getProjectedState(id);
+    }
+
+    // 2. 验证 DB 有 3 条快照
+    const before = await db.projectionSnapshot.findMany({
+      where: { characterId: { in: ids } },
+    });
+    assert(before.length === 3, `DB should have 3 snapshots before clear, got ${before.length}`);
+
+    // 3. clearProjectionCache 清全部
+    await projMod.clearProjectionCache();
+    const after = await db.projectionSnapshot.findMany({
+      where: { characterId: { in: ids } },
+    });
+    assert(after.length === 0, `DB should have 0 snapshots after clear, got ${after.length}`);
+
+    // 4. 内存 cache 也清（size = 0）
+    const stats = projMod.getProjectionCacheStats();
+    assert(stats.size === 0, `mem cache size should be 0 after clear, got ${stats.size}`);
+
+    // 清理
+    for (const id of ids) {
+      await db.character.delete({ where: { id } });
+    }
+  })();
+
+  log('smoke-projection-persist-004-clear-projection-clears-db', { passed: true });
+}
+
+function pgRunPhaseEsProjectorPersistSmokes(): void {
+  if (!isProjectionPersistEnabled()) {
+    log('smoke-projection-persist-skipped', {
+      passed: true,
+      skipped: true,
+      reason: 'requires --db flag (DB-dependent tests)',
+    });
+    return;
+  }
+
+  const cases = [
+    { name: 'smoke-projection-persist-001-model-and-exports', fn: smokeProjectionPersist001ModelAndExports },
+    { name: 'smoke-projection-persist-002-dual-layer-write', fn: smokeProjectionPersist002DualLayerWrite },
+    { name: 'smoke-projection-persist-003-invalidate-clears-db', fn: smokeProjectionPersist003InvalidateClearsDb },
+    { name: 'smoke-projection-persist-004-clear-projection-clears-db', fn: smokeProjectionPersist004ClearProjectionClearsDb },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
 }
