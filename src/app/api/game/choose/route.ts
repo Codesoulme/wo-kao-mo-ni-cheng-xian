@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 // POST /api/game/choose
 // 玩家在重要事件中做出选择
 

@@ -74,6 +74,7 @@ import {
   HeartDemonType,
   // AI-68
   WorldTier,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   AscensionRequirement,
   AscensionSession,
   // AI-70
@@ -115,7 +116,10 @@ import {
   InheritanceClaim,
   InheritanceChain,
   InheritancePool,
-} from './types';
+} from "./types";
+
+export type { AscensionRequirement } from "./types";
+
 import {
   // ===== Worker A (AI-91/AI-92/AI-93/AI-95/AI-96/AI-97/AI-98/AI-99/AI-100/AI-101/AI-103) additive imports =====
   CombatLogEntry,

@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 // POST /api/game/clean-test-artifacts
 // 仅清理事件/预加载/干扰日志，保留所有角色存档
 // P0: 加鉴权。

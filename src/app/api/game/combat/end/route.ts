@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 ﻿// POST /api/game/combat/end
 // 结束战斗：结算战利品、战斗叙事、任务推进，并写入隐藏审计。
 

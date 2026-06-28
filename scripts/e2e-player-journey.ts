@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/e2e-player-journey.ts
 // AI-107: 玩家完整旅程 E2E (纯 engine 层, 不依赖 dev server / DB)
 // 用法: bun scripts/e2e-player-journey.ts

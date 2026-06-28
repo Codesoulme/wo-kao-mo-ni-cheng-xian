@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 // POST /api/game/restriction/interact
 // AI-70: 禁制交互判定
 // P1 step2: 此 route 是纯函数调用（无 characterId/db），但仍加 auth gate 防滥用

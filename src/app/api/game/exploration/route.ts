@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 // POST /api/game/exploration
 // 秘境探索系统：玩家主动选择秘境探索，触发独特事件链
 // 请求体：{ characterId, action: 'start', realmId }

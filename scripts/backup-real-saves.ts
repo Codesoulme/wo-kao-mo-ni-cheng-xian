@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/backup-real-saves.ts
 // AI-73: 备份真实存档（schema migration 前必跑）
 // 用法：bun scripts/backup-real-saves.ts

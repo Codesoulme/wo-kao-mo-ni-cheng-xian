@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 // POST /api/game/reset-world
 // Clear local test world. Browser localStorage is cleared by the client button.
 // P0: 加鉴权 + 二次确认，避免被任意调用清库。

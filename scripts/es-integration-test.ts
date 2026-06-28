@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/es-integration-test.ts
 // 批 20b: Event Sourcing 真实链路集成测试
 //

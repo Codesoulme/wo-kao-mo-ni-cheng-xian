@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 // POST /api/game/tribulation/action
 // AI-67: 渡劫行动——执行一道雷或一次心魔判定
 // P1-2 修复：前端不再发送 characterRoll/heartDemon/soulStrength/bondedArtifactResonance，

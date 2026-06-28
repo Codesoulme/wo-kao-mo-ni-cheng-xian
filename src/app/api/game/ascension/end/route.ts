@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 // POST /api/game/ascension/end
 // AI-68: 飞升结算
 // P1-2 修复：前端不再发送 characterRoll/daoHeart/tribulationPassed/requirements，

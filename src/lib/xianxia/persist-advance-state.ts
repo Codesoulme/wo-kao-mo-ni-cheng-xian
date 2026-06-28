@@ -48,7 +48,7 @@ export function buildAdvanceStateData(state: any, opts?: {
     pendingChoiceJson,
     worldCalendarJson: worldCalendar ? JSON.stringify(worldCalendar) : Prisma.JsonNull,
     causeOfDeath: opts?.causeOfDeath ?? state.causeOfDeath ?? null,
-    realmProfile: state.realmProfile ?? Prisma.JsonNull,
+    // realmProfile: state.realmProfile ?? Prisma.JsonNull,  // Prisma schema 没此字段
     cultivationMultiplier: state.cultivationMultiplier,
     cultivationInsight: state.cultivationInsight ?? null,
     cultivationFactorsJson: state.cultivationFactors ? JSON.stringify(state.cultivationFactors) : Prisma.JsonNull,

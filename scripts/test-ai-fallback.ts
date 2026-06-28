@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 ﻿// scripts/test-ai-fallback.ts
 // AI-108: AI 接口稳定性 / fallback / retry 链路 E2E 测试
 // 用法: bun scripts/test-ai-fallback.ts

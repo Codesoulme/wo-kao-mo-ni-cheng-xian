@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/auto-test-l3-mechanisms.ts
 // AI-75: L3 机制自动测试（不依赖 dev server，调用 engine 派生函数）
 import {

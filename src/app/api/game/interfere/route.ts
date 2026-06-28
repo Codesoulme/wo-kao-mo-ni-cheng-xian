@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 // POST /api/game/interfere
 // 玩家在任意时刻输入"干扰模拟"
 

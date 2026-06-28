@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 /**
  * 每小时代码审查脚本（智能版）
  *

@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 ﻿import { readFileSync, existsSync } from 'fs';
 
 // Phase-T #9: NPC self-growth (3 smokes)

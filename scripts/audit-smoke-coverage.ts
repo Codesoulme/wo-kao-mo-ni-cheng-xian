@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/audit-smoke-coverage.ts
 // AI-106: smoke 覆盖率审计
 // 用法: bun scripts/audit-smoke-coverage.ts

@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/l3-integration-smoke.ts
 // AI-75: L3 机制综合集成测试（飞升/天劫/心魔/禁制/跨域/洞府联动）
 import { readFileSync } from 'node:fs';

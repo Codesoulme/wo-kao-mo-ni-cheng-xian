@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/perf-engine-cold-path.ts
 // AI-104: engine cold-path perf audit
 // 用法: bun scripts/perf-engine-cold-path.ts

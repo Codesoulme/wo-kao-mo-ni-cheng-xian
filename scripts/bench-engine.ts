@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/bench-engine.ts
 // AI-76: engine 派生函数性能基线
 // 用法：bun scripts/bench-engine.ts

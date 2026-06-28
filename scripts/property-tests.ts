@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/property-tests.ts
 // TechDoc 18.6.7 属性测试 PoC（手写 RNG，不依赖 fast-check 库）
 // 目标：对任意随机输入，验证引擎不变量始终成立

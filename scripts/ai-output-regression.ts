@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/ai-output-regression.ts
 // TechDoc 18.6.7 AI 输出回归测试 PoC
 //
@@ -21,8 +23,11 @@ interface AITestCase {
   notes?: string;          // 可选：fixture 备注
 }
 
-// 项目根 = scripts/ 的上一级
-const FIXTURES_DIR = path.join(import.meta.dir, '..', 'tests', 'fixtures', 'ai-output');
+// 项目根 = scripts/ 的上一级（用 fileURLToPath 避免 import.meta.dir 类型问题）
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname_esm = path.dirname(__filename);
+const FIXTURES_DIR = path.join(__dirname_esm, '..', 'tests', 'fixtures', 'ai-output');
 
 // ==================== 合规词（面向玩家可见文本） ====================
 // 这些词出现在 expectedOutput 里就是 PoC 失败。

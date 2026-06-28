@@ -8,7 +8,7 @@ const SESSION_COOKIE_NAME = 'xianxia_session';
 
 export async function POST(_req: NextRequest) {
   try {
-    const token = cookies().get(SESSION_COOKIE_NAME)?.value;
+    const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
     if (token) await logoutUser(token);
     clearSessionCookie();
     return NextResponse.json({ success: true });

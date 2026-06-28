@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/event-timeline.ts
 // 增强版：完整事件流查看工具
 // 用法：

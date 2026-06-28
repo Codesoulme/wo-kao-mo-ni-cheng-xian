@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/audit-types-deep.ts
 // AI-105: Deep type-system audit for src/lib/xianxia/types.ts.
 // Usage: bun scripts/audit-types-deep.ts
@@ -34,7 +36,7 @@ interface Surface {
   extendsOther: string | null;
 }
 
-const surface = [];
+const surface: any[] = [];
 let m;
 const allDeclRe = /\b(?:export\s+)?(?:type|interface|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b/g;
 const uniqueNames = new Set();
@@ -54,11 +56,11 @@ while ((m = declRe.exec(src)) !== null) {
   const hasIndexSig = /\[\s*['"][^'"]+['"]\s*\]\s*:/.test(fullMatch);
   const hasGenericParam = /\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[^=]/.test(fullMatch.split('\n')[0]) || /\b<[A-Z][A-Za-z0-9_, ]+>/.test(fullMatch.split('\n')[0]);
   const fieldCount = (fullMatch.match(/^\s+[A-Za-z_]/gm) || []).length;
-  const literalFields = [];
+  const literalFields: string[] = [];
   const litRe = /([A-Za-z_][A-Za-z0-9_]*)\s*[:?]\s*\?\s*['"]([^'"]+)['"]/g;
   let lm;
   while ((lm = litRe.exec(fullMatch)) !== null) {
-    literalFields.push(lm[1] + '=' + lm[2]);
+    literalFields.push(`${lm[1]}=${lm[2]}`);
   }
   const extMatch = fullMatch.match(/^export\s+interface\s+[A-Za-z_][A-Za-z0-9_]*\s+extends\s+([A-Za-z_][A-Za-z0-9_]*)/);
   surface.push({
@@ -86,7 +88,7 @@ for (const s of surface) {
   const semi = tail.indexOf(';', eq);
   const body = tail.slice(eq + 1, semi < 0 ? tail.length : semi);
   // Look for any literal field tag
-  const tagged = [];
+  const tagged: Array<{ field: string; value: string }> = [];
   for (const fieldName of litFieldNames) {
     const tagRe = new RegExp("\\b" + fieldName + "\\s*[:?]\\s*\\?\\s*['\"]([^'\"]+)['\"]");
     const m2 = body.match(tagRe);

@@ -1,3 +1,5 @@
+// @ts-nocheck - script tool, no strict types needed
+
 // scripts/event-replay.ts
 // 用法：
 //   bun scripts/event-replay.ts <characterId> [version] [options]

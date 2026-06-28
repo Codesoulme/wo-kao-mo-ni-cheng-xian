@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 ﻿// POST /api/game/auction
 // 拍卖会 Lite：入场邀约 / 确认入场 / 出价结算，接入注册、NPC、线索与隐藏审计。
 

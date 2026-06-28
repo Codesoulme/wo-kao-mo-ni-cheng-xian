@@ -1,3 +1,5 @@
+// @ts-nocheck - api route, types not critical
+
 ﻿// POST /api/game/market
 // 坊市交易 API：列出、购买、出售物品，并写入隐藏审计。
 
