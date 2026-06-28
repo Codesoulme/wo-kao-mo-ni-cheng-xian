@@ -2712,6 +2712,78 @@ function pgRunPhaseUYinyuanTimelineSmokes(): void {
   }
 }
 
+// Phase-V #6: Custom Technique Creator (3 smokes)
+
+function smokeV001CustomTechniqueLibExports(): void {
+  const mod = require('../src/lib/xianxia/custom-technique.ts');
+  assert(typeof mod.createCustomTechnique === 'function', 'should export createCustomTechnique');
+  assert(typeof mod.validateTechniqueInput === 'function', 'should export validateTechniqueInput');
+  assert(typeof mod.buildTechniqueDescription === 'function', 'should export buildTechniqueDescription');
+  // Categories & elements
+  assert(mod.TECHNIQUE_CATEGORY_LABELS.sword === '剑法', 'should label sword as 剑法');
+  assert(mod.TECHNIQUE_ELEMENT_LABELS.water === '水', 'should label water as 水');
+  log('smoke-v-001-custom-technique-lib-exports', { passed: true, categories: Object.keys(mod.TECHNIQUE_CATEGORY_LABELS).length, elements: Object.keys(mod.TECHNIQUE_ELEMENT_LABELS).length });
+}
+
+function smokeV002CustomTechniqueValidateAndCreate(): void {
+  const mod = require('../src/lib/xianxia/custom-technique.ts');
+  // Valid input
+  const tech = mod.createCustomTechnique({
+    name: '碧波剑诀',
+    category: 'sword',
+    element: 'water',
+    realmRequirement: '练气九层',
+  });
+  assert(typeof tech.id === 'string' && tech.id.length > 0, 'tech.id should be non-empty');
+  assert(tech.name === '碧波剑诀', 'tech.name should match');
+  assert(tech.category === 'sword', 'tech.category should match');
+  assert(typeof tech.description === 'string' && tech.description.length > 0, 'tech.description should be non-empty');
+  // Description should mention 剑法 + 水 + 碧波剑诀
+  assert(tech.description.includes('剑法'), 'description should mention category');
+  assert(tech.description.includes('水'), 'description should mention element');
+  assert(tech.description.includes('碧波剑诀'), 'description should mention name');
+
+  // Validation: empty name should fail
+  const v1 = mod.validateTechniqueInput({ name: '', category: 'sword', element: 'water', realmRequirement: '练气' });
+  assert(!v1.ok && v1.errors.length > 0, 'empty name should fail validation');
+
+  // Validation: invalid category should fail
+  const v2 = mod.validateTechniqueInput({ name: 'test', category: 'wrong', element: 'water', realmRequirement: '练气' });
+  assert(!v2.ok, 'invalid category should fail validation');
+
+  log('smoke-v-002-custom-technique-validate-and-create', { passed: true });
+}
+
+function smokeV003TechniqueCreatorPanelRenders(): void {
+  const src = readFileSync('src/components/xianxia/TechniqueCreatorPanel.tsx', 'utf-8');
+  assert(src.includes('technique-creator-panel'), 'panel should have technique-creator-panel testid');
+  assert(src.includes('technique-name-input'), 'panel should have name input testid');
+  assert(src.includes('technique-category-select'), 'panel should have category select testid');
+  assert(src.includes('technique-element-select'), 'panel should have element select testid');
+  assert(src.includes('technique-realm-select'), 'panel should have realm select testid');
+  assert(src.includes('technique-submit'), 'panel should have submit button testid');
+  assert(src.includes('validateTechniqueInput'), 'panel should validate input');
+  assert(src.includes('剑') || src.includes('剑法'), 'panel should render category labels in Chinese');
+  log('smoke-v-003-technique-creator-panel-renders', { passed: true });
+}
+
+function pgRunPhaseVTechniqueCreatorSmokes(): void {
+  const cases = [
+    { name: 'smoke-v-001-custom-technique-lib-exports', fn: smokeV001CustomTechniqueLibExports },
+    { name: 'smoke-v-002-custom-technique-validate-and-create', fn: smokeV002CustomTechniqueValidateAndCreate },
+    { name: 'smoke-v-003-technique-creator-panel-renders', fn: smokeV003TechniqueCreatorPanelRenders },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
 
 
 // Phase-M #2: Death Guidance Panel (Worker #2) — 死亡后引导，三个选项 + 关闭提示
@@ -5131,6 +5203,7 @@ function smokeBlueprintDocsCoverage(): void {
       // Phase-Q #4: End-to-end 100-year smoke (P0)
       pgRunPhaseQEndToEndSmokes();
       pgRunPhaseUYinyuanTimelineSmokes();
+      pgRunPhaseVTechniqueCreatorSmokes();
 }
 
 main().catch(error => {
