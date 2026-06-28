@@ -116,11 +116,54 @@ export function CycleProjectionPanel({
 
   const projections = useMemo<Record<TabKey, PlayerUIProjection>>(() => {
     const ch = character || null;
+
+    // Infer inheritance chain from character data when not provided externally.
+    // Reuses AI-I401 inheritance field if present, otherwise derives a minimal
+    // chain from character.master/parent/masterId so the panel never looks empty
+    // for a character who has any lineage signal.
+    const inheritedAbilities: string[] = Array.isArray(ch?.inheritedAbilities)
+      ? ch.inheritedAbilities.filter((x: any) => typeof x === 'string')
+      : [];
+    const inferredInheritanceChain = inheritanceChain ?? (inheritedAbilities.length > 0 || ch?.master || ch?.parent
+      ? {
+          rootCharacterId: typeof ch.master === 'string' ? ch.master : (typeof ch.parent === 'string' ? ch.parent : (ch.id || 'c-root')),
+          generations: inheritedAbilities.length > 0
+            ? [{ characterId: ch.id || 'c-self', inheritedFromId: typeof ch.master === 'string' ? ch.master : (typeof ch.parent === 'string' ? ch.parent : 'c-root') }]
+            : [],
+          activeClaims: [],
+          lostTechniques: [],
+        }
+      : null);
+
+    const inferredSectState = sectState ?? (ch?.faction || ch?.sect
+      ? {
+          sectId: ch.faction || ch.sect,
+          phase: ch?.sectPhase || 'stable',
+          currentPower: typeof ch?.sectPower === 'number' ? ch.sectPower : 0.5,
+          history: Array.isArray(ch?.sectHistory) ? ch.sectHistory : [],
+        }
+      : null);
+
+    const inferredFateEchoes = fateEchoes ?? (Array.isArray(ch?.fateEchoes)
+      ? ch.fateEchoes
+      : (Array.isArray(ch?.fateNodes)
+          ? ch.fateNodes.map((n: any) => ({ echoId: n?.id, resolved: n?.resolved === true, linkedThreadId: n?.linkedThreadId }))
+          : []));
+
+    const inferredWorldState = worldState ?? (ch?.age !== undefined
+      ? {
+          possibleEndings: Array.isArray(ch?.possibleEndings) ? ch.possibleEndings : [],
+          fixedEndings: Array.isArray(ch?.fixedEndings) ? ch.fixedEndings : [],
+          irreversibleChoices: Array.isArray(ch?.irreversibleChoices) ? ch.irreversibleChoices : [],
+          endgameMeter: typeof ch?.endgameMeter === 'number' ? ch.endgameMeter : Math.min(1, Math.max(0, (ch.age || 0) / 200)),
+        }
+      : null);
+
     return {
-      inheritance: projectInheritanceForUI(ch, inheritanceChain),
-      sect: projectSectTrajectoryForUI(ch, sectState),
-      fate: projectFateEchoForUI(ch, fateEchoes),
-      ending: projectEndingForUI(ch, worldState),
+      inheritance: projectInheritanceForUI(ch, inferredInheritanceChain),
+      sect: projectSectTrajectoryForUI(ch, inferredSectState),
+      fate: projectFateEchoForUI(ch, inferredFateEchoes),
+      ending: projectEndingForUI(ch, inferredWorldState),
     };
   }, [character, inheritanceChain, sectState, fateEchoes, worldState]);
 
