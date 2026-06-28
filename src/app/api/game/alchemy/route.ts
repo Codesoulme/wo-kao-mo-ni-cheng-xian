@@ -12,6 +12,9 @@ import { generateAlchemyOutcome } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { sanitizeNarrativeText } from '@/lib/xianxia/display';
+// 批 16: alchemy 路由接 Event Sourcing PoC — 炼丹触发 spirit-stones.changed（花费）+ item.added（产出）
+// appendEvent 失败不影响主流程；保留 AI/公式双路径 + 鉴权 + 全部原逻辑。
+import { appendEvent } from '@/lib/xianxia/events/store';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -94,6 +97,42 @@ export async function POST(req: NextRequest) {
       effectResolveTrace: [],
       aiBoundaryTrace: [],
     });
+
+    // Event Sourcing PoC: alchemy 触发 spirit-stones.changed（炼丹耗用，delta < 0）。
+    // 成功时（result.success === true 且 result.product 存在）再追加 item.added。
+    // 失败时只写灵石消耗事件，丹药 event 不发。
+    // appendEvent 失败用 try/catch 兜底——不影响主流程。
+    try {
+      await appendEvent({
+        characterId,
+        type: 'character.spirit-stones.changed',
+        data: {
+          type: 'character.spirit-stones.changed',
+          delta: -result.spiritStoneCost,
+          newValue: finalState.spiritStones,
+          reason: result.success ? 'alchemy-craft' : 'alchemy-failed',
+        },
+        source: 'user-action',
+        triggerActor: 'player',
+        createdAtAge: finalState.age,
+      });
+      if (result.success && result.product && result.product.id) {
+        await appendEvent({
+          characterId,
+          type: 'character.item.added',
+          data: {
+            type: 'character.item.added',
+            itemId: result.product.id,
+            item: result.product,
+          },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: finalState.age,
+        });
+      }
+    } catch (evtErr: any) {
+      console.error('[alchemy] event append failed (non-fatal):', evtErr?.message || evtErr);
+    }
 
     await db.character.update({
       where: { id: characterId, userId: user?.id },

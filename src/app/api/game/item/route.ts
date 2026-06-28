@@ -11,6 +11,7 @@ import { dbToState, equipItem, unequipItem, consumeItem, removeItemsByIds, recor
 import { generateItemActionNarrative } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
+import { appendEvent } from '@/lib/xianxia/events/store';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -198,6 +199,47 @@ export async function POST(req: NextRequest) {
       effectResolveTrace: result.effectResolveTrace,
       aiBoundaryTrace: [],
     });
+
+    // Event Sourcing（PoC15）：item 路由 add/remove 接 appendEvent。
+    // 语义映射：
+    //   unequip → 物品从装备栏回到背包（inventory 增加）→ character.item.added
+    //   use / discard → 物品离开 inventory → character.item.removed
+    //   equip → 物品从背包移到装备栏（未消失，仅位置变化）→ 不发 event
+    // appendEvent 失败用 try/catch 兜底——不能影响主流程。
+    if (appliedItem && appliedItem.id) {
+      try {
+        if (action === 'unequip') {
+          await appendEvent({
+            characterId,
+            type: 'character.item.added',
+            data: {
+              type: 'character.item.added',
+              itemId: appliedItem.id,
+              item: appliedItem,
+            },
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: state.age,
+          });
+        } else if (action === 'use' || action === 'discard') {
+          await appendEvent({
+            characterId,
+            type: 'character.item.removed',
+            data: {
+              type: 'character.item.removed',
+              itemId: appliedItem.id,
+              reason: action,
+            },
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: state.age,
+          });
+        }
+      } catch (evtErr: any) {
+        // Event Sourcing 失败为非致命——主流程 state 已更新，不回滚。
+        console.error('[item] appendEvent failed (non-fatal):', evtErr?.message || evtErr);
+      }
+    }
 
     await db.character.update({
       where: { id: characterId, userId: user?.id },

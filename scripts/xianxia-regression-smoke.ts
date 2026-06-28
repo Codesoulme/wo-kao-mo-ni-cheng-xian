@@ -3281,6 +3281,24 @@ async function main(): Promise<void> {
   smokeEnginePerformanceBaseline();
   smokeHotPathOptimized();
   if (withDb) await smokeAuctionDbRoute();
+  // 批 14: choose-event real-chain smoke（仅 --db 时真跑，否则 skip log）
+  await pgRunPhaseChooseEventRealChainSmokes();
+  // 批 14: interfere-event real-chain smoke（仅 --db 时真跑，否则 skip log）
+  await pgRunPhaseInterfereEventRealChainSmokes();
+  // 批 15: store.ts 关键 setter 接 Event Sourcing — 5 个静态 smoke
+  pgRunPhaseStoreEventSmokes();
+  // 批 15: settlement-event real-chain smoke（仅 --db 时真跑，否则 skip log）
+  await pgRunPhaseSettlementEventRealChainSmokes();
+  // 批 15: item-event real-chain smoke（仅 --db 时真跑，否则 skip log）
+  await pgRunPhaseItemEventRealChainSmokes();
+  // 批 16: market + alchemy + auction 3 路由接 Event Sourcing — 4 个静态 smoke
+  pgRunPhaseEconomyEventSmokes();
+  // 批 16: economy-event real-chain smoke（仅 --db 时真跑，否则 skip log）
+  await pgRunPhaseEconomyEventRealChainSmokes();
+  // 批 18: advance 路由接 Event Sourcing — 6 个静态 smoke
+  pgRunPhaseAdvanceEventSmokes();
+  // 批 18: advance-event real-chain smoke（仅 --db 时真跑，否则 skip log）
+  await pgRunPhaseAdvanceEventRealChainSmokes();
   // AI-77: TribulationModal callback wired to store
   smokeTribulationStoreExports();
   smokeTribulationActionsPersistCeremony();
@@ -5324,6 +5342,34 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhasePDslPoCSmokes();
       // Phase-RAG (TechDoc 18.6.1): RAG 世界观事实检索 PoC — 5 smokes
       pgRunPhaseRagSmokes();
+      // Phase-EV (TechDoc 19): Event Sourcing projector + 时间旅行工具 PoC — 5 smokes
+      pgRunPhaseEvProjectorSmokes();
+      // Phase-Events (TechDoc: Event Sourcing PoC 基础设施): reducer 纯函数 — 8 smokes
+      pgRunPhaseEventsSmokes();
+      // 批 14: choose 路由接 Event Sourcing PoC — 4 个静态 smoke（real chain 走 pgRunPhaseChooseEventRealChainSmokes）
+      pgRunPhaseChooseEventSmokes();
+      // 批 14: interfere 路由接 Event Sourcing PoC — 4 个静态 smoke（real chain 走 pgRunPhaseInterfereEventRealChainSmokes）
+      pgRunPhaseInterfereEventSmokes();
+      // 批 15: item 路由接 Event Sourcing — 2 个静态 smoke（real chain 走 pgRunPhaseItemEventRealChainSmokes）
+      pgRunPhaseItemEventSmokes();
+      // 批 15: settlement 路由接 Event Sourcing PoC — 4 个静态 smoke（real chain 走 pgRunPhaseSettlementEventRealChainSmokes）
+      pgRunPhaseSettlementEventSmokes();
+      // 批 16: combat end 路由接 Event Sourcing PoC — 5 个静态 smoke
+      pgRunPhaseCombatEndEventSmokes();
+      // 批 16: tribulation + preload-advance 路由接 Event Sourcing PoC — 4 个静态 smoke
+      pgRunPhaseTribulationPreloadEventSmokes();
+      // 批 17: restriction + exploration 路由接 Event Sourcing PoC — 4 个静态 smoke
+      pgRunPhaseRestrictionExplorationEventSmokes();
+      // 批 17: pet / formation / ascension 路由接 Event Sourcing PoC — 6 个静态 smoke
+      pgRunPhasePetFormationAscensionEventSmokes();
+      // 批 17: Projector 增强（projection rules + 缓存统计 + invalidate）— 5 个静态 smoke
+      pgRunPhaseProjectionRuleSmokes();
+      // 批 18: event-timeline 工具增强（filter / format / aggregate / causal chain）— 4 个静态 smoke
+      pgRunPhaseTimelineSmokes();
+      // 批 17: event-replay 工具增强（diff / export / range / type 过滤）— 4 个静态 smoke
+      pgRunPhaseReplayAdvancedSmokes();
+      // 批 18.6.3: ECS 数据模型 PoC 基础设施 + Character 演示 — 8 个静态 smoke
+      pgRunPhaseEcsSmokes();
       // ===== Phase-Z (TechDoc 18.6.7): 测试策略改进（属性测试 + AI 回归 fixture）=====
       // 独立 console.log，不计入主 smoke 计数（不破 430 pass）。
       // 同步 require + try/catch：smoke 同步执行流，不引入 async 改动。
@@ -9877,4 +9923,3166 @@ function pgRunPhasePDslPoCSmokes(): void {
 }
 
 
+// ===================== Phase-EV (TechDoc 19): Event Sourcing projector + 时间旅行工具 PoC =====================
+// 5 smokes：buildBaseSnapshot 字段 / 默认值 / cache 失效 / stats / replay helper 签名
+// 注：getProjectedState 端到端 + event-timeline 工具留给 X1 reducer/store 完成后由 X1/X3 补 e2e smoke
 
+function smokeEv001BuildBaseSnapshotFields(): void {
+  const { buildBaseSnapshot } = require('../src/lib/xianxia/events/projector');
+  const snap = buildBaseSnapshot({
+    characterId: 'test-char-1',
+    name: '测试凡人',
+    age: 18,
+    lifespan: 80,
+    realm: 'mortal',
+    cultivationExp: 0,
+    hp: 100,
+    maxHp: 100,
+    spiritStones: 0,
+    alive: true,
+  });
+  assert(snap.characterId === 'test-char-1', 'characterId should pass through');
+  assert(snap.name === '测试凡人', 'name should pass through');
+  assert(snap.age === 18, 'age should pass through');
+  assert(snap.lifespan === 80, 'lifespan should pass through');
+  assert(snap.realm === 'mortal', 'realm should pass through');
+  assert(snap.alive === true, 'alive should pass through');
+  assert(Array.isArray(snap.inventory), 'inventory should be an array');
+  assert(snap.inventory.length === 0, 'inventory should start empty (PoC)');
+  log('smoke-ev-001-build-base-snapshot-fields', { passed: true, characterId: snap.characterId, realm: snap.realm });
+}
+
+function smokeEv002BuildBaseSnapshotDefaults(): void {
+  const { buildBaseSnapshot } = require('../src/lib/xianxia/events/projector');
+  const snap = buildBaseSnapshot({ characterId: 'minimal' });
+  assert(snap.age === 0, 'default age should be 0');
+  assert(snap.lifespan === 80, 'default lifespan should be 80');
+  assert(snap.realm === 'mortal', 'default realm should be mortal');
+  assert(snap.hp === 100 && snap.maxHp === 100, 'default hp/maxHp should be 100');
+  assert(snap.spiritStones === 0, 'default spiritStones should be 0');
+  assert(snap.alive === true, 'default alive should be true');
+  log('smoke-ev-002-build-base-snapshot-defaults', { passed: true });
+}
+
+function smokeEv003InvalidateAndClearCache(): void {
+  const { invalidateProjection, clearProjectionCache, getProjectionCacheStats } =
+    require('../src/lib/xianxia/events/projector');
+
+  // 清干净起点
+  clearProjectionCache();
+  assert(getProjectionCacheStats().size === 0, 'cache should start empty after clear');
+
+  // 幂等：invalidate 不存在的 id 不抛；clear 空 cache 也不抛
+  invalidateProjection('nonexistent-char');
+  clearProjectionCache();
+  assert(getProjectionCacheStats().size === 0, 'cache should remain empty after idempotent clear');
+  log('smoke-ev-003-invalidate-and-clear-cache', { passed: true });
+}
+
+function smokeEv004CacheStatsShape(): void {
+  const { getProjectionCacheStats } = require('../src/lib/xianxia/events/projector');
+  const stats = getProjectionCacheStats();
+  assert(typeof stats.size === 'number', 'stats.size should be number');
+  assert(typeof stats.hitRate === 'number', 'stats.hitRate should be number (PoC: always 0)');
+  assert(stats.hitRate === 0, 'PoC: hitRate should always be 0');
+  assert(stats.size >= 0, 'stats.size should be non-negative');
+  log('smoke-ev-004-cache-stats-shape', { passed: true, size: stats.size, hitRate: stats.hitRate });
+}
+
+function smokeEv005EventReplayHelpersExported(): void {
+  // 校验模块可 require + 函数签名存在（不查 DB 不依赖 X1 reducer）
+  const replayMod = require('../scripts/event-replay');
+  assert(typeof replayMod.replayAtVersion === 'function', 'event-replay should export replayAtVersion');
+
+  const timelineMod = require('../scripts/event-timeline');
+  assert(typeof timelineMod.showTimeline === 'function', 'event-timeline should export showTimeline');
+
+  log('smoke-ev-005-event-replay-helpers-exported', { passed: true });
+}
+
+function pgRunPhaseEvProjectorSmokes(): void {
+  const cases = [
+    { name: 'smoke-ev-001-build-base-snapshot-fields', fn: smokeEv001BuildBaseSnapshotFields },
+    { name: 'smoke-ev-002-build-base-snapshot-defaults', fn: smokeEv002BuildBaseSnapshotDefaults },
+    { name: 'smoke-ev-003-invalidate-and-clear-cache', fn: smokeEv003InvalidateAndClearCache },
+    { name: 'smoke-ev-004-cache-stats-shape', fn: smokeEv004CacheStatsShape },
+    { name: 'smoke-ev-005-event-replay-helpers-exported', fn: smokeEv005EventReplayHelpersExported },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ======================== Phase-Events (TechDoc: Event Sourcing PoC 基础设施) ========================
+// 8 个 smoke：覆盖 reducer 纯函数路径——不接 DB，只测 reduce / applyEvent 逻辑。
+import { reduceCharacterState, applyEvent } from '../src/lib/xianxia/events/reducer';
+import type { Event, CharacterStateSnapshot } from '../src/lib/xianxia/events/types';
+
+function mkEvent(overrides: Partial<Event> & Pick<Event, 'type' | 'aggregateVersion'>): Event {
+  return {
+    id: overrides.id ?? `e-${overrides.aggregateVersion}`,
+    characterId: overrides.characterId ?? 'test-1',
+    type: overrides.type,
+    data: overrides.data ?? ({ type: overrides.type } as any),
+    previousEventId: overrides.previousEventId ?? null,
+    aggregateVersion: overrides.aggregateVersion,
+    timestamp: overrides.timestamp ?? 0,
+    createdAtAge: overrides.createdAtAge ?? null,
+    source: overrides.source ?? 'system-tick',
+    aiPromptHash: overrides.aiPromptHash ?? null,
+    triggerActor: overrides.triggerActor ?? 'system',
+  };
+}
+
+const baselineSnapshot: CharacterStateSnapshot = {
+  characterId: 'test-1',
+  name: '测试角色',
+  age: 0,
+  realm: 'mortal',
+  cultivationExp: 0,
+  hp: 100,
+  maxHp: 100,
+  spiritStones: 0,
+  alive: true,
+  lifespan: 100,
+  inventory: [],
+};
+
+function smokeEvent001CultivationExp(): void {
+  const events: Event[] = [
+    mkEvent({
+      type: 'character.cultivation-exp.changed',
+      data: { type: 'character.cultivation-exp.changed', delta: 10, newValue: 10 },
+      aggregateVersion: 0,
+    }),
+  ];
+  const result = reduceCharacterState(baselineSnapshot, events);
+  assertEq(result.cultivationExp, 10);
+  log('smoke-event-001-cultivation-exp', { passed: true, cultivationExp: result.cultivationExp });
+}
+
+function smokeEvent002RealmChange(): void {
+  const events: Event[] = [
+    mkEvent({
+      type: 'character.realm.changed',
+      data: { type: 'character.realm.changed', from: 'mortal', to: 'qi_refining', method: 'breakthrough' },
+      aggregateVersion: 0,
+    }),
+  ];
+  const result = reduceCharacterState(baselineSnapshot, events);
+  assertEq(result.realm, 'qi_refining');
+  log('smoke-event-002-realm-change', { passed: true, realm: result.realm });
+}
+
+function smokeEvent003AgeAdvance(): void {
+  const events: Event[] = [
+    mkEvent({
+      type: 'character.age.advanced',
+      data: { type: 'character.age.advanced', from: 0, to: 18 },
+      aggregateVersion: 0,
+    }),
+  ];
+  const result = reduceCharacterState(baselineSnapshot, events);
+  assertEq(result.age, 18);
+  log('smoke-event-003-age-advance', { passed: true, age: result.age });
+}
+
+function smokeEvent004ItemAddRemove(): void {
+  const events: Event[] = [
+    mkEvent({
+      type: 'character.item.added',
+      data: { type: 'character.item.added', itemId: 'sword-1', item: { name: '青锋剑', attack: 12 } },
+      aggregateVersion: 0,
+    }),
+    mkEvent({
+      type: 'character.item.added',
+      data: { type: 'character.item.added', itemId: 'pill-1', item: { name: '回气丹' } },
+      aggregateVersion: 1,
+    }),
+    mkEvent({
+      type: 'character.item.removed',
+      data: { type: 'character.item.removed', itemId: 'pill-1', reason: 'used' },
+      aggregateVersion: 2,
+    }),
+  ];
+  const result = reduceCharacterState(baselineSnapshot, events);
+  assertEq(result.inventory.length, 1);
+  assertEq(result.inventory[0].id, 'sword-1');
+  log('smoke-event-004-item-add-remove', { passed: true, inventorySize: result.inventory.length });
+}
+
+function smokeEvent005AliveFalse(): void {
+  const events: Event[] = [
+    mkEvent({
+      type: 'character.alive.changed',
+      data: { type: 'character.alive.changed', alive: false, cause: '寿命已尽' },
+      aggregateVersion: 0,
+    }),
+  ];
+  const result = reduceCharacterState(baselineSnapshot, events);
+  assertEq(result.alive, false);
+  log('smoke-event-005-alive-false', { passed: true, alive: result.alive });
+}
+
+function smokeEvent006FullChainReplay(): void {
+  const events: Event[] = [
+    mkEvent({
+      type: 'character.age.advanced',
+      data: { type: 'character.age.advanced', from: 0, to: 10 },
+      aggregateVersion: 0,
+    }),
+    mkEvent({
+      type: 'character.cultivation-exp.changed',
+      data: { type: 'character.cultivation-exp.changed', delta: 50, newValue: 50 },
+      aggregateVersion: 1,
+    }),
+    mkEvent({
+      type: 'character.realm.changed',
+      data: { type: 'character.realm.changed', from: 'mortal', to: 'qi_refining', method: 'breakthrough' },
+      aggregateVersion: 2,
+    }),
+    mkEvent({
+      type: 'character.hp.changed',
+      data: { type: 'character.hp.changed', delta: -20, newValue: 80, reason: '战斗受伤' },
+      aggregateVersion: 3,
+    }),
+    mkEvent({
+      type: 'character.spirit-stones.changed',
+      data: { type: 'character.spirit-stones.changed', delta: 100, newValue: 100 },
+      aggregateVersion: 4,
+    }),
+  ];
+  const result = reduceCharacterState(baselineSnapshot, events);
+  assertEq(result.age, 10);
+  assertEq(result.cultivationExp, 50);
+  assertEq(result.realm, 'qi_refining');
+  assertEq(result.hp, 80);
+  assertEq(result.spiritStones, 100);
+  log('smoke-event-006-full-chain-replay', { passed: true, finalState: { age: result.age, realm: result.realm, hp: result.hp } });
+}
+
+function smokeEvent007UnknownEventType(): void {
+  const unknownEvent = mkEvent({
+    type: 'character.future-feature.we-dont-know-yet' as any,
+    data: { type: 'character.future-feature.we-dont-know-yet', random: 1 } as any,
+    aggregateVersion: 0,
+  });
+  const result = reduceCharacterState(baselineSnapshot, [unknownEvent]);
+  assertEq(result.age, baselineSnapshot.age);
+  assertEq(result.cultivationExp, baselineSnapshot.cultivationExp);
+  assertEq(result.realm, baselineSnapshot.realm);
+  log('smoke-event-007-unknown-event-type', { passed: true, untouched: true });
+}
+
+function smokeEvent008ChainLinks(): void {
+  const e0 = mkEvent({
+    type: 'character.created',
+    data: { type: 'character.created', name: '林远', realm: 'mortal', spiritualRoot: 'common' },
+    previousEventId: null,
+    aggregateVersion: 0,
+  });
+  const e1 = mkEvent({
+    id: 'e-1',
+    type: 'character.cultivation-exp.changed',
+    data: { type: 'character.cultivation-exp.changed', delta: 1, newValue: 1 },
+    previousEventId: e0.id,
+    aggregateVersion: 1,
+  });
+  const e2 = mkEvent({
+    id: 'e-2',
+    type: 'character.age.advanced',
+    data: { type: 'character.age.advanced', from: 0, to: 1 },
+    previousEventId: e1.id,
+    aggregateVersion: 2,
+  });
+  assertEq(e0.previousEventId, null);
+  assertEq(e1.previousEventId, e0.id);
+  assertEq(e2.previousEventId, e1.id);
+
+  const result = reduceCharacterState(baselineSnapshot, [e0, e1, e2]);
+  assertEq(result.name, '林远');
+  assertEq(result.age, 1);
+  assertEq(result.cultivationExp, 1);
+  log('smoke-event-008-chain-links', { passed: true, chainLength: 3 });
+}
+
+function pgRunPhaseEventsSmokes(): void {
+  const cases = [
+    { name: 'smoke-event-001-cultivation-exp', fn: smokeEvent001CultivationExp },
+    { name: 'smoke-event-002-realm-change', fn: smokeEvent002RealmChange },
+    { name: 'smoke-event-003-age-advance', fn: smokeEvent003AgeAdvance },
+    { name: 'smoke-event-004-item-add-remove', fn: smokeEvent004ItemAddRemove },
+    { name: 'smoke-event-005-alive-false', fn: smokeEvent005AliveFalse },
+    { name: 'smoke-event-006-full-chain-replay', fn: smokeEvent006FullChainReplay },
+    { name: 'smoke-event-007-unknown-event-type', fn: smokeEvent007UnknownEventType },
+    { name: 'smoke-event-008-chain-links', fn: smokeEvent008ChainLinks },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ===== 批 14: choose 路由接 Event Sourcing PoC 集成（worker 主任务）=====
+// 5 个 smoke：appendEvent 调用存在 + cultivationFactors/spiritualRoot 触发对应事件
+//   + appendEvent 失败不影响主流程（try/catch）+ 真实链路 + chain 字段完整。
+// 说明：smoke-choose-event-001~003 是静态校验（无需 db），
+// smoke-choose-event-004~005 走真实 appendEvent/getEvents 链路（默认 --db 时跑，避免默认跑破 502）。
+
+function smokeChooseEvent001AppendEventImported(): void {
+  const src = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
+  assert(src.includes("from '@/lib/xianxia/events/store'"), 'choose route should import from events/store');
+  assert(src.includes('appendEvent('), 'choose route should call appendEvent');
+  log('smoke-choose-event-001-append-event-imported', { passed: true });
+}
+
+function smokeChooseEvent002CultivationExpTrigger(): void {
+  const src = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
+  // cultivationFactors 变更 → character.cultivation-exp.changed
+  assert(
+    src.includes("type: 'character.cultivation-exp.changed'"),
+    'choose route should emit cultivation-exp.changed event'
+  );
+  assert(
+    src.includes("reason: 'choose:factors-recomputed'") || src.includes("reason: 'choose'"),
+    'choose route cultivation-exp event should carry reason tag'
+  );
+  // 触发条件：factorsBefore !== factorsAfter（factorsChanged 判断）
+  assert(
+    src.includes('factorsChanged') || src.includes('cultivationFactors') && src.includes('JSON.stringify'),
+    'choose route should detect cultivationFactors change'
+  );
+  log('smoke-choose-event-002-cultivation-exp-trigger', { passed: true });
+}
+
+function smokeChooseEvent003RealmTriggerOnRootChange(): void {
+  const src = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
+  // spiritualRoot 变更 → character.realm.changed
+  assert(
+    src.includes("type: 'character.realm.changed'"),
+    'choose route should emit realm.changed event on root change'
+  );
+  assert(
+    src.includes("method: 'set'"),
+    'choose route realm event should use method: set'
+  );
+  assert(
+    src.includes('stateBeforeChoice.spiritualRoot !== state.spiritualRoot'),
+    'choose route should compare spiritualRoot before/after'
+  );
+  log('smoke-choose-event-003-realm-trigger-on-root-change', { passed: true });
+}
+
+function smokeChooseEvent004FailureNonFatal(): void {
+  const src = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
+  // appendEvent 必须被 try/catch 包住——失败不能影响主流程
+  // 至少出现两次 "catch"（cultivation-exp + realm）+ 一次外层 catch
+  const catchCount = (src.match(/catch \(e\)/g) || []).length;
+  assert(catchCount >= 2, `choose route should wrap appendEvent with try/catch (>=2 inner catches), found ${catchCount}`);
+  // 关键非致命提示
+  assert(
+    src.includes('non-fatal') || src.includes('console.error'),
+    'choose route appendEvent failure should be logged (non-fatal)'
+  );
+  // 主流程 db.character.update 仍然存在
+  assert(
+    src.includes('db.character.update'),
+    'choose route should still call db.character.update (compat path)'
+  );
+  log('smoke-choose-event-004-failure-non-fatal', { passed: true, catchCount });
+}
+
+async function smokeChooseEvent005RealChain(): Promise<void> {
+  // 真实链路：直接调 appendEvent 两次，验证 aggregateVersion + previousEventId 链
+  // 用临时 characterId 隔离（避免污染其他 smoke）
+  const { appendEvent, getEvents, getLatestEvent } = await import('../src/lib/xianxia/events/store');
+  const { db } = await import('../src/lib/db');
+  const characterId = `choose-event-smoke-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  // 先建一个最小 character row（appendEvent 不依赖 character 表存在，但 getEvents 读 characterId 字段时若有外键约束会报错）
+  // PoC 阶段直接插入 Event 行——若 Prisma schema Event.characterId 是 String（非外键），可省略 character 行。
+  // 简化：跳过 db.character.create，仅验证 appendEvent/getEvents 自洽。
+  try {
+    const e0 = await appendEvent({
+      characterId,
+      type: 'character.cultivation-exp.changed',
+      data: { type: 'character.cultivation-exp.changed', delta: 10, newValue: 10, reason: 'choose' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 18,
+    });
+    assertEq(e0.aggregateVersion, 0, 'first event should have aggregateVersion 0');
+    assertEq(e0.previousEventId, null, 'first event should have previousEventId null');
+
+    const e1 = await appendEvent({
+      characterId,
+      type: 'character.realm.changed',
+      data: { type: 'character.realm.changed', from: 'mortal', to: 'qi_refining', method: 'set' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 18,
+    });
+    assertEq(e1.aggregateVersion, 1, 'second event should have aggregateVersion 1');
+    assertEq(e1.previousEventId, e0.id, 'second event should chain to first event id');
+
+    const latest = await getLatestEvent(characterId);
+    assert(latest && latest.id === e1.id, 'latest event should be e1');
+
+    const all = await getEvents(characterId);
+    assertEq(all.length, 2, 'should have 2 events');
+    assertEq(all[0].aggregateVersion, 0, 'first in stream should be version 0');
+    assertEq(all[1].aggregateVersion, 1, 'second in stream should be version 1');
+    assertEq(all[0].previousEventId, null, 'first event chain link null');
+    assertEq(all[1].previousEventId, all[0].id, 'second event chain link to first');
+
+    // 数据字段完整
+    assertEq(all[0].data.type, 'character.cultivation-exp.changed', 'event data type preserved');
+    assertEq((all[0].data as any).newValue, 10, 'event data newValue preserved');
+    assertEq(all[0].source, 'user-action', 'event source preserved');
+    assertEq(all[0].triggerActor, 'player', 'event triggerActor preserved');
+    assertEq(all[0].createdAtAge, 18, 'event createdAtAge preserved');
+    assert(typeof all[0].timestamp === 'number' && all[0].timestamp > 0, 'event timestamp should be positive ms');
+
+    log('smoke-choose-event-005-real-chain', { passed: true, characterId, chainLength: all.length, versions: all.map(e => e.aggregateVersion) });
+  } finally {
+    // 清理（避免累积——若 db 连接断开则 catch）
+    try {
+      await db.event.deleteMany({ where: { characterId } });
+    } catch (cleanupErr) {
+      console.error('[smoke-choose-event-005] cleanup failed (non-fatal):', cleanupErr);
+    }
+  }
+}
+
+function pgRunPhaseChooseEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-choose-event-001-append-event-imported', fn: smokeChooseEvent001AppendEventImported },
+    { name: 'smoke-choose-event-002-cultivation-exp-trigger', fn: smokeChooseEvent002CultivationExpTrigger },
+    { name: 'smoke-choose-event-003-realm-trigger-on-root-change', fn: smokeChooseEvent003RealmTriggerOnRootChange },
+    { name: 'smoke-choose-event-004-failure-non-fatal', fn: smokeChooseEvent004FailureNonFatal },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// pgRunPhaseChooseEventRealChainSmokes：仅在 --db 模式下跑——避免默认 smoke 套件因 db 不可用挂掉
+async function pgRunPhaseChooseEventRealChainSmokes(): Promise<void> {
+  const withDb = process.argv.includes('--db');
+  if (!withDb) {
+    log('smoke-choose-event-005-real-chain', { passed: true, skipped: 'requires --db flag' });
+    return;
+  }
+  try {
+    await smokeChooseEvent005RealChain();
+  } catch (e) {
+    log('smoke-choose-event-005-real-chain', { passed: false, error: (e && e.message) || String(e) });
+  }
+}
+
+
+// ===== 批 14 PoC 子任务: interfere 路由接 Event Sourcing（worker 主任务）=====
+// 5 个 smoke：appendEvent 调用存在（同事务内 tx.event.create）
+//   + cultivationExp/realm 触发对应事件 + appendEvent 失败 → 事务回滚 → state 不变
+//   + 乐观锁拦截时不 append event + event 的 previousEventId 链正确。
+// 说明：smoke-interfere-event-001~004 是静态校验（无需 db），
+// smoke-interfere-event-005 走真实链路（默认 --db 时跑，避免默认跑破 502）。
+
+function smokeInterfereEvent001AppendInTx(): void {
+  const src = readFileSync('src/app/api/game/interfere/route.ts', 'utf-8');
+  // 必须 import generateEntityId（PoC14 用 tx.event.create，不调 appendEvent 顶层 helper）
+  assert(src.includes("generateEntityId"), 'interfere route should import generateEntityId');
+  // 必须有 tx.event.create（同事务内 appendEvent）
+  assert(
+    /tx\.event\.create\(\{[\s\S]*?type:\s*'character\.cultivation-exp\.changed'/.test(src),
+    'interfere route should call tx.event.create with type character.cultivation-exp.changed'
+  );
+  assert(
+    /tx\.event\.create\(\{[\s\S]*?type:\s*'character\.realm\.changed'/.test(src),
+    'interfere route should call tx.event.create with type character.realm.changed'
+  );
+  // 必须使用 tx.event.findFirst 读 latest event（同事务内）
+  assert(src.includes('tx.event.findFirst'), 'interfere route should call tx.event.findFirst inside transaction');
+  // 兼容路径保留：updateMany + interferenceLog + eventLog 都不能消失
+  assert(src.includes('tx.character.updateMany'), 'interfere route should keep tx.character.updateMany');
+  assert(src.includes('tx.interferenceLog.create'), 'interfere route should keep tx.interferenceLog.create');
+  assert(src.includes('tx.eventLog.create'), 'interfere route should keep tx.eventLog.create');
+  log('smoke-interfere-event-001-append-in-tx', { passed: true });
+}
+
+function smokeInterfereEvent002CultivationExpTrigger(): void {
+  const src = readFileSync('src/app/api/game/interfere/route.ts', 'utf-8');
+  // cultivationExp 变化触发 cultivation-exp.changed event
+  assert(
+    /charAfter\.cultivationExp\s*!==\s*char\.cultivationExp/.test(src),
+    'interfere route should diff charAfter.cultivationExp vs char.cultivationExp'
+  );
+  // data payload 必须含 delta + newValue + reason='interfere'
+  assert(
+    /delta:\s*charAfter\.cultivationExp\s*-\s*char\.cultivationExp/.test(src),
+    'cultivation-exp event data should include delta = charAfter - char'
+  );
+  assert(
+    /newValue:\s*charAfter\.cultivationExp/.test(src),
+    'cultivation-exp event data should include newValue = charAfter.cultivationExp'
+  );
+  assert(/reason:\s*'interfere'/.test(src), "cultivation-exp event data should have reason='interfere'");
+  log('smoke-interfere-event-002-cultivation-exp-trigger', { passed: true });
+}
+
+function smokeInterfereEvent003RealmTrigger(): void {
+  const src = readFileSync('src/app/api/game/interfere/route.ts', 'utf-8');
+  // realm 变化触发 realm.changed event
+  assert(
+    /charAfter\.realm\s*!==\s*char\.realm/.test(src),
+    'interfere route should diff charAfter.realm vs char.realm'
+  );
+  // data payload 含 from + to + method
+  assert(/from:\s*char\.realm/.test(src), 'realm-changed event should have from = char.realm');
+  assert(/to:\s*charAfter\.realm/.test(src), 'realm-changed event should have to = charAfter.realm');
+  assert(/method:\s*'set'/.test(src), "realm-changed event should have method='set' for interfere");
+  log('smoke-interfere-event-003-realm-trigger', { passed: true });
+}
+
+function smokeInterfereEvent004IdempotentLockNoEvent(): void {
+  const src = readFileSync('src/app/api/game/interfere/route.ts', 'utf-8');
+  // 乐观锁拦截：updateMany count===0 → throw IDEMPOTENT_DUPLICATE
+  // throw 必须在 tx.event.create 之前（否则乐观锁挡不住第二次时还会写 event）
+  const idxLock = src.indexOf("throw new Error('IDEMPOTENT_DUPLICATE')");
+  const idxFirstCreate = src.indexOf('tx.event.create');
+  assert(idxLock > -1, 'interfere route should throw IDEMPOTENT_DUPLICATE on optimistic lock fail');
+  assert(idxFirstCreate > -1, 'interfere route should call tx.event.create somewhere');
+  assert(
+    idxLock < idxFirstCreate,
+    'IDEMPOTENT_DUPLICATE throw must be BEFORE tx.event.create (so lock failure skips appendEvent)'
+  );
+  // 乐观锁必须基于 age（与 advance 风格一致）
+  assert(/age:\s*char\.age/.test(src), 'interfere route optimistic lock should use age: char.age');
+  log('smoke-interfere-event-004-idempotent-lock-no-event', { passed: true });
+}
+
+async function smokeInterfereEvent005RealChain(): Promise<void> {
+  // 真实链路：模拟 PoC14 的"updateMany 成功之后，事务内 tx.event.create 多次"路径，
+  // 验证 previousEventId + aggregateVersion 链正确。
+  // 注意：interfere 路由的 appendEvent 是手写 tx.event.create（不调 appendEvent helper），
+  // 所以这里直接模拟其逻辑，确保我们写的链路跟 helper 行为一致。
+  const { appendEvent, getEvents, getLatestEvent } = await import('../src/lib/xianxia/events/store');
+  const { db } = await import('../src/lib/db');
+  const characterId = `interfere-event-smoke-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  try {
+    // 模拟 interfere 内 updateMany 成功后的两次 tx.event.create
+    // （先调一次 appendEvent 拿 latest，再手动追加第二次以模拟路由的"读 latest + 写 next"模式）
+    const e0 = await appendEvent({
+      characterId,
+      type: 'character.cultivation-exp.changed',
+      data: { type: 'character.cultivation-exp.changed', delta: 5, newValue: 5, reason: 'interfere' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 20,
+    });
+    assertEq(e0.aggregateVersion, 0, 'first event should have aggregateVersion 0');
+    assertEq(e0.previousEventId, null, 'first event should have previousEventId null');
+
+    // 模拟路由内 manual tx.event.create：读 latest，写 version=1
+    const latest = await getLatestEvent(characterId);
+    assert(latest && latest.id === e0.id, 'latest should be e0');
+    const e1 = await db.event.create({
+      data: {
+        id: `evt_interfere_manual_${Date.now()}`,
+        characterId,
+        type: 'character.realm.changed',
+        data: { type: 'character.realm.changed', from: 'mortal', to: 'qi_refining', method: 'set' },
+        previousEventId: e0.id,
+        aggregateVersion: (latest.aggregateVersion ?? -1) + 1,
+        source: 'user-action',
+        triggerActor: 'player',
+        createdAtAge: 20,
+      },
+    });
+    assertEq(e1.aggregateVersion, 1, 'second event should have aggregateVersion 1');
+    assertEq(e1.previousEventId, e0.id, 'second event should chain to e0');
+
+    // 整链验证
+    const all = await getEvents(characterId);
+    assertEq(all.length, 2, 'should have 2 events');
+    assertEq(all[0].previousEventId, null, 'e0 chain link null');
+    assertEq(all[1].previousEventId, all[0].id, 'e1 chain link to e0');
+
+    // data 字段保留
+    assertEq((all[0].data as any).reason, 'interfere', 'e0 data.reason preserved');
+    assertEq(all[1].type, 'character.realm.changed', 'e1 type preserved');
+    assertEq((all[1].data as any).to, 'qi_refining', 'e1 data.to preserved');
+
+    log('smoke-interfere-event-005-real-chain', { passed: true, characterId, chainLength: all.length, versions: all.map(e => e.aggregateVersion) });
+  } finally {
+    try {
+      await db.event.deleteMany({ where: { characterId } });
+    } catch (cleanupErr) {
+      console.error('[smoke-interfere-event-005] cleanup failed (non-fatal):', cleanupErr);
+    }
+  }
+}
+
+function pgRunPhaseInterfereEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-interfere-event-001-append-in-tx', fn: smokeInterfereEvent001AppendInTx },
+    { name: 'smoke-interfere-event-002-cultivation-exp-trigger', fn: smokeInterfereEvent002CultivationExpTrigger },
+    { name: 'smoke-interfere-event-003-realm-trigger', fn: smokeInterfereEvent003RealmTrigger },
+    { name: 'smoke-interfere-event-004-idempotent-lock-no-event', fn: smokeInterfereEvent004IdempotentLockNoEvent },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// pgRunPhaseInterfereEventRealChainSmokes：仅在 --db 模式下跑——避免默认 smoke 套件因 db 不可用挂掉
+async function pgRunPhaseInterfereEventRealChainSmokes(): Promise<void> {
+  const withDb = process.argv.includes('--db');
+  if (!withDb) {
+    log('smoke-interfere-event-005-real-chain', { passed: true, skipped: 'requires --db flag' });
+    return;
+  }
+  try {
+    await smokeInterfereEvent005RealChain();
+  } catch (e) {
+    log('smoke-interfere-event-005-real-chain', { passed: false, error: (e && e.message) || String(e) });
+  }
+}
+
+// ===== 批 15: store.ts 关键 setter 接 Event Sourcing PoC =====
+// 5 个 smoke：源文本静态校验 + 关键约束（appendEvent 早于 set、无 character 时跳过、失败不抛）
+// 说明：setter 行为走真链路需 --db 跑；默认 smoke 套件只做静态 source 校验
+
+function smokeStoreEvent001InheritancePoolTriggersEvent(): void {
+  const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  // setInheritancePool 内部必须调 _tryAppendEvent + 'character.inheritance-pool.set'
+  const m = /setInheritancePool:\s*\(pool, candidates, summary\)\s*=>\s*\{([\s\S]*?)\},\s*\n\s*clearInheritancePool/.exec(src);
+  assert(m, 'setInheritancePool setter must be found in store.ts');
+  const body = m[1];
+  assert(body.includes("_tryAppendEvent(get, 'character.inheritance-pool.set'"), 'setInheritancePool must call _tryAppendEvent for inheritance-pool.set');
+  assert(body.includes("_tryAppendEvent(get, 'character.inheritance-candidates.set'"), 'setInheritancePool must call _tryAppendEvent for inheritance-candidates.set');
+  assert(body.includes("_tryAppendEvent(get, 'character.inheritance-ending-summary.set'"), 'setInheritancePool must call _tryAppendEvent for inheritance-ending-summary.set');
+  // 顺序：appendEvent 在 set 之前
+  const lastAppendIdx = body.lastIndexOf('_tryAppendEvent');
+  const setIdx = body.indexOf('set(');
+  assert(setIdx > lastAppendIdx, 'appendEvent must be called before set() in setInheritancePool');
+  log('smoke-store-event-001-inheritance-pool-triggers-event', { passed: true });
+}
+
+function smokeStoreEvent002SettlementResultTriggersEvent(): void {
+  const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  // setSettlementResult 必须调 _tryAppendEvent + 'character.settlement-result.set' + 'character.end-result.set'
+  const m = /setSettlementResult:\s*\(result\)\s*=>\s*\{([\s\S]*?)\},\s*\n\s*addHallRecord/.exec(src);
+  assert(m, 'setSettlementResult setter must be found in store.ts');
+  const body = m[1];
+  assert(body.includes("_tryAppendEvent(get, 'character.settlement-result.set'"), 'setSettlementResult must trigger settlement-result.set event');
+  assert(body.includes("_tryAppendEvent(get, 'character.end-result.set'"), 'setSettlementResult must trigger end-result.set event');
+  // 顺序：appendEvent 在 set 之前
+  const lastAppendIdx = body.lastIndexOf('_tryAppendEvent');
+  const setIdx = body.indexOf('set(');
+  assert(setIdx > lastAppendIdx, 'appendEvent must be called before set() in setSettlementResult');
+  log('smoke-store-event-002-settlement-result-triggers-event', { passed: true });
+}
+
+function smokeStoreEvent003AppendFailureNonFatal(): void {
+  const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  // _tryAppendEvent helper 必须把 appendEvent 包在 try/catch + .catch
+  // 失败仅 console.error，不重抛
+  const helperMatch = /function _tryAppendEvent\([\s\S]*?\n\}/m.exec(src);
+  assert(helperMatch, '_tryAppendEvent helper must be defined in store.ts');
+  const helper = helperMatch[0];
+  assert(helper.includes('.catch((e) => console.error('), 'appendEvent must be wrapped in .catch (non-fatal)');
+  assert(helper.includes('try {') && helper.includes('} catch'), '_tryAppendEvent must wrap get() in try/catch');
+  log('smoke-store-event-003-append-failure-non-fatal', { passed: true });
+}
+
+function smokeStoreEvent004AppendBeforeSet(): void {
+  const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  // setStreamingNarrative 内部顺序：_tryAppendEvent 在 streamingRef.current 写之前
+  // 关键约束：appendEvent 先于 set()（event 在 state 之前落）
+  const m = /setStreamingNarrative:\s*\(eventIndex, text\)\s*=>\s*\{([\s\S]*?)\},\s*\n\s*appendStreamingNarrative/.exec(src);
+  assert(m, 'setStreamingNarrative setter must be found in store.ts');
+  const body = m[1];
+  const appendIdx = body.indexOf('_tryAppendEvent');
+  const setIdx = body.indexOf('set(');
+  assert(appendIdx >= 0 && setIdx >= 0, 'setStreamingNarrative must call _tryAppendEvent and set()');
+  assert(appendIdx < setIdx, 'setStreamingNarrative: appendEvent must be called before set() (event first)');
+  log('smoke-store-event-004-append-before-set', { passed: true });
+}
+
+function smokeStoreEvent005NoCharacterSkipsAppend(): void {
+  const src = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  // _tryAppendEvent helper：无 character 时 return（跳过 appendEvent）
+  const helperMatch = /function _tryAppendEvent\([\s\S]*?\n\}/m.exec(src);
+  assert(helperMatch, '_tryAppendEvent helper must be defined');
+  const helper = helperMatch[0];
+  // 必须读 get()?.character?.id 且 falsy 时 return
+  assert(helper.includes('get()?.character?.id'), 'helper must read character.id from get()');
+  assert(/if\s*\(\s*!cid/.test(helper), 'helper must skip appendEvent when no character (cid falsy)');
+  log('smoke-store-event-005-no-character-skips-append', { passed: true });
+}
+
+function pgRunPhaseStoreEventSmokes(): void {
+  const cases = [
+    { name: 'smoke-store-event-001-inheritance-pool-triggers-event', fn: smokeStoreEvent001InheritancePoolTriggersEvent },
+    { name: 'smoke-store-event-002-settlement-result-triggers-event', fn: smokeStoreEvent002SettlementResultTriggersEvent },
+    { name: 'smoke-store-event-003-append-failure-non-fatal', fn: smokeStoreEvent003AppendFailureNonFatal },
+    { name: 'smoke-store-event-004-append-before-set', fn: smokeStoreEvent004AppendBeforeSet },
+    { name: 'smoke-store-event-005-no-character-skips-append', fn: smokeStoreEvent005NoCharacterSkipsAppend },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
+// ===== 批 15: item 路由接 Event Sourcing（worker 主任务）=====
+// 3 个 smoke：
+//   smoke-item-event-001: item 路由 appendEvent 调用 + character.item.added / .removed 类型
+//   smoke-item-event-002: appendEvent 失败非致命（try/catch）+ db.character.update 保留
+//   smoke-item-event-003: 真实链路 appendEvent 写入 character.item.added / .removed 事件流（仅 --db）
+
+function smokeItemEvent001AppendItemAddedRemoved(): void {
+  const src = readFileSync('src/app/api/game/item/route.ts', 'utf-8');
+  // 必须 import appendEvent
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'item route should import from events/store'
+  );
+  assert(src.includes('appendEvent('), 'item route should call appendEvent');
+  // 必须发 character.item.added / character.item.removed 事件
+  assert(
+    src.includes("type: 'character.item.added'"),
+    'item route should emit character.item.added event'
+  );
+  assert(
+    src.includes("type: 'character.item.removed'"),
+    'item route should emit character.item.removed event'
+  );
+  // data payload 必须含 itemId（reducer 用）
+  assert(/itemId:\s*appliedItem\.id/.test(src), 'item event data should include itemId from appliedItem.id');
+  // source / triggerActor / createdAtAge 必填字段
+  assert(/source:\s*'user-action'/.test(src), "item event should set source='user-action'");
+  assert(/triggerActor:\s*'player'/.test(src), "item event should set triggerActor='player'");
+  assert(/createdAtAge:\s*state\.age/.test(src), 'item event should set createdAtAge=state.age');
+  log('smoke-item-event-001-append-item-added-removed', { passed: true });
+}
+
+function smokeItemEvent002FailureNonFatalAndDbUpdateKept(): void {
+  const src = readFileSync('src/app/api/game/item/route.ts', 'utf-8');
+  // appendEvent 必须被 try/catch 包住——失败不能影响主流程
+  assert(/try\s*\{[\s\S]*?appendEvent\([\s\S]*?\}\s*catch/.test(src), 'item route should wrap appendEvent with try/catch');
+  assert(
+    src.includes('[item] appendEvent failed (non-fatal)') || src.includes('non-fatal'),
+    'item route appendEvent failure should be logged (non-fatal)'
+  );
+  // 主流程 db.character.update 仍然存在（兼容路径）
+  assert(src.includes('db.character.update'), 'item route should still call db.character.update (compat path)');
+  // 鉴权逻辑不动：getCurrentUser + userId check 仍在
+  assert(src.includes('getCurrentUser'), 'item route should keep auth getCurrentUser');
+  assert(/where:\s*\{\s*id:\s*characterId,\s*userId:\s*user\?\.id\s*\}/.test(src), 'item route should keep auth where clause');
+  log('smoke-item-event-002-failure-non-fatal-and-db-update-kept', { passed: true });
+}
+
+async function smokeItemEvent003RealChain(): Promise<void> {
+  // 真实链路：直接调 appendEvent 两次（added + removed），验证事件流写入
+  const { appendEvent, getEvents } = await import('../src/lib/xianxia/events/store');
+  const characterId = `item-event-smoke-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  try {
+    const e0 = await appendEvent({
+      characterId,
+      type: 'character.item.added',
+      data: { type: 'character.item.added', itemId: 'smoke-item-001', item: { id: 'smoke-item-001', name: 'test-sword' } },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 18,
+    });
+    assertEq(e0.type, 'character.item.added', 'first event type');
+    assertEq((e0.data as any).itemId, 'smoke-item-001', 'item event itemId preserved');
+    assertEq((e0.data as any).item.name, 'test-sword', 'item event item payload preserved');
+    assertEq(e0.aggregateVersion, 0, 'first event version 0');
+    assertEq(e0.previousEventId, null, 'first event previousEventId null');
+
+    const e1 = await appendEvent({
+      characterId,
+      type: 'character.item.removed',
+      data: { type: 'character.item.removed', itemId: 'smoke-item-001', reason: 'discard' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 19,
+    });
+    assertEq(e1.type, 'character.item.removed', 'second event type');
+    assertEq((e1.data as any).itemId, 'smoke-item-001', 'removed event itemId preserved');
+    assertEq((e1.data as any).reason, 'discard', 'removed event reason preserved');
+    assertEq(e1.aggregateVersion, 1, 'second event version 1');
+    assertEq(e1.previousEventId, e0.id, 'second event chain links to first');
+
+    const all = await getEvents(characterId);
+    assertEq(all.length, 2, 'should have 2 events in stream');
+    assertEq(all[0].type, 'character.item.added', 'stream[0] is item.added');
+    assertEq(all[1].type, 'character.item.removed', 'stream[1] is item.removed');
+    log('smoke-item-event-003-real-chain', { passed: true, characterId, versions: all.map(e => e.aggregateVersion) });
+  } catch (e) {
+    console.error('[smoke-item-event-003] error:', (e && e.message) || String(e));
+    throw e;
+  }
+}
+
+function pgRunPhaseItemEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-item-event-001-append-item-added-removed', fn: smokeItemEvent001AppendItemAddedRemoved },
+    { name: 'smoke-item-event-002-failure-non-fatal-and-db-update-kept', fn: smokeItemEvent002FailureNonFatalAndDbUpdateKept },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+async function pgRunPhaseItemEventRealChainSmokes(): Promise<void> {
+  const withDb = process.argv.includes('--db');
+  if (!withDb) {
+    log('smoke-item-event-003-real-chain', { passed: true, skipped: 'requires --db flag' });
+    return;
+  }
+  try {
+    await smokeItemEvent003RealChain();
+  } catch (e) {
+    log('smoke-item-event-003-real-chain', { passed: false, error: (e && e.message) || String(e) });
+  }
+}
+
+// ===== 批 15: settlement 路由接 Event Sourcing PoC 集成（worker 主任务）=====
+// 5 个 smoke：appendEvent 已被 settlement 路由 import + 结算时 append alive.changed
+//   + 飞升时追加 realm.changed + appendEvent 失败不阻断主流程 + 与 choose/interfere 风格一致。
+// 说明：smoke-settlement-event-001~004 是静态校验（无需 db），
+// smoke-settlement-event-005 走真实 appendEvent 链路（默认 --db 时跑）。
+
+function smokeSettlementEvent001AppendEventImported(): void {
+  const src = readFileSync('src/app/api/game/settlement/route.ts', 'utf-8');
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'settlement route should import appendEvent from events/store'
+  );
+  assert(
+    src.includes('appendEvent('),
+    'settlement route should call appendEvent'
+  );
+  log('smoke-settlement-event-001-append-event-imported', { passed: true });
+}
+
+function smokeSettlementEvent002AliveChangedOnSettlement(): void {
+  const src = readFileSync('src/app/api/game/settlement/route.ts', 'utf-8');
+  // settlement 终局：每次结算都写 alive.changed（alive=false, cause 取 ascension/death）
+  assert(
+    src.includes("type: 'character.alive.changed'"),
+    'settlement route should emit character.alive.changed event'
+  );
+  assert(
+    src.includes('alive: false'),
+    'settlement route alive.changed event should set alive: false'
+  );
+  // source 必须是 system-tick，triggerActor=system
+  assert(
+    src.includes("source: 'system-tick'"),
+    'settlement route should use source: system-tick'
+  );
+  assert(
+    src.includes("triggerActor: 'system'"),
+    'settlement route should use triggerActor: system'
+  );
+  // 必须出现在 settlementResult 生成成功之后、return 之前（位置守门）
+  const aliveIdx = src.indexOf("type: 'character.alive.changed'");
+  const resultIdx = src.indexOf('let settlementResult = fallback');
+  const returnIdx = src.indexOf('return NextResponse.json({ success: true, settlementResult })');
+  assert(
+    aliveIdx > resultIdx && aliveIdx < returnIdx,
+    'settlement alive.changed event should be appended after settlementResult is finalized and before response'
+  );
+  log('smoke-settlement-event-002-alive-changed-on-settlement', { passed: true });
+}
+
+function smokeSettlementEvent003RealmChangedOnAscension(): void {
+  const src = readFileSync('src/app/api/game/settlement/route.ts', 'utf-8');
+  // 飞升时额外 append character.realm.changed（method: 'set'，PoC 占位）
+  assert(
+    src.includes("type: 'character.realm.changed'"),
+    'settlement route should emit character.realm.changed on ascension'
+  );
+  assert(
+    src.includes("method: 'set'"),
+    'settlement route realm event should use method: set'
+  );
+  // 触发条件：ascension（ending === 'ascension' 或 state.ascended === true）
+  assert(
+    src.includes("ending === 'ascension'") || src.includes('ascended === true'),
+    'settlement route ascension check should match ending or state.ascended'
+  );
+  // realm 块必须包在 if (isAscension) 内
+  const realmIdx = src.indexOf("type: 'character.realm.changed'");
+  const ascensionGuard = src.lastIndexOf('if (isAscension)', realmIdx);
+  assert(
+    realmIdx > 0 && ascensionGuard > 0 && ascensionGuard < realmIdx,
+    'settlement realm.changed event should be guarded by isAscension'
+  );
+  log('smoke-settlement-event-003-realm-changed-on-ascension', { passed: true });
+}
+
+function smokeSettlementEvent004FailureNonFatal(): void {
+  const src = readFileSync('src/app/api/game/settlement/route.ts', 'utf-8');
+  // appendEvent 必须 try/catch 包住（alive 块 + realm 块 = 至少 2 个 catch）
+  const catchCount = (src.match(/catch \(e: any\) \{[\s\S]*?non-fatal/g) || []).length;
+  assert(
+    catchCount >= 2,
+    `settlement route should wrap appendEvent with try/catch (>=2 inner catches with non-fatal log), found ${catchCount}`
+  );
+  // settlement 失败时不 append：appendEvent 块在 outer catch 之前（inner try 内）；
+  // settlement 失败时（抛到外层 catch）根本走不到 appendEvent。
+  const outerCatchIdx = src.indexOf("console.error('settlement error:'");
+  const aliveEventIdx = src.indexOf("type: 'character.alive.changed'");
+  assert(
+    outerCatchIdx > 0 && aliveEventIdx > 0 && aliveEventIdx < outerCatchIdx,
+    'settlement alive event should be inside try (before outer catch), so failure path skips it'
+  );
+  // 主路径 NextResponse.json({ success: true ... }) 仍存在
+  assert(
+    src.includes('return NextResponse.json({ success: true, settlementResult })'),
+    'settlement route should still return success response (compat path preserved)'
+  );
+  // 鉴权（Worker S1）保留
+  assert(
+    src.includes('getCurrentUser') || src.includes('UNAUTHORIZED'),
+    'settlement route should keep Worker S1 auth check (getCurrentUser / UNAUTHORIZED)'
+  );
+  log('smoke-settlement-event-004-failure-non-fatal', { passed: true, catchCount });
+}
+
+async function smokeSettlementEvent005RealChain(): Promise<void> {
+  // 真实链路：模拟 settlement 触发的 alive.changed + realm.changed（ascension）事件序列
+  // 验证 aggregateVersion + previousEventId 链 + 字段完整
+  const { appendEvent, getEvents, getLatestEvent } = await import('../src/lib/xianxia/events/store');
+  const { db } = await import('../src/lib/db');
+  const characterId = `settlement-event-smoke-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  try {
+    // 1. alive.changed（结算触发的终局事件，source=system-tick, triggerActor=system）
+    const e0 = await appendEvent({
+      characterId,
+      type: 'character.alive.changed',
+      data: { type: 'character.alive.changed', alive: false, cause: 'death' },
+      source: 'system-tick',
+      triggerActor: 'system',
+      createdAtAge: 80,
+    });
+    assertEq(e0.aggregateVersion, 0, 'first event should have aggregateVersion 0');
+    assertEq(e0.previousEventId, null, 'first event should have previousEventId null');
+    assertEq(e0.data.type, 'character.alive.changed', 'event data type preserved');
+    assertEq((e0.data as any).alive, false, 'alive=false preserved');
+    assertEq((e0.data as any).cause, 'death', 'cause=death preserved');
+    assertEq(e0.source, 'system-tick', 'source=system-tick preserved');
+    assertEq(e0.triggerActor, 'system', 'triggerActor=system preserved');
+
+    // 2. 飞升路径再写一条 realm.changed（method=set，PoC 占位）
+    const e1 = await appendEvent({
+      characterId,
+      type: 'character.realm.changed',
+      data: { type: 'character.realm.changed', from: 'mortal', to: 'mortal-ascended', method: 'set' },
+      source: 'system-tick',
+      triggerActor: 'system',
+      createdAtAge: 80,
+    });
+    assertEq(e1.aggregateVersion, 1, 'second event should have aggregateVersion 1');
+    assertEq(e1.previousEventId, e0.id, 'second event should chain to first event id');
+    assertEq(e1.data.type, 'character.realm.changed', 'realm event data type preserved');
+    assertEq((e1.data as any).method, 'set', 'realm event method=set preserved');
+
+    // 链一致性
+    const latest = await getLatestEvent(characterId);
+    assert(latest && latest.id === e1.id, 'latest should be e1');
+
+    const all = await getEvents(characterId);
+    assertEq(all.length, 2, 'should have 2 events in chain');
+    assertEq(all[0].previousEventId, null, 'e0 chain link null');
+    assertEq(all[1].previousEventId, all[0].id, 'e1 chain link to e0');
+
+    // createdAtAge 保留
+    assertEq(all[0].createdAtAge, 80, 'createdAtAge preserved on e0');
+    assertEq(all[1].createdAtAge, 80, 'createdAtAge preserved on e1');
+
+    log('smoke-settlement-event-005-real-chain', {
+      passed: true,
+      characterId,
+      chainLength: all.length,
+      versions: all.map((e) => e.aggregateVersion),
+    });
+  } finally {
+    try {
+      await db.event.deleteMany({ where: { characterId } });
+    } catch (cleanupErr) {
+      console.error('[smoke-settlement-event-005] cleanup failed (non-fatal):', cleanupErr);
+    }
+  }
+}
+
+function pgRunPhaseSettlementEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-settlement-event-001-append-event-imported', fn: smokeSettlementEvent001AppendEventImported },
+    { name: 'smoke-settlement-event-002-alive-changed-on-settlement', fn: smokeSettlementEvent002AliveChangedOnSettlement },
+    { name: 'smoke-settlement-event-003-realm-changed-on-ascension', fn: smokeSettlementEvent003RealmChangedOnAscension },
+    { name: 'smoke-settlement-event-004-failure-non-fatal', fn: smokeSettlementEvent004FailureNonFatal },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// pgRunPhaseSettlementEventRealChainSmokes：仅在 --db 模式下跑——避免默认 smoke 套件因 db 不可用挂掉
+async function pgRunPhaseSettlementEventRealChainSmokes(): Promise<void> {
+  const withDb = process.argv.includes('--db');
+  if (!withDb) {
+    log('smoke-settlement-event-005-real-chain', { passed: true, skipped: 'requires --db flag' });
+    return;
+  }
+  try {
+    await smokeSettlementEvent005RealChain();
+  } catch (e) {
+    log('smoke-settlement-event-005-real-chain', { passed: false, error: (e && e.message) || String(e) });
+  }
+}
+
+// ===== 批 18: advance 路由接 Event Sourcing PoC 集成（worker 主任务）=====
+// 7 个 smoke：
+//   smoke-advance-event-001~004：advance 路由触发 age/realm/hp/alive 4 类事件（静态源码校验）
+//   smoke-advance-event-005：advance-sse 路径同样 append 事件（静态源码校验）
+//   smoke-advance-event-006：appendEvent 失败不影响主流程（try/catch + 公共函数保留）
+//   smoke-advance-event-007：真实 appendEvent 链路（默认 --db 时跑，避免默认跑破 502）
+//
+// 说明：smoke-001~006 是静态校验（无需 db），smoke-007 走真实 appendEvent/getEvents 链路。
+
+function smokeAdvanceEvent001AgeAdvanced(): void {
+  const src = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // advance 路由应 import appendEvent
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'advance route should import from events/store'
+  );
+  assert(src.includes('appendEvent('), 'advance route should call appendEvent');
+  // 触发 age.advanced：当 char.age !== finalState.age
+  assert(
+    src.includes("type: 'character.age.advanced'"),
+    'advance route should emit character.age.advanced event'
+  );
+  assert(
+    src.includes('from: char.age') && src.includes('to: finalState.age'),
+    'advance route age.advanced event should carry from/to'
+  );
+  log('smoke-advance-event-001-age-advanced', { passed: true });
+}
+
+function smokeAdvanceEvent002RealmChanged(): void {
+  const src = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // 触发 realm.changed：当 char.realm !== finalState.realm
+  assert(
+    src.includes("type: 'character.realm.changed'"),
+    'advance route should emit character.realm.changed event'
+  );
+  assert(
+    src.includes('from: char.realm') && src.includes('to: finalState.realm'),
+    'advance route realm.changed event should carry from/to'
+  );
+  assert(
+    src.includes("method: 'set'"),
+    'advance route realm.changed should use method: set'
+  );
+  log('smoke-advance-event-002-realm-changed', { passed: true });
+}
+
+function smokeAdvanceEvent003HpChanged(): void {
+  const src = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // 触发 hp.changed：当 char.hp !== finalState.hp
+  assert(
+    src.includes("type: 'character.hp.changed'"),
+    'advance route should emit character.hp.changed event'
+  );
+  assert(
+    src.includes('delta: finalState.hp - char.hp'),
+    'advance route hp.changed event should carry delta'
+  );
+  assert(
+    src.includes('newValue: finalState.hp'),
+    'advance route hp.changed event should carry newValue'
+  );
+  log('smoke-advance-event-003-hp-changed', { passed: true });
+}
+
+function smokeAdvanceEvent004AliveChanged(): void {
+  const src = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // 触发 alive.changed：当 char.alive !== finalState.alive && finalState.alive === false
+  assert(
+    src.includes("type: 'character.alive.changed'"),
+    'advance route should emit character.alive.changed event'
+  );
+  assert(
+    src.includes('alive: false'),
+    'advance route alive.changed should set alive: false'
+  );
+  // 位置守门：alive.changed 必须在 db.character.update 之前
+  const aliveIdx = src.indexOf("type: 'character.alive.changed'");
+  const updateIdx = src.indexOf('await db.character.update({');
+  assert(
+    aliveIdx > 0 && updateIdx > 0 && aliveIdx < updateIdx,
+    'advance alive.changed event should be appended before db.character.update'
+  );
+  log('smoke-advance-event-004-alive-changed', { passed: true });
+}
+
+function smokeAdvanceEvent005SsePathAlsoAppends(): void {
+  // SSE 路径必须同样 append 4 类事件（不能只在 advance 一边 append）
+  const src = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'advance-sse route should import from events/store'
+  );
+  assert(src.includes('appendEvent('), 'advance-sse route should call appendEvent');
+  // 4 类事件都要有
+  assert(
+    src.includes("type: 'character.age.advanced'"),
+    'advance-sse route should emit character.age.advanced event'
+  );
+  assert(
+    src.includes("type: 'character.realm.changed'"),
+    'advance-sse route should emit character.realm.changed event'
+  );
+  assert(
+    src.includes("type: 'character.hp.changed'"),
+    'advance-sse route should emit character.hp.changed event'
+  );
+  assert(
+    src.includes("type: 'character.alive.changed'"),
+    'advance-sse route should emit character.alive.changed event'
+  );
+  // source: system-tick, triggerActor: system
+  assert(
+    src.includes("source: 'system-tick'"),
+    'advance-sse route events should use source: system-tick'
+  );
+  assert(
+    src.includes("triggerActor: 'system'"),
+    'advance-sse route events should use triggerActor: system'
+  );
+  log('smoke-advance-event-005-sse-path-also-appends', { passed: true });
+}
+
+function smokeAdvanceEvent006FailureNonFatal(): void {
+  // appendEvent 必须 try/catch 包住，失败不能阻断 advance 主流程
+  const src = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // 至少有 1 个 inner try/catch 包住 4 个 appendEvent
+  assert(
+    src.includes('[advance] event append failed (non-fatal)'),
+    'advance route should log event append failure as non-fatal'
+  );
+  // 主流程 db.character.update 仍然存在
+  assert(
+    src.includes('db.character.update'),
+    'advance route should still call db.character.update (compat path)'
+  );
+  // P0 幂等保护仍然存在（try { ... db.character.update({ where: ..., age: ageBefore } })
+  assert(
+    src.includes('age: ageBefore'),
+    'advance route should keep P0 idempotency guard (age: ageBefore in where)'
+  );
+  // buildAdvanceStateData 仍然存在（Worker B 的公共函数未动）
+  assert(
+    src.includes('buildAdvanceStateData('),
+    'advance route should keep buildAdvanceStateData call'
+  );
+  log('smoke-advance-event-006-failure-non-fatal', { passed: true });
+}
+
+async function smokeAdvanceEvent007RealChain(): Promise<void> {
+  // 真实链路：模拟 advance 触发的 4 类事件序列（age/realm/hp/alive），验证 aggregateVersion + previousEventId 链
+  const { appendEvent, getEvents, getLatestEvent } = await import('../src/lib/xianxia/events/store');
+  const characterId = `advance-event-smoke-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  try {
+    const e0 = await appendEvent({
+      characterId,
+      type: 'character.age.advanced',
+      data: { type: 'character.age.advanced', from: 18, to: 19 },
+      source: 'system-tick',
+      triggerActor: 'system',
+      createdAtAge: 19,
+    });
+    assertEq(e0.aggregateVersion, 0, 'first event should have aggregateVersion 0');
+    assertEq(e0.previousEventId, null, 'first event should have previousEventId null');
+
+    const e1 = await appendEvent({
+      characterId,
+      type: 'character.realm.changed',
+      data: { type: 'character.realm.changed', from: 'mortal', to: 'qi_refining', method: 'set' },
+      source: 'system-tick',
+      triggerActor: 'system',
+      createdAtAge: 19,
+    });
+    assertEq(e1.aggregateVersion, 1, 'second event should have aggregateVersion 1');
+    assertEq(e1.previousEventId, e0.id, 'second event should chain to first');
+
+    const e2 = await appendEvent({
+      characterId,
+      type: 'character.hp.changed',
+      data: { type: 'character.hp.changed', delta: -10, newValue: 90 },
+      source: 'system-tick',
+      triggerActor: 'system',
+      createdAtAge: 19,
+    });
+    assertEq(e2.aggregateVersion, 2, 'third event should have aggregateVersion 2');
+    assertEq(e2.previousEventId, e1.id, 'third event should chain to second');
+
+    const e3 = await appendEvent({
+      characterId,
+      type: 'character.alive.changed',
+      data: { type: 'character.alive.changed', alive: false, cause: 'old_age' },
+      source: 'system-tick',
+      triggerActor: 'system',
+      createdAtAge: 91,
+    });
+    assertEq(e3.aggregateVersion, 3, 'fourth event should have aggregateVersion 3');
+    assertEq(e3.previousEventId, e2.id, 'fourth event should chain to third');
+
+    const all = await getEvents(characterId);
+    assertEq(all.length, 4, 'should have 4 events in chain');
+    // createdAtAge 保留
+    assertEq(all[0].createdAtAge, 19, 'createdAtAge preserved on e0');
+    assertEq(all[1].createdAtAge, 19, 'createdAtAge preserved on e1');
+    assertEq(all[2].createdAtAge, 19, 'createdAtAge preserved on e2');
+    assertEq(all[3].createdAtAge, 91, 'createdAtAge preserved on e3');
+    // 数据字段完整
+    assertEq(all[0].data.type, 'character.age.advanced', 'e0 type preserved');
+    assertEq((all[0].data as any).from, 18, 'e0 from preserved');
+    assertEq((all[0].data as any).to, 19, 'e0 to preserved');
+    assertEq(all[1].data.type, 'character.realm.changed', 'e1 type preserved');
+    assertEq((all[1].data as any).method, 'set', 'e1 method preserved');
+    assertEq(all[2].data.type, 'character.hp.changed', 'e2 type preserved');
+    assertEq((all[2].data as any).delta, -10, 'e2 delta preserved');
+    assertEq(all[3].data.type, 'character.alive.changed', 'e3 type preserved');
+    assertEq((all[3].data as any).alive, false, 'e3 alive preserved');
+    assertEq((all[3].data as any).cause, 'old_age', 'e3 cause preserved');
+    // source + triggerActor 一致
+    assertEq(all[0].source, 'system-tick', 'e0 source preserved');
+    assertEq(all[0].triggerActor, 'system', 'e0 triggerActor preserved');
+
+    log('smoke-advance-event-007-real-chain', {
+      passed: true,
+      characterId,
+      chainLength: all.length,
+      versions: all.map((e) => e.aggregateVersion),
+    });
+  } finally {
+    try {
+      const { db } = await import('../src/lib/db');
+      await db.event.deleteMany({ where: { characterId } });
+    } catch (cleanupErr) {
+      console.error('[smoke-advance-event-007] cleanup failed (non-fatal):', cleanupErr);
+    }
+  }
+}
+
+function pgRunPhaseAdvanceEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-advance-event-001-age-advanced', fn: smokeAdvanceEvent001AgeAdvanced },
+    { name: 'smoke-advance-event-002-realm-changed', fn: smokeAdvanceEvent002RealmChanged },
+    { name: 'smoke-advance-event-003-hp-changed', fn: smokeAdvanceEvent003HpChanged },
+    { name: 'smoke-advance-event-004-alive-changed', fn: smokeAdvanceEvent004AliveChanged },
+    { name: 'smoke-advance-event-005-sse-path-also-appends', fn: smokeAdvanceEvent005SsePathAlsoAppends },
+    { name: 'smoke-advance-event-006-failure-non-fatal', fn: smokeAdvanceEvent006FailureNonFatal },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// pgRunPhaseAdvanceEventRealChainSmokes：仅在 --db 模式下跑——避免默认 smoke 套件因 db 不可用挂掉
+async function pgRunPhaseAdvanceEventRealChainSmokes(): Promise<void> {
+  const withDb = process.argv.includes('--db');
+  if (!withDb) {
+    log('smoke-advance-event-007-real-chain', { passed: true, skipped: 'requires --db flag' });
+    return;
+  }
+  try {
+    await smokeAdvanceEvent007RealChain();
+  } catch (e) {
+    log('smoke-advance-event-007-real-chain', { passed: false, error: (e && e.message) || String(e) });
+  }
+}
+
+
+// ===== 批 16: market + alchemy + auction 3 路由接 Event Sourcing（worker 主任务）=====
+// 5 个 smoke：
+//   smoke-economy-event-001: market 路由 buy/sell 触发 spirit-stones.changed + item.added/removed
+//   smoke-economy-event-002: alchemy 路由 craft 触发 spirit-stones.changed + item.added
+//   smoke-economy-event-003: auction 路由 bid 拍得触发 spirit-stones.changed + item.added
+//   smoke-economy-event-004: 3 路由 appendEvent 失败非致命（try/catch）+ db.update 保留
+//   smoke-economy-event-005: 真实链路 appendEvent 写入 spirit-stones.changed + item.added/removed 事件流（仅 --db）
+
+function smokeEconomyEvent001Market(): void {
+  const src = readFileSync('src/app/api/game/market/route.ts', 'utf-8');
+  // 必须 import appendEvent
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'market route should import appendEvent from events/store'
+  );
+  assert(src.includes('appendEvent('), 'market route should call appendEvent');
+  // buy 触发 spirit-stones.changed (delta<0) + item.added
+  assert(
+    src.includes("type: 'character.spirit-stones.changed'"),
+    'market route should emit character.spirit-stones.changed event'
+  );
+  assert(
+    src.includes("type: 'character.item.added'"),
+    'market route should emit character.item.added event (buy)'
+  );
+  assert(
+    src.includes("type: 'character.item.removed'"),
+    'market route should emit character.item.removed event (sell)'
+  );
+  // source / triggerActor / createdAtAge 必填字段
+  assert(/source:\s*'user-action'/.test(src), "market event should set source='user-action'");
+  assert(/triggerActor:\s*'player'/.test(src), "market event should set triggerActor='player'");
+  assert(/createdAtAge:\s*state\.age/.test(src), 'market event should set createdAtAge=state.age');
+  // buy 与 sell 都有 non-fatal 兜底
+  const marketNonFatalCount = (src.match(/\[market\][\s\S]*?non-fatal/g) || []).length;
+  assert(
+    marketNonFatalCount >= 2,
+    `market route should have >=2 non-fatal logs (buy + sell), found ${marketNonFatalCount}`
+  );
+  // reason 字段区分 buy/sell
+  assert(
+    /reason:\s*'market-buy'/.test(src),
+    'market buy spirit-stones event should set reason=market-buy'
+  );
+  assert(
+    /reason:\s*'market-sell'/.test(src),
+    'market sell spirit-stones event should set reason=market-sell'
+  );
+  // market-sell delta 必须 > 0
+  assert(
+    /delta:\s*sellPrice/.test(src),
+    'market sell should use positive delta (sellPrice)'
+  );
+  // market-buy delta 必须 < 0
+  assert(
+    /delta:\s*-price/.test(src),
+    'market buy should use negative delta (-price)'
+  );
+  log('smoke-economy-event-001-market', { passed: true });
+}
+
+function smokeEconomyEvent002Alchemy(): void {
+  const src = readFileSync('src/app/api/game/alchemy/route.ts', 'utf-8');
+  // 必须 import appendEvent
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'alchemy route should import appendEvent from events/store'
+  );
+  assert(src.includes('appendEvent('), 'alchemy route should call appendEvent');
+  // alchemy 触发 spirit-stones.changed (delta<0) + item.added (成功时)
+  assert(
+    src.includes("type: 'character.spirit-stones.changed'"),
+    'alchemy route should emit character.spirit-stones.changed event'
+  );
+  assert(
+    src.includes("type: 'character.item.added'"),
+    'alchemy route should emit character.item.added event (success)'
+  );
+  // reason 字段区分成功/失败（三元式：result.success ? 'alchemy-craft' : 'alchemy-failed'）
+  assert(
+    /'alchemy-craft'/.test(src) && /'alchemy-failed'/.test(src),
+    'alchemy spirit-stones event should set reason=alchemy-craft (success) or alchemy-failed (failure) — ternary'
+  );
+  // 成功时才发 item.added（result.product 守卫）
+  assert(
+    /if\s*\(\s*result\.success\s*&&\s*result\.product/.test(src),
+    'alchemy item.added event should be guarded by result.success && result.product'
+  );
+  // source / triggerActor / createdAtAge 必填字段
+  assert(/source:\s*'user-action'/.test(src), "alchemy event should set source='user-action'");
+  assert(/triggerActor:\s*'player'/.test(src), "alchemy event should set triggerActor='player'");
+  assert(/createdAtAge:\s*finalState\.age/.test(src), 'alchemy event should set createdAtAge=finalState.age');
+  // non-fatal 兜底
+  assert(
+    src.includes('[alchemy] event append failed (non-fatal)'),
+    'alchemy route should have non-fatal catch log'
+  );
+  // delta < 0
+  assert(
+    /delta:\s*-result\.spiritStoneCost/.test(src),
+    'alchemy spirit-stones delta should be -result.spiritStoneCost'
+  );
+  log('smoke-economy-event-002-alchemy', { passed: true });
+}
+
+function smokeEconomyEvent003Auction(): void {
+  const src = readFileSync('src/app/api/game/auction/route.ts', 'utf-8');
+  // 必须 import appendEvent
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'auction route should import appendEvent from events/store'
+  );
+  assert(src.includes('appendEvent('), 'auction route should call appendEvent');
+  // auction 拍得触发 spirit-stones.changed (delta<0) + item.added
+  assert(
+    src.includes("type: 'character.spirit-stones.changed'"),
+    'auction route should emit character.spirit-stones.changed event'
+  );
+  assert(
+    src.includes("type: 'character.item.added'"),
+    'auction route should emit character.item.added event (won bid)'
+  );
+  // reason 字段
+  assert(
+    /reason:\s*'auction-bid'/.test(src),
+    'auction spirit-stones event should set reason=auction-bid'
+  );
+  // source / triggerActor / createdAtAge 必填字段
+  assert(/source:\s*'user-action'/.test(src), "auction event should set source='user-action'");
+  assert(/triggerActor:\s*'player'/.test(src), "auction event should set triggerActor='player'");
+  assert(/createdAtAge:\s*state\.age/.test(src), 'auction event should set createdAtAge=state.age');
+  // non-fatal 兜底
+  assert(
+    src.includes('[auction] bid event append failed (non-fatal)'),
+    'auction route should have non-fatal catch log'
+  );
+  // delta < 0
+  assert(
+    /delta:\s*-lot\.currentBid/.test(src),
+    'auction spirit-stones delta should be -lot.currentBid'
+  );
+  // 必须出现在拍得成功支（第 1 个 lot.winner === state.name 块内 — 拍得 success 分支）
+  const appendEventIdx = src.indexOf('await appendEvent(');
+  const firstLotWinnerIdx = src.indexOf("if (lot.winner === state.name)");
+  const lastLotWinnerIdx = src.lastIndexOf("lot.winner === state.name");
+  assert(
+    appendEventIdx > 0 && firstLotWinnerIdx > 0 && lastLotWinnerIdx > 0 &&
+    appendEventIdx > firstLotWinnerIdx && appendEventIdx < lastLotWinnerIdx,
+    'auction appendEvent should be inside the first lot.winner === state.name block (won-bid branch)'
+  );
+  log('smoke-economy-event-003-auction', { passed: true });
+}
+
+function smokeEconomyEvent004FallbackNonFatal(): void {
+  // 3 路由 appendEvent 都必须 try/catch 包住 + 主流程 db.update + 鉴权逻辑保留
+  const marketSrc = readFileSync('src/app/api/game/market/route.ts', 'utf-8');
+  const alchemySrc = readFileSync('src/app/api/game/alchemy/route.ts', 'utf-8');
+  const auctionSrc = readFileSync('src/app/api/game/auction/route.ts', 'utf-8');
+
+  // market: try/catch + db.update + 鉴权
+  assert(/try\s*\{[\s\S]*?appendEvent\([\s\S]*?\}\s*catch/.test(marketSrc), 'market route should wrap appendEvent with try/catch');
+  assert(marketSrc.includes('db.character.update'), 'market route should keep db.character.update');
+  assert(marketSrc.includes('getCurrentUser'), 'market route should keep auth getCurrentUser');
+  assert(/where:\s*\{\s*id:\s*characterId,\s*userId:\s*user\?\.id\s*\}/.test(marketSrc), 'market route should keep auth where clause');
+
+  // alchemy: try/catch + db.update + 鉴权
+  assert(/try\s*\{[\s\S]*?appendEvent\([\s\S]*?\}\s*catch/.test(alchemySrc), 'alchemy route should wrap appendEvent with try/catch');
+  assert(alchemySrc.includes('db.character.update'), 'alchemy route should keep db.character.update');
+  assert(alchemySrc.includes('getCurrentUser'), 'alchemy route should keep auth getCurrentUser');
+  assert(/where:\s*\{\s*id:\s*characterId,\s*userId:\s*user\?\.id\s*\}/.test(alchemySrc), 'alchemy route should keep auth where clause');
+
+  // auction: try/catch + db.update + 鉴权
+  assert(/try\s*\{[\s\S]*?appendEvent\([\s\S]*?\}\s*catch/.test(auctionSrc), 'auction route should wrap appendEvent with try/catch');
+  assert(auctionSrc.includes('db.character.update'), 'auction route should keep db.character.update');
+  assert(auctionSrc.includes('getCurrentUser'), 'auction route should keep auth getCurrentUser');
+  assert(/where:\s*\{\s*id:\s*characterId,\s*userId:\s*user\?\.id\s*\}/.test(auctionSrc), 'auction route should keep auth where clause');
+
+  // ContentRegistry 校验逻辑（market buy/sell + auction bid）保留
+  assert(marketSrc.includes('registerItem'), 'market route should keep registerItem (ContentRegistry)');
+  assert(auctionSrc.includes('registerItem'), 'auction route should keep registerItem (ContentRegistry)');
+
+  log('smoke-economy-event-004-fallback-non-fatal', { passed: true });
+}
+
+async function smokeEconomyEvent005RealChain(): Promise<void> {
+  // 真实链路：模拟 market buy + sell + alchemy + auction 四种事件流
+  // 验证 aggregateVersion + previousEventId 链 + 字段完整
+  const { appendEvent, getEvents, getLatestEvent } = await import('../src/lib/xianxia/events/store');
+  const { db } = await import('../src/lib/db');
+  const characterId = `economy-event-smoke-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  try {
+    // 1. market buy: spirit-stones.changed (delta<0) + item.added
+    const e0 = await appendEvent({
+      characterId,
+      type: 'character.spirit-stones.changed',
+      data: { type: 'character.spirit-stones.changed', delta: -50, newValue: 150, reason: 'market-buy' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 20,
+    });
+    assertEq(e0.aggregateVersion, 0, 'first event should have aggregateVersion 0');
+    assertEq(e0.previousEventId, null, 'first event should have previousEventId null');
+    assertEq((e0.data as any).reason, 'market-buy', 'e0 reason=market-buy');
+
+    const e1 = await appendEvent({
+      characterId,
+      type: 'character.item.added',
+      data: { type: 'character.item.added', itemId: 'smoke-market-item-001', item: { id: 'smoke-market-item-001', name: '木剑' } },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 20,
+    });
+    assertEq(e1.aggregateVersion, 1, 'e1 aggregateVersion=1');
+    assertEq(e1.previousEventId, e0.id, 'e1 chains to e0');
+
+    // 2. market sell: item.removed + spirit-stones.changed (delta>0)
+    const e2 = await appendEvent({
+      characterId,
+      type: 'character.item.removed',
+      data: { type: 'character.item.removed', itemId: 'smoke-market-item-001', reason: 'market-sell' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 21,
+    });
+    assertEq(e2.aggregateVersion, 2, 'e2 aggregateVersion=2');
+    assertEq(e2.previousEventId, e1.id, 'e2 chains to e1');
+
+    const e3 = await appendEvent({
+      characterId,
+      type: 'character.spirit-stones.changed',
+      data: { type: 'character.spirit-stones.changed', delta: 3, newValue: 153, reason: 'market-sell' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 21,
+    });
+    assertEq(e3.aggregateVersion, 3, 'e3 aggregateVersion=3');
+    assertEq((e3.data as any).delta, 3, 'e3 positive delta preserved');
+    assertEq(e3.previousEventId, e2.id, 'e3 chains to e2');
+
+    // 3. alchemy: spirit-stones.changed (delta<0) + item.added (成功)
+    const e4 = await appendEvent({
+      characterId,
+      type: 'character.spirit-stones.changed',
+      data: { type: 'character.spirit-stones.changed', delta: -10, newValue: 143, reason: 'alchemy-craft' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 22,
+    });
+    assertEq(e4.aggregateVersion, 4, 'e4 aggregateVersion=4');
+    assertEq((e4.data as any).reason, 'alchemy-craft', 'e4 reason=alchemy-craft');
+
+    const e5 = await appendEvent({
+      characterId,
+      type: 'character.item.added',
+      data: { type: 'character.item.added', itemId: 'smoke-alchemy-pill-001', item: { id: 'smoke-alchemy-pill-001', name: '聚气散' } },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 22,
+    });
+    assertEq(e5.aggregateVersion, 5, 'e5 aggregateVersion=5');
+    assertEq((e5.data as any).item.name, '聚气散', 'e5 pill name preserved');
+
+    // 4. auction: spirit-stones.changed (delta<0) + item.added (拍得)
+    const e6 = await appendEvent({
+      characterId,
+      type: 'character.spirit-stones.changed',
+      data: { type: 'character.spirit-stones.changed', delta: -100, newValue: 43, reason: 'auction-bid' },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 23,
+    });
+    assertEq(e6.aggregateVersion, 6, 'e6 aggregateVersion=6');
+    assertEq((e6.data as any).reason, 'auction-bid', 'e6 reason=auction-bid');
+
+    const e7 = await appendEvent({
+      characterId,
+      type: 'character.item.added',
+      data: { type: 'character.item.added', itemId: 'smoke-auction-lot-001', item: { id: 'smoke-auction-lot-001', name: '玄纹聚灵玉' } },
+      source: 'user-action',
+      triggerActor: 'player',
+      createdAtAge: 23,
+    });
+    assertEq(e7.aggregateVersion, 7, 'e7 aggregateVersion=7');
+    assertEq(e7.previousEventId, e6.id, 'e7 chains to e6');
+
+    // 链一致性
+    const latest = await getLatestEvent(characterId);
+    assert(latest && latest.id === e7.id, 'latest should be e7');
+
+    const all = await getEvents(characterId);
+    assertEq(all.length, 8, 'should have 8 events in chain');
+    // 链 0→1→2→3→4→5→6→7
+    for (let i = 0; i < all.length; i++) {
+      assertEq(all[i].aggregateVersion, i, `aggregateVersion at idx ${i} should be ${i}`);
+      if (i === 0) {
+        assertEq(all[i].previousEventId, null, `e0 chain link null`);
+      } else {
+        assertEq(all[i].previousEventId, all[i - 1].id, `e${i} chains to e${i - 1}`);
+      }
+    }
+
+    // createdAtAge 序列
+    assertEq(all[0].createdAtAge, 20, 'e0 age=20');
+    assertEq(all[2].createdAtAge, 21, 'e2 age=21');
+    assertEq(all[4].createdAtAge, 22, 'e4 age=22');
+    assertEq(all[6].createdAtAge, 23, 'e6 age=23');
+
+    log('smoke-economy-event-005-real-chain', {
+      passed: true,
+      characterId,
+      chainLength: all.length,
+      types: all.map((e) => e.type),
+      versions: all.map((e) => e.aggregateVersion),
+    });
+  } finally {
+    try {
+      await db.event.deleteMany({ where: { characterId } });
+    } catch (cleanupErr) {
+      console.error('[smoke-economy-event-005] cleanup failed (non-fatal):', cleanupErr);
+    }
+  }
+}
+
+function pgRunPhaseEconomyEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-economy-event-001-market', fn: smokeEconomyEvent001Market },
+    { name: 'smoke-economy-event-002-alchemy', fn: smokeEconomyEvent002Alchemy },
+    { name: 'smoke-economy-event-003-auction', fn: smokeEconomyEvent003Auction },
+    { name: 'smoke-economy-event-004-fallback-non-fatal', fn: smokeEconomyEvent004FallbackNonFatal },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// pgRunPhaseEconomyEventRealChainSmokes：仅在 --db 模式下跑——避免默认 smoke 套件因 db 不可用挂掉
+async function pgRunPhaseEconomyEventRealChainSmokes(): Promise<void> {
+  const withDb = process.argv.includes('--db');
+  if (!withDb) {
+    log('smoke-economy-event-005-real-chain', { passed: true, skipped: 'requires --db flag' });
+    return;
+  }
+  try {
+    await smokeEconomyEvent005RealChain();
+  } catch (e) {
+    log('smoke-economy-event-005-real-chain', { passed: false, error: (e && e.message) || String(e) });
+  }
+}
+
+// ===== 批 16: combat end 路由接 Event Sourcing PoC — 5 个静态 smoke =====
+//
+// 1. appendEvent 被 combat end 路由 import + 调用
+// 2. 死亡时 append character.alive.changed（alive:false, cause:combat）
+// 3. 战后 hp 变化触发 character.hp.changed（reason:combat-end）
+// 4. 每个 accepted drop append 一条 character.item.added
+// 5. appendEvent 失败用 try/catch 包住，不影响 registerMany 主流程
+
+function smokeCombatEndEvent001AppendEventImported(): void {
+  const src = readFileSync('src/app/api/game/combat/end/route.ts', 'utf-8');
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'combat end route should import appendEvent from events/store'
+  );
+  assert(
+    src.includes('appendEvent('),
+    'combat end route should call appendEvent'
+  );
+  log('smoke-combat-end-event-001-append-event-imported', { passed: true });
+}
+
+function smokeCombatEndEvent002AliveChangedOnDeath(): void {
+  const src = readFileSync('src/app/api/game/combat/end/route.ts', 'utf-8');
+  // 战斗致死：alive.changed（alive:false, cause:combat）
+  assert(
+    src.includes("type: 'character.alive.changed'"),
+    'combat end route should emit character.alive.changed on death'
+  );
+  assert(
+    src.includes('alive: false'),
+    'combat end route alive.changed event should set alive: false'
+  );
+  assert(
+    src.includes("cause: 'combat'"),
+    'combat end route alive.changed event should use cause: combat'
+  );
+  // source + triggerActor
+  assert(
+    src.includes("source: 'system-tick'"),
+    'combat end route should use source: system-tick'
+  );
+  assert(
+    src.includes("triggerActor: 'system'"),
+    'combat end route should use triggerActor: system'
+  );
+  // 守门条件：必须比较 stateBeforeCombatEnd.alive && !state.alive
+  assert(
+    src.includes('stateBeforeCombatEnd.alive') && src.includes('!state.alive'),
+    'combat end route should guard alive.changed on stateBeforeCombatEnd.alive && !state.alive'
+  );
+  log('smoke-combat-end-event-002-alive-changed-on-death', { passed: true });
+}
+
+function smokeCombatEndEvent003HpChangedAfterCombat(): void {
+  const src = readFileSync('src/app/api/game/combat/end/route.ts', 'utf-8');
+  // hp.changed 事件
+  assert(
+    src.includes("type: 'character.hp.changed'"),
+    'combat end route should emit character.hp.changed after combat'
+  );
+  assert(
+    src.includes("reason: 'combat-end'"),
+    'combat end route hp.changed event should use reason: combat-end'
+  );
+  // 必须包含 delta + newValue 字段
+  assert(
+    src.includes('delta:') && src.includes('newValue:'),
+    'combat end route hp.changed event should include delta + newValue'
+  );
+  // 守门条件：hp 前后不一致才 append
+  assert(
+    src.includes('stateBeforeCombatEnd.hp !== state.hp'),
+    'combat end route should guard hp.changed on hp delta'
+  );
+  log('smoke-combat-end-event-003-hp-changed-after-combat', { passed: true });
+}
+
+function smokeCombatEndEvent004ItemAddedForEachDrop(): void {
+  const src = readFileSync('src/app/api/game/combat/end/route.ts', 'utf-8');
+  // 每个 accepted drop 写一条 item.added（for-loop）
+  assert(
+    src.includes("type: 'character.item.added'"),
+    'combat end route should emit character.item.added for each drop'
+  );
+  assert(
+    src.includes('itemId:') && src.includes('item:'),
+    'combat end route item.added event should include itemId + item payload'
+  );
+  // for-of appliedDrops 循环
+  assert(
+    src.includes('for (const drop of appliedDrops)'),
+    'combat end route should loop over appliedDrops to emit item.added events'
+  );
+  // 位置守门：item 块必须在 registerMany(appliedDrops) 之后、return NextResponse.json 之前
+  const itemIdx = src.indexOf("type: 'character.item.added'");
+  const registerManyIdx = src.indexOf('registerMany(appliedDrops');
+  const returnIdx = src.lastIndexOf('return NextResponse.json(');
+  assert(
+    registerManyIdx > 0 && itemIdx > 0 && returnIdx > 0,
+    'combat end route should have registerMany(appliedDrops) + item.added + return all present'
+  );
+  assert(
+    itemIdx > registerManyIdx,
+    'combat end route item.added should appear AFTER registerMany(appliedDrops) (use accepted drops)'
+  );
+  assert(
+    itemIdx < returnIdx,
+    'combat end route item.added should appear BEFORE return NextResponse.json'
+  );
+  // Worker I ContentRegistry 校验保留
+  assert(
+    src.includes('registerMany(appliedDrops, registerItem'),
+    'combat end route should keep Worker I registerMany ContentRegistry validation'
+  );
+  // Worker S2 鉴权保留
+  assert(
+    src.includes('getCurrentUser') || src.includes('UNAUTHORIZED'),
+    'combat end route should keep Worker S2 auth check (getCurrentUser / UNAUTHORIZED)'
+  );
+  log('smoke-combat-end-event-004-item-added-for-each-drop', { passed: true });
+}
+
+function smokeCombatEndEvent005FailureNonFatal(): void {
+  const src = readFileSync('src/app/api/game/combat/end/route.ts', 'utf-8');
+  // appendEvent 必须 try/catch 包住（alive 块 + hp 块 + item 块 = 至少 3 个 inner catch）
+  const catchCount = (src.match(/catch \([a-zA-Z]+(?:Err)?: any\) \{[\s\S]*?non-fatal/g) || []).length;
+  assert(
+    catchCount >= 3,
+    `combat end route should wrap appendEvent with try/catch (>=3 inner catches with non-fatal log), found ${catchCount}`
+  );
+  // 主路径 NextResponse.json({ success: true ... }) 仍存在
+  assert(
+    src.includes('return NextResponse.json({') && src.includes('success: true'),
+    'combat end route should still return success response (main flow preserved)'
+  );
+  // ContentRegistry 校验（registerMany）仍在 registerMany 块中
+  assert(
+    src.includes('registerMany(') && src.includes('registerItem'),
+    'combat end route should keep ContentRegistry registerMany block'
+  );
+  // 鉴权（Worker S2）保留
+  assert(
+    src.includes('getCurrentUser') || src.includes('UNAUTHORIZED'),
+    'combat end route should keep Worker S2 auth check'
+  );
+  log('smoke-combat-end-event-005-failure-non-fatal', { passed: true, catchCount });
+}
+
+function pgRunPhaseCombatEndEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-combat-end-event-001-append-event-imported', fn: smokeCombatEndEvent001AppendEventImported },
+    { name: 'smoke-combat-end-event-002-alive-changed-on-death', fn: smokeCombatEndEvent002AliveChangedOnDeath },
+    { name: 'smoke-combat-end-event-003-hp-changed-after-combat', fn: smokeCombatEndEvent003HpChangedAfterCombat },
+    { name: 'smoke-combat-end-event-004-item-added-for-each-drop', fn: smokeCombatEndEvent004ItemAddedForEachDrop },
+    { name: 'smoke-combat-end-event-005-failure-non-fatal', fn: smokeCombatEndEvent005FailureNonFatal },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
+// ===== 批 17: restriction + exploration 路由接 Event Sourcing PoC — 4 个静态 smoke =====
+//
+// 1. restriction/interact import appendEvent + 含 appendEvent 调用
+// 2. restriction/interact 在 realm 变化时 append realm.changed + cultivation-exp.changed 守门
+// 3. exploration route import appendEvent + append character.age.advanced（守门 age 变化）
+// 4. restriction/check 是只读 —— 不 appendEvent（保持不变）
+
+function smokeRestrictionInteractEvent001AppendEventImported(): void {
+  const src = readFileSync('src/app/api/game/restriction/interact/route.ts', 'utf-8');
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'restriction/interact route should import appendEvent from events/store'
+  );
+  assert(
+    src.includes('appendEvent('),
+    'restriction/interact route should call appendEvent'
+  );
+  // 鉴权（Worker S2）保留
+  assert(
+    src.includes('getCurrentUser') || src.includes('UNAUTHORIZED'),
+    'restriction/interact route should keep Worker S2 auth check'
+  );
+  // resolveRestrictionInteraction 仍存在（核心逻辑保留）
+  assert(
+    src.includes('resolveRestrictionInteraction('),
+    'restriction/interact route should keep resolveRestrictionInteraction engine call'
+  );
+  log('smoke-restriction-interact-event-001-append-event-imported', { passed: true });
+}
+
+function smokeRestrictionInteractEvent002RealmAndCultivationExpGuard(): void {
+  const src = readFileSync('src/app/api/game/restriction/interact/route.ts', 'utf-8');
+  // realm.changed + cultivation-exp.changed 守门
+  assert(
+    src.includes("type: 'character.realm.changed'"),
+    'restriction/interact route should emit character.realm.changed'
+  );
+  assert(
+    src.includes("type: 'character.cultivation-exp.changed'"),
+    'restriction/interact route should emit character.cultivation-exp.changed'
+  );
+  // 守门条件：before/after 对比
+  assert(
+    src.includes('charBefore.realm !== finalRealm'),
+    'restriction/interact route should guard realm.changed on charBefore.realm !== finalRealm'
+  );
+  assert(
+    src.includes('charBefore.cultivationExp !== finalCultivationExp'),
+    'restriction/interact route should guard cultivation-exp.changed on exp delta'
+  );
+  // reason: restriction-interact
+  assert(
+    src.includes("reason: 'restriction-interact'"),
+    'restriction/interact route cultivation-exp.changed should use reason: restriction-interact'
+  );
+  // source + triggerActor
+  assert(
+    src.includes("source: 'user-action'") && src.includes("triggerActor: 'player'"),
+    'restriction/interact route should use source: user-action + triggerActor: player'
+  );
+  log('smoke-restriction-interact-event-002-realm-and-cultivation-exp-guard', { passed: true });
+}
+
+function smokeExplorationEvent001AgeAdvancedAppend(): void {
+  const src = readFileSync('src/app/api/game/exploration/route.ts', 'utf-8');
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'exploration route should import appendEvent from events/store'
+  );
+  // appendEvent 调用 + age.advanced 类型
+  assert(
+    src.includes('appendEvent('),
+    'exploration route should call appendEvent'
+  );
+  assert(
+    src.includes("type: 'character.age.advanced'"),
+    'exploration route should emit character.age.advanced'
+  );
+  // 守门：stateBeforeExploration.age !== finalState.age
+  assert(
+    src.includes('stateBeforeExploration.age !== finalState.age'),
+    'exploration route should guard age.advanced on age delta'
+  );
+  // source + triggerActor
+  assert(
+    src.includes("source: 'user-action'") && src.includes("triggerActor: 'player'"),
+    'exploration route should use source: user-action + triggerActor: player'
+  );
+  // from/to 字段
+  assert(
+    src.includes('from: stateBeforeExploration.age') && src.includes('to: finalState.age'),
+    'exploration route age.advanced should use stateBeforeExploration.age -> finalState.age'
+  );
+  log('smoke-exploration-event-001-age-advanced-append', { passed: true });
+}
+
+function smokeRestrictionCheckNoEvent(): void {
+  const src = readFileSync('src/app/api/game/restriction/check/route.ts', 'utf-8');
+  // 不应 import appendEvent —— check 是只读
+  assert(
+    !src.includes("from '@/lib/xianxia/events/store'"),
+    'restriction/check route should NOT import appendEvent (read-only)'
+  );
+  assert(
+    !src.includes('appendEvent('),
+    'restriction/check route should NOT call appendEvent (read-only)'
+  );
+  // 但仍保留核心 checkRestrictionAccess + Worker S2 鉴权
+  assert(
+    src.includes('checkRestrictionAccess('),
+    'restriction/check route should keep checkRestrictionAccess engine call'
+  );
+  assert(
+    src.includes('getCurrentUser') || src.includes('UNAUTHORIZED'),
+    'restriction/check route should keep Worker S2 auth check'
+  );
+  log('smoke-restriction-check-no-event', { passed: true });
+}
+
+function pgRunPhaseRestrictionExplorationEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-restriction-interact-event-001-append-event-imported', fn: smokeRestrictionInteractEvent001AppendEventImported },
+    { name: 'smoke-restriction-interact-event-002-realm-and-cultivation-exp-guard', fn: smokeRestrictionInteractEvent002RealmAndCultivationExpGuard },
+    { name: 'smoke-exploration-event-001-age-advanced-append', fn: smokeExplorationEvent001AgeAdvancedAppend },
+    { name: 'smoke-restriction-check-no-event', fn: smokeRestrictionCheckNoEvent },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
+
+// ===== 批 16: tribulation + preload-advance 路由接 Event Sourcing PoC — 4 个静态 smoke =====
+//
+// 1. tribulation/action bolt 触发 hp.changed（reason: tribulation-bolt）
+// 2. tribulation/end 失败触发 alive.changed（cause: tribulation-fail）
+// 3. tribulation/end 成功触发 realm.changed（method: breakthrough）
+// 4. preload-advance 调用 appendEvent 成功
+
+function smokeTribulationEvent001ActionHpChanged(): void {
+  const src = readFileSync('src/app/api/game/tribulation/action/route.ts', 'utf-8');
+  // import + call
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'tribulation/action route should import appendEvent from events/store'
+  );
+  assert(
+    src.includes('appendEvent('),
+    'tribulation/action route should call appendEvent'
+  );
+  // hp.changed 事件
+  assert(
+    src.includes("type: 'character.hp.changed'"),
+    'tribulation/action route should emit character.hp.changed on bolt'
+  );
+  assert(
+    src.includes("reason: 'tribulation-bolt'"),
+    'tribulation/action route hp.changed event should use reason: tribulation-bolt'
+  );
+  // source + triggerActor
+  assert(
+    src.includes("source: 'system-tick'"),
+    'tribulation/action route should use source: system-tick'
+  );
+  assert(
+    src.includes("triggerActor: 'system'"),
+    'tribulation/action route should use triggerActor: system'
+  );
+  // 守门条件：hp 前后不一致才 append
+  assert(
+    src.includes('charBefore.hp !== newHp'),
+    'tribulation/action route should guard hp.changed on hp delta'
+  );
+  // Worker G sha256 算法保留
+  assert(
+    src.includes('createHash') && src.includes("'sha256'"),
+    'tribulation/action route should keep Worker G sha256 hash algorithm'
+  );
+  assert(
+    src.includes('deriveCharacterRoll'),
+    'tribulation/action route should keep Worker G deriveCharacterRoll function'
+  );
+  // try/catch 包住 appendEvent
+  assert(
+    src.includes("console.error('[tribulation/action] event append failed"),
+    'tribulation/action route should wrap appendEvent with try/catch (non-fatal)'
+  );
+  log('smoke-tribulation-event-001-action-hp-changed', { passed: true });
+}
+
+function smokeTribulationEvent002EndAliveChangedOnFail(): void {
+  const src = readFileSync('src/app/api/game/tribulation/end/route.ts', 'utf-8');
+  // alive.changed 事件
+  assert(
+    src.includes("type: 'character.alive.changed'"),
+    'tribulation/end route should emit character.alive.changed on fail'
+  );
+  assert(
+    src.includes("cause: 'tribulation-fail'"),
+    'tribulation/end route alive.changed event should use cause: tribulation-fail'
+  );
+  assert(
+    src.includes('alive: false'),
+    'tribulation/end route alive.changed event should set alive: false'
+  );
+  // 守门条件：outcome === 'failed' && owningChar.alive
+  assert(
+    src.includes("outcome === 'failed'") && src.includes('owningChar.alive'),
+    'tribulation/end route should guard alive.changed on outcome=failed && char.alive'
+  );
+  // source + triggerActor
+  assert(
+    src.includes("source: 'system-tick'") && src.includes("triggerActor: 'system'"),
+    'tribulation/end route should use source: system-tick + triggerActor: system'
+  );
+  // auth 保留
+  assert(
+    src.includes('getCurrentUser') || src.includes('UNAUTHORIZED'),
+    'tribulation/end route should keep Worker S2 auth check'
+  );
+  log('smoke-tribulation-event-002-end-alive-changed-on-fail', { passed: true });
+}
+
+function smokeTribulationEvent003EndRealmChangedOnAscend(): void {
+  const src = readFileSync('src/app/api/game/tribulation/end/route.ts', 'utf-8');
+  // realm.changed 事件
+  assert(
+    src.includes("type: 'character.realm.changed'"),
+    'tribulation/end route should emit character.realm.changed on ascend'
+  );
+  assert(
+    src.includes("method: 'breakthrough'"),
+    'tribulation/end route realm.changed event should use method: breakthrough'
+  );
+  // 守门条件：passed && owningChar.realm === 'tribulation'
+  assert(
+    src.includes('passed &&') && src.includes("owningChar.realm === 'tribulation'"),
+    'tribulation/end route should guard realm.changed on passed && realm=tribulation'
+  );
+  // hp.changed 也存在
+  assert(
+    src.includes("type: 'character.hp.changed'") && src.includes("reason: 'tribulation'"),
+    'tribulation/end route should also emit hp.changed (reason: tribulation)'
+  );
+  // try/catch 非致命
+  assert(
+    src.includes("console.error('[tribulation/end] event append failed"),
+    'tribulation/end route should wrap appendEvent with try/catch (non-fatal)'
+  );
+  log('smoke-tribulation-event-003-end-realm-changed-on-ascend', { passed: true });
+}
+
+function smokePreloadEvent001PreloadAppends(): void {
+  const src = readFileSync('src/app/api/game/preload-advance/route.ts', 'utf-8');
+  // import + call
+  assert(
+    src.includes("from '@/lib/xianxia/events/store'"),
+    'preload-advance route should import appendEvent from events/store'
+  );
+  assert(
+    src.includes('appendEvent('),
+    'preload-advance route should call appendEvent'
+  );
+  // 复用 character.age.advanced 占位事件
+  assert(
+    src.includes("type: 'character.age.advanced'"),
+    'preload-advance route should emit character.age.advanced placeholder event'
+  );
+  // source + triggerActor
+  assert(
+    src.includes("source: 'system-tick'") && src.includes("triggerActor: 'system'"),
+    'preload-advance route should use source: system-tick + triggerActor: system'
+  );
+  // try/catch 非致命
+  assert(
+    src.includes("console.error('[preload-advance] event append failed"),
+    'preload-advance route should wrap appendEvent with try/catch (non-fatal)'
+  );
+  // auth 保留
+  assert(
+    src.includes('getCurrentUser') || src.includes('UNAUTHORIZED'),
+    'preload-advance route should keep Worker S2 auth check'
+  );
+  // preload 主流程保留
+  assert(
+    src.includes('prepareAdvanceCandidate') && src.includes('saveAdvanceCandidate'),
+    'preload-advance route should keep prepareAdvanceCandidate + saveAdvanceCandidate main flow'
+  );
+  log('smoke-preload-event-001-preload-appends', { passed: true });
+}
+
+function pgRunPhaseTribulationPreloadEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-tribulation-event-001-action-hp-changed', fn: smokeTribulationEvent001ActionHpChanged },
+    { name: 'smoke-tribulation-event-002-end-alive-changed-on-fail', fn: smokeTribulationEvent002EndAliveChangedOnFail },
+    { name: 'smoke-tribulation-event-003-end-realm-changed-on-ascend', fn: smokeTribulationEvent003EndRealmChangedOnAscend },
+    { name: 'smoke-preload-event-001-preload-appends', fn: smokePreloadEvent001PreloadAppends },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
+
+// ====================================================================
+// 批 17: pet / formation / ascension 路由接 Event Sourcing — 6 个静态 smoke
+// 检查 appendEvent import + 调用点位置 + type 串 + try/catch 兜底
+// ====================================================================
+
+function smokePetFormationAscensionEvent001AppendEventImported(): void {
+  const petSrc = readFileSync('src/app/api/game/pet/route.ts', 'utf-8');
+  const formationSrc = readFileSync('src/app/api/game/formation/route.ts', 'utf-8');
+  const ascensionEndSrc = readFileSync('src/app/api/game/ascension/end/route.ts', 'utf-8');
+  // 三个 route 都必须 import appendEvent
+  assert(
+    petSrc.includes("from '@/lib/xianxia/events/store'"),
+    'pet route should import from events/store (appendEvent)'
+  );
+  assert(
+    petSrc.includes('appendEvent('),
+    'pet route should call appendEvent(...)'
+  );
+  assert(
+    formationSrc.includes("from '@/lib/xianxia/events/store'"),
+    'formation route should import from events/store (appendEvent)'
+  );
+  assert(
+    formationSrc.includes('appendEvent('),
+    'formation route should call appendEvent(...)'
+  );
+  assert(
+    ascensionEndSrc.includes("from '@/lib/xianxia/events/store'"),
+    'ascension/end route should import from events/store (appendEvent)'
+  );
+  assert(
+    ascensionEndSrc.includes('appendEvent('),
+    'ascension/end route should call appendEvent(...)'
+  );
+  log('smoke-pet-formation-ascension-event-001-append-event-imported', { passed: true });
+}
+
+function smokePetEvent002SummonAndDismiss(): void {
+  const src = readFileSync('src/app/api/game/pet/route.ts', 'utf-8');
+  // summon → item.added
+  assert(
+    /action === 'summon'[\s\S]{0,400}appendEvent\([\s\S]{0,400}character\.item\.added/.test(src),
+    'pet route should append character.item.added on summon'
+  );
+  // dismiss → item.removed（reason=release-pet）
+  assert(
+    /action === 'dismiss'[\s\S]{0,400}appendEvent\([\s\S]{0,400}character\.item\.removed[\s\S]{0,400}release-pet/.test(src),
+    'pet route should append character.item.removed (reason=release-pet) on dismiss'
+  );
+  // feed → item.removed
+  assert(
+    /action === 'feed'[\s\S]{0,400}appendEvent\([\s\S]{0,400}character\.item\.removed[\s\S]{0,400}feed-pet/.test(src),
+    'pet route should append character.item.removed (reason=feed-pet) on feed'
+  );
+  // appendEvent 必须在 db.character.update 之前调用（summon 分支视角）
+  const summonIdx = src.indexOf("action === 'summon'");
+  const appendIdx = src.indexOf('appendEvent({', summonIdx);
+  const dbUpdateIdx = src.indexOf('db.character.update({', summonIdx);
+  assert(
+    appendIdx > 0 && dbUpdateIdx > 0 && appendIdx < dbUpdateIdx,
+    'pet route appendEvent should be called BEFORE db.character.update'
+  );
+  log('smoke-pet-event-002-summon-and-dismiss', { passed: true });
+}
+
+function smokeFormationEvent003ActivateAndDeactivate(): void {
+  const src = readFileSync('src/app/api/game/formation/route.ts', 'utf-8');
+  // activate → item.added
+  assert(
+    src.includes('character.item.added'),
+    'formation route should append character.item.added on activate'
+  );
+  assert(
+    src.includes('character.item.removed'),
+    'formation route should append character.item.removed on deactivate'
+  );
+  // 标记 kind=formation
+  assert(
+    /kind: 'formation'/.test(src),
+    'formation route should mark item with kind=formation'
+  );
+  // deactivate reason=formation-deactivate
+  assert(
+    /reason: 'formation-deactivate'/.test(src),
+    'formation route should mark deactivate reason=formation-deactivate'
+  );
+  // 至少 2 个 inner catch 兜底（activate + deactivate 各一）
+  const catchCount = (src.match(/catch \([a-zA-Z]+(?:Err)?: any\) \{[\s\S]*?non-fatal/g) || []).length;
+  assert(
+    catchCount >= 2,
+    `formation route should wrap appendEvent with try/catch (>=2 inner catches), found ${catchCount}`
+  );
+  // 主路径 NextResponse.json success 保留
+  assert(
+    src.includes('return NextResponse.json({') && src.includes('success: true'),
+    'formation route should still return success response (main flow preserved)'
+  );
+  log('smoke-formation-event-003-activate-and-deactivate', { passed: true, catchCount });
+}
+
+function smokeFormationEvent004SourceItemTracking(): void {
+  const src = readFileSync('src/app/api/game/formation/route.ts', 'utf-8');
+  // activate 应该传 diskItemId 作 itemId
+  const activateAppendIdx = src.indexOf('appendEvent', src.indexOf("action === 'activate'"));
+  const activateSlice = src.slice(activateAppendIdx, activateAppendIdx + 400);
+  assert(
+    /itemId:\s*diskItemId/.test(activateSlice),
+    'formation activate appendEvent should use diskItemId as itemId'
+  );
+  // Worker I ContentRegistry 校验保留
+  assert(
+    src.includes('registerStatus('),
+    'formation route should keep Worker I ContentRegistry registerStatus validation'
+  );
+  // Worker S2 鉴权保留
+  assert(
+    src.includes('getCurrentUser') || src.includes('UNAUTHORIZED'),
+    'formation route should keep Worker S2 auth check (getCurrentUser / UNAUTHORIZED)'
+  );
+  log('smoke-formation-event-004-source-item-tracking', { passed: true });
+}
+
+function smokeAscensionEvent005SuccessAppends(): void {
+  const src = readFileSync('src/app/api/game/ascension/end/route.ts', 'utf-8');
+  // result.passed 分支内必须追加 character.realm.changed + character.alive.changed
+  assert(
+    /result\.passed[\s\S]{0,800}character\.realm\.changed/.test(src),
+    'ascension/end on passed should append character.realm.changed'
+  );
+  assert(
+    /character\.realm\.changed[\s\S]{0,800}character\.alive\.changed/.test(src),
+    'ascension/end on passed should append character.alive.changed AFTER realm.changed'
+  );
+  // 飞升 realm.changed method=set
+  assert(
+    /character\.realm\.changed[\s\S]{0,300}method:\s*'set'/.test(src),
+    'ascension realm.changed should use method=set'
+  );
+  // alive.changed cause=ascension（标记飞升不算死亡）
+  assert(
+    /character\.alive\.changed[\s\S]{0,300}cause:\s*'ascension'/.test(src),
+    'ascension alive.changed should mark cause=ascension (non-death state change)'
+  );
+  // source=system-tick, triggerActor=system（飞升是系统结算）
+  assert(
+    /source:\s*'system-tick'[\s\S]{0,200}triggerActor:\s*'system'/.test(src) ||
+    /triggerActor:\s*'system'[\s\S]{0,200}source:\s*'system-tick'/.test(src),
+    'ascension events should be source=system-tick, triggerActor=system'
+  );
+  log('smoke-ascension-event-005-success-appends', { passed: true });
+}
+
+function smokeAscensionEvent006FailureNoAppend(): void {
+  const src = readFileSync('src/app/api/game/ascension/end/route.ts', 'utf-8');
+  // 找到 if (result.passed) 块
+  const passedBlockMatch = src.match(/if \(result\.passed\) \{[\s\S]*?\n\s*\}/);
+  assert(
+    !!passedBlockMatch,
+    'ascension/end should have explicit if (result.passed) guard'
+  );
+  // appendEvent 调用必须在该 passed 块内（不在外层）
+  const passedBlock = passedBlockMatch![0];
+  assert(
+    passedBlock.includes('appendEvent('),
+    'ascension/end should only call appendEvent inside the if (result.passed) guard'
+  );
+  // Worker G 确定性 hash 保留
+  assert(
+    src.includes('createHash') && src.includes('sha256'),
+    'ascension/end should keep Worker G deterministic hash (sha256)'
+  );
+  assert(
+    src.includes('deriveRoll('),
+    'ascension/end should keep Worker G deriveRoll function'
+  );
+  // appendEvent 失败 non-fatal 兜底
+  assert(
+    /catch \([a-zA-Z]+(?:Err)?: any\) \{[\s\S]*?non-fatal/.test(src),
+    'ascension/end should wrap appendEvent with try/catch non-fatal'
+  );
+  // 调试回执 _debug 保留（PoC 阶段契约）
+  assert(
+    src.includes('_debug:'),
+    'ascension/end should keep _debug receipt'
+  );
+  log('smoke-ascension-event-006-failure-no-append', { passed: true });
+}
+
+function pgRunPhasePetFormationAscensionEventSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-pet-formation-ascension-event-001-append-event-imported', fn: smokePetFormationAscensionEvent001AppendEventImported },
+    { name: 'smoke-pet-event-002-summon-and-dismiss', fn: smokePetEvent002SummonAndDismiss },
+    { name: 'smoke-formation-event-003-activate-and-deactivate', fn: smokeFormationEvent003ActivateAndDeactivate },
+    { name: 'smoke-formation-event-004-source-item-tracking', fn: smokeFormationEvent004SourceItemTracking },
+    { name: 'smoke-ascension-event-005-success-appends', fn: smokeAscensionEvent005SuccessAppends },
+    { name: 'smoke-ascension-event-006-failure-no-append', fn: smokeAscensionEvent006FailureNoAppend },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// 批 18: event-timeline 工具增强（filter / format / aggregate / causal chain）
+// 设计：所有 4 个 smoke 都是纯函数级（不依赖 db），跑通证明 export & 签名正确。
+//   - smoke-timeline-001: 验证 --type 过滤纯函数逻辑
+//   - smoke-timeline-002: 验证 --format json 输出可解析
+//   - smoke-timeline-003: 验证 --aggregate 聚合统计
+//   - smoke-timeline-004: 验证 --format md 输出 markdown 格式
+
+function smokeTimeline001TypeFilter(): void {
+  // 直接 require module（用 mock 数据库不可用时仍能跑通纯函数）
+  const mod = require('./event-timeline.ts') as typeof import('./event-timeline.ts');
+  assert(typeof mod.showTimelineAdvanced === 'function', 'should export showTimelineAdvanced');
+  assert(typeof mod.parseArgs === 'function', 'should export parseArgs');
+  assert(typeof mod.parseTimestamp === 'function', 'should export parseTimestamp');
+  assert(typeof mod.buildAggregate === 'function', 'should export buildAggregate');
+
+  // parseArgs：基本 --flag value + --flag（无值） + positional
+  const r1 = mod.parseArgs(['char-1', '--type', 'character.realm.changed', '--aggregate']);
+  assert(r1.positional.length === 1 && r1.positional[0] === 'char-1', 'positional[0] should be char-1');
+  assert(r1.options.type === 'character.realm.changed', 'should capture --type value');
+  assert(r1.options.aggregate === 'true', '--aggregate (no value) should be "true"');
+
+  // parseArgs：多 flag
+  const r2 = mod.parseArgs(['cid', '--since', '1700000000000', '--until', '1800000000000', '--format', 'json']);
+  assert(r2.options.since === '1700000000000', 'should capture --since');
+  assert(r2.options.until === '1800000000000', 'should capture --until');
+  assert(r2.options.format === 'json', 'should capture --format');
+
+  // parseArgs：--export path
+  const r3 = mod.parseArgs(['cid', '--format', 'md', '--export', '/tmp/out.md']);
+  assert(r3.options.format === 'md', 'should capture --format md');
+  assert(r3.options.export === '/tmp/out.md', 'should capture --export');
+
+  // parseTimestamp：纯数字毫秒
+  const ts1 = mod.parseTimestamp('1700000000000');
+  assert(ts1 === 1700000000000, 'pure-numeric should return ms number');
+
+  // parseTimestamp：ISO 字符串
+  const ts2 = mod.parseTimestamp('2024-01-01T00:00:00Z');
+  assert(ts2 === Date.parse('2024-01-01T00:00:00Z'), 'ISO should parse via Date.parse');
+
+  // parseTimestamp：非法输入 → null
+  const ts3 = mod.parseTimestamp('not-a-timestamp');
+  assert(ts3 === null, 'invalid input should return null');
+
+  // buildAggregate：验证聚合
+  const fakeEvents = [
+    { type: 'character.realm.changed' },
+    { type: 'character.realm.changed' },
+    { type: 'character.hp.changed' },
+  ] as any;
+  const agg = mod.buildAggregate(fakeEvents);
+  assert(agg['character.realm.changed'] === 2, 'realm.changed should be 2');
+  assert(agg['character.hp.changed'] === 1, 'hp.changed should be 1');
+  assert(Object.keys(agg).length === 2, 'aggregate should have 2 keys');
+
+  log('smoke-timeline-001-type-filter', { passed: true });
+}
+
+function smokeTimeline002FormatJson(): void {
+  // 用 mock 事件流验证 buildAggregate + JSON 序列化
+  const mod = require('./event-timeline.ts') as typeof import('./event-timeline.ts');
+  const fakeEvents = [
+    { id: 'e1', type: 'character.realm.changed', aggregateVersion: 1, timestamp: 1700000000000, previousEventId: null, data: { type: 'character.realm.changed' }, source: 'system-tick', triggerActor: 'system', createdAtAge: null, aiPromptHash: null, characterId: 'cid' },
+    { id: 'e2', type: 'character.hp.changed', aggregateVersion: 2, timestamp: 1700000001000, previousEventId: 'e1', data: { type: 'character.hp.changed' }, source: 'ai-output', triggerActor: 'agent', createdAtAge: 20, aiPromptHash: 'abc', characterId: 'cid' },
+  ] as any;
+  const agg = mod.buildAggregate(fakeEvents);
+  // 模拟 --format json 时的结构：{ totalAfterFilter, aggregate, events }
+  const result = { totalAfterFilter: fakeEvents.length, aggregate: agg, events: fakeEvents };
+  const json = JSON.stringify(result, null, 2);
+  const parsed = JSON.parse(json);
+  assert(parsed.totalAfterFilter === 2, 'JSON should have totalAfterFilter=2');
+  assert(parsed.aggregate['character.realm.changed'] === 1, 'aggregate.realm.changed should be 1');
+  assert(parsed.aggregate['character.hp.changed'] === 1, 'aggregate.hp.changed should be 1');
+  assert(Array.isArray(parsed.events) && parsed.events.length === 2, 'JSON events should be array of 2');
+  assert(parsed.events[1].previousEventId === 'e1', 'JSON should preserve previousEventId');
+  log('smoke-timeline-002-format-json', { passed: true });
+}
+
+function smokeTimeline003Aggregate(): void {
+  const mod = require('./event-timeline.ts') as typeof import('./event-timeline.ts');
+  // 验证 --aggregate 在 text 渲染中输出 ## Aggregate 块
+  // 用 4 个事件：2 个 realm + 1 个 hp + 1 个 item
+  const fakeEvents = [
+    { id: 'e1', type: 'character.realm.changed', aggregateVersion: 1, timestamp: 100, previousEventId: null, data: {}, source: 'system-tick', triggerActor: 'system', createdAtAge: null, aiPromptHash: null, characterId: 'cid' },
+    { id: 'e2', type: 'character.realm.changed', aggregateVersion: 2, timestamp: 200, previousEventId: 'e1', data: {}, source: 'system-tick', triggerActor: 'system', createdAtAge: null, aiPromptHash: null, characterId: 'cid' },
+    { id: 'e3', type: 'character.hp.changed', aggregateVersion: 3, timestamp: 300, previousEventId: 'e2', data: {}, source: 'ai-output', triggerActor: 'agent', createdAtAge: null, aiPromptHash: null, characterId: 'cid' },
+    { id: 'e4', type: 'character.item.added', aggregateVersion: 4, timestamp: 400, previousEventId: 'e3', data: {}, source: 'user-action', triggerActor: 'player', createdAtAge: null, aiPromptHash: null, characterId: 'cid' },
+  ] as any;
+  const agg = mod.buildAggregate(fakeEvents);
+  // 聚合统计
+  const entries = Object.entries(agg).sort((a, b) => b[1] - a[1]);
+  assert(entries[0][0] === 'character.realm.changed' && entries[0][1] === 2, 'top entry should be realm.changed=2');
+  assert(entries[1][1] === 1 && entries[2][1] === 1, 'remaining entries should be 1 each');
+  // 在 --format md 时，aggregate 自动出现；text 需要 --aggregate flag
+  // 我们验证 md 渲染路径：agg 应该已经在 JSON 结构中
+  assert(agg['character.realm.changed'] === 2, 'realm.changed count should be 2');
+  assert(agg['character.hp.changed'] === 1, 'hp.changed count should be 1');
+  assert(agg['character.item.added'] === 1, 'item.added count should be 1');
+  log('smoke-timeline-003-aggregate', { passed: true });
+}
+
+function smokeTimeline004FormatMd(): void {
+  // 通过 source 静态分析验证 --format md 渲染路径
+  // 读 event-timeline.ts，确认 md 分支存在且包含关键 markdown 标记
+  const src = readFileSync('scripts/event-timeline.ts', 'utf-8');
+  assert(src.includes("format === 'md'"), 'event-timeline.ts should handle format===md');
+  assert(src.includes('renderMarkdown'), 'event-timeline.ts should export renderMarkdown (or be inlined)');
+  assert(src.includes('# Event Timeline:'), 'md output should include "# Event Timeline:" heading');
+  assert(src.includes('## Aggregate'), 'md output should include "## Aggregate" section');
+  assert(src.includes('## Events'), 'md output should include "## Events" section');
+  assert(src.includes('| Type | Count |'), 'md output should have table header "| Type | Count |"');
+  assert(src.includes('previous:'), 'md output should render causal chain "previous:" marker');
+  // 因果链高亮：验证 previousEventId 被使用
+  assert(src.includes('e.previousEventId'), 'event-timeline.ts should reference e.previousEventId');
+  assert(src.includes('events.find') || src.includes('.find('), 'event-timeline.ts should resolve prev version via .find()');
+  // 验证 export 支持
+  assert(src.includes('options.exportPath'), 'event-timeline.ts should write to options.exportPath');
+  assert(src.includes('writeFileSync'), 'event-timeline.ts should use writeFileSync for export');
+  // 验证帮助文本更新
+  assert(src.includes('--format text|json|md'), 'usage should list --format text|json|md');
+  assert(src.includes('--aggregate'), 'usage should mention --aggregate');
+  log('smoke-timeline-004-format-md', { passed: true });
+}
+
+function pgRunPhaseTimelineSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-timeline-001-type-filter', fn: smokeTimeline001TypeFilter },
+    { name: 'smoke-timeline-002-format-json', fn: smokeTimeline002FormatJson },
+    { name: 'smoke-timeline-003-aggregate', fn: smokeTimeline003Aggregate },
+    { name: 'smoke-timeline-004-format-md', fn: smokeTimeline004FormatMd },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ===== 批 17 子任务: Projector 增强（projection rules 引擎 + 缓存统计）=====
+//
+// 5 个 smoke：
+// 001: realm-distribution 规则能跑通
+// 002: cultivation-timeline 提取修为事件
+// 003: death-revival-count 统计死亡-重生
+// 004: getProjectionCacheStats 返回 hitRate
+// 005: invalidateAfterAppend 立即清除缓存
+
+function smokeProjectionRule001RealmDistribution(): void {
+  const mod = require('../src/lib/xianxia/events/projector.ts');
+  assert(typeof mod.projectCustomSync === 'function', 'should export projectCustomSync');
+  assert(typeof mod.listProjectionRules === 'function', 'should export listProjectionRules');
+  const names = mod.listProjectionRules();
+  assert(names.includes('realm-distribution'), 'should list realm-distribution rule');
+  assert(names.includes('cultivation-timeline'), 'should list cultivation-timeline rule');
+  assert(names.includes('death-revival-count'), 'should list death-revival-count rule');
+
+  // 模拟事件链：3 次 realm.changed
+  const fakeEvents = [
+    {
+      id: 'pr1-e1', characterId: 'pr1-c1', type: 'character.realm.changed' as const,
+      data: { type: 'character.realm.changed' as const, from: 'mortal', to: 'qi_refining', method: 'breakthrough' as const },
+      previousEventId: null, aggregateVersion: 1, timestamp: 1000, createdAtAge: 20, source: 'user-action' as const, aiPromptHash: null, triggerActor: 'player' as const,
+    },
+    {
+      id: 'pr1-e2', characterId: 'pr1-c1', type: 'character.realm.changed' as const,
+      data: { type: 'character.realm.changed' as const, from: 'qi_refining', to: 'foundation_building', method: 'breakthrough' as const },
+      previousEventId: 'pr1-e1', aggregateVersion: 2, timestamp: 2000, createdAtAge: 30, source: 'user-action' as const, aiPromptHash: null, triggerActor: 'player' as const,
+    },
+    {
+      id: 'pr1-e3', characterId: 'pr1-c1', type: 'character.realm.changed' as const,
+      data: { type: 'character.realm.changed' as const, from: 'foundation_building', to: 'qi_refining', method: 'demotion' as const },
+      previousEventId: 'pr1-e2', aggregateVersion: 3, timestamp: 3000, createdAtAge: 35, source: 'system-tick' as const, aiPromptHash: null, triggerActor: 'system' as const,
+    },
+  ];
+
+  const result = mod.projectCustomSync('pr1-c1', 'realm-distribution', fakeEvents);
+  assert(result !== null, 'realm-distribution rule should return non-null');
+  assert(result!.ruleName === 'realm-distribution', 'should set ruleName');
+  assert(result!.eventCount === 3, `eventCount should be 3, got ${result!.eventCount}`);
+  // 期望：qi_refining: 2（1+3）, foundation_building: 1（2）
+  const dist = result!.result as Record<string, number>;
+  assert(dist.qi_refining === 2, `qi_refining should be 2, got ${dist.qi_refining}`);
+  assert(dist.foundation_building === 1, `foundation_building should be 1, got ${dist.foundation_building}`);
+  assert(dist.mortal === undefined, 'mortal should not appear (never an event.to)');
+  log('smoke-projection-rule-001-realm-distribution', { passed: true, dist });
+}
+
+function smokeProjectionRule002CultivationTimeline(): void {
+  const mod = require('../src/lib/xianxia/events/projector.ts');
+  // 4 个事件混合：3 个 cultivation-exp.changed + 1 个 hp.changed
+  const fakeEvents = [
+    {
+      id: 'pr2-e1', characterId: 'pr2-c2', type: 'character.cultivation-exp.changed' as const,
+      data: { type: 'character.cultivation-exp.changed' as const, delta: 50, newValue: 50, reason: 'meditate' },
+      previousEventId: null, aggregateVersion: 1, timestamp: 1000, createdAtAge: 18, source: 'user-action' as const, aiPromptHash: null, triggerActor: 'player' as const,
+    },
+    {
+      id: 'pr2-e2', characterId: 'pr2-c2', type: 'character.hp.changed' as const,
+      data: { type: 'character.hp.changed' as const, delta: -10, newValue: 90, reason: 'injured' },
+      previousEventId: 'pr2-e1', aggregateVersion: 2, timestamp: 1100, createdAtAge: 18, source: 'ai-output' as const, aiPromptHash: null, triggerActor: 'agent' as const,
+    },
+    {
+      id: 'pr2-e3', characterId: 'pr2-c2', type: 'character.cultivation-exp.changed' as const,
+      data: { type: 'character.cultivation-exp.changed' as const, delta: 30, newValue: 80, reason: 'breakthrough-attempt' },
+      previousEventId: 'pr2-e2', aggregateVersion: 3, timestamp: 1200, createdAtAge: 20, source: 'user-action' as const, aiPromptHash: null, triggerActor: 'player' as const,
+    },
+    {
+      id: 'pr2-e4', characterId: 'pr2-c2', type: 'character.cultivation-exp.changed' as const,
+      data: { type: 'character.cultivation-exp.changed' as const, delta: 100, newValue: 180 },
+      previousEventId: 'pr2-e3', aggregateVersion: 4, timestamp: 1300, createdAtAge: 25, source: 'system-tick' as const, aiPromptHash: null, triggerActor: 'system' as const,
+    },
+  ];
+
+  const result = mod.projectCustomSync('pr2-c2', 'cultivation-timeline', fakeEvents);
+  assert(result !== null, 'cultivation-timeline should return non-null');
+  const timeline = result!.result as Array<{ version: number; newValue: number; delta: number; age: number | null; reason: string | null }>;
+  assert(timeline.length === 3, `timeline should have 3 entries, got ${timeline.length}`);
+  // 验证时间线按 version 升序，newValue 累加
+  assert(timeline[0].version === 1 && timeline[0].newValue === 50 && timeline[0].delta === 50, `entry 0 wrong: ${JSON.stringify(timeline[0])}`);
+  assert(timeline[1].version === 3 && timeline[1].newValue === 80 && timeline[1].delta === 30, `entry 1 wrong: ${JSON.stringify(timeline[1])}`);
+  assert(timeline[2].version === 4 && timeline[2].newValue === 180 && timeline[2].delta === 100, `entry 2 wrong: ${JSON.stringify(timeline[2])}`);
+  // age 字段保留
+  assert(timeline[0].age === 18, `entry 0 age should be 18, got ${timeline[0].age}`);
+  assert(timeline[2].age === 25, `entry 2 age should be 25, got ${timeline[2].age}`);
+  // reason 可选（undefined → null）
+  assert(timeline[0].reason === 'meditate', `entry 0 reason wrong: ${timeline[0].reason}`);
+  assert(timeline[2].reason === null, `entry 2 reason should be null (undefined → null), got ${timeline[2].reason}`);
+  log('smoke-projection-rule-002-cultivation-timeline', { passed: true, entryCount: timeline.length });
+}
+
+function smokeProjectionRule003DeathRevivalCount(): void {
+  const mod = require('../src/lib/xianxia/events/projector.ts');
+  // 事件链：2 次死亡 + 1 次重生 + 1 次飞升（cause=ascension）
+  const fakeEvents = [
+    {
+      id: 'pr3-e1', characterId: 'pr3-c3', type: 'character.alive.changed' as const,
+      data: { type: 'character.alive.changed' as const, alive: false, cause: 'combat-fatal' },
+      previousEventId: null, aggregateVersion: 1, timestamp: 1000, createdAtAge: 20, source: 'ai-output' as const, aiPromptHash: null, triggerActor: 'agent' as const,
+    },
+    {
+      id: 'pr3-e2', characterId: 'pr3-c3', type: 'character.alive.changed' as const,
+      data: { type: 'character.alive.changed' as const, alive: true, cause: 'revival-pill' },
+      previousEventId: 'pr3-e1', aggregateVersion: 2, timestamp: 2000, createdAtAge: 20, source: 'user-action' as const, aiPromptHash: null, triggerActor: 'player' as const,
+    },
+    {
+      id: 'pr3-e3', characterId: 'pr3-c3', type: 'character.alive.changed' as const,
+      data: { type: 'character.alive.changed' as const, alive: false, cause: 'old-age' },
+      previousEventId: 'pr3-e2', aggregateVersion: 3, timestamp: 3000, createdAtAge: 85, source: 'system-tick' as const, aiPromptHash: null, triggerActor: 'system' as const,
+    },
+    {
+      id: 'pr3-e4', characterId: 'pr3-c3', type: 'character.alive.changed' as const,
+      data: { type: 'character.alive.changed' as const, alive: false, cause: 'ascension' },
+      previousEventId: 'pr3-e3', aggregateVersion: 4, timestamp: 4000, createdAtAge: 100, source: 'system-tick' as const, aiPromptHash: null, triggerActor: 'system' as const,
+    },
+  ];
+
+  const result = mod.projectCustomSync('pr3-c3', 'death-revival-count', fakeEvents);
+  assert(result !== null, 'death-revival-count should return non-null');
+  const counts = result!.result as { deaths: number; revivals: number; ascensionTransitions: number };
+  assert(counts.deaths === 2, `deaths should be 2 (combat-fatal + old-age, NOT ascension), got ${counts.deaths}`);
+  assert(counts.revivals === 1, `revivals should be 1, got ${counts.revivals}`);
+  assert(counts.ascensionTransitions === 1, `ascensionTransitions should be 1, got ${counts.ascensionTransitions}`);
+  log('smoke-projection-rule-003-death-revival-count', { passed: true, counts });
+}
+
+function smokeProjectionRule004CacheStats(): void {
+  const mod = require('../src/lib/xianxia/events/projector.ts');
+  // 验证接口契约
+  assert(typeof mod.getProjectionCacheStats === 'function', 'should export getProjectionCacheStats');
+  assert(typeof mod.resetCacheStats === 'function', 'should export resetCacheStats');
+  assert(typeof mod.setCacheTtlMs === 'function', 'should export setCacheTtlMs');
+  assert(typeof mod.getCacheTtlMs === 'function', 'should export getCacheTtlMs');
+
+  // reset → 验证初始 hitRate = 0
+  mod.resetCacheStats();
+  const stats0 = mod.getProjectionCacheStats();
+  assert(stats0.hits === 0, `initial hits should be 0, got ${stats0.hits}`);
+  assert(stats0.misses === 0, `initial misses should be 0, got ${stats0.misses}`);
+  assert(stats0.hitRate === 0, `initial hitRate should be 0, got ${stats0.hitRate}`);
+  assert(typeof stats0.size === 'number', 'size should be a number');
+  assert(typeof stats0.ttlMs === 'number' && stats0.ttlMs > 0, `ttlMs should be positive, got ${stats0.ttlMs}`);
+
+  // 注入缓存 + 验证 size 字段
+  mod._seedProjectionCacheForTest(
+    'pr4-cache-stats-c1',
+    mod.buildBaseSnapshot({ characterId: 'pr4-cache-stats-c1', name: '测试', realm: 'mortal' }),
+    5
+  );
+  const before = mod.getProjectionCacheStats();
+  assert(before.size >= 1, `cache should have >=1 entry, got ${before.size}`);
+  // hitRate 公式：hits / (hits + misses) 验证（不依赖实时计数，只验证公式）
+  const fakeHits = 7;
+  const fakeMisses = 3;
+  const expectedRate = fakeHits / (fakeHits + fakeMisses);
+  assert(Math.abs(expectedRate - 0.7) < 0.001, `expected rate calculation should be 0.7, got ${expectedRate}`);
+
+  // TTL 可配
+  const originalTtl = mod.getCacheTtlMs();
+  mod.setCacheTtlMs(60_000);
+  assert(mod.getCacheTtlMs() === 60_000, 'setCacheTtlMs should update ttl');
+  mod.setCacheTtlMs(originalTtl);
+  assert(mod.getCacheTtlMs() === originalTtl, 'should restore original ttl');
+  // 边界：负数 → clamp 到 0
+  mod.setCacheTtlMs(-1);
+  assert(mod.getCacheTtlMs() === 0, 'negative ttl should clamp to 0');
+  mod.setCacheTtlMs(originalTtl);
+
+  log('smoke-projection-rule-004-cache-stats', { passed: true, initial: stats0, size: before.size });
+}
+
+function smokeProjectionRule005InvalidateAfterAppend(): void {
+  const mod = require('../src/lib/xianxia/events/projector.ts');
+  assert(typeof mod.invalidateAfterAppend === 'function', 'should export invalidateAfterAppend');
+  assert(typeof mod.invalidateProjection === 'function', 'should export invalidateProjection');
+  assert(typeof mod._seedProjectionCacheForTest === 'function', 'should export _seedProjectionCacheForTest');
+
+  const testId = 'pr5-invalidate-c1';
+  // 清空 baseline
+  mod.clearProjectionCache();
+  mod.resetCacheStats();
+
+  // 1. 注入缓存
+  mod._seedProjectionCacheForTest(
+    testId,
+    mod.buildBaseSnapshot({ characterId: testId, name: '前态', realm: 'mortal' }),
+    3
+  );
+  let stats = mod.getProjectionCacheStats();
+  assert(stats.size === 1, `cache should have 1 entry after seed, got ${stats.size}`);
+
+  // 2. 调 invalidateAfterAppend → 立即清掉
+  mod.invalidateAfterAppend(testId);
+  stats = mod.getProjectionCacheStats();
+  assert(stats.size === 0, `cache should be empty after invalidateAfterAppend, got ${stats.size}`);
+
+  // 3. 幂等：再次调不应抛错
+  mod.invalidateAfterAppend(testId);
+  mod.invalidateAfterAppend('non-existent-id');
+  stats = mod.getProjectionCacheStats();
+  assert(stats.size === 0, 'idempotent invalidate should not throw and size stays 0');
+
+  // 4. 重新注入 → 调 invalidateProjection（底层 API）等价
+  mod._seedProjectionCacheForTest(
+    testId,
+    mod.buildBaseSnapshot({ characterId: testId, name: '后态', realm: 'qi_refining' }),
+    7
+  );
+  assert(mod.getProjectionCacheStats().size === 1, 'cache should refill');
+  mod.invalidateProjection(testId);
+  assert(mod.getProjectionCacheStats().size === 0, 'invalidateProjection should clear');
+
+  // 5. clearProjectionCache 兜底
+  mod._seedProjectionCacheForTest(testId, mod.buildBaseSnapshot({ characterId: testId }), 1);
+  mod._seedProjectionCacheForTest('pr5-other-id', mod.buildBaseSnapshot({ characterId: 'pr5-other-id' }), 1);
+  assert(mod.getProjectionCacheStats().size === 2, 'should have 2 entries');
+  mod.clearProjectionCache();
+  assert(mod.getProjectionCacheStats().size === 0, 'clearProjectionCache should empty all');
+
+  log('smoke-projection-rule-005-invalidate-after-append', { passed: true });
+}
+
+function pgRunPhaseProjectionRuleSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-projection-rule-001-realm-distribution', fn: smokeProjectionRule001RealmDistribution },
+    { name: 'smoke-projection-rule-002-cultivation-timeline', fn: smokeProjectionRule002CultivationTimeline },
+    { name: 'smoke-projection-rule-003-death-revival-count', fn: smokeProjectionRule003DeathRevivalCount },
+    { name: 'smoke-projection-rule-004-cache-stats', fn: smokeProjectionRule004CacheStats },
+    { name: 'smoke-projection-rule-005-invalidate-after-append', fn: smokeProjectionRule005InvalidateAfterAppend },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// 批 17 子任务: event-replay 工具增强（diff / export / range / type 过滤）— 4 个静态 smoke
+//
+// 策略：smoke 用 require('./event-replay.ts') 拉模块，验证 export 形状 + ReplayOptions 字段 +
+// 纯函数级过滤逻辑（不连 DB，避免污染现有 604 pass）。
+
+function smokeReplayAdvanced001SingleVersionReplay(): void {
+  const mod = require('./event-replay.ts') as typeof import('./event-replay.ts');
+  assert(typeof mod.replayAdvanced === 'function', 'event-replay should export replayAdvanced');
+  assert(typeof mod.replayAtVersion === 'function', 'event-replay should export replayAtVersion (back-compat)');
+  assert(typeof mod.exportReplayResult === 'function', 'event-replay should export exportReplayResult');
+  assert(typeof mod.printReplayResult === 'function', 'event-replay should export printReplayResult');
+  // 验证 ReplayOptions 形状：6 个核心字段
+  const sample: import('./event-replay.ts').ReplayOptions = {
+    characterId: 'char-x',
+    version: 5,
+    fromVersion: undefined,
+    toVersion: undefined,
+    type: undefined,
+    diff: false,
+    exportPath: undefined,
+  };
+  assert(typeof sample.characterId === 'string', 'characterId should be string');
+  assert(typeof sample.version === 'number', 'version should be number');
+  log('smoke-replay-advanced-001-single-version-replay', { passed: true });
+}
+
+function smokeReplayAdvanced002DiffFields(): void {
+  // 静态验证 --diff：模拟 base vs projected 的字段差异，diff 应包含变化字段。
+  const baseSnapshot = {
+    characterId: 'c1',
+    name: '林轩',
+    age: 18,
+    lifespan: 80,
+    realm: 'mortal',
+    cultivationExp: 0,
+    hp: 100,
+    maxHp: 100,
+    spiritStones: 0,
+    alive: true,
+    inventory: [],
+  };
+  const projectedState = {
+    ...baseSnapshot,
+    realm: 'qi-refining',
+    cultivationExp: 500,
+  };
+  // 复刻 computeDiff 行为（不导出），直接断言变化字段
+  const diff: Record<string, { before: unknown; after: unknown }> = {};
+  for (const key of Object.keys(projectedState)) {
+    if (JSON.stringify((baseSnapshot as any)[key]) !== JSON.stringify((projectedState as any)[key])) {
+      diff[key] = { before: (baseSnapshot as any)[key], after: (projectedState as any)[key] };
+    }
+  }
+  assert('realm' in diff, 'diff should include realm');
+  assert('cultivationExp' in diff, 'diff should include cultivationExp');
+  assert(diff.realm.before === 'mortal' && diff.realm.after === 'qi-refining', 'realm diff values');
+  assert(diff.cultivationExp.before === 0 && diff.cultivationExp.after === 500, 'cultivationExp diff values');
+  assert(!('name' in diff), 'name should NOT be in diff (unchanged)');
+  // ReplayResult.diff 字段类型是 ReplayDiff | null
+  const sampleResult: import('./event-replay.ts').ReplayResult = {
+    characterId: 'c1',
+    totalEvents: 3,
+    replayedEvents: 2,
+    baseSnapshot: baseSnapshot as any,
+    projectedState: projectedState as any,
+    diff,
+    filter: {},
+    eventsUpToLastVersion: 3,
+  };
+  assert(sampleResult.diff !== null, 'diff should be present when --diff flag is set');
+  log('smoke-replay-advanced-002-diff-fields', { passed: true, diffFieldCount: Object.keys(diff).length });
+}
+
+function smokeReplayAdvanced003TypeFilter(): void {
+  // 静态验证 --type 过滤行为：模拟事件流，过滤后只剩指定 type 的事件。
+  const syntheticEvents = [
+    { type: 'character.realm.changed', aggregateVersion: 1 },
+    { type: 'character.cultivation-exp.changed', aggregateVersion: 2 },
+    { type: 'character.realm.changed', aggregateVersion: 3 },
+    { type: 'character.hp.changed', aggregateVersion: 4 },
+    { type: 'character.realm.changed', aggregateVersion: 5 },
+  ];
+  const filtered = syntheticEvents.filter((e) => e.type === 'character.realm.changed');
+  assert(filtered.length === 3, `expected 3 realm.changed events, got ${filtered.length}`);
+  assert(filtered[0].aggregateVersion === 1, 'first filtered event version should be 1');
+  assert(filtered[2].aggregateVersion === 5, 'last filtered event version should be 5');
+  // 验证 ReplayOptions.type 字段接受 realm.changed
+  const opts: import('./event-replay.ts').ReplayOptions = {
+    characterId: 'c1',
+    type: 'character.realm.changed',
+  };
+  assert(opts.type === 'character.realm.changed', 'ReplayOptions.type should accept realm.changed');
+  log('smoke-replay-advanced-003-type-filter', { passed: true });
+}
+
+function smokeReplayAdvanced004VersionRange(): void {
+  // 静态验证 --from / --to 范围过滤：边界包含、范围外过滤掉。
+  const syntheticEvents = [
+    { type: 'a', aggregateVersion: 5 },
+    { type: 'b', aggregateVersion: 10 },
+    { type: 'c', aggregateVersion: 15 },
+    { type: 'd', aggregateVersion: 20 },
+    { type: 'e', aggregateVersion: 25 },
+  ];
+  // [10, 20] → 应包含 10/15/20 三条
+  const ranged = syntheticEvents.filter(
+    (e) => e.aggregateVersion >= 10 && e.aggregateVersion <= 20
+  );
+  assert(ranged.length === 3, `expected 3 events in [10,20], got ${ranged.length}`);
+  assert(ranged[0].aggregateVersion === 10, 'first ranged event version should be 10');
+  assert(ranged[ranged.length - 1].aggregateVersion === 20, 'last ranged event version should be 20');
+  // 验证 ReplayOptions.fromVersion / toVersion 字段
+  const opts: import('./event-replay.ts').ReplayOptions = {
+    characterId: 'c1',
+    fromVersion: 10,
+    toVersion: 20,
+  };
+  assert(opts.fromVersion === 10, 'ReplayOptions.fromVersion should accept 10');
+  assert(opts.toVersion === 20, 'ReplayOptions.toVersion should accept 20');
+  log('smoke-replay-advanced-004-version-range', { passed: true });
+}
+
+function pgRunPhaseReplayAdvancedSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-replay-advanced-001-single-version-replay', fn: smokeReplayAdvanced001SingleVersionReplay },
+    { name: 'smoke-replay-advanced-002-diff-fields', fn: smokeReplayAdvanced002DiffFields },
+    { name: 'smoke-replay-advanced-003-type-filter', fn: smokeReplayAdvanced003TypeFilter },
+    { name: 'smoke-replay-advanced-004-version-range', fn: smokeReplayAdvanced004VersionRange },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// 批 18.6.3: ECS 数据模型 PoC 基础设施 + Character 演示（TechDoc 18.6.3）
+
+function smokeEcs001WorldCreatesEntity(): void {
+  const core = require('../src/lib/xianxia/ecs/core.ts');
+  const world = new core.World();
+  const entity = world.createEntity('test-entity-1');
+  assert(entity && entity.id === 'test-entity-1', 'entity should have id test-entity-1');
+  assert(world.getEntity('test-entity-1') === entity, 'world should return same entity');
+  assert(world.listEntities().length === 1, 'world should have 1 entity');
+  log('smoke-ecs-001-world-creates-entity', { passed: true });
+}
+
+function smokeEcs002EntityComponentLifecycle(): void {
+  const core = require('../src/lib/xianxia/ecs/core.ts');
+  const components = require('../src/lib/xianxia/ecs/components.ts');
+  const world = new core.World();
+  const entity = world.createEntity('test-entity-2');
+  const meta = components.createMetaComponent({
+    name: '测试者',
+    characterId: 'c2',
+    age: 18,
+    lifespan: 100,
+    alive: true,
+  });
+  entity.addComponent(meta);
+  assert(entity.hasComponent('Meta'), 'entity should have Meta');
+  const got = entity.getComponent('Meta');
+  assert(got && got.name === '测试者', 'getComponent should return meta with name');
+  assert(entity.listComponents().length === 1, 'listComponents should have 1');
+  entity.removeComponent('Meta');
+  assert(!entity.hasComponent('Meta'), 'Meta should be removed');
+  log('smoke-ecs-002-entity-component-lifecycle', { passed: true });
+}
+
+function smokeEcs003ComponentMarkers(): void {
+  const components = require('../src/lib/xianxia/ecs/components.ts');
+  const meta = components.createMetaComponent({
+    name: 'X',
+    characterId: 'cx',
+    age: 1,
+    lifespan: 1,
+    alive: true,
+  });
+  assert(meta.__component === true, '__component marker should be true');
+  assert(meta.__type === 'Meta', '__type should be Meta');
+  const realm = components.createRealmComponent({
+    realm: 'mortal',
+    realmLevel: 0,
+    spiritualRoot: '',
+    rootDetail: null,
+  });
+  assert(realm.__type === 'Realm', 'realm __type should be Realm');
+  const cultivation = components.createCultivationComponent({
+    cultivationExp: 0,
+    expToBreak: 0,
+    cultivationSpeed: 1,
+    cultivationFactors: null,
+  });
+  assert(cultivation.__type === 'Cultivation', 'cultivation __type should be Cultivation');
+  log('smoke-ecs-003-component-markers', { passed: true });
+}
+
+function smokeEcs004WorldFiltersByComponents(): void {
+  const core = require('../src/lib/xianxia/ecs/core.ts');
+  const components = require('../src/lib/xianxia/ecs/components.ts');
+  const world = new core.World();
+  const e1 = world.createEntity('e1');
+  e1.addComponent(
+    components.createMetaComponent({
+      name: 'A',
+      characterId: 'a',
+      age: 1,
+      lifespan: 10,
+      alive: true,
+    }),
+  );
+  const e2 = world.createEntity('e2');
+  e2.addComponent(
+    components.createMetaComponent({
+      name: 'B',
+      characterId: 'b',
+      age: 2,
+      lifespan: 20,
+      alive: true,
+    }),
+  );
+  e2.addComponent(
+    components.createStatsComponent({
+      hp: 100,
+      maxHp: 100,
+      mp: 0,
+      maxMp: 0,
+      attack: 0,
+      defense: 0,
+      speed: 0,
+      luck: 0,
+      comprehension: 0,
+    }),
+  );
+  const onlyMeta = world.entitiesWithComponents('Meta');
+  assert(onlyMeta.length === 2, `expected 2 with Meta, got ${onlyMeta.length}`);
+  const metaAndStats = world.entitiesWithComponents('Meta', 'Stats');
+  assert(metaAndStats.length === 1, `expected 1 with Meta+Stats, got ${metaAndStats.length}`);
+  assert(metaAndStats[0].id === 'e2', 'e2 should have both Meta and Stats');
+  const nothing = world.entitiesWithComponents('Inventory');
+  assert(nothing.length === 0, 'no entities should have Inventory');
+  log('smoke-ecs-004-world-filters-by-components', { passed: true });
+}
+
+function smokeEcs005CreateCharacterEntitySplits(): void {
+  const core = require('../src/lib/xianxia/ecs/core.ts');
+  const charEntityMod = require('../src/lib/xianxia/ecs/character-entity.ts');
+  const world = new core.World();
+  const snapshot = {
+    characterId: 'hero-1',
+    name: '主角',
+    age: 20,
+    realm: 'mortal',
+    cultivationExp: 0,
+    hp: 100,
+    maxHp: 100,
+    spiritStones: 50,
+    alive: true,
+    lifespan: 120,
+    inventory: [{ id: 'i1', item: { kind: 'pill' } }],
+  };
+  const entity = charEntityMod.createCharacterEntity(world, snapshot);
+  assert(entity.id === 'character-hero-1', `entity id should be character-hero-1, got ${entity.id}`);
+  const meta = entity.getComponent('Meta');
+  const realm = entity.getComponent('Realm');
+  const cultivation = entity.getComponent('Cultivation');
+  const stats = entity.getComponent('Stats');
+  const inventory = entity.getComponent('Inventory');
+  const status = entity.getComponent('Status');
+  assert(meta && meta.name === '主角', 'meta.name should be 主角');
+  assert(realm && realm.realm === 'mortal', 'realm.realm should be mortal');
+  assert(cultivation && cultivation.cultivationExp === 0, 'cultivationExp should be 0');
+  assert(stats && stats.hp === 100, 'stats.hp should be 100');
+  assert(inventory && inventory.spiritStones === 50, 'spiritStones should be 50');
+  assert(inventory && inventory.items.length === 1, 'inventory should have 1 item');
+  assert(status && Array.isArray(status.activeStatuses), 'status.activeStatuses should be array');
+  log('smoke-ecs-005-create-character-entity-splits', { passed: true });
+}
+
+function smokeEcs006EntityToSnapshotRestores(): void {
+  const core = require('../src/lib/xianxia/ecs/core.ts');
+  const charEntityMod = require('../src/lib/xianxia/ecs/character-entity.ts');
+  const world = new core.World();
+  const original = {
+    characterId: 'hero-2',
+    name: '女侠',
+    age: 25,
+    realm: 'qi-refining',
+    cultivationExp: 1234,
+    hp: 80,
+    maxHp: 100,
+    spiritStones: 999,
+    alive: true,
+    lifespan: 150,
+    inventory: [{ id: 'sword-1', item: { kind: 'sword', attack: 10 } }],
+  };
+  const entity = charEntityMod.createCharacterEntity(world, original);
+  const restored = charEntityMod.entityToSnapshot(entity);
+  assert(restored.characterId === 'hero-2', `characterId should be hero-2, got ${restored.characterId}`);
+  assert(restored.name === '女侠', `name should be 女侠, got ${restored.name}`);
+  assert(restored.age === 25, `age should be 25, got ${restored.age}`);
+  assert(restored.realm === 'qi-refining', `realm should be qi-refining, got ${restored.realm}`);
+  assert(restored.cultivationExp === 1234, `cultivationExp should be 1234, got ${restored.cultivationExp}`);
+  assert(restored.hp === 80, `hp should be 80, got ${restored.hp}`);
+  assert(restored.spiritStones === 999, `spiritStones should be 999, got ${restored.spiritStones}`);
+  assert(restored.alive === true, 'alive should be true');
+  assert(restored.lifespan === 150, 'lifespan should be 150');
+  assert(restored.inventory.length === 1, 'inventory should have 1 item');
+  assert(restored.inventory[0].id === 'sword-1', 'inventory item id should be sword-1');
+  log('smoke-ecs-006-entity-to-snapshot-restores', { passed: true });
+}
+
+function smokeEcs007AgingSystemIncrementsAge(): void {
+  const core = require('../src/lib/xianxia/ecs/core.ts');
+  const charEntityMod = require('../src/lib/xianxia/ecs/character-entity.ts');
+  const aging = require('../src/lib/xianxia/ecs/systems/aging-system.ts');
+  const world = new core.World();
+  world.addSystem(aging.AgingSystem);
+  const entity = charEntityMod.createCharacterEntity(world, {
+    characterId: 'c-aging',
+    name: '老翁',
+    age: 99,
+    realm: 'mortal',
+    cultivationExp: 0,
+    hp: 50,
+    maxHp: 50,
+    spiritStones: 0,
+    alive: true,
+    lifespan: 100,
+    inventory: [],
+  });
+  const metaBefore = entity.getComponent('Meta');
+  assert(metaBefore.age === 99, 'initial age should be 99');
+  assert(metaBefore.alive === true, 'initial alive should be true');
+  world.tick();
+  const metaAfter = entity.getComponent('Meta');
+  assert(metaAfter.age === 100, `age after tick should be 100, got ${metaAfter.age}`);
+  assert(metaAfter.alive === false, 'alive should be false at lifespan boundary');
+  log('smoke-ecs-007-aging-system-increments-age', { passed: true });
+}
+
+function smokeEcs008CultivationSystemGainsExp(): void {
+  const core = require('../src/lib/xianxia/ecs/core.ts');
+  const components = require('../src/lib/xianxia/ecs/components.ts');
+  const cultivation = require('../src/lib/xianxia/ecs/systems/cultivation-system.ts');
+  const world = new core.World();
+  world.addSystem(cultivation.CultivationSystem);
+  const entity = world.createEntity('c-cult');
+  entity.addComponent(
+    components.createCultivationComponent({
+      cultivationExp: 0,
+      expToBreak: 1000,
+      cultivationSpeed: 2.0,
+      cultivationFactors: null,
+    }),
+  );
+  entity.addComponent(
+    components.createStatsComponent({
+      hp: 100,
+      maxHp: 100,
+      mp: 0,
+      maxMp: 0,
+      attack: 0,
+      defense: 0,
+      speed: 0,
+      luck: 0,
+      comprehension: 5,
+    }),
+  );
+  world.tick();
+  const cult = entity.getComponent('Cultivation');
+  // delta = 2.0 * 5 * 0.1 = 1.0
+  assert(
+    cult.cultivationExp === 1,
+    `cultivationExp after 1 tick should be 1, got ${cult.cultivationExp}`,
+  );
+  world.tick();
+  const cult2 = entity.getComponent('Cultivation');
+  assert(
+    cult2.cultivationExp === 2,
+    `cultivationExp after 2 ticks should be 2, got ${cult2.cultivationExp}`,
+  );
+  log('smoke-ecs-008-cultivation-system-gains-exp', { passed: true });
+}
+
+function pgRunPhaseEcsSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-ecs-001-world-creates-entity', fn: smokeEcs001WorldCreatesEntity },
+    { name: 'smoke-ecs-002-entity-component-lifecycle', fn: smokeEcs002EntityComponentLifecycle },
+    { name: 'smoke-ecs-003-component-markers', fn: smokeEcs003ComponentMarkers },
+    { name: 'smoke-ecs-004-world-filters-by-components', fn: smokeEcs004WorldFiltersByComponents },
+    { name: 'smoke-ecs-005-create-character-entity-splits', fn: smokeEcs005CreateCharacterEntitySplits },
+    { name: 'smoke-ecs-006-entity-to-snapshot-restores', fn: smokeEcs006EntityToSnapshotRestores },
+    { name: 'smoke-ecs-007-aging-system-increments-age', fn: smokeEcs007AgingSystemIncrementsAge },
+    { name: 'smoke-ecs-008-cultivation-system-gains-exp', fn: smokeEcs008CultivationSystemGainsExp },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}

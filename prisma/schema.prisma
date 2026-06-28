@@ -171,6 +171,8 @@ model Character {
   worldCalendarJson String @default("{\"eraName\":\"青岚仙历\",\"calendarYear\":5000,\"elapsedDays\":0}")
 
   events          EventLog[]
+  // Phase-Event-Sourcing: 主事件流（source of truth）
+  eventStream     Event[]
   choices         ChoiceLog[]
   interferences   InterferenceLog[]
   advancePreload  AdvancePreload?
@@ -246,4 +248,38 @@ model AdvancePreload {
   updatedAt         DateTime @updatedAt
 
   @@index([characterId, baseAge])
+}
+
+// ===== Phase-Event-Sourcing (TechDoc: Event Sourcing 主表，source of truth) =====
+// PoC 阶段：与 EventLog 共存——EventLog 是历史归档（AI 叙事 + 玩家选择的 prose 日志），
+// 本表是 source of truth（所有 state change 走这里）。后续批会把 EventLog 派生自 Event + AI 快照。
+model Event {
+  id              String   @id @default(cuid())
+  characterId     String
+  character       Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  type            String   // event 类型（见 src/lib/xianxia/events/types.ts EventType union）
+  data            Json     // 事件 payload（结构随 type 而变）
+
+  // 链式引用（用于因果图 + 顺序保证）
+  previousEventId String?  // 前一个事件 ID；null = 该 character 的第一个事件
+  previousEvent   Event?   @relation("EventChain", fields: [previousEventId], references: [id])
+  nextEvents      Event[]  @relation("EventChain")
+
+  // 聚合版本（乐观锁：每次 append +1）
+  aggregateVersion Int
+
+  // 时间
+  timestamp       DateTime @default(now())
+  createdAtAge    Int?     // 角色年龄（游戏内时间）
+
+  // 元数据（审计 + 复盘）
+  source          String   // 'user-action' | 'ai-output' | 'system-tick' | 'migration'
+  aiPromptHash    String?  // 触发此事件的 AI prompt hash（用于审计）
+  triggerActor    String?  // 'player' | 'agent' | 'system'
+
+  @@index([characterId, aggregateVersion])  // 顺序查询（replay）
+  @@index([characterId, type])              // 按类型查询
+  @@index([characterId, timestamp])         // 时间范围
+  @@index([previousEventId])                // 因果链反向查找
 }

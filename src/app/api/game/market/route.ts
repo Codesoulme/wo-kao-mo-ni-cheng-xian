@@ -18,6 +18,9 @@ import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { generateMarketOfferings } from '@/lib/xianxia/llm';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerItem } from '@/lib/xianxia/content-registry';
+// 批 16: market 路由接 Event Sourcing PoC — buy/sell 触发 spirit-stones.changed + item.added/removed
+// appendEvent 失败不影响主流程；保留 ContentRegistry 校验 + 鉴权 + db.character.update 全部原逻辑。
+import { appendEvent } from '@/lib/xianxia/events/store';
 import type { AttributeChange } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
@@ -294,6 +297,29 @@ export async function POST(req: NextRequest) {
       const displayEffects = buildEventDisplayEffects({ before, after: state, changes: appliedChanges, newItems });
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
+      // Event Sourcing PoC: buy 触发 spirit-stones.changed + item.added。
+      // 失败不阻断主流程——appendEvent 在 db.character.update 之前写入事件流。
+      try {
+        await appendEvent({
+          characterId,
+          type: 'character.spirit-stones.changed',
+          data: { type: 'character.spirit-stones.changed', delta: -price, newValue: state.spiritStones, reason: 'market-buy' },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: state.age,
+        });
+        await appendEvent({
+          characterId,
+          type: 'character.item.added',
+          data: { type: 'character.item.added', itemId: registered.content.id, item: registered.content },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: state.age,
+        });
+      } catch (evtErr: any) {
+        console.error('[market] buy event append failed (non-fatal):', evtErr?.message || evtErr);
+      }
+
       await db.character.update({ where: { id: characterId, userId: user?.id }, data: persistableMarketStateData(state) });
       await db.eventLog.create({ data: { characterId, age: state.age, title, narrative, eventType: 'trade', effects: JSON.stringify(effectsWithAudit) } });
 
@@ -339,6 +365,29 @@ export async function POST(req: NextRequest) {
       const stateChangeLog = buildStateChangeLog({ before, after: state, appliedChanges, rejectedChanges: removed.rejectedChanges || [], contentRegistryTrace, effectResolveTrace, aiBoundaryTrace: [] });
       const displayEffects = buildEventDisplayEffects({ before, after: state, changes: appliedChanges, removedItemIds });
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
+
+      // Event Sourcing PoC: sell 触发 item.removed + spirit-stones.changed (delta > 0)。
+      // 失败不阻断主流程。
+      try {
+        await appendEvent({
+          characterId,
+          type: 'character.item.removed',
+          data: { type: 'character.item.removed', itemId: item.id, reason: 'market-sell' },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: state.age,
+        });
+        await appendEvent({
+          characterId,
+          type: 'character.spirit-stones.changed',
+          data: { type: 'character.spirit-stones.changed', delta: sellPrice, newValue: state.spiritStones, reason: 'market-sell' },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: state.age,
+        });
+      } catch (evtErr: any) {
+        console.error('[market] sell event append failed (non-fatal):', evtErr?.message || evtErr);
+      }
 
       await db.character.update({ where: { id: characterId, userId: user?.id }, data: persistableMarketStateData(state) });
       await db.eventLog.create({ data: { characterId, age: state.age, title, narrative, eventType: 'trade', effects: JSON.stringify(effectsWithAudit) } });

@@ -4,6 +4,9 @@ import { dbToState } from '@/lib/xianxia/engine';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
 import { generateSettlementEvaluation } from '@/lib/xianxia/llm';
 import { getCurrentUser } from '@/lib/auth-helpers';
+// 批 15: Event Sourcing PoC — settlement 路由接 appendEvent。
+// appendEvent 失败不影响 settlement 主流程；保留 P0-9/P1-12/S1 已有逻辑。
+import { appendEvent } from '@/lib/xianxia/events/store';
 
 // P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
@@ -97,6 +100,55 @@ export async function POST(req: NextRequest) {
     } catch (err: any) {
       console.error('settlement ai failed:', err?.message || err);
       settlementResult = { ...fallback, options: fallback.options.slice(0, Math.min(3, fallback.options.length)) };
+    }
+
+    // 批 15: Event Sourcing PoC — settlement 写事件。
+    // 仅在 settlementResult 生成成功之后才 append；settlement 失败时（外层 catch）不写。
+    // appendEvent 失败不影响 settlement 主流程（保留 P0-9 结算双路径 / P1-12 ending catch / S1 鉴权）。
+    // PoC 简化：只看 ending 是否 ascension/state 是否 ascended，不改 settlementResult 生成逻辑。
+    if (settlementResult) {
+      const isAscension =
+        settlementResult.ending === 'ascension' || (state as any).ascended === true;
+      const causeLabel = isAscension
+        ? 'ascension'
+        : (state as any).causeOfDeath || 'death';
+      // alive.changed — 每次结算都写一份（ascension/death 都触发 alive=false 终局）。
+      try {
+        await appendEvent({
+          characterId,
+          type: 'character.alive.changed',
+          data: {
+            type: 'character.alive.changed',
+            alive: false,
+            cause: causeLabel,
+          },
+          source: 'system-tick',
+          triggerActor: 'system',
+          createdAtAge: state.age,
+        });
+      } catch (e: any) {
+        console.error('[settlement] alive event append failed (non-fatal):', e?.message || e);
+      }
+      // realm.changed — 飞升结局额外写一份（method: 'set'，因为 PoC 不算严格突破）。
+      if (isAscension) {
+        try {
+          await appendEvent({
+            characterId,
+            type: 'character.realm.changed',
+            data: {
+              type: 'character.realm.changed',
+              from: (state as any).realm || 'unknown',
+              to: `${(state as any).realm || 'unknown'}-ascended`,
+              method: 'set',
+            },
+            source: 'system-tick',
+            triggerActor: 'system',
+            createdAtAge: state.age,
+          });
+        } catch (e: any) {
+          console.error('[settlement] realm event append failed (non-fatal):', e?.message || e);
+        }
+      }
     }
 
     return NextResponse.json({ success: true, settlementResult });

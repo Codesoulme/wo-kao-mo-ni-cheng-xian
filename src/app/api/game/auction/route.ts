@@ -20,6 +20,9 @@ import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { generateAuctionContent } from '@/lib/xianxia/llm';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerItem, registerMany, registerNpc, registerThread } from '@/lib/xianxia/content-registry';
+// 批 16: auction 路由接 Event Sourcing PoC — bid 拍得触发 spirit-stones.changed + item.added
+// appendEvent 失败不影响主流程；保留 NPC 互竞/aftermath/线索/鉴权等所有原逻辑。
+import { appendEvent } from '@/lib/xianxia/events/store';
 import type { AttributeChange, AuctionAIOutcome, CausalEdge, CausalNode, CharacterState, ItemEntry, PendingThread, WorldNpc } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 import { z } from 'zod';
@@ -605,6 +608,39 @@ export async function POST(req: NextRequest) {
         if (registeredItem.content) {
           newItems = [registeredItem.content];
           state = addItems(state, newItems);
+        }
+        // Event Sourcing PoC: 拍得成功 → spirit-stones.changed（花费）+ item.added（得物）。
+        // appendEvent 失败不影响主流程；放在 addItems 之后确保 event 反映最终 state。
+        try {
+          await appendEvent({
+            characterId,
+            type: 'character.spirit-stones.changed',
+            data: {
+              type: 'character.spirit-stones.changed',
+              delta: -lot.currentBid,
+              newValue: state.spiritStones,
+              reason: 'auction-bid',
+            },
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: state.age,
+          });
+          if (registeredItem.content && registeredItem.content.id) {
+            await appendEvent({
+              characterId,
+              type: 'character.item.added',
+              data: {
+                type: 'character.item.added',
+                itemId: registeredItem.content.id,
+                item: registeredItem.content,
+              },
+              source: 'user-action',
+              triggerActor: 'player',
+              createdAtAge: state.age,
+            });
+          }
+        } catch (evtErr: any) {
+          console.error('[auction] bid event append failed (non-fatal):', evtErr?.message || evtErr);
         }
         const threadRaw = auctionThread(session, lot, state.age);
         if (threadRaw) {

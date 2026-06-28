@@ -2,6 +2,7 @@ import { getCurrentUser } from '@/lib/auth-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate, saveAdvanceCandidate } from '@/lib/xianxia/advance-preload';
+import { appendEvent } from '@/lib/xianxia/events/store';
 
 // P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
 // ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
@@ -46,12 +47,36 @@ export async function POST(req: NextRequest) {
     const existing = await db.advancePreload.findUnique({ where: { characterId } });
     const preloadResult = existing ? await isAdvancePreloadUsable(char, existing) : { usable: false };
     if (preloadResult.usable) {
+      // 批 16: preload-advance 路由接 Event Sourcing——复用 character.age.advanced 占位事件
+      try {
+        await appendEvent({
+          characterId,
+          type: 'character.age.advanced',
+          data: { type: 'character.age.advanced', from: 0, to: 0 },
+          source: 'system-tick',
+          triggerActor: 'system',
+        });
+      } catch (e) {
+        console.error('[preload-advance] event append failed (non-fatal):', e);
+      }
       return NextResponse.json({ success: true });
     }
     if (existing) await clearAdvancePreload(characterId);
 
     const candidate = await prepareAdvanceCandidate(char);
     await saveAdvanceCandidate(characterId, candidate);
+    // 批 16: preload-advance 路由接 Event Sourcing——预加载完成占位事件
+    try {
+      await appendEvent({
+        characterId,
+        type: 'character.age.advanced',
+        data: { type: 'character.age.advanced', from: 0, to: 0 },
+        source: 'system-tick',
+        triggerActor: 'system',
+      });
+    } catch (e) {
+      console.error('[preload-advance] event append failed (non-fatal):', e);
+    }
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('advance prepare error:', err);

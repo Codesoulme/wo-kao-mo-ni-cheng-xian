@@ -6,6 +6,8 @@ import type { TribulationSession, AscensionSession, Restriction, HeartDemonType 
 import { selectNextProtagonist } from './engine';
 import { triggerEndingEvaluation } from './engine';
 import { tickAllNpcsForYear as libTickAllNpcsForYear } from './npc-growth';
+// 批 15: store.ts 关键 setter 接 Event Sourcing（PoC 双写，appendEvent 失败仅 console.error）
+import { appendEvent } from './events/store';
 
 // 流式叙事：绕过 React 状态系统，直接更新 DOM
 export interface StreamingState {
@@ -13,6 +15,28 @@ export interface StreamingState {
   text: string;
 }
 export const streamingRef: { current: StreamingState | null } = { current: null };
+
+// 批 15: 内部 helper —— setter 在 closure 内传入 get()，helper 自己取 character.id
+// 无 character 时跳过 appendEvent；appendEvent 失败仅 console.error（不抛）
+function _tryAppendEvent(
+  get: () => any,
+  type: 'character.inheritance-pool.set' | 'character.inheritance-candidates.set' | 'character.inheritance-ending-summary.set' | 'character.end-result.set' | 'character.settlement-result.set' | 'character.streaming-narrative.started',
+  data: any
+): void {
+  try {
+    const cid = get()?.character?.id;
+    if (!cid || typeof cid !== 'string') return;
+    appendEvent({
+      characterId: cid,
+      type,
+      data: { type, ...data } as any,
+      source: 'system-tick',
+      triggerActor: 'system',
+    }).catch((e) => console.error('[store] ' + type + ' event failed (non-fatal):', e));
+  } catch (e) {
+    console.error('[store] ' + type + ' event helper threw (non-fatal):', e);
+  }
+}
 
 
 export type HeritageCategory = 'scripture' | 'fate' | 'pet' | 'artifact' | 'constitution' | 'treasure';
@@ -164,6 +188,8 @@ export interface CharacterState {
   // ===== Task 23 新增 =====
   // 灵宠列表
   pets?: any[];
+  // ===== Task 24 关联 NPC 列表（NPC growth 模块写入）
+  npcs?: any[];
   // ===== Task 24 新增 =====
   // 已探秘境记录（ExplorationRecord[]）—— 用于秘境面板显示冷却状态
   exploredRealms?: any[];
@@ -533,6 +559,8 @@ export const useGameStore = create<GameState>()(
       setNewEventRange: (range) => set({ newEventRange: range }),
       setSettlingHint: (hint) => set({ settlingHint: hint }),
       setStreamingNarrative: (eventIndex, text) => {
+        // 批 15: 流式叙事开始 —— 双写 appendEvent（PoC：失败仅 console.error）
+        _tryAppendEvent(get, 'character.streaming-narrative.started', { eventIndex, placeholderId: String(eventIndex) });
         streamingRef.current = { eventIndex, text };
         set({ streamingNarrative: { eventIndex, text } });
       },
@@ -573,17 +601,35 @@ export const useGameStore = create<GameState>()(
         };
       }),
       clearSelectedHeritage: () => set({ selectedHeritage: {} }),
-      setSettlementResult: (result) => set({ settlementResult: result }),
+      setSettlementResult: (result) => {
+        // 批 15: 结算结果 —— 双写 appendEvent（PoC：失败仅 console.error）
+        const status = (result && typeof result === 'object' && 'ending' in result) ? String((result as any).ending) : 'unknown';
+        const narrative = (result && typeof result === 'object' && 'summary' in result && typeof (result as any).summary === 'string')
+          ? String((result as any).summary)
+          : '';
+        _tryAppendEvent(get, 'character.settlement-result.set', { settlement: result ?? null });
+        _tryAppendEvent(get, 'character.end-result.set', { status, narrative });
+        set({ settlementResult: result });
+      },
       addHallRecord: (record) => set((s) => ({
         hallOfSimulations: [record, ...s.hallOfSimulations.filter((it) => it.id !== record.id)].slice(0, 50),
       })),
       setWorldCalendar: (world) => set({ worldCalendar: world }),
       // Phase-M #3: 继承池运行时 setter（不持久化，由调用方决定何时填入/清空）
-      setInheritancePool: (pool, candidates, summary) => set({
-        inheritancePool: Array.isArray(pool) ? pool : [],
-        inheritanceCandidates: Array.isArray(candidates) ? candidates : [],
-        inheritanceEndingSummary: typeof summary === 'string' ? summary : null,
-      }),
+      setInheritancePool: (pool, candidates, summary) => {
+        // 批 15: 继承池 setter —— 双写 3 个事件（PoC：失败仅 console.error）
+        const safePool = Array.isArray(pool) ? pool : [];
+        const safeCands = Array.isArray(candidates) ? candidates : [];
+        const safeSummary = typeof summary === 'string' ? summary : null;
+        _tryAppendEvent(get, 'character.inheritance-pool.set', { pool: safePool });
+        _tryAppendEvent(get, 'character.inheritance-candidates.set', { candidates: safeCands });
+        _tryAppendEvent(get, 'character.inheritance-ending-summary.set', { summary: safeSummary });
+        set({
+          inheritancePool: safePool,
+          inheritanceCandidates: safeCands,
+          inheritanceEndingSummary: safeSummary,
+        });
+      },
       clearInheritancePool: () => set({
         inheritancePool: [], inheritanceCandidates: [], inheritanceEndingSummary: null,
       }),

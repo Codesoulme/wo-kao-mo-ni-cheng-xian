@@ -5,6 +5,7 @@ import { buildStateContext, executeAIEvent, stateToResponse } from '@/lib/xianxi
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
+import { appendEvent } from '@/lib/xianxia/events/store';
 import {
   callLLMStream,
   buildAdvancePrompt,
@@ -312,6 +313,57 @@ export async function POST(req: NextRequest) {
           // 立即写回角色状态（不阻塞 done，但确保 event 保存）
           const ageBefore = char.age;
           if (finalState.age > ageBefore || (finalState as any).causeOfDeath || (finalState as any).deathReason || finalState.isAtChoice) {
+            // 批 18 advance-sse-event PoC：写库前先 append 4 类核心事件（age/realm/hp/alive）。
+            // 独立 try/catch —— appendEvent 失败不阻断 SSE 主流程。
+            try {
+              if (char.age !== finalState.age) {
+                await appendEvent({
+                  characterId,
+                  type: 'character.age.advanced',
+                  data: { type: 'character.age.advanced', from: char.age, to: finalState.age },
+                  source: 'system-tick',
+                  triggerActor: 'system',
+                  createdAtAge: finalState.age,
+                });
+              }
+
+              if (char.realm !== finalState.realm) {
+                await appendEvent({
+                  characterId,
+                  type: 'character.realm.changed',
+                  data: { type: 'character.realm.changed', from: char.realm, to: finalState.realm, method: 'set' },
+                  source: 'system-tick',
+                  triggerActor: 'system',
+                  createdAtAge: finalState.age,
+                });
+              }
+
+              if (char.hp !== finalState.hp) {
+                await appendEvent({
+                  characterId,
+                  type: 'character.hp.changed',
+                  data: { type: 'character.hp.changed', delta: finalState.hp - char.hp, newValue: finalState.hp },
+                  source: 'system-tick',
+                  triggerActor: 'system',
+                  createdAtAge: finalState.age,
+                });
+              }
+
+              if (char.alive !== finalState.alive && finalState.alive === false) {
+                await appendEvent({
+                  characterId,
+                  type: 'character.alive.changed',
+                  data: { type: 'character.alive.changed', alive: false, cause: (finalState as any).causeOfDeath || 'unknown' },
+                  source: 'system-tick',
+                  triggerActor: 'system',
+                  createdAtAge: finalState.age,
+                });
+              }
+            } catch (e) {
+              console.error('[advance-sse] event append failed (non-fatal):', e);
+              // 不阻断 SSE 主流程
+            }
+
             // 修复 P1-1：SSE 路径补齐所有漏写字段——走与 non-SSE 同一个 buildAdvanceStateData
             await db.character.update({
               where: isProdMode

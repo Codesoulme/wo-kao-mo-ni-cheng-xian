@@ -16,6 +16,7 @@ import {
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerStatus } from '@/lib/xianxia/content-registry';
+import { appendEvent } from '@/lib/xianxia/events/store';
 import type { AttributeChange, CharacterState } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
@@ -197,6 +198,28 @@ export async function POST(req: NextRequest) {
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
       await db.character.update({ where: { id: characterId, userId: user?.id }, data: persistableFormationStateData(state) });
+
+      // Event Sourcing（PoC17）：formation activate → character.item.added（阵法装上）
+      try {
+        const formationItem = result.formation?.sourceItem || before.inventory.find(it => it.id === diskItemId);
+        if (diskItemId) {
+          await appendEvent({
+            characterId,
+            type: 'character.item.added',
+            data: {
+              type: 'character.item.added',
+              itemId: diskItemId,
+              item: { kind: 'formation', ...(formationItem || { id: diskItemId, name: result.formation?.name || '阵法' }) },
+            },
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: state.age,
+          });
+        }
+      } catch (evtErr: any) {
+        console.error('[formation/activate] appendEvent failed (non-fatal):', evtErr?.message || evtErr);
+      }
+
       await db.eventLog.create({ data: { characterId, age: state.age, title, narrative, eventType: 'formation', effects: JSON.stringify(effectsWithAudit) } });
 
       return NextResponse.json({
@@ -232,6 +255,27 @@ export async function POST(req: NextRequest) {
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
       await db.character.update({ where: { id: characterId, userId: user?.id }, data: persistableFormationStateData(state) });
+
+      // Event Sourcing（PoC17）：formation deactivate → character.item.removed（阵法卸下）
+      try {
+        if (formationId) {
+          await appendEvent({
+            characterId,
+            type: 'character.item.removed',
+            data: {
+              type: 'character.item.removed',
+              itemId: formationId,
+              reason: 'formation-deactivate',
+            },
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: state.age,
+          });
+        }
+      } catch (evtErr: any) {
+        console.error('[formation/deactivate] appendEvent failed (non-fatal):', evtErr?.message || evtErr);
+      }
+
       await db.eventLog.create({ data: { characterId, age: state.age, title, narrative, eventType: 'formation', effects: JSON.stringify(effectsWithAudit) } });
 
       return NextResponse.json({

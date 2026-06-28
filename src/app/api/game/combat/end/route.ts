@@ -21,6 +21,9 @@ import { generateCombatEndNarrative, generateCombatLootProposal } from '@/lib/xi
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerItem, registerMany, registerThread } from '@/lib/xianxia/content-registry';
+// 批 16: combat end 路由接 Event Sourcing — alive/hp/item 事件。
+// appendEvent 失败不影响战斗结算主流程（保留 Worker I ContentRegistry 校验 + Worker S2 鉴权）。
+import { appendEvent } from '@/lib/xianxia/events/store';
 import type { AttributeChange, CombatLootAIOutcome } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
@@ -297,6 +300,68 @@ export async function POST(req: NextRequest) {
       });
     } catch {
       // 日志写入失败不影响战斗结算。
+    }
+
+    // 批 16: Event Sourcing — combat end 终局事件 append。
+    // 必须在 ContentRegistry 校验之后（用 accepted drops）、return 之前。
+    // 整块包一层 try/catch：appendEvent 失败不影响战斗结算主流程。
+    try {
+      // 1. alive.changed：战斗致死触发（endCombat 已写死 state.alive=false）
+      if (stateBeforeCombatEnd.alive && !state.alive) {
+        try {
+          await appendEvent({
+            characterId,
+            type: 'character.alive.changed',
+            data: { type: 'character.alive.changed', alive: false, cause: 'combat' },
+            source: 'system-tick',
+            triggerActor: 'system',
+            createdAtAge: state.age,
+          });
+        } catch (aliveErr: any) {
+          console.error('[combat-end] alive event append failed (non-fatal):', aliveErr?.message || aliveErr);
+        }
+      }
+
+      // 2. hp.changed：战后 hp 变化（endCombat 扣血 / 心魔试炼扣血等）
+      if (stateBeforeCombatEnd.hp !== state.hp) {
+        try {
+          await appendEvent({
+            characterId,
+            type: 'character.hp.changed',
+            data: {
+              type: 'character.hp.changed',
+              delta: state.hp - stateBeforeCombatEnd.hp,
+              newValue: state.hp,
+              reason: 'combat-end',
+            },
+            source: 'system-tick',
+            triggerActor: 'system',
+            createdAtAge: state.age,
+          });
+        } catch (hpErr: any) {
+          console.error('[combat-end] hp event append failed (non-fatal):', hpErr?.message || hpErr);
+        }
+      }
+
+      // 3. item.added：每个 accepted drop 写一条（ContentRegistry 已拒的不会进 appliedDrops）
+      for (const drop of appliedDrops) {
+        if (!drop || !drop.id) continue;
+        try {
+          await appendEvent({
+            characterId,
+            type: 'character.item.added',
+            data: { type: 'character.item.added', itemId: drop.id, item: drop },
+            source: 'system-tick',
+            triggerActor: 'system',
+            createdAtAge: state.age,
+          });
+        } catch (itemErr: any) {
+          console.error('[combat-end] item event append failed (non-fatal):', itemErr?.message || itemErr);
+        }
+      }
+    } catch (combatEndEventErr: any) {
+      // 外层兜底：单个事件失败已内层 catch，整块不应再抛；这里只防未来重构漏掉。
+      console.error('[combat-end] event append block failed (non-fatal):', combatEndEventErr?.message || combatEndEventErr);
     }
 
     return NextResponse.json({

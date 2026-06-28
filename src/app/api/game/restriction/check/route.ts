@@ -45,5 +45,6 @@ export async function POST(req: NextRequest) {
     providedPassword,
     currentTiming,
   );
+  // restriction/check 是只读检查：不 append event（无 state change）。
   return NextResponse.json({ ok: true, result });
 }

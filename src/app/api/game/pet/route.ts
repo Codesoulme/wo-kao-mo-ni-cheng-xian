@@ -22,6 +22,7 @@ import {
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { generatePetBond, generatePetCareOutcome } from '@/lib/xianxia/llm';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
+import { appendEvent } from '@/lib/xianxia/events/store';
 import type { AttributeChange, CharacterState, Pet, PetBondAIOutcome, PetCareAIOutcome } from '@/lib/xianxia/types';
 import { z } from 'zod';
 
@@ -238,7 +239,60 @@ export async function POST(req: NextRequest) {
     const name = pet?.name || '灵宠';
     const titleMeta = eventAndResponseTitle(action, name);
 
+    // Event Sourcing（PoC17）：pet 路由接 appendEvent。
+    // 语义映射：
+    //   summon → 结缘灵宠（state.pets 新增） → character.item.added（kind=pet）
+    //   dismiss → 放归灵宠（state.pets 移除） → character.item.removed
+    //   feed → 喂养消耗物品 → character.item.removed（消耗的物品 id）
+    // appendEvent 失败用 try/catch 兜底——不能影响主流程。
+    try {
+      if (action === 'summon' && pet && pet.id) {
+        await appendEvent({
+          characterId,
+          type: 'character.item.added',
+          data: {
+            type: 'character.item.added',
+            itemId: pet.id,
+            item: { kind: 'pet', ...pet },
+          },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: state.age,
+        });
+      } else if (action === 'dismiss' && petId) {
+        await appendEvent({
+          characterId,
+          type: 'character.item.removed',
+          data: {
+            type: 'character.item.removed',
+            itemId: petId,
+            reason: 'release-pet',
+          },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: state.age,
+        });
+      } else if (action === 'feed' && itemId) {
+        // 喂养消耗物品 → item.removed
+        await appendEvent({
+          characterId,
+          type: 'character.item.removed',
+          data: {
+            type: 'character.item.removed',
+            itemId,
+            reason: 'feed-pet',
+          },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: state.age,
+        });
+      }
+    } catch (evtErr: any) {
+      console.error('[pet] appendEvent failed (non-fatal):', evtErr?.message || evtErr);
+    }
+
     await db.character.update({ where: { id: characterId, userId: user?.id }, data: persistablePetStateData(state) });
+
     await db.eventLog.create({
       data: {
         characterId,

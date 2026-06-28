@@ -15,6 +15,7 @@ import {
 } from '@/lib/xianxia/engine';
 import { db } from '@/lib/db';
 import { z } from 'zod';
+import { appendEvent } from '@/lib/xianxia/events/store';
 
 export const runtime = 'nodejs';
 export const maxDuration = 15;
@@ -131,6 +132,23 @@ export async function POST(req: NextRequest) {
       soulStrength,
       bondedArtifactResonance,
     });
+    // 批 16: tribulation 路由接 Event Sourcing——bolt 试算触发 hp.changed
+    try {
+      const charBefore = { hp: char.hp ?? 100 };
+      const newHp = result.hpRemaining;
+      if (charBefore.hp !== newHp) {
+        await appendEvent({
+          characterId: char.id,
+          type: 'character.hp.changed',
+          data: { type: 'character.hp.changed', delta: newHp - charBefore.hp, newValue: newHp, reason: 'tribulation-bolt' },
+          source: 'system-tick',
+          triggerActor: 'system',
+          createdAtAge: char.age,
+        });
+      }
+    } catch (e) {
+      console.error('[tribulation/action] event append failed (non-fatal):', e);
+    }
     return NextResponse.json({
       ok: true,
       result,

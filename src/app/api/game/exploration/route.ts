@@ -26,6 +26,7 @@ import {
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect } from '@/lib/xianxia/state-change-log';
+import { appendEvent } from '@/lib/xianxia/events/store';
 import type { SecretRealm } from '@/lib/xianxia/types';
 
 // P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
@@ -274,6 +275,23 @@ export async function POST(req: NextRequest) {
         effects: JSON.stringify(appendStateChangeAuditEffect(displayEffects, result.stateChangeLog)),
       },
     });
+
+    // 批 16 Event Sourcing PoC：探索事件追加 age.advanced（探索不主动推进年龄，但若 age 发生变化仍记录）。
+    // appendEvent 失败不影响主流程（独立 try/catch）。
+    try {
+      if (stateBeforeExploration.age !== finalState.age) {
+        await appendEvent({
+          characterId,
+          type: 'character.age.advanced',
+          data: { type: 'character.age.advanced', from: stateBeforeExploration.age, to: finalState.age },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: finalState.age,
+        });
+      }
+    } catch (e) {
+      console.error('[exploration] event failed (non-fatal):', e);
+    }
 
     return NextResponse.json({
       success: true,

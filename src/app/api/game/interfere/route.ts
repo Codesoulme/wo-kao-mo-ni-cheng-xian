@@ -12,6 +12,7 @@ import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 import { getCurrentUser } from '@/lib/auth-helpers';
+import { generateEntityId } from '@/lib/xianxia/engine';
 
 // P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
@@ -297,6 +298,71 @@ export async function POST(req: NextRequest) {
       if (updateResult.count === 0) {
         // 乐观锁失败 → 抛错让事务回滚（连 log 也不会写）
         throw new Error('IDEMPOTENT_DUPLICATE');
+      }
+
+      // ===== Event Sourcing PoC（PoC14）：updateMany 成功后、同事务内 append event =====
+      // 读最新 state（事务内 updateMany 已提交，读到的是 after 状态）。
+      // 与事务前的 `char` 做 diff——只有真变化的字段才 append event，避免噪音。
+      const charAfter = await tx.character.findUnique({ where: { id: characterId } });
+      if (!charAfter) {
+        // 极端兜底：updateMany 刚成功却读不到（不太可能，但防御一下）。
+        throw new Error('CHARACTER_GONE_AFTER_UPDATE');
+      }
+
+      // 查该 character 最新 event（用于 previousEventId + aggregateVersion 乐观锁）。
+      // 注意：必须用事务内的 tx.event（不是 db.event），否则拿不到本次事务里刚 append 的 event。
+      const latestEvent = await tx.event.findFirst({
+        where: { characterId },
+        orderBy: { aggregateVersion: 'desc' },
+        select: { id: true, aggregateVersion: true },
+      });
+      let nextAggregateVersion = (latestEvent?.aggregateVersion ?? -1) + 1;
+      const previousEventId = latestEvent?.id ?? null;
+
+      // 修为变更
+      if (result.accepted && charAfter.cultivationExp !== char.cultivationExp) {
+        await tx.event.create({
+          data: {
+            id: generateEntityId('evt'),
+            characterId,
+            type: 'character.cultivation-exp.changed',
+            data: {
+              type: 'character.cultivation-exp.changed',
+              delta: charAfter.cultivationExp - char.cultivationExp,
+              newValue: charAfter.cultivationExp,
+              reason: 'interfere',
+            },
+            previousEventId,
+            aggregateVersion: nextAggregateVersion,
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: charAfter.age,
+          },
+        });
+        nextAggregateVersion += 1;
+      }
+
+      // 境界变更
+      if (result.accepted && charAfter.realm !== char.realm) {
+        await tx.event.create({
+          data: {
+            id: generateEntityId('evt'),
+            characterId,
+            type: 'character.realm.changed',
+            data: {
+              type: 'character.realm.changed',
+              from: char.realm,
+              to: charAfter.realm,
+              method: 'set',
+            },
+            previousEventId: previousEventId, // 简化 PoC：不再追 complex chain（multiple events in one tx）
+            aggregateVersion: nextAggregateVersion,
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: charAfter.age,
+          },
+        });
+        nextAggregateVersion += 1;
       }
 
       // 写入干扰日志

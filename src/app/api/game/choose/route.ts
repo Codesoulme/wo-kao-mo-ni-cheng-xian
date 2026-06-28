@@ -12,6 +12,10 @@ import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 import { getCurrentUser } from '@/lib/auth-helpers';
+// Event Sourcing PoC: appendEvent 接入 choose 写路径（批 14 PoC 集成）。
+// 仅在 cultivationInsight / spiritualRoot / cultivationFactors 变更时 append event。
+// appendEvent 失败不影响主流程——保留原 db.character.update 兼容路径。
+import { appendEvent } from '@/lib/xianxia/events/store';
 
 // P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
@@ -141,6 +145,62 @@ export async function POST(req: NextRequest) {
     }
     if (result.failThreadIds && result.failThreadIds.length) {
       for (const id of result.failThreadIds) state = failThread(state, id);
+    }
+
+    // Event Sourcing PoC: 在写路径上 append event。
+    // 仅在 cultivationInsight / spiritualRoot / cultivationFactors 变更时触发。
+    // stateBeforeChoice 是 dbToState(char) 后的浅拷贝快照——含 cultivationFactors / spiritualRoot / realm / cultivationExp。
+    // 注意：try/catch 包住——appendEvent 失败不影响主流程（保留原 db.update 兼容路径）。
+    try {
+      const factorsBefore = stateBeforeChoice.cultivationFactors;
+      const factorsAfter = state.cultivationFactors;
+      const factorsChanged =
+        JSON.stringify(factorsBefore || []) !== JSON.stringify(factorsAfter || []);
+
+      // 修为因素（cultivationFactors）变更 → cultivation-exp.changed 事件
+      if (factorsChanged) {
+        try {
+          await appendEvent({
+            characterId,
+            type: 'character.cultivation-exp.changed',
+            data: {
+              type: 'character.cultivation-exp.changed',
+              delta: (state.cultivationExp ?? 0) - (stateBeforeChoice.cultivationExp ?? 0),
+              newValue: state.cultivationExp ?? 0,
+              reason: 'choose:factors-recomputed',
+            },
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: state.age,
+          });
+        } catch (e) {
+          console.error('[choose] cultivation-exp event append failed (non-fatal):', e);
+        }
+      }
+
+      // 灵根（spiritualRoot）变更 → realm.changed 事件（method: 'set' 标识 choose 触发的覆写）
+      if (stateBeforeChoice.spiritualRoot !== state.spiritualRoot) {
+        try {
+          await appendEvent({
+            characterId,
+            type: 'character.realm.changed',
+            data: {
+              type: 'character.realm.changed',
+              from: stateBeforeChoice.realm,
+              to: state.realm,
+              method: 'set',
+            },
+            source: 'user-action',
+            triggerActor: 'player',
+            createdAtAge: state.age,
+          });
+        } catch (e) {
+          console.error('[choose] realm event append failed (non-fatal):', e);
+        }
+      }
+    } catch (e) {
+      // 外层 try：兜底防御，理论上内层已经捕获，但保险起见再 catch 一次。
+      console.error('[choose] event sourcing PoC outer catch (non-fatal):', e);
     }
     // Task 20: 触发战斗
     // Task 22: 优先使用选择结果的 triggerCombat（AI 可根据玩家选择定制战斗）；

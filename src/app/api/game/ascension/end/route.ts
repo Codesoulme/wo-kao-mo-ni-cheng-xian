@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { resolveAscensionOutcome, type AscensionRequirement } from '@/lib/xianxia/engine';
 import { db } from '@/lib/db';
+import { appendEvent } from '@/lib/xianxia/events/store';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -96,6 +97,46 @@ export async function POST(req: NextRequest) {
     tribulationPassed,
     requirements,
   });
+
+  // Event Sourcing（PoC17）：ascension/end 在飞升成功时追加事件。
+  // 语义映射：
+  //   飞升成功 → character.realm.changed（from=当前 realm, to=requirements.toTier 标签, method=set）
+  //   飞升成功 → character.alive.changed（alive=true 不变，cause=ascension 标记）
+  //   飞升失败 → 不追加事件（保持主流程不变量）。
+  // Worker G 确定性 hash（characterRoll / daoHeart / tribulationPassed）保持不变。
+  // appendEvent 失败用 try/catch 兜底——不能影响主流程结算回执。
+  if (result.passed) {
+    try {
+      await appendEvent({
+        characterId: data.characterId,
+        type: 'character.realm.changed',
+        data: {
+          type: 'character.realm.changed',
+          from: char.realm,
+          to: requirements.toTier,
+          method: 'set',
+        },
+        source: 'system-tick',
+        triggerActor: 'system',
+        createdAtAge: char.age,
+      });
+      await appendEvent({
+        characterId: data.characterId,
+        type: 'character.alive.changed',
+        data: {
+          type: 'character.alive.changed',
+          alive: true,
+          cause: 'ascension',
+        },
+        source: 'system-tick',
+        triggerActor: 'system',
+        createdAtAge: char.age,
+      });
+    } catch (evtErr: any) {
+      console.error('[ascension/end] appendEvent failed (non-fatal):', evtErr?.message || evtErr);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     settlement: {
