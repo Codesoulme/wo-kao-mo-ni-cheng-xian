@@ -1,4 +1,5 @@
-'use 
+'use client';
+
 
               {/* Phase-M #1: Ending spectrum panel - 8 ending archetypes preview */}
               <div className="shrink-0 px-3 pb-1" data-testid="ending-section">
