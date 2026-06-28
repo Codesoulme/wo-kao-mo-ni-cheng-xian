@@ -67,7 +67,7 @@ export function EndingPanel({ character, worldState, defaultCollapsed = true }: 
           {hasCharacter && (
             <>
               <div style={{ fontSize: '11px', color: '#7a5a3a', marginBottom: '8px' }}>
-                当前：{character?.name ?? '无名'} · {character?.realm ?? character?.cultivation ?? '凡人'} · {character?.age ?? 0}岁
+                当前：{character?.name ?? '无名'} · {character?.realmName ?? character?.realm ?? character?.cultivation ?? '凡人'} · {character?.age ?? 0}岁
                 {character?.faction || character?.sect ? ` · ${character?.faction || character?.sect}` : ''}
               </div>
 

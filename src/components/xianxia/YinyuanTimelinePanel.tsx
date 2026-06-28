@@ -74,7 +74,7 @@ export function YinyuanTimelinePanel({ character, fateNodes, web, defaultCollaps
           {hasCharacter && entries.length > 0 && (
             <>
               <div style={{ fontSize: '11px', color: '#7a5a3a', marginBottom: '8px' }}>
-                主角 · {character?.name ?? '无名'} · {character?.age ?? 0}岁 · {character?.realm ?? character?.cultivation ?? '凡人'}
+                主角 · {character?.name ?? '无名'} · {character?.age ?? 0}岁 · {character?.realmName ?? character?.realm ?? character?.cultivation ?? '凡人'}
               </div>
 
               <div style={{ position: 'relative', paddingLeft: '20px' }}>
