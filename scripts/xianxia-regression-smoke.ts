@@ -2638,6 +2638,81 @@ function pgRunPhaseQEndToEndSmokes(): void {
   }
 }
 
+// Phase-S #5: Yinyuan Timeline (因缘时间线) - 4 smokes
+
+function smokeU001YinyuanTimelineLibReturnsEntries(): void {
+  const mod = require('../src/lib/xianxia/yinyuan-timeline.ts');
+  const result = mod.buildYinyuanTimeline({
+    character: { id: 'test', name: '试修', age: 25, realm: '练气', fateNodes: [], pendingThreads: [], npcs: [] },
+    fateNodes: [
+      { index: 1, name: '入门', realm: 'qi_refining', triggerAge: { min: 6, max: 16 }, theme: '天赋', coreConflict: '修道', narrativeGoal: '确定道路' },
+      { index: 2, name: '入世', realm: 'qi_refining', triggerAge: { min: 20, max: 30 }, theme: '历练', coreConflict: '红尘', narrativeGoal: '悟道' },
+    ],
+  });
+  assert(Array.isArray(result), 'buildYinyuanTimeline should return array');
+  assert(result.length >= 2, `should return >=2 entries (resolved + untriggered), got ${result.length}`);
+  // Each entry has required fields
+  for (const e of result) {
+    assert(typeof e.age === 'number' && e.age >= 0, 'entry.age should be number >= 0');
+    assert(typeof e.title === 'string' && e.title.length > 0, 'entry.title should be non-empty string');
+    assert(['resolved', 'echo-active', 'predicted', 'untriggered'].includes(e.archetype), `entry.archetype ${e.archetype} should be valid`);
+    assert(typeof e.narrative === 'string', 'entry.narrative should be string');
+    assert(['low', 'normal', 'high', 'critical', 'unknown'].includes(e.urgency), `entry.urgency ${e.urgency} should be valid`);
+  }
+  // Should be sorted by age ascending
+  for (let i = 1; i < result.length; i++) {
+    assert(result[i].age >= result[i-1].age - 1e-9, 'entries should be sorted by age asc');
+  }
+  log('smoke-u-001-yinyuan-timeline-lib-returns-entries', { passed: true, count: result.length });
+}
+
+function smokeU002YinyuanTimelineHandlesNull(): void {
+  const mod = require('../src/lib/xianxia/yinyuan-timeline.ts');
+  const r1 = mod.buildYinyuanTimeline({ character: null, fateNodes: null });
+  assert(Array.isArray(r1), 'null character should return array');
+  const r2 = mod.buildYinyuanTimeline({ character: {}, fateNodes: [] });
+  assert(Array.isArray(r2), 'empty character should return array');
+  log('smoke-u-002-yinyuan-timeline-handles-null', { passed: true });
+}
+
+function smokeU003YinyuanPanelRenders(): void {
+  const src = readFileSync('src/components/xianxia/YinyuanTimelinePanel.tsx', 'utf-8');
+  assert(src.includes('yinyuan-timeline-panel'), 'panel should have yinyuan-timeline-panel testid');
+  assert(src.includes('data-testid={`yinyuan-${e.archetype}-${idx}`}'), 'panel should render per-entry testid');
+  assert(src.includes('buildYinyuanTimeline'), 'panel should call buildYinyuanTimeline');
+  assert(src.includes('defaultCollapsed'), 'panel should accept defaultCollapsed prop');
+  log('smoke-u-003-yinyuan-panel-renders', { passed: true });
+}
+
+function smokeU004YinyuanPanelHasAllFourArchetypes(): void {
+  const src = readFileSync('src/components/xianxia/YinyuanTimelinePanel.tsx', 'utf-8');
+  // All 4 archetype badges should be in the panel
+  for (const arch of ['resolved', 'echo-active', 'predicted', 'untriggered']) {
+    assert(src.includes(arch), `panel should handle archetype ${arch}`);
+  }
+  // Color legend
+  assert(src.includes('已了') || src.includes('回响中'), 'panel should have archetype labels in Chinese');
+  log('smoke-u-004-yinyuan-panel-has-all-four-archetypes', { passed: true, archetypes: 4 });
+}
+
+function pgRunPhaseUYinyuanTimelineSmokes(): void {
+  const cases = [
+    { name: 'smoke-u-001-yinyuan-timeline-lib-returns-entries', fn: smokeU001YinyuanTimelineLibReturnsEntries },
+    { name: 'smoke-u-002-yinyuan-timeline-handles-null', fn: smokeU002YinyuanTimelineHandlesNull },
+    { name: 'smoke-u-003-yinyuan-panel-renders', fn: smokeU003YinyuanPanelRenders },
+    { name: 'smoke-u-004-yinyuan-panel-has-all-four-archetypes', fn: smokeU004YinyuanPanelHasAllFourArchetypes },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
 
 // Phase-M #2: Death Guidance Panel (Worker #2) — 死亡后引导，三个选项 + 关闭提示
 
@@ -5055,6 +5130,7 @@ function smokeBlueprintDocsCoverage(): void {
     pgRunPhasePInheritancePoolSmokes();
       // Phase-Q #4: End-to-end 100-year smoke (P0)
       pgRunPhaseQEndToEndSmokes();
+      pgRunPhaseUYinyuanTimelineSmokes();
 }
 
 main().catch(error => {
