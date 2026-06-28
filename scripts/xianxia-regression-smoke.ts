@@ -5374,6 +5374,8 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseEcsSmokes();
       // 批 20b: ES 真实链路集成测试（轻量——import + 返回值结构；完整跑需 --db）— 2 个静态 smoke
       pgRunPhaseEsIntegrationSmokes();
+      // 批 22: page.tsx 主 tab 重构（5 个新 tab：道途/命途/传承/人情/修行）— 5 个静态 smoke
+      pgRunPhaseTabRestructureSmokes();
       // ===== Phase-Z (TechDoc 18.6.7): 测试策略改进（属性测试 + AI 回归 fixture）=====
       // 独立 console.log，不计入主 smoke 计数（不破 430 pass）。
       // 同步 require + try/catch：smoke 同步执行流，不引入 async 改动。
@@ -5518,6 +5520,170 @@ main().catch(error => {
   console.error(JSON.stringify({ passed: false, suite: 'xianxia-regression-smoke', error: error?.message || String(error) }));
   process.exit(1);
 });
+
+
+
+// 批 22: page.tsx 主 tab 重构（5 个新 tab + 顶部状态条 + 死亡 banner）
+
+function smokeTabRestructure001PageHasFiveMainTabs(): void {
+  const src = readFileSync('src/app/page.tsx', 'utf-8');
+  // 5 个新主 tab value
+  const requiredTabValues = [
+    'value="story"',
+    'value="mingtu"',
+    'value="chuancheng"',
+    'value="renqing"',
+    'value="xiuxing"',
+  ];
+  const missing = requiredTabValues.filter((v) => !src.includes(v));
+  assert(missing.length === 0, 'page.tsx 应包含 5 个新主 tab value，缺少: ' + missing.join(', '));
+
+  // TabsList 应为 grid-cols-5
+  assert(/grid-cols-5/.test(src), 'TabsList 应使用 grid-cols-5');
+  // 不应再保留旧的 grid-cols-4
+  assert(!/grid-cols-4/.test(src), '不应再保留旧的 grid-cols-4');
+
+  // 5 个 tab 文字标签
+  const labels = ['道途', '命途', '传承', '人情', '修行'];
+  const missingLabels = labels.filter((l) => !src.includes(l));
+  assert(missingLabels.length === 0, '5 个新 tab 文字标签应存在，缺少: ' + missingLabels.join(', '));
+
+  log('smoke-tab-restructure-001-page-has-five-main-tabs', { passed: true, tabCount: 5 });
+}
+
+function smokeTabRestructure002StatusPanelInTopBar(): void {
+  const src = readFileSync('src/app/page.tsx', 'utf-8');
+  // 顶部固定条 testid
+  assert(src.includes('data-testid="top-status-bar"'), 'page.tsx 应有 top-status-bar testid');
+  // StatusPanel 应在 top-status-bar 之后立即渲染（用 indexed substring 验证相邻性）
+  const topBarIdx = src.indexOf('data-testid="top-status-bar"');
+  const statusPanelIdx = src.indexOf('<StatusPanel', topBarIdx);
+  assert(statusPanelIdx > topBarIdx, 'StatusPanel 应渲染在 top-status-bar 内部');
+  // 不应再在 tab 内放 StatusList
+  const statusListIdx = src.indexOf('<StatusList');
+  if (statusListIdx !== -1) {
+    // 若仍存在 StatusList（import 保留），它不能出现在主 tab 内容里
+    const tabSectionIdx = src.indexOf('main-tab-list');
+    assert(statusListIdx > tabSectionIdx || statusListIdx < topBarIdx, 'StatusList 不应放在主 tab 内容里');
+  }
+  log('smoke-tab-restructure-002-status-panel-in-top-bar', { passed: true });
+}
+
+function smokeTabRestructure003DeathGuidanceBanner(): void {
+  const src = readFileSync('src/app/page.tsx', 'utf-8');
+  // DeathGuidancePanel 移到顶部 banner（仅 alive=false 条件）
+  assert(src.includes('data-testid="death-guidance-banner"'), 'page.tsx 应有 death-guidance-banner testid');
+  // 旧 testid 仍可保留作兼容（panel 组件内可能自带 death-guidance-section），但 banner 必须是新 testid
+  // 条件渲染：!character?.alive
+  const aliveFalsePattern = /!\s*character\?\.alive\s*&&/;
+  assert(aliveFalsePattern.test(src), 'death-guidance-banner 应仅在 !character?.alive 时渲染');
+  // DeathGuidancePanel 仍应被引用（import + 渲染）
+  assert(src.includes('DeathGuidancePanel'), 'page.tsx 应保留 DeathGuidancePanel 引用');
+  log('smoke-tab-restructure-003-death-guidance-banner', { passed: true });
+}
+
+function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
+  const src = readFileSync('src/app/page.tsx', 'utf-8');
+  // 各 panel 应分布到对应 tab：
+  // 命途 tab：cycle-projection / ending / yinyuan-timeline
+  // 传承 tab：cross-cycle / inheritance / save-slot
+  // 人情 tab：npc-growth / sect-storyline / heart-intent
+  // 修行 tab：technique-creator / pet / formation / secret-realm / inventory
+  // 世界：world-legacy / reset-world
+  const requiredTestids = [
+    // 命途
+    'cycle-projection-section',
+    'ending-section',
+    'yinyuan-timeline-section',
+    // 传承
+    'cross-cycle-section',
+    'inheritance-section-wrapper',
+    'save-slot-section',
+    // 人情
+    'npc-growth-section',
+    'sect-storyline-section',
+    'heart-intent-section',
+    // 修行
+    'technique-creator-section',
+    'pet-section',
+    'formation-section',
+    'inventory-section',
+    // 世界
+    'world-legacy-section',
+    'reset-world-section',
+  ];
+  const missing = requiredTestids.filter((id) => !src.includes('data-testid="' + id + '"'));
+  assert(missing.length === 0, 'page.tsx 应包含所有 panel testid，缺少: ' + missing.join(', '));
+
+  // 关键 panel 必须 import
+  const requiredImports = [
+    'CycleProjectionPanel',
+    'EndingPanel',
+    'YinyuanTimelinePanel',
+    'CrossCycleInheritancePanel',
+    'InheritancePoolPanel',
+    'SaveSlotPanel',
+    'NpcGrowthPanel',
+    'SectStorylinePanel',
+    'HeartIntentPanel',
+    'TechniqueCreatorPanel',
+    'PetPanel',
+    'FormationPanel',
+    'InventoryPanel',
+    'WorldLegacyPanel',
+    'ResetWorldButton',
+    'DeathGuidancePanel',
+    'StatusPanel',
+  ];
+  const missingImports = requiredImports.filter((name) => !src.includes(name));
+  assert(missingImports.length === 0, 'page.tsx 应 import 所有 panel，缺少: ' + missingImports.join(', '));
+
+  log('smoke-tab-restructure-004-panel-distribution-across-tabs', { passed: true, panelCount: requiredTestids.length });
+}
+
+function smokeTabRestructure005BackcompatFourTabs(): void {
+  const src = readFileSync('src/app/page.tsx', 'utf-8');
+  // 原 4 tab 内容必须保留（story 必保留 + status/inventory/scroll 兼容）
+  // story: EventTimeline + ActionButtons
+  assert(src.includes('<EventTimeline'), 'page.tsx 应保留 EventTimeline（story tab 内容）');
+  assert(src.includes('<ActionButtons'), 'page.tsx 应保留 ActionButtons（story tab 推进按钮）');
+  // inventory: InventoryPanel
+  assert(src.includes('<InventoryPanel'), 'page.tsx 应保留 InventoryPanel（兼容原 inventory tab）');
+  // status: StatusList
+  assert(src.includes('<StatusList'), 'page.tsx 应保留 StatusList（兼容原 status tab）');
+  // scroll: MilestonesLog
+  assert(src.includes('<MilestonesLog'), 'page.tsx 应保留 MilestonesLog（兼容原 scroll tab）');
+  // 顶层 'use client' 必须存在
+  const firstLine = src.split(/\r?\n/)[0];
+  assert(firstLine === "'use client';", 'page.tsx L1 应保持 use client，got: ' + JSON.stringify(firstLine));
+  // ensureHydration 检测仍存在
+  assert(src.includes('useHydrated'), 'page.tsx 应保留 useHydrated hydration 检测');
+  // useAutoSave 仍存在
+  assert(src.includes('useAutoSave'), 'page.tsx 应保留 useAutoSave 自动存档');
+  // modals 仍渲染
+  assert(src.includes('<ChoiceModal'), 'page.tsx 应保留 ChoiceModal');
+  assert(src.includes('<CombatModal'), 'page.tsx 应保留 CombatModal');
+  assert(src.includes('<SettlementModal'), 'page.tsx 应保留 SettlementModal');
+  log('smoke-tab-restructure-005-backcompat-four-tabs', { passed: true });
+}
+
+function pgRunPhaseTabRestructureSmokes(): void {
+  const cases = [
+    { name: 'smoke-tab-restructure-001-page-has-five-main-tabs', fn: smokeTabRestructure001PageHasFiveMainTabs },
+    { name: 'smoke-tab-restructure-002-status-panel-in-top-bar', fn: smokeTabRestructure002StatusPanelInTopBar },
+    { name: 'smoke-tab-restructure-003-death-guidance-banner', fn: smokeTabRestructure003DeathGuidanceBanner },
+    { name: 'smoke-tab-restructure-004-panel-distribution-across-tabs', fn: smokeTabRestructure004PanelDistributionAcrossTabs },
+    { name: 'smoke-tab-restructure-005-backcompat-four-tabs', fn: smokeTabRestructure005BackcompatFourTabs },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
 
 
 

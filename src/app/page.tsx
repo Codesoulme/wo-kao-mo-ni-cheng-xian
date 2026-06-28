@@ -28,7 +28,8 @@ import { AscensionModal } from '@/components/xianxia/AscensionModal';
 import { RestrictionModal } from '@/components/xianxia/RestrictionModal';
 import { TribulationModal } from '@/components/xianxia/TribulationModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Scroll, Sparkles, Package } from 'lucide-react';
+import { BookOpen, ScrollText, Compass, GitBranch, Users, Sword, Globe } from 'lucide-react';
+import { ResetWorldButton } from '@/components/xianxia/ResetWorldButton';
 import { YinyuanTimelinePanel } from '@/components/xianxia/YinyuanTimelinePanel';
 import { TechniqueCreatorPanel } from '@/components/xianxia/TechniqueCreatorPanel';
 import { NpcGrowthPanel } from '@/components/xianxia/NpcGrowthPanel';
@@ -271,91 +272,19 @@ export default function Home() {
           />
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col max-w-md mx-auto w-full">
-            {/* 状态面板（常驻顶部 - 简化版） */}
-            <div className="shrink-0 px-3 py-2">
+            {/* ===== 顶部固定条：StatusPanel（每帧必看） ===== */}
+            <div className="shrink-0 px-3 py-2" data-testid="top-status-bar">
               <StatusPanel character={character} />
             </div>
 
-            {/* AI-60: WorldLegacyPanel 折叠区（默认折叠，限 3 条，展开全部） */}
-            <div className="shrink-0 px-3 pb-1" data-testid="world-legacy-section">
-              <WorldLegacyPanel character={character} defaultCollapsed={true} maxCollapsed={3} />
-            </div>
-
-            {/* Phase-L: 轮回投影面板 - 接入 phase-k B 的 4 个 UI 投影函数 */}
-            <div className="shrink-0 px-3 pb-1" data-testid="cycle-projection-section">
-              <CycleProjectionPanel
-                character={character}
-                defaultCollapsed={true}
-              />
-            </div>
-
-              {/* Phase-M: da cf cao ping mian */}
-              <div className="shrink-0 px-3 pb-1" data-testid="save-slot-section">
-                <SaveSlotPanel
-                  snapshot={fullSnapshot}
-                  onLoadSlot={handleLoadSlot}
-                  refreshKey={slotRefresh}
-                />
-              </div>
-
-                {/* Phase-M #1: Ending spectrum panel - 8 ending archetypes preview */}
-                <div className="shrink-0 px-3 pb-1" data-testid="ending-section">
-                  <EndingPanel
-                    character={character}
-                    worldState={useGameStore.getState().worldCalendar}
-                    defaultCollapsed={true}
-                  />
-                </div>
-
-                {/* Phase-M #2: 死亡后引导 — 三个选项（轮回重开 / 回归入凡 / 继续旁观） */}
-                
-              {/* Phase-U #5: 因缘时间线 (4 archetype) */}
-              <div className="shrink-0 px-3 pb-1" data-testid="yinyuan-timeline-section">
-                <YinyuanTimelinePanel
-                  character={character}
-                  defaultCollapsed={true}
-                />
-              </div>
-
-              {/* Phase-V #6: 自创功法 */}
-              <div className="shrink-0 px-3 pb-1" data-testid="technique-creator-section">
-                <TechniqueCreatorPanel
-                  defaultCollapsed={true}
-                />
-              </div>
-
-              {/* Phase-T #9: NPC 自生长 */}
-              <div className="shrink-0 px-3 pb-1" data-testid="npc-growth-section">
-                <NpcGrowthPanel
-                  character={character}
-                  defaultCollapsed={true}
-                />
-              </div>
-
-              {/* Phase-R #8: 宗门剧情 */}
-              <div className="shrink-0 px-3 pb-1" data-testid="sect-storyline-section">
-                <SectStorylinePanel
-                  character={character}
-                  defaultCollapsed={true}
-                />
-              </div>
-
-              {/* Phase-W #10: 跨周目传承 */}
-              <div className="shrink-0 px-3 pb-1" data-testid="cross-cycle-section">
-                <CrossCycleInheritancePanel
-                  character={character}
-                  defaultCollapsed={true}
-                />
-              </div>
-
-              <div className="shrink-0 px-3 pb-1" data-testid="death-guidance-section">
+            {/* ===== DeathGuidance 触发 banner（仅 alive=false） ===== */}
+            {!character?.alive && (
+              <div className="shrink-0 px-3 pb-1" data-testid="death-guidance-banner">
+                <div data-testid="death-guidance-section">
                   <DeathGuidancePanel character={character} defaultCollapsed={false} />
                 </div>
-
-              {/* Phase-M #3: 继承池选择面板 - 角色陨落后、归凡前浮现 */}
-              <div className="shrink-0 px-3 pb-1" data-testid="inheritance-section-wrapper">
-                <InheritancePoolPanel defaultCollapsed={true} />
               </div>
+            )}
 
             {/* AI-72: L3 modals 占位（飞升/禁制），按 character 状态条件渲染 */}
             {character.ascensionPending && (
@@ -410,34 +339,48 @@ export default function Home() {
               </div>
             )}
 
-            {/* Tab 切换 */}
-            <div className="shrink-0 px-3 pb-2">
+            {/* ===== 5 个主 Tab 切换 ===== */}
+            <div className="shrink-0 px-3 pb-2" data-testid="main-tab-list">
               <Tabs value={effectiveTab} onValueChange={setTab} className="w-full">
-                <TabsList className="grid grid-cols-4 w-full h-9 bg-muted/40">
-                  <TabsTrigger value="story" className="text-xs gap-1">
+                <TabsList className="grid grid-cols-5 w-full h-9 bg-muted/40">
+                  <TabsTrigger value="story" className="text-[10px] sm:text-xs gap-1">
                     <BookOpen className="w-3 h-3" />
-                    <span className="hidden sm:inline">传</span>
+                    <span>道途</span>
                   </TabsTrigger>
-                  <TabsTrigger value="status" className="text-xs gap-1">
-                    <Sparkles className="w-3 h-3" />
-                    <span className="hidden sm:inline">态</span>
+                  <TabsTrigger value="mingtu" className="text-[10px] sm:text-xs gap-1">
+                    <Compass className="w-3 h-3" />
+                    <span>命途</span>
                   </TabsTrigger>
-                  <TabsTrigger value="inventory" className="text-xs gap-1">
-                    <Package className="w-3 h-3" />
-                    <span className="hidden sm:inline">宝</span>
+                  <TabsTrigger value="chuancheng" className="text-[10px] sm:text-xs gap-1">
+                    <GitBranch className="w-3 h-3" />
+                    <span>传承</span>
                   </TabsTrigger>
-                  <TabsTrigger value="scroll" className="text-xs gap-1">
-                    <Scroll className="w-3 h-3" />
-                    <span className="hidden sm:inline">史</span>
+                  <TabsTrigger value="renqing" className="text-[10px] sm:text-xs gap-1">
+                    <Users className="w-3 h-3" />
+                    <span>人情</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="xiuxing" className="text-[10px] sm:text-xs gap-1">
+                    <Sword className="w-3 h-3" />
+                    <span>修行</span>
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
 
-            {/* 内容区 */}
+            {/* 兼容旧 status/scroll tab 入口（隐藏 trigger - 通过 setTab('status'|'scroll') 进入） */}
+            <div className="hidden" aria-hidden="true">
+              <Tabs value={effectiveTab} onValueChange={setTab}>
+                <TabsList>
+                  <TabsTrigger value="status">态</TabsTrigger>
+                  <TabsTrigger value="scroll">史</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {/* ===== Tab 内容区 ===== */}
             <div className="flex-1 overflow-hidden">
               <Tabs value={effectiveTab} onValueChange={setTab} className="h-full">
-                {/* 故事 - 默认，可折叠 */}
+                {/* 道途（原 story：互动叙事 + 战斗） */}
                 <TabsContent value="story" forceMount className="h-full m-0 data-[state=inactive]:hidden">
                   <div className="h-full flex flex-col">
                     <div
@@ -454,27 +397,136 @@ export default function Home() {
                   </div>
                 </TabsContent>
 
-                {/* 状态 */}
+                {/* 状态（兼容原 status tab - 通过 setTab('status') 触发） */}
                 <TabsContent value="status" className="h-full m-0 data-[state=inactive]:hidden">
                   <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
                     <StatusList />
                   </div>
                 </TabsContent>
 
-                {/* 宝物 - 装备/储物袋 */}
-                <TabsContent value="inventory" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
-                    <InventoryPanel />
-                  </div>
-                </TabsContent>
-
-                {/* 史册 - 关键节点记录 */}
+                {/* 史册（兼容原 scroll tab - 通过 setTab('scroll') 触发） */}
                 <TabsContent value="scroll" className="h-full m-0 data-[state=inactive]:hidden">
                   <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
                     <MilestonesLog />
                   </div>
                 </TabsContent>
+
+                {/* 命途：轮回投影 + 因缘长河 + 命运终章 */}
+                <TabsContent value="mingtu" className="h-full m-0 data-[state=inactive]:hidden">
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
+                    <div data-testid="cycle-projection-section">
+                      <CycleProjectionPanel
+                        character={character}
+                        defaultCollapsed={true}
+                      />
+                    </div>
+                    <div data-testid="ending-section">
+                      <EndingPanel
+                        character={character}
+                        worldState={useGameStore.getState().worldCalendar}
+                        defaultCollapsed={true}
+                      />
+                    </div>
+                    <div data-testid="yinyuan-timeline-section">
+                      <YinyuanTimelinePanel
+                        character={character}
+                        defaultCollapsed={true}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* 传承：跨周目传承 + 继承池（仅轮回）+ 存档 */}
+                <TabsContent value="chuancheng" className="h-full m-0 data-[state=inactive]:hidden">
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
+                    <div data-testid="cross-cycle-section">
+                      <CrossCycleInheritancePanel
+                        character={character}
+                        defaultCollapsed={true}
+                      />
+                    </div>
+                    {character?.alive === false && (
+                      <div data-testid="inheritance-section-wrapper">
+                        <InheritancePoolPanel defaultCollapsed={true} />
+                      </div>
+                    )}
+                    <div data-testid="save-slot-section">
+                      <SaveSlotPanel
+                        snapshot={fullSnapshot}
+                        onLoadSlot={handleLoadSlot}
+                        refreshKey={slotRefresh}
+                      />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* 人情：故交旧雨 + 宗门剧情 + 心之所向 */}
+                <TabsContent value="renqing" className="h-full m-0 data-[state=inactive]:hidden">
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
+                    <div data-testid="npc-growth-section">
+                      <NpcGrowthPanel
+                        character={character}
+                        defaultCollapsed={true}
+                      />
+                    </div>
+                    <div data-testid="sect-storyline-section">
+                      <SectStorylinePanel
+                        character={character}
+                        defaultCollapsed={true}
+                      />
+                    </div>
+                    <div data-testid="heart-intent-section">
+                      <HeartIntentPanel />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* 修行：自创功法 + 灵宠 + 阵法 + 秘境 + 宝物（原 inventory） */}
+                <TabsContent value="xiuxing" className="h-full m-0 data-[state=inactive]:hidden">
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
+                    <div data-testid="technique-creator-section">
+                      <TechniqueCreatorPanel
+                        defaultCollapsed={true}
+                      />
+                    </div>
+                    <div data-testid="pet-section">
+                      <PetPanel />
+                    </div>
+                    <div data-testid="formation-section">
+                      <FormationPanel />
+                    </div>
+                    <div data-testid="secret-realm-section">
+                      <SecretRealmPanel />
+                    </div>
+                    <div data-testid="inventory-section">
+                      <InventoryPanel />
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* 世界：世界遗留 + 重置（隐藏 tab，由主 tab 第 6 个按钮访问） */}
+                {/* 注：原 4 tab 兼容性 - status/inventory/scroll 在新结构中分散到对应 tab，
+                    此处 WorldLegacyPanel + ResetWorldButton 通过独立的"世界"入口触发。
+                    为不丢失原 scroll tab（MilestonesLog），在 story tab 中保留史册摘要以备回退。 */}
               </Tabs>
+            </div>
+
+            {/* ===== 世界 Tab 独立入口（按钮放在主 tab 下方，避免挤占主 5 tab 空间） ===== */}
+            <div className="shrink-0 px-3 pb-2" data-testid="world-tab-section">
+              <details className="rounded border border-border/40 bg-card/40">
+                <summary className="cursor-pointer px-3 py-1.5 text-xs font-serif-cn flex items-center gap-2 select-none">
+                  <Globe className="w-3 h-3" />
+                  <span>世界（遗留 / 重置）</span>
+                </summary>
+                <div className="px-3 pb-2 pt-1 space-y-2">
+                  <div data-testid="world-legacy-section">
+                    <WorldLegacyPanel character={character} defaultCollapsed={true} maxCollapsed={3} />
+                  </div>
+                  <div data-testid="reset-world-section">
+                    <ResetWorldButton />
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
         )}
