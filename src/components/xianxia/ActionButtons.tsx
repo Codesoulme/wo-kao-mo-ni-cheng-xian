@@ -399,6 +399,8 @@ export function ActionButtons() {
       advancingRef.current = false;
       setLoading(false);
       advanceAbortRef.current = null;
+      // 兜底：无论 done 是否到达，最终都清除结算提示（防止 narrative_complete 后卡在"收获结算中"）
+      useGameStore.getState().setSettlingHint(null);
     }
   };
 

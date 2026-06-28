@@ -510,29 +510,9 @@ export default function Home() {
                     为不丢失原 scroll tab（MilestonesLog），在 story tab 中保留史册摘要以备回退。 */}
               </Tabs>
             </div>
-
-            {/* ===== 世界 Tab 独立入口（按钮放在主 tab 下方，避免挤占主 5 tab 空间） ===== */}
-            <div className="shrink-0 px-3 pb-2" data-testid="world-tab-section">
-              <details className="rounded border border-border/40 bg-card/40">
-                <summary className="cursor-pointer px-3 py-1.5 text-xs font-serif-cn flex items-center gap-2 select-none">
-                  <Globe className="w-3 h-3" />
-                  <span>世界（遗留 / 重置）</span>
-                </summary>
-                <div className="px-3 pb-2 pt-1 space-y-2">
-                  <div data-testid="world-legacy-section">
-                    <WorldLegacyPanel character={character} defaultCollapsed={true} maxCollapsed={3} />
-                  </div>
-                  <div data-testid="reset-world-section">
-                    <ResetWorldButton />
-                  </div>
-                </div>
-              </details>
-            </div>
           </div>
         )}
       </main>
-
-      {/* 底部干扰输入（常驻） */}
       {character && !showHome && character.alive && !pendingChoice && !combatResultPending && (
         <div className="shrink-0 max-w-md mx-auto w-full">
           <InterfereInput />

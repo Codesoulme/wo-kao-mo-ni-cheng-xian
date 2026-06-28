@@ -559,8 +559,7 @@ export const useGameStore = create<GameState>()(
       setNewEventRange: (range) => set({ newEventRange: range }),
       setSettlingHint: (hint) => set({ settlingHint: hint }),
       setStreamingNarrative: (eventIndex, text) => {
-        // 批 15: 流式叙事开始 —— 双写 appendEvent（PoC：失败仅 console.error）
-        _tryAppendEvent(get, 'character.streaming-narrative.started', { eventIndex, placeholderId: String(eventIndex) });
+        // 流式叙事占位符是 UI 临时状态，不入 event store（之前双写 appendEvent 在浏览器触发 Prisma 错误，2026-06-29 移除）
         streamingRef.current = { eventIndex, text };
         set({ streamingNarrative: { eventIndex, text } });
       },
@@ -602,13 +601,8 @@ export const useGameStore = create<GameState>()(
       }),
       clearSelectedHeritage: () => set({ selectedHeritage: {} }),
       setSettlementResult: (result) => {
-        // 批 15: 结算结果 —— 双写 appendEvent（PoC：失败仅 console.error）
-        const status = (result && typeof result === 'object' && 'ending' in result) ? String((result as any).ending) : 'unknown';
-        const narrative = (result && typeof result === 'object' && 'summary' in result && typeof (result as any).summary === 'string')
-          ? String((result as any).summary)
-          : '';
-        _tryAppendEvent(get, 'character.settlement-result.set', { settlement: result ?? null });
-        _tryAppendEvent(get, 'character.end-result.set', { status, narrative });
+        // 客户端只设 UI 状态；事件追踪归服务端 route（settlement/route.ts）单一来源
+        // 之前双写 appendEvent 在浏览器触发 Prisma 错误，2026-06-29 移除
         set({ settlementResult: result });
       },
       addHallRecord: (record) => set((s) => ({
@@ -617,13 +611,10 @@ export const useGameStore = create<GameState>()(
       setWorldCalendar: (world) => set({ worldCalendar: world }),
       // Phase-M #3: 继承池运行时 setter（不持久化，由调用方决定何时填入/清空）
       setInheritancePool: (pool, candidates, summary) => {
-        // 批 15: 继承池 setter —— 双写 3 个事件（PoC：失败仅 console.error）
+        // 客户端只设 UI 状态；事件追踪归服务端 route 单一来源（之前双写触发 Prisma 浏览器错误，2026-06-29 移除）
         const safePool = Array.isArray(pool) ? pool : [];
         const safeCands = Array.isArray(candidates) ? candidates : [];
         const safeSummary = typeof summary === 'string' ? summary : null;
-        _tryAppendEvent(get, 'character.inheritance-pool.set', { pool: safePool });
-        _tryAppendEvent(get, 'character.inheritance-candidates.set', { candidates: safeCands });
-        _tryAppendEvent(get, 'character.inheritance-ending-summary.set', { summary: safeSummary });
         set({
           inheritancePool: safePool,
           inheritanceCandidates: safeCands,

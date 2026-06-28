@@ -420,14 +420,7 @@ export async function POST(req: NextRequest) {
             });
           }
 
-          } catch (e: any) {
-          clearInterval(heartbeat);
-          console.error('[SSE] executeAIEvent error:', e?.message, e?.stack);
-          // 修复：DB 错误不再静默吞，传播给上层 handler 决定（防止 SSE 推 done 但数据未落地）
-          send('error', { error: `engine error: ${e?.message}`, detail: String(e?.message || e) });
-          close();
-          throw e;
-        }
+          }
 
         // 7) 推送 done（数据库已同步写入，刷新页面不会丢失气泡）
         clearInterval(heartbeat);
@@ -449,9 +442,12 @@ export async function POST(req: NextRequest) {
 
         close();
       } catch (err: any) {
-        console.error('[SSE] Top error:', err?.message);
+        console.error('[SSE] Top error:', err?.message, err?.stack);
         try {
-          send('error', { error: err?.message || 'unknown error' });
+          send('error', {
+            error: err?.message || 'unknown SSE error',
+            detail: String(err?.stack || err?.message || err),
+          });
         } catch {}
         clearInterval(heartbeat);
         close();
