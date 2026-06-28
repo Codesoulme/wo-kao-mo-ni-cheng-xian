@@ -1,4 +1,13 @@
-'use client';
+'use 
+
+              {/* Phase-M #1: Ending spectrum panel - 8 ending archetypes preview */}
+              <div className="shrink-0 px-3 pb-1" data-testid="ending-section">
+                <EndingPanel
+                  character={character}
+                  worldState={useGameStore.getState().worldCalendar}
+                  defaultCollapsed={true}
+                />
+              </div>client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
@@ -10,6 +19,7 @@ import { EventTimeline } from '@/components/xianxia/EventTimeline';
 import { StatusList } from '@/components/xianxia/StatusList';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
 import { SaveSlotPanel } from '@/components/xianxia/SaveSlotPanel';
+import { EndingPanel } from '@/components/xianxia/EndingPanel';
 import { useAutoSave } from '@/lib/xianxia/useAutoSave';
 import { readSaveSlot, listSaveSlots, type SaveSlotMeta } from '@/lib/xianxia/save-slots';
 import { InterfereInput } from '@/components/xianxia/InterfereInput';
@@ -278,6 +288,15 @@ export default function Home() {
                   refreshKey={slotRefresh}
                 />
               </div>
+
+                {/* Phase-M #1: Ending spectrum panel - 8 ending archetypes preview */}
+                <div className="shrink-0 px-3 pb-1" data-testid="ending-section">
+                  <EndingPanel
+                    character={character}
+                    worldState={useGameStore.getState().worldCalendar}
+                    defaultCollapsed={true}
+                  />
+                </div>
 
             {/* AI-72: L3 modals 占位（飞升/禁制），按 character 状态条件渲染 */}
             {character.ascensionPending && (

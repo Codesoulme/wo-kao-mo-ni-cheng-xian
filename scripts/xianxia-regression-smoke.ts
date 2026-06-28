@@ -4490,6 +4490,7 @@ function smokeBlueprintDocsCoverage(): void {
   log('blueprint-docs-coverage', { passed: true });
     pgRunPhaseLSmokes();
     pgRunPhaseMSmokes();
+    pgRunPhaseNFollowupSmokes();
 }
 
 main().catch(error => {
@@ -8213,3 +8214,71 @@ function pgRunPhaseMSmokes(): void {
     }
   }
 }
+
+// Phase-M follow-up: ending preview helper + EndingPanel smokes.
+
+function smokeN001EndingPreviewReturnsEight(): void {
+  const mod = require('../src/lib/xianxia/ending-preview.ts');
+  const result = mod.previewEndingsForCharacter(
+    { id: 'test', name: '测试者', age: 80, realm: '金丹', faction: '青岚派', spiritualRoot: 'water' },
+    { calendarYear: 5100 },
+  );
+  assert(Array.isArray(result), 'previewEndingsForCharacter should return array');
+  assert(result.length === 8, `should return 8 archetypes, got ${result.length}`);
+  const archetypes = result.map((e) => e.archetype);
+  for (const arch of ['ascend-immortal', 'sit-death', 'fall-demonic', 'found-sect', 'reincarnate', 'escape-world', 'world-collapse', 'fade-into-mortal']) {
+    assert(archetypes.includes(arch), `missing archetype ${arch}`);
+  }
+  for (const e of result) {
+    assert(typeof e.label === 'string' && e.label.length > 0, `archetype ${e.archetype} should have label`);
+    assert(typeof e.weight === 'number' && e.weight >= 0 && e.weight <= 1, `archetype ${e.archetype} should have weight 0..1`);
+    assert(typeof e.reason === 'string', `archetype ${e.archetype} should have reason string`);
+    assert(e.progress && typeof e.progress.overallPct === 'number', `archetype ${e.archetype} should have progress.overallPct`);
+    assert(['good', 'bad', 'neutral', 'mystery'].includes(e.tone), `archetype ${e.archetype} should have valid tone`);
+  }
+  let prevWeight = Infinity;
+  for (const e of result) {
+    assert(e.weight <= prevWeight + 1e-9, 'entries should be sorted by weight desc');
+    prevWeight = e.weight;
+  }
+  log('smoke-n-001-ending-preview-returns-eight', { passed: true, count: result.length, topArchetype: result[0]?.archetype });
+}
+
+function smokeN002EndingPreviewHandlesNull(): void {
+  const mod = require('../src/lib/xianxia/ending-preview.ts');
+  const r1 = mod.previewEndingsForCharacter(null, null);
+  assert(r1.length === 8, `null character should still return 8 archetypes, got ${r1.length}`);
+  const r2 = mod.previewEndingsForCharacter({}, {});
+  assert(r2.length === 8, `empty character should still return 8 archetypes, got ${r2.length}`);
+  log('smoke-n-002-ending-preview-handles-null', { passed: true });
+}
+
+function smokeN003EndingPanelRenders(): void {
+  const src = readFileSync('src/components/xianxia/EndingPanel.tsx', 'utf-8');
+  assert(src.includes('ending-panel'), 'EndingPanel should have ending-panel testid');
+  // React JSX uses `ending-${e.archetype}` template literal
+  assert(src.includes('ending-${e.archetype}') || src.includes('ending-ascend-immortal'), 'EndingPanel should render ending-{arch} testid');
+  assert(src.includes('entries.map'), 'EndingPanel should map over entries');
+  assert(src.includes('defaultCollapsed'), 'EndingPanel should accept defaultCollapsed prop');
+  const page = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(page.includes('import { EndingPanel }'), 'page.tsx should import EndingPanel');
+  assert(page.includes('data-testid="ending-section"'), 'page.tsx should have ending-section testid');
+  log('smoke-n-003-ending-panel-renders', { passed: true });
+}
+
+function pgRunPhaseNFollowupSmokes(): void {
+  const cases = [
+    { name: 'smoke-n-001-ending-preview-returns-eight', fn: smokeN001EndingPreviewReturnsEight },
+    { name: 'smoke-n-002-ending-preview-handles-null', fn: smokeN002EndingPreviewHandlesNull },
+    { name: 'smoke-n-003-ending-panel-renders', fn: smokeN003EndingPanelRenders },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
