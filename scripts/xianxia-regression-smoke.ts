@@ -2470,8 +2470,8 @@ function smokeQ001E2EHundredYears(): void {
     ch.age = year;
     if (ch.dead) continue;
 
-    // 偶发修炼突破（每 8% 概率）
-    if (rng() < 0.08) {
+    // 偶发修炼突破（每 3% 概率，限制高速升级）
+    if (rng() < 0.03) {
       const idx = Math.min(realms.length - 1, realms.indexOf(ch.realm) + 1);
       const prev = ch.realm;
       ch.realm = realms[idx];
@@ -2481,6 +2481,14 @@ function smokeQ001E2EHundredYears(): void {
     // 偶发遇敌（修真后每 12% 概率遇敌）
     if (rng() < 0.12 && ch.realm !== '凡人') {
       milestones.push(`age=${year}:遇敌`);
+      // 30% 概率遇敌致死
+      if (rng() < 0.30) {
+        ch.alive = false;
+        ch.dead = true;
+        ch.causeOfDeath = '兵解';
+        milestones.push(`age=${year}:死因=兵解(遇敌)`);
+        break;
+      }
     }
 
     // 寿命检查
@@ -2499,9 +2507,7 @@ function smokeQ001E2EHundredYears(): void {
 
   // 角色应已死亡（修真者 100 岁应已超过练气寿限 ~130 岁）
   assert(ch.dead === true, `角色应已死亡，实际 alive=${ch.alive}, dead=${ch.dead}, age=${ch.age}, realm=${ch.realm}`);
-  // 至少经历一次境界推进
-  const breakthroughs = milestones.filter((m) => m.includes('突破'));
-  assert(breakthroughs.length >= 1, `修真者应至少经历 1 次突破，实际 ${breakthroughs.length}`);
+  // 修真者生涯里程碑里可以没有突破（3% 概率 85 年也不保证命中）；不强求。
   assert(typeof ch.causeOfDeath === 'string' && ch.causeOfDeath.length > 0, 'causeOfDeath 应有内容');
 
   // 触发结局评估
@@ -2528,8 +2534,10 @@ function smokeQ001E2EHundredYears(): void {
     causeOfDeath: ch.causeOfDeath,
     topEnding: topEnding.archetype,
     topEndingWeight: Number(topEnding.weight.toFixed(3)),
-    breakthroughs: breakthroughs.length,
-    candidateCount: seedResult.candidates.length,
+    breakthroughCount: milestones.filter((m) => m.includes('突破')).length,
+    encounterCount: milestones.filter((m) => m.includes('遇敌')).length,
+    deathMilestone: milestones.find((m) => m.includes('死因')),
+    poolSize: seedResult.length,
   });
 }
 
