@@ -20,6 +20,8 @@ import { StatusList } from '@/components/xianxia/StatusList';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
 import { SaveSlotPanel } from '@/components/xianxia/SaveSlotPanel';
 import { EndingPanel } from '@/components/xianxia/EndingPanel';
+import { InheritancePoolPanel } from '@/components/xianxia/InheritancePoolPanel';
+import { DeathGuidancePanel } from '@/components/xianxia/DeathGuidancePanel';
 import { useAutoSave } from '@/lib/xianxia/useAutoSave';
 import { readSaveSlot, listSaveSlots, type SaveSlotMeta } from '@/lib/xianxia/save-slots';
 import { InterfereInput } from '@/components/xianxia/InterfereInput';
@@ -297,6 +299,16 @@ export default function Home() {
                     defaultCollapsed={true}
                   />
                 </div>
+
+                {/* Phase-M #2: 死亡后引导 — 三个选项（轮回重开 / 回归入凡 / 继续旁观） */}
+                <div className="shrink-0 px-3 pb-1" data-testid="death-guidance-section">
+                  <DeathGuidancePanel character={character} defaultCollapsed={false} />
+                </div>
+
+              {/* Phase-M #3: 继承池选择面板 - 角色陨落后、归凡前浮现 */}
+              <div className="shrink-0 px-3 pb-1" data-testid="inheritance-section-wrapper">
+                <InheritancePoolPanel defaultCollapsed={true} />
+              </div>
 
             {/* AI-72: L3 modals 占位（飞升/禁制），按 character 状态条件渲染 */}
             {character.ascensionPending && (

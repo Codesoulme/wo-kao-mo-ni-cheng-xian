@@ -1,8 +1,10 @@
-﻿﻿﻿'use client';
+??'use client';
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { TribulationSession, AscensionSession, Restriction, HeartDemonType } from './types';
+import { selectNextProtagonist } from './engine';
+import { triggerEndingEvaluation } from './engine';
 
 // 流式叙事：绕过 React 状态系统，直接更新 DOM
 export interface StreamingState {
@@ -283,6 +285,11 @@ interface GameState {
   worldCalendar: WorldCalendarState;
   worldLegacies: WorldLegacyRecord[];
 
+  // Phase-M #3: 继承池 + 候选继承人（运行时状态，不进 partialize，避免破坏 12 字段约束）
+  inheritancePool: any[];
+  inheritanceCandidates: any[];
+  inheritanceEndingSummary: string | null;
+
   setCharacter: (c: CharacterState | null) => void;
   setEvents: (e: GameEvent[]) => void;
   addEvent: (e: GameEvent) => void;
@@ -336,6 +343,15 @@ interface GameState {
   setWorldCalendar: (world: WorldCalendarState) => void;
   advanceWorldCalendar: (time?: TimeAdvance | null) => WorldCalendarState;
   addWorldLegacy: (record: WorldLegacyRecord) => void;
+  // Phase-M #3: 继承池运行时 setter + claimInheritanceCandidate action
+  setInheritancePool: (pool: any[], candidates: any[], summary?: string | null) => void;
+  clearInheritancePool: () => void;
+  claimInheritanceCandidate: (candidateId: string) => void;
+  // Phase-M #2: 死亡引导 — 3 个选项 + 关闭提示
+  deathGuidanceDismissed: boolean;
+  dismissDeathGuidance: () => void;
+  selectNextProtagonistAndContinue: () => { ok: boolean; narrative?: string; selectedId?: string; error?: string };
+  resetCharacterToMortalStart: () => void;
   appendStreamingNarrative: (eventIndex: number, delta: string) => void;
   setStreamingNarrative: (eventIndex: number, text: string) => void;
   finishStreamingNarrative: () => void;
@@ -373,6 +389,11 @@ export const useGameStore = create<GameState>()(
       settlementResult: null,
       worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
       worldLegacies: [],
+      // Phase-M #3: 继承池初始为空（运行时由调用方填入）
+      inheritancePool: [],
+      inheritanceCandidates: [],
+      inheritanceEndingSummary: null,
+      deathGuidanceDismissed: false,
       newEventRange: null,
       settlingHint: null,
       streamingNarrative: null,
@@ -515,6 +536,174 @@ export const useGameStore = create<GameState>()(
         hallOfSimulations: [record, ...s.hallOfSimulations.filter((it) => it.id !== record.id)].slice(0, 50),
       })),
       setWorldCalendar: (world) => set({ worldCalendar: world }),
+      // Phase-M #3: 继承池运行时 setter（不持久化，由调用方决定何时填入/清空）
+      setInheritancePool: (pool, candidates, summary) => set({
+        inheritancePool: Array.isArray(pool) ? pool : [],
+        inheritanceCandidates: Array.isArray(candidates) ? candidates : [],
+        inheritanceEndingSummary: typeof summary === 'string' ? summary : null,
+      }),
+      clearInheritancePool: () => set({
+        inheritancePool: [], inheritanceCandidates: [], inheritanceEndingSummary: null,
+      }),
+
+      // Phase-M #3: claimInheritanceCandidate —— 玩家选定继承人后，
+      // 调 engine.selectNextProtagonist 复算适配分；若候选存在则构造新 character
+      // 替换当前角色（age 重置、alive=true、causeOfDeath 清空、ascended=false、dead 字段抹除），
+      // 把候选池与上一代 ending 摘要沉入 heritageVault，再清空继承池；
+      // 该动作不向远端发请求，纯本地状态机，符合 UI-only 边界。
+      claimInheritanceCandidate: (candidateId: string) => {
+        const s = get();
+        if (!candidateId || typeof candidateId !== 'string') return;
+        const candidates = Array.isArray(s.inheritanceCandidates) ? s.inheritanceCandidates : [];
+        const cand = candidates.find((c) => c && typeof c === 'object' && c.id === candidateId);
+        if (!cand) return;
+        const pool = Array.isArray(s.inheritancePool) ? s.inheritancePool : [];
+        const selection = selectNextProtagonist(pool, s.worldCalendar, candidates);
+        const prev = s.character;
+        const nextName = (typeof cand.name === 'string' && cand.name) ? cand.name : ((prev && prev.name) || '新主角');
+        const nextAge = (typeof cand.age === 'number' && cand.age >= 0) ? cand.age : 0;
+        const nextRealm = (typeof cand.realm === 'string' && cand.realm) ? cand.realm : 'mortal';
+        const nextRoot = (typeof cand.spiritualRoot === 'string' && cand.spiritualRoot) ? cand.spiritualRoot : 'none';
+        const newChar: any = {
+          ...(prev && typeof prev === 'object' ? prev : {}),
+          ...cand,
+          id: typeof cand.id === 'string' ? cand.id : ('protagonist-' + Date.now()),
+          name: nextName,
+          age: nextAge,
+          realm: nextRealm,
+          spiritualRoot: nextRoot,
+          alive: true,
+          ascended: false,
+          causeOfDeath: '',
+          ...(prev && typeof prev === 'object' && 'dead' in prev ? { dead: false } : {}),
+          lastEventAge: nextAge,
+          isAtChoice: false,
+        };
+        const eligVal = (selection && typeof selection.eligibility === 'number') ? selection.eligibility : 0;
+        const heritageLine = s.inheritanceEndingSummary
+          ? s.inheritanceEndingSummary + ' · 承继者：' + nextName + '（适配 ' + eligVal.toFixed(2) + '）'
+          : '承继者：' + nextName + '（适配 ' + eligVal.toFixed(2) + '）';
+        const heritageEntry: any = {
+          id: 'herit-' + ((prev && prev.id) ? prev.id : 'prev') + '-' + Date.now(),
+          name: '传承 · ' + nextName,
+          category: 'fate',
+          rarity: 'rare',
+          narrative: heritageLine,
+          source: 'inheritance-pool',
+        };
+        set({
+          character: newChar,
+          heritageVault: [heritageEntry, ...s.heritageVault],
+          inheritancePool: [],
+          inheritanceCandidates: [],
+          inheritanceEndingSummary: null,
+          settlementResult: null,
+          pendingChoice: null,
+        });
+      },
+
+      // Phase-M #2: dismissDeathGuidance — 玩家选择「继续旁观」后关闭死亡引导
+      dismissDeathGuidance: () => set({ deathGuidanceDismissed: true }),
+
+      // Phase-M #2: selectNextProtagonistAndContinue — 「轮回重开」
+      // 流程：triggerEndingEvaluation 取传承池 → 用 worldLegacies + pool hostCharacterIds 衍生候选 →
+      //   selectNextProtagonist 选继承人 → setInheritancePool + claimInheritanceCandidate 替换角色
+      // 池空 / 候选空 / 引擎未选出 → 返回 ok=false；UI 显示「无可继承之人」。
+      selectNextProtagonistAndContinue: () => {
+        const s = get();
+        const prev = s.character;
+        if (!prev || typeof prev !== 'object') return { ok: false, error: 'no-character' };
+        const cause = (typeof prev.causeOfDeath === 'string' && prev.causeOfDeath)
+          ? prev.causeOfDeath
+          : 'sit-death';
+        // 1. 引擎评估：取传承池
+        let evalRes: any = null;
+        try {
+          evalRes = triggerEndingEvaluation(prev, s.worldCalendar, cause);
+        } catch (_e) {
+          evalRes = null;
+        }
+        const pool = (evalRes && Array.isArray(evalRes.inheritancePool)) ? evalRes.inheritancePool : [];
+        if (pool.length === 0) {
+          return { ok: false, error: 'no-pool', narrative: '此生未留传承池，仙路轮转暂止。' };
+        }
+        // 2. 衍生候选：从 worldLegacies（仙界历代名册）取，再补 pool hostCharacterIds 兜底
+        const legacyCandidates = (Array.isArray(s.worldLegacies) ? s.worldLegacies : [])
+          .filter((w) => w && typeof w === 'object' && w.characterId)
+          .slice(0, 8)
+          .map((w) => ({
+            id: w.characterId,
+            name: w.characterName || w.characterId,
+            age: typeof w.age === 'number' ? w.age : 12,
+            realm: (typeof w.highestRealm === 'string' && w.highestRealm) ? w.highestRealm : 'mortal',
+            spiritualRoot: 'mixed',
+            bloodline: '',
+            karmaTags: [],
+            inherited: [],
+            traitNarrative: (typeof w.summary === 'string' && w.summary) ? w.summary : '无名后辈',
+          }));
+        const legacyIds = new Set(legacyCandidates.map((c) => c.id));
+        const hostCandidates: any[] = [];
+        for (const p of pool) {
+          if (!p || !Array.isArray(p.hostCharacterIds)) continue;
+          for (const hid of p.hostCharacterIds) {
+            if (typeof hid !== 'string' || legacyIds.has(hid)) continue;
+            hostCandidates.push({
+              id: hid,
+              name: hid,
+              age: 12,
+              realm: 'mortal',
+              spiritualRoot: 'mixed',
+              bloodline: '',
+              karmaTags: [],
+              inherited: (p && typeof p.kind === 'string') ? [{ poolId: p.id, kind: p.kind }] : [],
+              traitNarrative: (p && typeof p.name === 'string') ? p.name : '传承之人',
+            });
+          }
+        }
+        const candidates = legacyCandidates.concat(hostCandidates);
+        if (candidates.length === 0) {
+          return { ok: false, error: 'no-candidates', narrative: '无可继承之人，仙路轮转暂止。' };
+        }
+        // 3. 引擎选继承人
+        const selection = selectNextProtagonist(pool, s.worldCalendar, candidates);
+        const picked = selection && typeof selection.selectedId === 'string' ? selection.selectedId : '';
+        if (!picked) {
+          return { ok: false, error: 'no-pick', narrative: (selection && selection.narrative) || '无人可承此衣钵。' };
+        }
+        // 4. 设置池 + 候选 + 摘要（让现有面板可同步显示）
+        const summary = (evalRes && evalRes.primaryEnding && typeof evalRes.primaryEnding.summary === 'string')
+          ? evalRes.primaryEnding.summary
+          : '衣钵未竟，待后人接续。';
+        s.setInheritancePool(pool, candidates, summary);
+        // 5. 替换 character
+        s.claimInheritanceCandidate(picked);
+        // 6. 关闭引导面板，让玩家重新开始推进
+        set({ deathGuidanceDismissed: false });
+        return { ok: true, selectedId: picked, narrative: selection.narrative || '已承衣钵。' };
+      },
+
+      // Phase-M #2: resetCharacterToMortalStart — 「回归入凡」
+      // 清空 character 回到 StartScreen（玩家可重新投胎）；保留 heritageVault / worldCalendar /
+      //   settlementResult / hallOfSimulations 供后续阅读与世界延续。
+      resetCharacterToMortalStart: () => set({
+        character: null,
+        pendingChoice: null,
+        deathGuidanceDismissed: false,
+        events: [],
+        choices: [],
+        selectedEventId: null,
+        breakthroughCeremony: null,
+        tribulationCeremony: null,
+        tribulationResult: null,
+        ascensionCeremony: null,
+        restrictionChallenge: null,
+        lastChange: null,
+        lastBreakthrough: null,
+        lastInterfere: null,
+        // 注意：不重置 inheritancePool — 让玩家继续浏览候选；不重置 settlementResult — 玩家可阅读结局
+      }),
+
       advanceWorldCalendar: (time) => {
         let nextWorld: WorldCalendarState = { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 };
         set((s) => {
@@ -538,8 +727,13 @@ export const useGameStore = create<GameState>()(
         selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
         explorationOpen: false, lastExploration: null, settlementResult: null,
         heritageVault: [], selectedHeritage: {}, hallOfSimulations: [],
+        inheritancePool: [], inheritanceCandidates: [], inheritanceEndingSummary: null,
         worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
         worldLegacies: [],
+      // Phase-M #3: 继承池初始为空（运行时由调用方填入）
+      inheritancePool: [],
+      inheritanceCandidates: [],
+      inheritanceEndingSummary: null,
       }),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],

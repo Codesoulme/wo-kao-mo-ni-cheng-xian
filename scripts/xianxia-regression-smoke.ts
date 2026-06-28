@@ -2244,6 +2244,270 @@ function smokeBodyGrowthWithNarrative(): void {
   });
 }
 
+
+// ======================== Phase-P #3: Inheritance Pool UI (smoke) ========================
+// Validates the Phase-M #3 inheritance-pool UI surface:
+//  - InheritancePoolPanel.tsx 存在、testid、渲染分支
+//  - store.claimInheritanceCandidate action 存在、可调、能把死角色换成活角色
+//  - page.tsx 接入 section-wrapper
+//  - engine.seedInheritancePoolFromEnding / selectNextProtagonist 是 export 的
+//  - 空池 / 无候选 → 空态分支存在
+//
+// 不重写 engine.ts；只读 source / 调 import 的函数。
+// 不动 EndingPanel.tsx / SaveSlotPanel.tsx；不引入 worker。
+
+function smokeP001InheritancePoolPanelExists(): void {
+  const f = 'src/components/xianxia/InheritancePoolPanel.tsx';
+  assert(existsSync(f), `InheritancePoolPanel.tsx should exist at ${f}`);
+  const src = readFileSync(f, 'utf-8');
+  assert(src.includes('inheritance-section'), 'InheritancePoolPanel should expose inheritance-section testid');
+  assert(src.includes('data-testid="inheritance-candidate-list"'), 'InheritancePoolPanel should have candidate list testid');
+  assert(src.includes('data-testid="inheritance-empty"'), 'InheritancePoolPanel should have empty state testid');
+  assert(src.includes('claimInheritanceCandidate'), 'InheritancePoolPanel should call claimInheritanceCandidate');
+  assert(src.includes('selectNextProtagonist'), 'InheritancePoolPanel should reuse selectNextProtagonist for eligibility display');
+  assert(!src.includes('????'), 'InheritancePoolPanel must not contain ????');
+  assert(src.includes('继承池') || src.includes('衣钵'), 'InheritancePoolPanel must use world-internal 继承池 / 衣钵 wording');
+  assert(src.includes('character.alive === false') || src.includes('character.dead === true'),
+    'InheritancePoolPanel should trigger on !character.alive or character.dead');
+  log('smoke-p-001-inheritance-pool-panel-exists', { passed: true });
+}
+
+function smokeP002ClaimInheritanceCandidateAction(): void {
+  const store = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  assert(store.includes('claimInheritanceCandidate: (candidateId: string) => void;'),
+    'store should declare claimInheritanceCandidate signature');
+  assert(store.includes('claimInheritanceCandidate: (candidateId: string) => {'),
+    'store should implement claimInheritanceCandidate');
+  assert(/import\s*\{\s*selectNextProtagonist\s*[^}]*\}\s*from\s*[\x27"]\.\/engine[\x27"];?/.test(store) || store.includes("selectNextProtagonist"),
+    'store should import selectNextProtagonist from engine');
+  assert(store.includes('inheritancePool: any[];') && store.includes('inheritanceCandidates: any[];'),
+    'store should declare inheritancePool + inheritanceCandidates fields');
+  assert(store.includes("if (!candidateId || typeof candidateId !== 'string') return;"),
+    'claimInheritanceCandidate should guard invalid id');
+  assert(store.includes('candidates.find('),
+    'claimInheritanceCandidate should find candidate by id');
+  assert(store.includes('alive: true'),
+    'claimInheritanceCandidate should set alive: true on new character');
+  assert(store.includes("causeOfDeath: ''"),
+    'claimInheritanceCandidate should clear causeOfDeath');
+  assert(store.includes('heritageVault: [heritageEntry'),
+    'claimInheritanceCandidate should push heritage entry to heritageVault');
+
+  // 运行时调用：直接 import engine 的 selectNextProtagonist 验证行为
+  const ws = { calendarYear: 5100, eraName: '青岚仙历', elapsedDays: 0 };
+  const pool = [
+    { id: 'pool-test-1', name: '功法', kind: 'technique', availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['char-prev'] },
+    { id: 'pool-test-2', name: '法宝', kind: 'artifact', availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['char-prev'] },
+  ];
+  const cands = [
+    { id: 'cand-A', age: 18, realm: '凡人', spiritualRoot: '双灵根', bloodline: '嫡系', karmaTags: ['因缘'], traitNarrative: '山中少年' },
+    { id: 'cand-B', age: 22, realm: '筑基', spiritualRoot: '凡根', bloodline: '', karmaTags: [], traitNarrative: '游方道人' },
+  ];
+  const result = selectNextProtagonist(pool, ws, cands);
+  assert(result && typeof result === 'object', 'selectNextProtagonist should return object');
+  assert(typeof result.eligibility === 'number' && result.eligibility >= 0 && result.eligibility <= 1,
+    'selectNextProtagonist should return 0..1 eligibility');
+  assert(['cand-A', 'cand-B'].includes(result.selectedId),
+    'selectNextProtagonist should select one of the candidates');
+  log('smoke-p-002-claim-inheritance-candidate-action', { passed: true, selectedId: result.selectedId, eligibility: result.eligibility });
+}
+
+function smokeP003EmptyPoolEmptyState(): void {
+  const panel = readFileSync('src/components/xianxia/InheritancePoolPanel.tsx', 'utf-8');
+  assert(panel.includes('inheritance-empty'),
+    'InheritancePoolPanel should expose inheritance-empty testid for empty pool/empty candidates');
+  assert(panel.includes('尚无可继承者候选') || panel.includes('轮转暂止'),
+    'InheritancePoolPanel empty state must use 修真 world-internal wording');
+
+  const emptyRes = selectNextProtagonist([], {}, []);
+  assert(emptyRes && emptyRes.selectedId === '', 'selectNextProtagonist with empty candidates should return empty selectedId');
+  assert(emptyRes.eligibility === 0, 'selectNextProtagonist with empty candidates should return 0 eligibility');
+
+  const pool = seedInheritancePoolFromEnding({ archetype: 'sit-death', endingId: 'e-1', summary: '坐化', age: 88 }, { id: 'char-x' });
+  assert(Array.isArray(pool) && pool.length >= 3, `seedInheritancePoolFromEnding should yield >=3 items, got ${pool?.length}`);
+
+  log('smoke-p-003-empty-pool-empty-state', { passed: true, emptySelected: emptyRes.selectedId, seededPoolSize: pool.length });
+}
+
+function smokeP004PageHasInheritanceSection(): void {
+  const page = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(page.includes("import { InheritancePoolPanel } from '@/components/xianxia/InheritancePoolPanel';"),
+    'page.tsx should import InheritancePoolPanel');
+  assert(page.includes('<InheritancePoolPanel'),
+    'page.tsx should render <InheritancePoolPanel>');
+  assert(page.includes('inheritance-section-wrapper') || page.includes('inheritance-section'),
+    'page.tsx should have inheritance-section testid wrapper');
+  const idxEnd = page.indexOf('ending-section');
+  const idxInh = page.indexOf('inheritance-section-wrapper');
+  assert(idxEnd > 0 && idxInh > 0, 'page.tsx should contain both ending-section and inheritance-section-wrapper');
+  assert(idxInh > idxEnd, 'inheritance-section-wrapper should be placed after ending-section');
+  log('smoke-p-004-page-has-inheritance-section', { passed: true });
+}
+
+function smokeP005EngineExportsCycleHooks(): void {
+  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(/export function seedInheritancePoolFromEnding\s*\(/.test(engine),
+    'engine.ts should export seedInheritancePoolFromEnding');
+  assert(/export function selectNextProtagonist\s*\(/.test(engine),
+    'engine.ts should export selectNextProtagonist');
+  const archetypes = ['ascend-immortal', 'sit-death', 'fall-demonic', 'found-sect', 'reincarnate', 'escape-world', 'world-collapse', 'fade-into-mortal'];
+  for (const arch of archetypes) {
+    const p = seedInheritancePoolFromEnding({ archetype: arch, endingId: 'e-' + arch, summary: arch, age: 80 }, { id: 'c-' + arch });
+    assert(Array.isArray(p) && p.length >= 3, `${arch} should yield >=3 pool items, got ${p?.length}`);
+    for (const item of p) {
+      assert(typeof item.id === 'string', 'pool item should have id string');
+      assert(typeof item.kind === 'string', 'pool item should have kind string');
+      assert(typeof item.availableSlots === 'number' && item.availableSlots >= 0, 'pool item should have availableSlots >= 0');
+      assert(Array.isArray(item.hostCharacterIds), 'pool item should have hostCharacterIds array');
+    }
+  }
+  const cands = [
+    { id: 'x1', age: 16, realm: '凡人', spiritualRoot: '天灵根', bloodline: '嫡系传承', karmaTags: ['因缘'], traitNarrative: 'a' },
+    { id: 'x2', age: 30, realm: '金丹', spiritualRoot: '凡根', bloodline: '', karmaTags: ['仇'], traitNarrative: 'b' },
+    { id: 'x3', age: 24, realm: '筑基', spiritualRoot: '双灵根', bloodline: '旁系', karmaTags: ['中'], traitNarrative: 'c' },
+  ];
+  const sel = selectNextProtagonist(
+    [{ id: 'pool-a', name: '血', kind: 'bloodline', availableSlots: 1, lockedUntilAge: 0, hostCharacterIds: ['prev'] }],
+    {},
+    cands,
+  );
+  assert(['x1', 'x2', 'x3'].includes(sel.selectedId), 'selectNextProtagonist should pick one of three candidates');
+  assert(sel.eligibility > 0, 'selectNextProtagonist should give positive eligibility for non-empty candidates');
+  log('smoke-p-005-engine-exports-cycle-hooks', { passed: true, archetypes: archetypes.length, picked: sel.selectedId });
+}
+
+function pgRunPhasePInheritancePoolSmokes(): void {
+  const cases = [
+    { name: 'smoke-p-001-inheritance-pool-panel-exists', fn: smokeP001InheritancePoolPanelExists },
+    { name: 'smoke-p-002-claim-inheritance-candidate-action', fn: smokeP002ClaimInheritanceCandidateAction },
+    { name: 'smoke-p-003-empty-pool-empty-state', fn: smokeP003EmptyPoolEmptyState },
+    { name: 'smoke-p-004-page-has-inheritance-section', fn: smokeP004PageHasInheritanceSection },
+    { name: 'smoke-p-005-engine-exports-cycle-hooks', fn: smokeP005EngineExportsCycleHooks },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// Phase-M #2: Death Guidance Panel (Worker #2) — 死亡后引导，三个选项 + 关闭提示
+
+function smokeO001DeathGuidancePanelExists(): void {
+  const panelPath = 'src/components/xianxia/DeathGuidancePanel.tsx';
+  assert(existsSync(panelPath), 'DeathGuidancePanel.tsx should exist');
+  const src = readFileSync(panelPath, 'utf-8');
+  assert(src.includes('data-testid="death-guidance-panel"'), 'panel should expose death-guidance-panel testid');
+  assert(src.includes('isDeadLike'), 'panel should detect dead-like character via isDeadLike');
+  assert(src.includes('character.alive === false') || src.includes('alive === false'), 'panel should detect character.alive === false');
+  assert(src.includes('causeOfDeath'), 'panel should reference causeOfDeath');
+  const page = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(page.includes('import { DeathGuidancePanel }'), 'page.tsx should import DeathGuidancePanel');
+  assert(page.includes('data-testid="death-guidance-section"'), 'page.tsx should mount death-guidance-section');
+  log('smoke-o-001-death-guidance-panel-exists', { passed: true });
+}
+
+function smokeO002ThreeButtonsNaming(): void {
+  const src = readFileSync('src/components/xianxia/DeathGuidancePanel.tsx', 'utf-8');
+  assert(src.includes('轮回重开'), 'panel should label primary button "轮回重开"');
+  assert(src.includes('回归入凡'), 'panel should label reset button "回归入凡"');
+  assert(src.includes('继续旁观'), 'panel should label dismiss button "继续旁观"');
+  assert(src.includes('data-testid="death-guidance-reincarnate"'), 'panel should expose reincarnate testid');
+  assert(src.includes('data-testid="death-guidance-reset"'), 'panel should expose reset testid');
+  assert(src.includes('data-testid="death-guidance-observe"'), 'panel should expose observe testid');
+  for (const bad of ['????', '游戏失败', 'Game Over', 'lose', 'gameover', 'AI评估', '引擎诊断', 'debug', 'config id']) {
+    assert(!src.includes(bad), `panel should not expose forbidden term "${bad}"`);
+  }
+  log('smoke-o-002-three-buttons-naming', { passed: true });
+}
+
+function smokeO003ReincarnateCallsSelectNext(): void {
+  const store = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  assert(/selectNextProtagonistAndContinue\s*:\s*\(\s*\)\s*=>/.test(store), 'store should define selectNextProtagonistAndContinue');
+  // 接口声明用 2 个前导空格，action 实现用 6 个前导空格。我们要锁定实现块。
+  const implMarkers: number[] = [];
+  const implNeedle = '      selectNextProtagonistAndContinue:';
+  let from = 0;
+  while (true) {
+    const idx = store.indexOf(implNeedle, from);
+    if (idx < 0) break;
+    implMarkers.push(idx);
+    from = idx + implNeedle.length;
+  }
+  assert(implMarkers.length > 0, 'should locate action implementation block');
+  const blockStart = implMarkers[0];
+  // action 体右侧边界：下一个 6-空格起头的 action（resetCharacterToMortalStart:）。
+  const nextImpl = '      resetCharacterToMortalStart:';
+  const blockEndCandidate = store.indexOf(nextImpl, blockStart);
+  const blockEnd = blockEndCandidate > blockStart ? blockEndCandidate : store.length;
+  const block = store.slice(blockStart, blockEnd);
+  assert(block.includes('triggerEndingEvaluation'), 'action should call triggerEndingEvaluation for pool');
+  assert(block.includes('selectNextProtagonist'), 'action should call engine.selectNextProtagonist');
+  assert(block.includes('claimInheritanceCandidate'), 'action should commit selection via claimInheritanceCandidate');
+  assert(block.includes('no-pool') || block.includes('no-candidates') || block.includes('no-pick'), 'action should expose failure codes for empty pool/candidates');
+  assert(block.includes('无可继承之人') || block.includes('轮转暂止') || block.includes('衣钵未竟'), 'action should return a Chinese fallback narrative');
+  log('smoke-o-003-reincarnate-calls-select-next', { passed: true });
+}
+
+function smokeO004ResetClearsCharacter(): void {
+  const store = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  assert(/resetCharacterToMortalStart\s*:\s*\(\s*\)\s*=>/.test(store), 'store should define resetCharacterToMortalStart');
+  const implNeedle = '      resetCharacterToMortalStart:';
+  const blockStart = store.indexOf(implNeedle);
+  assert(blockStart > 0, 'should locate reset action implementation');
+  // 锁定实现块：到下一个 6-空格起头的 action 或文件末尾
+  const nextImpls = ['      advanceWorldCalendar:', '      addWorldLegacy:'];
+  let blockEnd = store.length;
+  for (const n of nextImpls) {
+    const idx = store.indexOf(n, blockStart + implNeedle.length);
+    if (idx > 0 && idx < blockEnd) blockEnd = idx;
+  }
+  const block = store.slice(blockStart, blockEnd);
+  assert(/character:\s*null/.test(block), 'reset action should null out character');
+  assert(/pendingChoice:\s*null/.test(block), 'reset action should null pendingChoice');
+  assert(!/heritageVault:\s*\[\]/.test(block) && !/heritageVault:\s*\{\s*\}/.test(block), 'reset action should NOT clear heritageVault (preserve memory)');
+  assert(!/worldCalendar:\s*\{/.test(block), 'reset action should NOT reset worldCalendar');
+  log('smoke-o-004-reset-clears-character', { passed: true });
+}
+
+function smokeO005AliveHidesPanel(): void {
+  const src = readFileSync('src/components/xianxia/DeathGuidancePanel.tsx', 'utf-8');
+  // 面板函数入口应有 dead-like 闸门
+  assert(src.includes('isDeadLike'), 'panel should gate by isDeadLike');
+  assert(src.includes('deathGuidanceDismissed'), 'panel should respect dismissal flag');
+  const idx = src.indexOf('if (!isDeadLike');
+  assert(idx > 0, 'panel should early-return when not dead-like');
+  // 该分支必须 return null
+  const tail = src.slice(idx, idx + 200);
+  assert(tail.includes('return null'), 'not-dead branch should return null');
+  // 状态名：alive=false / dead=true / causeOfDeath 有值 → 显示；其他 → 不显示
+  assert(/alive\s*===\s*false/.test(src), 'detector should consider alive === false');
+  assert(/dead\s*===\s*true/.test(src), 'detector should consider dead === true');
+  assert(/causeOfDeath/.test(src), 'detector should consider causeOfDeath string');
+  log('smoke-o-005-alive-hides-panel', { passed: true });
+}
+
+function pgRunPhaseODeathGuidanceSmokes(): void {
+  const cases = [
+    { name: 'smoke-o-001-death-guidance-panel-exists', fn: smokeO001DeathGuidancePanelExists },
+    { name: 'smoke-o-002-three-buttons-naming', fn: smokeO002ThreeButtonsNaming },
+    { name: 'smoke-o-003-reincarnate-calls-select-next', fn: smokeO003ReincarnateCallsSelectNext },
+    { name: 'smoke-o-004-reset-clears-character', fn: smokeO004ResetClearsCharacter },
+    { name: 'smoke-o-005-alive-hides-panel', fn: smokeO005AliveHidesPanel },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
 async function main(): Promise<void> {
   const withDb = process.argv.includes('--db');
   smokeBirthCoreAttributesAndTimeProjection();
@@ -4491,6 +4755,10 @@ function smokeBlueprintDocsCoverage(): void {
     pgRunPhaseLSmokes();
     pgRunPhaseMSmokes();
     pgRunPhaseNFollowupSmokes();
+    // Phase-O #2: Death Guidance Panel (Worker #2) - 死亡后引导，3 选项 + 关闭提示
+    pgRunPhaseODeathGuidanceSmokes();
+    // Phase-P #3: Inheritance Pool UI (Worker #3) - 与 Worker #2 的 phase-O 各自追加、不互相覆盖
+    pgRunPhasePInheritancePoolSmokes();
 }
 
 main().catch(error => {
