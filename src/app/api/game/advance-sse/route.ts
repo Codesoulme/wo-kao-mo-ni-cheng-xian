@@ -443,7 +443,9 @@ export async function POST(req: NextRequest) {
         close();
         } catch (err: any) {
           console.error('[SSE] executeAIEvent error:', err?.message, err?.stack);
-          // 不阻断 done 推送
+          // 兜底：仍然推送 done 事件 + close（不阻断客户端收尾）
+          try { send('done', { type: 'done', error: err?.message, fallbackGenerated: true }); } catch {}
+          try { close(); } catch {}
         }
       } catch (err: any) {
         console.error('[SSE] Top error:', err?.message, err?.stack);

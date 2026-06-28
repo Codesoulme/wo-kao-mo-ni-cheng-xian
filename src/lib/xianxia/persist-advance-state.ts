@@ -59,7 +59,7 @@ export function buildAdvanceStateData(state: any, opts?: {
     memoryJson: state.longTermMemory ? JSON.stringify(state.longTermMemory) : Prisma.JsonNull,
     pendingThreadsJson: state.pendingThreads ? JSON.stringify(state.pendingThreads) : Prisma.JsonNull,
     characterIntentsJson: state.characterIntents ? JSON.stringify(state.characterIntents) : Prisma.JsonNull,
-    combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : Prisma.JsonNull,
+    combatStateJson: state.combatSession ? String(state.combatSession) : Prisma.JsonNull,
     npcsJson: state.npcs ? JSON.stringify(state.npcs) : Prisma.JsonNull,
     causalGraphJson: state.causalGraph ? JSON.stringify(state.causalGraph) : Prisma.JsonNull,
     worldFactsJson: state.worldFacts ? JSON.stringify(state.worldFacts) : Prisma.JsonNull,
