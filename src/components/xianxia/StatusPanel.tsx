@@ -81,7 +81,20 @@ export function StatusPanel({ character }: StatusPanelProps) {
     .slice(0, 3);
   // AI-46: topTags slot 消费 — AI 创造的 attribute/status 若标记 topTags 也在此呈现
   const allDisplayEntries = characterDisplayEntries(character);
-  const topTagEntries = entriesForSlot(allDisplayEntries, 'topTags', 5);
+  // 过滤已在别处显示的条目，避免重复：
+  // - 神识/魂魄/体魄 → 在展开面板的 coreCultivationStats 显示
+  // - 体质 → 在角色名旁的 topConstitutions 显示
+  // - 身份（宗门/师承/声望/灵石） → 在 AI-22 独立分组显示
+  const isExcludedTopTag = (entry: any) => {
+    const label = entry?.displayLabel || '';
+    if (label === '神识' || label === '魂魄' || label === '体魄') return true;
+    const group = entry?.displayGroup || '';
+    if (group === '体质' || group === '身份') return true;
+    return false;
+  };
+  const topTagEntries = entriesForSlot(allDisplayEntries, 'topTags', 20)
+    .filter((entry: any) => !isExcludedTopTag(entry))
+    .slice(0, 5);
   const topTagToneClass = (tone: string) => {
     switch (tone) {
       case 'rare': return 'bg-amber-50 text-amber-900 border-amber-300';
