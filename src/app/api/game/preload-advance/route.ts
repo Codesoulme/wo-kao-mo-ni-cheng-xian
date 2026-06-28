@@ -1,6 +1,10 @@
+import { getCurrentUser } from '@/lib/auth-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate, saveAdvanceCandidate } from '@/lib/xianxia/advance-preload';
+
+// P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
+// ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -11,7 +15,16 @@ export async function POST(req: NextRequest) {
     const characterId: string | undefined = body?.characterId;
     if (!characterId) return NextResponse.json({ success: false }, { status: 400 });
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
+    const char = await db.character.findUnique({ where: { id: characterId, userId: user?.id } });
     if (!char || !char.alive || char.ascended || char.isAtChoice || char.pendingChoiceJson) {
       if (characterId) await clearAdvancePreload(characterId).catch(() => undefined);
       return NextResponse.json({ success: false });

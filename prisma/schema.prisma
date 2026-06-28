@@ -10,9 +10,41 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 玩家账号（P1 step1: User model + session cookie 鉴权升级）
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  characters   Character[]
+  sessions     UserSession[]
+
+  @@index([email])
+}
+
+// 用户 session 表：cookie token → userId 的服务端映射
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
+
 // 玩家角色 - core character state
 model Character {
   id              String   @id @default(cuid())
+  // P1 step1: 关联 User（nullable 兼容旧数据；后续 step2 收 where: { id, userId }）
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   name            String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -142,6 +174,9 @@ model Character {
   choices         ChoiceLog[]
   interferences   InterferenceLog[]
   advancePreload  AdvancePreload?
+
+  // P1 step1: 按 userId 拉取某用户所有角色（step2 路由会用到）
+  @@index([userId])
 }
 
 // 事件日志
@@ -157,6 +192,8 @@ model EventLog {
   createdAt    DateTime @default(now())
 
   @@index([characterId, age])
+  // P1-4: 单列索引，按 characterId 查询时用得上（如不与 age 组合的列表查询）
+  @@index([characterId])
 }
 
 // 选择日志
@@ -171,6 +208,10 @@ model ChoiceLog {
   chosenText   String                       // 玩家选择的文本
   result       String                       // 选择结果叙事
   createdAt    DateTime @default(now())
+
+  // P1-4: 复合索引。游戏后期（500+ 事件、100+ 选择）所有调用点都是
+  // `where: { characterId }, orderBy: { age: 'asc'|'desc' }` → 走 (characterId, age) 索引避免全表扫描
+  @@index([characterId, age])
 }
 
 // 玩家干扰日志
@@ -185,6 +226,9 @@ model InterferenceLog {
   effects      String   @default("[]")      // JSON: 状态变更
   accepted     Boolean  @default(true)      // 是否被接受（false=静默拒绝）
   createdAt    DateTime @default(now())
+
+  // P1-4: 复合索引，与 ChoiceLog 同样的优化理由
+  @@index([characterId, age])
 }
 
 

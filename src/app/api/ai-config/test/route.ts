@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
         error: errorMessageFromResponse(data || text, res.status),
         status: res.status,
         elapsedMs,
-      }, { status: 200 });
+      }, { status: res.status >= 400 ? res.status : 502 });
     }
 
     let reply = '';
@@ -165,6 +165,6 @@ export async function POST(req: NextRequest) {
       reply: String(reply).slice(0, 80),
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err?.message || '测试连接失败' }, { status: 200 });
+    return NextResponse.json({ success: false, error: err?.message || '测试连接失败' }, { status: 502 });
   }
 }

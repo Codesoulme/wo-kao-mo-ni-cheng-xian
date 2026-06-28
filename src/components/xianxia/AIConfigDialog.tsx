@@ -36,6 +36,17 @@ type AIConfigDialogProps = {
   variant?: 'icon' | 'start' | 'menu';
 };
 
+// 生产模式鉴权：服务端 requireAuth 需要 x-admin-token header。
+// dev 模式下 NEXT_PUBLIC_ADMIN_TOKEN 为空 → 不带 header → 后端走 dev 默认放行。
+function buildAuthHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...(extra || {}) };
+  const token = process.env.NEXT_PUBLIC_ADMIN_TOKEN;
+  if (token && token.length > 0) {
+    headers['x-admin-token'] = token;
+  }
+  return headers;
+}
+
 export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<AIConfigStatus>({ configured: false, activeId: null, profiles: [], config: null });
@@ -55,7 +66,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   const loadStatus = async () => {
     setChecking(true);
     try {
-      const res = await fetch('/api/ai-config', { cache: 'no-store' });
+      const res = await fetch('/api/ai-config', { cache: 'no-store', headers: buildAuthHeaders() });
       const data = await res.json();
       setStatus(data);
     } catch {
@@ -97,7 +108,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     try {
       const res = await fetch('/api/ai-config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           action: 'save',
           profileId: editingProfileId || undefined,
@@ -126,7 +137,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     try {
       const res = await fetch('/api/ai-config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action: 'switch', activeId: profileId }),
       });
       const data = await res.json();
@@ -143,7 +154,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     try {
       const res = await fetch('/api/ai-config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ action: 'delete', profileId }),
       });
       const data = await res.json();
@@ -167,7 +178,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     try {
       const res = await fetch('/api/ai-config/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ baseUrl: editBaseUrl, apiKey: editApiKey, model: editModel }),
       });
       const data = await res.json();
@@ -185,7 +196,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     try {
       const res = await fetch('/api/ai-config/test', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ profileId }),
       });
       const data = await res.json();

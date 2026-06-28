@@ -24,6 +24,10 @@ import type { AttributeChange, AuctionAIOutcome, CausalEdge, CausalNode, Charact
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 import { z } from 'zod';
 
+// P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
+// ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
+import { getCurrentUser } from '@/lib/auth-helpers';
+
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
@@ -490,7 +494,16 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) return NextResponse.json({ success: false, error: '来意不明' }, { status: 400 });
     const { characterId, action, lotId, bid } = parsed.data;
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
+    const char = await db.character.findUnique({ where: { id: characterId, userId: user?.id } });
     await clearAdvancePreload(characterId);
     const canAct = validateCharacterCanAct(char);
     if (!canAct.ok) return NextResponse.json({ success: false, error: canAct.error }, { status: canAct.status });
@@ -515,7 +528,7 @@ export async function POST(req: NextRequest) {
       } catch (err: any) { console.error('auction AI content failed, fallback to seeds:', err?.message || err); }
       session = buildAuctionSession(state, aiAuction);
       await db.character.update({
-        where: { id: characterId },
+        where: { id: characterId, userId: user?.id },
         data: {
           isAtChoice: true,
           pendingChoiceJson: JSON.stringify({
@@ -549,7 +562,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'leave') {
-      await db.character.update({ where: { id: characterId }, data: { isAtChoice: false, pendingChoiceJson: '' } });
+      await db.character.update({ where: { id: characterId, userId: user?.id }, data: { isAtChoice: false, pendingChoiceJson: '' } });
       narrative = `${state.name}收起素笺，没有踏入${session.title}。楼中槌声隔墙而起，片刻后又归于夜色。`;
       await db.eventLog.create({ data: { characterId, age: state.age, title: '错身槌声', narrative, eventType: 'normal', effects: JSON.stringify([]) } });
       return NextResponse.json({ success: true, narrative, state: stateToResponse({ ...state, isAtChoice: false }) });
@@ -664,7 +677,7 @@ export async function POST(req: NextRequest) {
     const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
     await db.character.update({
-      where: { id: characterId },
+      where: { id: characterId, userId: user?.id },
       data: {
         ...persistableAuctionStateData(state),
         isAtChoice: false,

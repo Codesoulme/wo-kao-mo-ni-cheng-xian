@@ -1,0 +1,16 @@
+{
+  "id": "event-combat-victory",
+  "prompt": "角色 qi_refining, age 24, 遭遇灵狐一只于薄雾山林",
+  "expectedSchema": {
+    "eventType": "string",
+    "narrative": "string",
+    "triggerCombat": "boolean"
+  },
+  "expectedOutput": {
+    "eventType": "combat",
+    "narrative": "薄雾中灵狐嘶吼扑来,你袖袍一挥将其震退。",
+    "triggerCombat": true
+  },
+  "tags": ["combat", "victory"],
+  "notes": "战斗中触发,叙事保持古典中文,无内部词"
+}

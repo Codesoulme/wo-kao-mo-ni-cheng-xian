@@ -10,13 +10,25 @@ import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-l
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { getRealmInfo } from '@/lib/xianxia/types';
 import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections, worldTimeStamp } from '@/lib/xianxia/world-time';
+import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
+import { getCurrentUser } from '@/lib/auth-helpers';
 
 
+// P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const characterId: string | undefined = body?.characterId;
     const qualityMode: 'full' | 'light' = body?.qualityMode === 'light' ? 'light' : 'full';
@@ -27,7 +39,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
     }
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const char = await db.character.findUnique({
+      where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
+    });
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落，无法继续' }, { status: 400 });
     if (char.ascended) return NextResponse.json({ success: false, error: '角色已飞升，无需继续' }, { status: 400 });
@@ -225,67 +239,32 @@ ${breakthroughText}`;
 
     // P0: 幂等保护 - update 加 age 条件，重复请求会触发 P2025
     try {
+      // 修复 P1-1：与 SSE 路径共用 buildAdvanceStateData，确保两路径落库字段一致
       await db.character.update({
-        where: { id: characterId, age: ageBefore },
-      data: {
-        age: finalState.age,
-        lifespan: finalState.lifespan,
-        realm: finalState.realm,
-        spiritualRoot: finalState.spiritualRoot,
-        rootDetail: finalState.rootDetail,
-        realmLevel: finalState.realmLevel,
-        cultivationExp: finalState.cultivationExp,
-        expToBreak: finalState.expToBreak,
-        elementMetal: finalState.elements.metal,
-        elementWood: finalState.elements.wood,
-        elementWater: finalState.elements.water,
-        elementFire: finalState.elements.fire,
-        elementEarth: finalState.elements.earth,
-        hp: finalState.hp,
-        maxHp: finalState.maxHp,
-        mp: finalState.mp,
-        maxMp: finalState.maxMp,
-        attack: finalState.attack,
-        defense: finalState.defense,
-        speed: finalState.speed,
-        luck: finalState.luck,
-        comprehension: finalState.comprehension,
-        spiritStones: finalState.spiritStones,
-        reputation: finalState.reputation,
-        alive: finalState.alive,
-        ascended: finalState.ascended,
-        causeOfDeath: finalState.causeOfDeath || '',
-        faction: finalState.faction,
-        master: finalState.master,
-        location: finalState.location,
-        fateNodes: finalState.fateNodes.join(','),
-        isAtChoice: finalState.isAtChoice,
-        lastEventAge: finalState.age,
-        statusJson: JSON.stringify(finalState.activeStatuses),
-        inventoryJson: JSON.stringify(finalState.inventory),
-        equippedJson: JSON.stringify(finalState.equipped || []),
-        storageCapacity: finalState.storageCapacity ?? 5,
-        cultivationMultiplier: finalState.cultivationMultiplier ?? 1.0,
-        cultivationInsight: finalState.cultivationInsight || '',
-        cultivationFactorsJson: JSON.stringify(finalState.cultivationFactors || []),
-        pendingChoiceJson,
-        memoryJson: JSON.stringify(finalState.longTermMemory),
-        // Task 20 新字段
-        pendingThreadsJson: JSON.stringify(finalState.pendingThreads || []),
-        characterIntentsJson: JSON.stringify(finalState.characterIntents || []),
-        combatStateJson: finalState.combatSession ? JSON.stringify(finalState.combatSession) : '',
-        npcsJson: JSON.stringify(finalState.npcs || []),
-        causalGraphJson: JSON.stringify(finalState.causalGraph || { nodes: [], edges: [] }),
-        worldFactsJson: JSON.stringify(finalState.worldFacts || []),
-        recentEventTypesJson: JSON.stringify(recentEventTypes),
-        recentBlueprintCategoriesJson: JSON.stringify(newRecentBlueprintCategories),
-        // Task 22: 心魔值
-        heartDemon: finalState.heartDemon ?? 0,
-        // Task 23: 灵宠
-        petsJson: JSON.stringify(finalState.pets || []),
-        // Task 24: 秘境探索记录
-        exploredRealmsJson: JSON.stringify(finalState.exploredRealms || []),
-      },
+        where: isProdMode
+          ? { id: characterId, userId: user!.id, age: ageBefore }
+          : { id: characterId, age: ageBefore },
+        data: {
+          ...buildAdvanceStateData(finalState, {
+            pendingChoiceJson,
+            worldCalendar,
+            causeOfDeath: finalState.causeOfDeath || '',
+            lastEventAge: finalState.age,
+            recentEventTypes,
+            recentBlueprintCategories: newRecentBlueprintCategories,
+          }),
+          // non-SSE 路径额外字段（schema 有但 build 函数没暴露的，比如五元素细分、reputation、faction、master、location、fateNodes）
+          elementMetal: finalState.elements.metal,
+          elementWood: finalState.elements.wood,
+          elementWater: finalState.elements.water,
+          elementFire: finalState.elements.fire,
+          elementEarth: finalState.elements.earth,
+          reputation: finalState.reputation,
+          faction: finalState.faction,
+          master: finalState.master,
+          location: finalState.location,
+          fateNodes: finalState.fateNodes.join(','),
+        },
       });
     } catch (e: any) {
       // P2025 = record to update not found → 年龄条件不满足，说明重复请求已被其他调用处理

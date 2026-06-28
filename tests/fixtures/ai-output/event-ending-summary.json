@@ -1,0 +1,18 @@
+{
+  "id": "event-ending-summary",
+  "prompt": "角色 age 320, ascension 飞升结局生成",
+  "expectedSchema": {
+    "eventType": "string",
+    "narrative": "string",
+    "triggerCombat": "boolean",
+    "endingArchetype": "string"
+  },
+  "expectedOutput": {
+    "eventType": "ending",
+    "narrative": "天门洞开,你御剑直上九霄,凡尘种种皆成身后云烟。",
+    "triggerCombat": false,
+    "endingArchetype": "ascend-immortal"
+  },
+  "tags": ["ending", "ascension"],
+  "notes": "结局 archetype 必须是 8 种预设之一,触发战斗=false"
+}

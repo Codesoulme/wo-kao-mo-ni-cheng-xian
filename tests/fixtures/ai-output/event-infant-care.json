@@ -1,0 +1,16 @@
+{
+  "id": "event-infant-care",
+  "prompt": "角色 age 3, scene family-home, 婴孩期事件",
+  "expectedSchema": {
+    "eventType": "string",
+    "narrative": "string",
+    "triggerCombat": "boolean"
+  },
+  "expectedOutput": {
+    "eventType": "cultivation",
+    "narrative": "你在母亲怀中懵懂张望,偶见窗外流云。",
+    "triggerCombat": false
+  },
+  "tags": ["infant", "family"],
+  "notes": "婴孩期禁止成人行动,无战斗触发"
+}

@@ -39,6 +39,8 @@ export function SettlementModal() {
   const { settlementResult, setSettlementResult, addHeritageItems, addHallRecord, addWorldLegacy, worldCalendar, reset } = useGameStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
+  // P0-8: 一旦发出归档请求就锁死对话框，禁止玩家通过 ESC/X/外部点击逃出本世
+  const [archiveStarted, setArchiveStarted] = useState(false);
 
   const options = settlementResult?.options || [];
   const selectedItem = options.find((option) => selectedIds.includes(option.id));
@@ -55,6 +57,7 @@ export function SettlementModal() {
   const confirm = async () => {
     if (confirming) return;
     setConfirming(true);
+    setArchiveStarted(true);
     const heritageItems: HeritageItem[] = selectedItem ? [selectedItem].map(({ reason: _reason, ...item }) => item) : [];
 
     try {
@@ -96,7 +99,18 @@ export function SettlementModal() {
   };
 
   return (
-    <Dialog open onOpenChange={() => undefined}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (open) return; // open 由 settlementResult 控制
+        if (archiveStarted) return; // 归档中/成功后保持锁死
+        if (typeof window !== 'undefined' && window.confirm('放弃本世归档？一切将不存')) {
+          // 玩家确认放弃 → 关闭弹窗（保留 settlementResult 但跳过本世：仅清空选择）
+          setSelectedIds([]);
+          setSettlementResult(null);
+        }
+      }}
+    >
       <DialogContent className="max-w-md max-h-[86dvh] overflow-y-auto paper-texture">
         <DialogHeader>
           <DialogTitle className="font-serif-cn flex items-center gap-2">
@@ -134,25 +148,16 @@ export function SettlementModal() {
             options.map((option) => {
               const checked = selectedIds.includes(option.id);
               return (
-                <div
+                <label
                   key={option.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => toggle(option.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      toggle(option.id);
-                    }
-                  }}
-                  className="w-full cursor-pointer text-left rounded-lg border bg-card/70 p-3 transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                  className="w-full block text-left rounded-lg border bg-card/70 p-3 transition hover:bg-muted/40 cursor-pointer"
                 >
                   <div className="flex gap-3">
                     <Checkbox
                       checked={checked}
                       onCheckedChange={() => toggle(option.id)}
-                      onClick={(event) => event.stopPropagation()}
                       className="mt-1"
+                      aria-label={option.name}
                     />
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex items-center gap-2">
@@ -165,7 +170,7 @@ export function SettlementModal() {
                       <p className="text-[10px] text-primary/80 leading-relaxed">{option.reason}</p>
                     </div>
                   </div>
-                </div>
+                </label>
               );
             })
           )}

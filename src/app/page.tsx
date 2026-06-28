@@ -382,16 +382,15 @@ export default function Home() {
                 <TribulationModal
                   session={character.tribulationPending}
                   onBolt={async (boltNumber) => {
+                    // P1-2 修复：前端不再发送任何 roll/数值字段，避免玩家 DevTools 反复触发直到 random >= 0.5 刷渡劫。
+                    // characterRoll / heartDemon / soulStrength / bondedArtifactResonance 全部由后端从 character 派生（确定性 hash 算 roll）。
                     await fetch('/api/game/tribulation/action', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({
                         action: 'bolt',
+                        characterId: character.id,
                         boltNumber,
-                        characterRoll: Math.random(),
-                        heartDemon: 0,
-                        soulStrength: 50,
-                        bondedArtifactResonance: false,
                       }),
                     });
                   }}

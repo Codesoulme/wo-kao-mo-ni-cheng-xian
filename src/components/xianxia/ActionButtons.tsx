@@ -12,6 +12,7 @@ import type { CharacterState, GameEvent } from '@/lib/xianxia/store';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
 import { LOADING_LABELS } from '@/lib/xianxia/display';
+import { useStreamingPlaceholder } from '@/hooks/useStreamingPlaceholder';
 
 function latestActionProjections(events: GameEvent[]) {
   const latest = events[events.length - 1];
@@ -54,6 +55,9 @@ export function ActionButtons() {
   const [restartOpen, setRestartOpen] = useState(false);
   const autoCancelRef = useRef(false);
   const preloadRef = useRef<{ key: string | null; inFlight: boolean }>({ key: null, inFlight: false });
+
+  // ★ 流式叙事占位事件 ID 状态（之前用 (store as any)._placeholderId 是 hack）
+  const { setPlaceholder, placeholderIdRef } = useStreamingPlaceholder();
 
   const syncLatestState = async (characterId: string) => {
     const res = await fetch(`/api/game/state?characterId=${characterId}`);
@@ -164,13 +168,13 @@ export function ActionButtons() {
       setNewEventRange({ start: previousEventCount, end: previousEventCount + 5 });
 
       // ★ 清理上次推进遗留：旧占位事件、旧流式叙事、旧结算提示
-      const stalePlaceholderId = (useGameStore.getState() as any)._placeholderId;
+      const stalePlaceholderId = placeholderIdRef.current;
       if (stalePlaceholderId) {
         const curEvents = useGameStore.getState().events;
         if (curEvents.some((e: any) => e.id === stalePlaceholderId)) {
           setEvents(curEvents.filter((e: any) => e.id !== stalePlaceholderId));
         }
-        (useGameStore.getState() as any)._placeholderId = null;
+        setPlaceholder(null);
       }
       useGameStore.getState().finishStreamingNarrative();
       useGameStore.getState().setSettlingHint(null);
@@ -250,14 +254,14 @@ export function ActionButtons() {
               // 用 setEvents 替换（不是 addEvent），避免出现两个事件
               setEvents([...events, placeholderEvent]);
               // 记录占位 ID，后面 done 时替换
-              (useGameStore.getState() as any)._placeholderId = placeholderId;
+              setPlaceholder(placeholderId);
             } else if (obj.type === 'heartbeat') {
               // 忽略心跳
             } else if (obj.type === 'narrative_delta') {
               fullNarrative += obj.delta;
               useGameStore.getState().setStreamingNarrative(eventIndex, fullNarrative);
               // ★ 同步更新占位事件的 narrative 字段，这样 done 到达前气泡也不会空
-              const phId = (useGameStore.getState() as any)._placeholderId;
+              const phId = placeholderIdRef.current;
               if (phId) {
                 const curEvents = useGameStore.getState().events;
                 setEvents(curEvents.map((e: any) =>
@@ -305,7 +309,7 @@ export function ActionButtons() {
       if (doneData.breakthrough) setLastBreakthrough(doneData.breakthrough);
 
       // ★ 同步更新占位事件（标题 + narrative + effects + id）
-      const phId = (useGameStore.getState() as any)._placeholderId;
+      const phId = placeholderIdRef.current;
       if (phId) {
         const phEvents = useGameStore.getState().events;
         const savedTimeAdvance = phEvents.find((e: any) => e.id === phId)?.timeAdvance;
@@ -328,7 +332,7 @@ export function ActionButtons() {
               }
             : e
         ));
-        (useGameStore.getState() as any)._placeholderId = null;
+        setPlaceholder(null);
       }
 
       finishStreamingNarrative();

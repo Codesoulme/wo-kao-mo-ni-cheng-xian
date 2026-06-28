@@ -4,19 +4,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, applySpiritualRootChange, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, applySpiritualRootChange, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality, applyCultivationInsight } from '@/lib/xianxia/engine';
 import { generateInterfereResponse } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
+import { getCurrentUser } from '@/lib/auth-helpers';
+
+// P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const characterId: string | undefined = body?.characterId;
     const input: string | undefined = body?.input;
@@ -25,7 +37,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'characterId 和 input 必填' }, { status: 400 });
     }
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const char = await db.character.findUnique({
+      where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
+    });
     await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
@@ -84,10 +98,8 @@ export async function POST(req: NextRequest) {
         state = unequipItemsByIds(state, result.unequipItemIds).state;
       }
       if (result.memory) state = addMemory(state, result.memory);
-      // 应用修炼心得文本（仅当 AI 输出了非空文本时覆盖）
-      if (result.cultivationInsight && result.cultivationInsight.trim()) {
-        state.cultivationInsight = result.cultivationInsight.trim();
-      }
+      // 应用修炼心得文本（仅当 AI 输出了非空文本时覆盖；P1-10 走 sanitizeNarrativeText 清洗内部机制词）
+      state = applyCultivationInsight(state, result.cultivationInsight);
       // 引擎权威：cultivationFactors 完全由引擎从 state 计算（灵根 + 功法 + 状态词条）
       // 不再合并 AI 输出——避免条目忽隐忽现 + 数字与 multiplier 脱节
       state = applySpiritualRootChange(state, result.spiritualRootChange).state;
@@ -210,54 +222,10 @@ export async function POST(req: NextRequest) {
 
 
     // 持久化
-    await db.character.update({
-      where: { id: characterId },
-      data: {
-        age: state.age,
-        lifespan: state.lifespan,
-        realm: state.realm,
-        spiritualRoot: state.spiritualRoot,
-        rootDetail: state.rootDetail,
-        realmLevel: state.realmLevel,
-        cultivationExp: state.cultivationExp,
-        expToBreak: state.expToBreak,
-        elementMetal: state.elements.metal,
-        elementWood: state.elements.wood,
-        elementWater: state.elements.water,
-        elementFire: state.elements.fire,
-        elementEarth: state.elements.earth,
-        hp: state.hp, maxHp: state.maxHp,
-        mp: state.mp, maxMp: state.maxMp,
-        attack: state.attack, defense: state.defense, speed: state.speed,
-        luck: state.luck, comprehension: state.comprehension,
-        spiritStones: state.spiritStones, reputation: state.reputation,
-        alive: state.alive, ascended: state.ascended,
-        causeOfDeath: state.causeOfDeath || '',
-        faction: state.faction, master: state.master, location: state.location,
-        statusJson: JSON.stringify(state.activeStatuses),
-        inventoryJson: JSON.stringify(state.inventory),
-        equippedJson: JSON.stringify(state.equipped || []),
-        storageCapacity: state.storageCapacity ?? 5,
-        cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
-        cultivationInsight: state.cultivationInsight || '',
-        cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
-        memoryJson: JSON.stringify(state.longTermMemory),
-        // Task 20 新字段
-        pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
-        characterIntentsJson: JSON.stringify(state.characterIntents || []),
-        combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : '',
-        npcsJson: JSON.stringify(state.npcs || []),
-        causalGraphJson: JSON.stringify(state.causalGraph || { nodes: [], edges: [] }),
-        worldFactsJson: JSON.stringify(state.worldFacts || []),
-        // Task 22: 心魔值
-        heartDemon: state.heartDemon ?? 0,
-        // Task 23: 灵宠
-        petsJson: JSON.stringify(state.pets || []),
-        // Task 24: 秘境探索记录
-        exploredRealmsJson: JSON.stringify(state.exploredRealms || []),
-      },
-    });
-
+    // P1-3 修复：interfere 路由加幂等保护——与 advance 路由风格一致，用 updateMany + age 条件做乐观锁。
+    // P1-4 加固：把 updateMany + InterferenceLog.create + EventLog.create 包到 $transaction 里，
+    // 防止 updateMany 成功但 log 写入失败（或乐观锁挡住第二次但第一次 log 漏写）的 race。
+    // 事务内 updateMany count=0 → 自动回滚，连带两个 log 都不会写——这就是要的 race-safe 语义。
     const displayEffects = result.accepted ? buildEventDisplayEffects({
       before: stateBeforeInterfere,
       after: state,
@@ -270,30 +238,106 @@ export async function POST(req: NextRequest) {
     }) : [];
     const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
-    // 写入干扰日志
-    await db.interferenceLog.create({
-      data: {
-        characterId,
-        age: state.age,
-        input: input.trim(),
-        classification: result.classification,
-        response: safeNarrative,
-        effects: JSON.stringify(effectsWithAudit),
-        accepted: result.accepted,
-      },
+    type PersistResult =
+      | { ok: true }
+      | { ok: false; error: 'IDEMPOTENT_DUPLICATE' };
+    const persistResult: PersistResult = await db.$transaction(async (tx) => {
+      const updateResult = await tx.character.updateMany({
+        where: {
+          id: characterId,
+          ...(isProdMode ? { userId: user!.id } : {}),
+          age: char.age, // 乐观锁：age 没变说明还没被其他 interfere / advance 抢先
+          isAtChoice: char.isAtChoice, // 双重保险：正在选择时不允许 interfere
+        },
+        data: {
+          age: state.age,
+          lifespan: state.lifespan,
+          realm: state.realm,
+          spiritualRoot: state.spiritualRoot,
+          rootDetail: state.rootDetail,
+          realmLevel: state.realmLevel,
+          cultivationExp: state.cultivationExp,
+          expToBreak: state.expToBreak,
+          elementMetal: state.elements.metal,
+          elementWood: state.elements.wood,
+          elementWater: state.elements.water,
+          elementFire: state.elements.fire,
+          elementEarth: state.elements.earth,
+          hp: state.hp, maxHp: state.maxHp,
+          mp: state.mp, maxMp: state.maxMp,
+          attack: state.attack, defense: state.defense, speed: state.speed,
+          luck: state.luck, comprehension: state.comprehension,
+          spiritStones: state.spiritStones, reputation: state.reputation,
+          alive: state.alive, ascended: state.ascended,
+          causeOfDeath: state.causeOfDeath || '',
+          faction: state.faction, master: state.master, location: state.location,
+          statusJson: JSON.stringify(state.activeStatuses),
+          inventoryJson: JSON.stringify(state.inventory),
+          equippedJson: JSON.stringify(state.equipped || []),
+          storageCapacity: state.storageCapacity ?? 5,
+          cultivationMultiplier: state.cultivationMultiplier ?? 1.0,
+          cultivationInsight: state.cultivationInsight || '',
+          cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
+          memoryJson: JSON.stringify(state.longTermMemory),
+          // Task 20 新字段
+          pendingThreadsJson: JSON.stringify(state.pendingThreads || []),
+          characterIntentsJson: JSON.stringify(state.characterIntents || []),
+          combatStateJson: state.combatSession ? JSON.stringify(state.combatSession) : '',
+          npcsJson: JSON.stringify(state.npcs || []),
+          causalGraphJson: JSON.stringify(state.causalGraph || { nodes: [], edges: [] }),
+          worldFactsJson: JSON.stringify(state.worldFacts || []),
+          // Task 22: 心魔值
+          heartDemon: state.heartDemon ?? 0,
+          // Task 23: 灵宠
+          petsJson: JSON.stringify(state.pets || []),
+          // Task 24: 秘境探索记录
+          exploredRealmsJson: JSON.stringify(state.exploredRealms || []),
+        },
+      });
+      if (updateResult.count === 0) {
+        // 乐观锁失败 → 抛错让事务回滚（连 log 也不会写）
+        throw new Error('IDEMPOTENT_DUPLICATE');
+      }
+
+      // 写入干扰日志
+      await tx.interferenceLog.create({
+        data: {
+          characterId,
+          age: state.age,
+          input: input.trim(),
+          classification: result.classification,
+          response: safeNarrative,
+          effects: JSON.stringify(effectsWithAudit),
+          accepted: result.accepted,
+        },
+      });
+
+      // 干扰也算一次事件，写入事件日志
+      await tx.eventLog.create({
+        data: {
+          characterId,
+          age: state.age,
+          title: result.accepted ? '干扰·天道回响' : '干扰·世界如常',
+          narrative: safeNarrative,
+          eventType: 'interference',
+          effects: JSON.stringify(effectsWithAudit),
+        },
+      });
+
+      return { ok: true as const };
+    }).catch((err: any) => {
+      if (err?.message === 'IDEMPOTENT_DUPLICATE') {
+        return { ok: false as const, error: 'IDEMPOTENT_DUPLICATE' as const };
+      }
+      throw err;
     });
 
-    // 干扰也算一次事件，写入事件日志
-    await db.eventLog.create({
-      data: {
-        characterId,
-        age: state.age,
-        title: result.accepted ? '干扰·天道回响' : '干扰·世界如常',
-        narrative: safeNarrative,
-        eventType: 'interference',
-        effects: JSON.stringify(effectsWithAudit),
-      },
-    });
+    if (!persistResult.ok) {
+      return NextResponse.json(
+        { success: false, error: '请求已被处理，请刷新页面', code: 'IDEMPOTENT_DUPLICATE' },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

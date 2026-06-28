@@ -19,6 +19,10 @@ import { registerStatus } from '@/lib/xianxia/content-registry';
 import type { AttributeChange, CharacterState } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
+// P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
+// ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
+import { getCurrentUser } from '@/lib/auth-helpers';
+
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
@@ -118,7 +122,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '缺少 characterId 或 action' }, { status: 400 });
     }
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
+    const char = await db.character.findUnique({ where: { id: characterId, userId: user?.id } });
     await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: '角色不存在' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
@@ -183,7 +196,7 @@ export async function POST(req: NextRequest) {
       const displayEffects = buildEventDisplayEffects({ before, after: state, changes: appliedChanges });
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
-      await db.character.update({ where: { id: characterId }, data: persistableFormationStateData(state) });
+      await db.character.update({ where: { id: characterId, userId: user?.id }, data: persistableFormationStateData(state) });
       await db.eventLog.create({ data: { characterId, age: state.age, title, narrative, eventType: 'formation', effects: JSON.stringify(effectsWithAudit) } });
 
       return NextResponse.json({
@@ -218,7 +231,7 @@ export async function POST(req: NextRequest) {
       const displayEffects = buildEventDisplayEffects({ before, after: state, changes: appliedChanges, removedItemIds: [] });
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
-      await db.character.update({ where: { id: characterId }, data: persistableFormationStateData(state) });
+      await db.character.update({ where: { id: characterId, userId: user?.id }, data: persistableFormationStateData(state) });
       await db.eventLog.create({ data: { characterId, age: state.age, title, narrative, eventType: 'formation', effects: JSON.stringify(effectsWithAudit) } });
 
       return NextResponse.json({

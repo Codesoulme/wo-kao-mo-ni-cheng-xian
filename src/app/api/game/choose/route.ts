@@ -4,19 +4,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
-import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, applySpiritualRootChange, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality } from '@/lib/xianxia/engine';
+import { dbToState, buildStateContext, applyChanges, addStatuses, addItems, addMemory, checkLifespan, tickStatusDurations, tryBreakthrough, stateToResponse, removeItemsByIds, equipItemsByIds, unequipItemsByIds, recalcCultivationMultiplier, applyItemEffects, ensureUniqueIds, computeCultivationFactors, applySpiritualRootChange, addThreads, advanceThread, completeThread, failThread, startCombat, addPet, upsertNpcs, recordActionCausality, applyCultivationInsight } from '@/lib/xianxia/engine';
 import { generateChoiceResult } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect, buildStateChangeLog } from '@/lib/xianxia/state-change-log';
 import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
+import { getCurrentUser } from '@/lib/auth-helpers';
+
+// P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const characterId: string | undefined = body?.characterId;
     const chosenIndex: number | undefined = body?.chosenIndex;
@@ -27,7 +39,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: `参数缺失: ${!characterId ? 'characterId' : ''} ${chosenIndex === undefined ? 'chosenIndex' : ''} ${typeof choicePrompt !== 'string' ? 'choicePrompt' : ''} ${!Array.isArray(options) ? 'options' : ''}` }, { status: 400 });
     }
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const char = await db.character.findUnique({
+      where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
+    });
     await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
@@ -99,10 +113,8 @@ export async function POST(req: NextRequest) {
       state = unequipItemsByIds(state, result.unequipItemIds).state;
     }
     if (result.memory) state = addMemory(state, result.memory);
-    // 应用修炼心得文本（仅当 AI 输出了非空文本时覆盖）
-    if (result.cultivationInsight && result.cultivationInsight.trim()) {
-      state.cultivationInsight = result.cultivationInsight.trim();
-    }
+    // 应用修炼心得文本（仅当 AI 输出了非空文本时覆盖；P1-10 走 sanitizeNarrativeText 清洗内部机制词）
+    state = applyCultivationInsight(state, result.cultivationInsight);
     state = applySpiritualRootChange(state, result.spiritualRootChange).state;
     // 引擎权威：cultivationFactors 完全由引擎从 state 计算（灵根 + 功法 + 状态词条）
     // 不再合并 AI 输出——AI 输出不稳定会导致条目忽隐忽现，且编造的数字与 multiplier 脱节
@@ -221,7 +233,9 @@ export async function POST(req: NextRequest) {
     // P0: 幂等保护 - update 加 isAtChoice + lastEventAge 条件，重复请求会触发 P2025
     try {
       await db.character.update({
-        where: { id: characterId, isAtChoice: isAtChoiceBefore, lastEventAge: lastEventAgeBefore },
+        where: isProdMode
+          ? { id: characterId, userId: user!.id, isAtChoice: isAtChoiceBefore, lastEventAge: lastEventAgeBefore }
+          : { id: characterId, isAtChoice: isAtChoiceBefore, lastEventAge: lastEventAgeBefore },
       data: {
         age: state.age,
         lifespan: state.lifespan,

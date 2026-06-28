@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { toast } from 'sonner';
 import {
   listSaveSlots, readSaveSlot, writeSaveSlot, deleteSaveSlot,
   exportSaveSlot, importSaveSlot, summarizeCharacterForSlot,
   SAVE_SLOT_LIMIT, type SaveSlotMeta, type SlotId,
 } from '@/lib/xianxia/save-slots';
+import { useGameStore } from '@/lib/xianxia/store';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface Props {
   // Snapshot of current persistable state from the page.
@@ -23,6 +26,12 @@ export function SaveSlotPanel(props: Props) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
+  // P1 修复: 订阅全局 store 的自动存档失败状态（不再本地 useAutoSave，避免 3 组件实例双写）
+  const autoSaveError = useGameStore((s) => s.lastAutoSaveError);
+  const clearAutoSaveError = useCallback(() => {
+    useGameStore.getState().setLastAutoSaveError(null);
+  }, []);
+
   const refresh = useCallback(() => {
     setSlots(listSaveSlots());
   }, []);
@@ -38,7 +47,7 @@ export function SaveSlotPanel(props: Props) {
     try {
       const summary = summarizeCharacterForSlot(character);
       const wc = props.snapshot?.worldCalendar ?? {};
-      const meta = writeSaveSlot(slotId, props.snapshot, {
+      const result = writeSaveSlot(slotId, props.snapshot, {
         name: props.defaultSlotName?.(slotId) ?? (slotId === 3 ? '自动档' : `手动档 ${slotId}`),
         savedAt: new Date().toISOString(),
         savedAge: summary.age,
@@ -49,10 +58,23 @@ export function SaveSlotPanel(props: Props) {
         eventsCount: Array.isArray(props.snapshot?.events) ? props.snapshot.events.length : 0,
         isAutoSave: slotId === 3,
       });
+      if (!result.ok) {
+        // P1 关键修复: 失败时不再显示"已存档"误导文案
+        const errMsg = result.error || '存储空间不足或浏览器拒绝了写入';
+        setMsg(`存档失败：${errMsg}`);
+        try { toast.error(`存档失败：${errMsg}`); } catch { /* sonner not ready */ }
+        return;
+      }
+      const meta = result.meta;
       setMsg(`已存档到槽 ${slotId}：${meta.characterName}（${meta.savedRealm}）`);
+      try { toast.success(`已存档到槽 ${slotId}`); } catch { /* sonner not ready */ }
+      // 手动存档成功一次,顺手清掉自动存档残留错误,让顶部红条消失
+      if (autoSaveError) clearAutoSaveError();
       refresh();
     } catch (e: any) {
-      setMsg(`存档失败：${e?.message ?? String(e)}`);
+      const errMsg = e?.message ?? String(e);
+      setMsg(`存档失败：${errMsg}`);
+      try { toast.error(`存档失败：${errMsg}`); } catch { /* sonner not ready */ }
     } finally {
       setBusy(false);
     }
@@ -119,6 +141,35 @@ export function SaveSlotPanel(props: Props) {
       <div className="rich-panel-title" style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: '#5a3a18' }}>
         轮回手札 · 存档
       </div>
+      {autoSaveError && (
+        <Alert
+          variant="destructive"
+          data-testid="save-slot-autosave-error"
+          style={{ marginBottom: '12px' }}
+        >
+          <AlertTitle>上次自动存档失败</AlertTitle>
+          <AlertDescription>
+            角色年龄 {autoSaveError.age} 岁时自动存档失败（{autoSaveError.reason}）：{autoSaveError.error}
+            <div style={{ marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => clearAutoSaveError()}
+                style={{
+                  fontSize: '11px',
+                  padding: '3px 10px',
+                  border: '1px solid currentColor',
+                  borderRadius: '4px',
+                  background: 'transparent',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                知道了
+              </button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
         {slotMetas.map((id) => {
           const meta = slots.find((m) => m.slotId === id);

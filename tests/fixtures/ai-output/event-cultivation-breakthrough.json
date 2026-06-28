@@ -1,0 +1,18 @@
+{
+  "id": "event-cultivation-breakthrough",
+  "prompt": "角色 foundation→golden_core 突破瞬间, age 78",
+  "expectedSchema": {
+    "eventType": "string",
+    "narrative": "string",
+    "triggerCombat": "boolean",
+    "cultivationDelta": "number"
+  },
+  "expectedOutput": {
+    "eventType": "breakthrough",
+    "narrative": "丹田中灵力翻涌,金丹凝聚成形,灵台清明如镜。",
+    "triggerCombat": false,
+    "cultivationDelta": 5000
+  },
+  "tags": ["cultivation", "breakthrough"],
+  "notes": "突破事件不应触发战斗,cultivationDelta 为正值"
+}

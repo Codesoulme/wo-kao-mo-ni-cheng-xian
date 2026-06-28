@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Swords, Heart, Sparkles, Shield, Footprints, ChevronDown, FlaskConical, Loader2, Zap, BookOpen,
+  Swords, Heart, Sparkles, Shield, ChevronDown, FlaskConical, Loader2, Zap, BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -166,16 +166,12 @@ export function CombatModal() {
       if (data.ended) {
         const status = data.state?.combatSession?.status || data.endStatus;
         const endedState = { ...character, ...data.state } as typeof character;
-        const terminal = !endedState.alive || (endedState as any).ascended;
         autoBattleSessionRef.current = null;
         setAutoBattle(false);
         setOpenPalette(null);
         setLoading(false);
         setCharacter(endedState);
-        // 终局（死亡/飞升）直接交给统一全局轮回结算，不再先弹战后小结面板，避免两个结算窗口。
-        if (!terminal) {
-          setEndResult({ status, narrative: '战局尘埃落定，余波仍在胸臆间回荡……' });
-        }
+        // P0-9: 结算统一交给 endCombat 处理，不在此处预设 endResult，避免与 endCombat 内部的 setEndResult/setSettlementResult 产生竞态。
         await endCombat(status);
       } else {
         setCharacter({ ...character, ...data.state });
@@ -199,10 +195,14 @@ export function CombatModal() {
   const endCombat = async (status: string) => {
     if (!character) return;
     try {
+      // P1-9: 把会话内 AI 校准的战利品附带过去（endCombat route 优先使用，避免再算一次）
+      const clientAiLoot = status === 'victory' && (session as any)?.pendingLoot
+        ? (session as any).pendingLoot
+        : null;
       const res = await fetch('/api/game/combat/end', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: character.id }),
+        body: JSON.stringify({ characterId: character.id, aiLoot: clientAiLoot }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '战斗结算失败');
@@ -808,36 +808,13 @@ export function CombatModal() {
                 </div>
               )
             )}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-6 gap-1">
               <PaletteButton paletteKey="basicAttack" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('basicAttack', '\u653b\u4f10')} icon={<Swords className="w-3.5 h-3.5" />} tone="primary" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="technique" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('technique', '\u529f\u6cd5')} icon={<BookOpen className="w-3.5 h-3.5" />} tone="gold" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="spell" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('spell', '\u6cd5\u672f')} icon={<Sparkles className="w-3.5 h-3.5" />} tone="blue" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="defense" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('defense', '\u5b88\u5fa1')} icon={<Shield className="w-3.5 h-3.5" />} tone="neutral" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="item" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('item', '\u7269\u7528')} icon={<FlaskConical className="w-3.5 h-3.5" />} tone="green" busy={busy} onPick={runPaletteOption} />
               <PaletteButton paletteKey="other" openPalette={openPalette} setOpenPalette={setOpenPalette} group={groupOf('other', '\u5e94\u53d8')} icon={<Zap className="w-3.5 h-3.5" />} tone="purple" busy={busy} onPick={runPaletteOption} />
-              <button
-                onClick={() => {
-                  if (halfHpOrLower) {
-                    toast.warning('不可自运', { description: '气血不足半数，请亲自决断。' });
-                    return;
-                  }
-                  setAutoBattle(v => {
-                    const next = !v;
-                    autoBattleSessionRef.current = next ? (session?.id || null) : null;
-                    return next;
-                  });
-                }}
-                disabled={busy || halfHpOrLower}
-                className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 h-14 rounded-md border-2 transition-all active:scale-95",
-                  autoBattle ? "border-red-500/50 bg-red-500/10 text-red-600" : "border-muted-foreground/30 bg-muted/30 hover:bg-muted/50 text-muted-foreground",
-                  (busy || halfHpOrLower) && "opacity-40 cursor-not-allowed"
-                )}
-              >
-                <Footprints className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-serif-cn font-semibold">{autoBattle ? '止运' : '自运'}</span>
-                <span className="text-[8px] text-muted-foreground">半血止</span>
-              </button>
             </div>
 
           </div>

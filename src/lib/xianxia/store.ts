@@ -246,6 +246,35 @@ export interface RestrictionChallenge {
   narrative: string;
 }
 
+// P1-5：继承白名单字段。AI/legacy 候选对象可能含任意字段（causeOfDeath/alive/dead/realmLevel 等），
+// 构造新 character 时只把白名单内的字段从 cand 合并，避免污染新角色并绕过 executeAIEvent 校验链路。
+const ALLOWED_INHERITANCE_FIELDS = ['spiritualRoot', 'bloodline', 'karmaTags', 'traitNarrative'] as const;
+
+// P1-6：白名单校验 helper —— 候选 id 必须在某条 pool 的 hostCharacterIds 之内，
+// 或（兜底）必须能在当前 worldLegacies 找到对应记录；否则认为该候选与本世传承无关，丢弃。
+function validateInheritanceCandidate(cand: any, pool: any[], legacies?: any[]): boolean {
+  if (!cand || typeof cand !== 'object') return false;
+  const cid = cand.id;
+  if (typeof cid !== 'string' || !cid) return false;
+  // 主校验：候选 id 是否出现在 pool 的某条 hostCharacterIds 中
+  if (Array.isArray(pool)) {
+    for (const p of pool) {
+      if (p && Array.isArray(p.hostCharacterIds) && p.hostCharacterIds.indexOf(cid) >= 0) {
+        return true;
+      }
+    }
+  }
+  // 兜底：候选 id 是否出现在 worldLegacies（仙界历代名册）中
+  if (Array.isArray(legacies)) {
+    for (const w of legacies) {
+      if (w && typeof w === 'object' && w.characterId === cid) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 interface GameState {
   character: CharacterState | null;
   events: GameEvent[];
@@ -286,10 +315,16 @@ interface GameState {
   worldCalendar: WorldCalendarState;
   worldLegacies: WorldLegacyRecord[];
 
-  // Phase-M #3: 继承池 + 候选继承人（运行时状态，不进 partialize，避免破坏 12 字段约束）
+  // Phase-M #3: 继承池 + 候选继承人 + 上一代结局摘要（已加入 partialize，version=2，避免刷新页面后池子消失）
   inheritancePool: any[];
   inheritanceCandidates: any[];
   inheritanceEndingSummary: string | null;
+
+  // Phase-M #4: 自动存档全局状态（移到 store 避免多实例 useAutoSave 双写）
+  // lastAutoSaveAt 持久化（玩家刷新页面后还能显示上次存档时间）；
+  // lastAutoSaveError 是 transient UI state，不进 partialize
+  lastAutoSaveAt: string | null;
+  lastAutoSaveError: { age: number; error: string; reason: string; at: number } | null;
 
   setCharacter: (c: CharacterState | null) => void;
   setEvents: (e: GameEvent[]) => void;
@@ -351,6 +386,9 @@ interface GameState {
   // Phase-M #2: 死亡引导 — 3 个选项 + 关闭提示
   deathGuidanceDismissed: boolean;
   dismissDeathGuidance: () => void;
+  // Phase-M #4: 自动存档全局 setter（useAutoSave 写，UI 读）
+  setLastAutoSaveAt: (at: string | null) => void;
+  setLastAutoSaveError: (err: { age: number; error: string; reason: string; at: number } | null) => void;
   selectNextProtagonistAndContinue: () => { ok: boolean; narrative?: string; selectedId?: string; error?: string };
   resetCharacterToMortalStart: () => void;
   appendStreamingNarrative: (eventIndex: number, delta: string) => void;
@@ -395,6 +433,9 @@ export const useGameStore = create<GameState>()(
       inheritanceCandidates: [],
       inheritanceEndingSummary: null,
       deathGuidanceDismissed: false,
+      // Phase-M #4: 自动存档全局状态（默认空）
+      lastAutoSaveAt: null,
+      lastAutoSaveError: null,
       newEventRange: null,
       settlingHint: null,
       streamingNarrative: null,
@@ -552,6 +593,10 @@ export const useGameStore = create<GameState>()(
       // 替换当前角色（age 重置、alive=true、causeOfDeath 清空、ascended=false、dead 字段抹除），
       // 把候选池与上一代 ending 摘要沉入 heritageVault，再清空继承池；
       // 该动作不向远端发请求，纯本地状态机，符合 UI-only 边界。
+      // P1-5 修复：AI/legacy 候选对象可能含任意字段（causeOfDeath/alive/causeOfDeath/dead 等），
+      // 不再直接 `...cand` 展开覆盖整个 character；改用 ALLOWED_INHERITANCE_FIELDS 白名单
+      // 只把可继承字段（spiritualRoot/bloodline/karmaTags/traitNarrative）合并进去，
+      // 避免污染新角色并绕过 executeAIEvent 校验链路。
       claimInheritanceCandidate: (candidateId: string) => {
         const s = get();
         if (!candidateId || typeof candidateId !== 'string') return;
@@ -565,9 +610,18 @@ export const useGameStore = create<GameState>()(
         const nextAge = (typeof cand.age === 'number' && cand.age >= 0) ? cand.age : 0;
         const nextRealm = (typeof cand.realm === 'string' && cand.realm) ? cand.realm : 'mortal';
         const nextRoot = (typeof cand.spiritualRoot === 'string' && cand.spiritualRoot) ? cand.spiritualRoot : 'none';
+        // P1-5：以 prev 为基底，然后只把白名单内的继承字段从 cand 合并进来
+        // 这些 override 字段（id/name/age/realm/spiritualRoot/alive/ascended/causeOfDeath/dead/lastEventAge/isAtChoice）
+        // 用对象字面量写在展开后确保正确覆盖 prev 残留（如 alive=false/causeOfDeath 旧值）
+        const whitelistMerge: Record<string, any> = {};
+        for (const k of ALLOWED_INHERITANCE_FIELDS) {
+          if (cand && Object.prototype.hasOwnProperty.call(cand, k)) {
+            whitelistMerge[k] = (cand as any)[k];
+          }
+        }
         const newChar: any = {
           ...(prev && typeof prev === 'object' ? prev : {}),
-          ...cand,
+          ...whitelistMerge,
           id: typeof cand.id === 'string' ? cand.id : ('protagonist-' + Date.now()),
           name: nextName,
           age: nextAge,
@@ -620,6 +674,11 @@ export const useGameStore = create<GameState>()(
       // Phase-M #2: dismissDeathGuidance — 玩家选择「继续旁观」后关闭死亡引导
       dismissDeathGuidance: () => set({ deathGuidanceDismissed: true }),
 
+      // Phase-M #4: 自动存档全局 setter — useAutoSave 写入，SaveSlotPanel/DeathGuidancePanel 读取。
+      // 之前每个组件各自 useRef 维护 lastError，导致同一 age 推进时 writeSaveSlot 被触发 3 次。
+      setLastAutoSaveAt: (at) => set({ lastAutoSaveAt: at }),
+      setLastAutoSaveError: (err) => set({ lastAutoSaveError: err }),
+
       // Phase-M #2: selectNextProtagonistAndContinue — 「轮回重开」
       // 流程：triggerEndingEvaluation 取传承池 → 用 worldLegacies + pool hostCharacterIds 衍生候选 →
       //   selectNextProtagonist 选继承人 → setInheritancePool + claimInheritanceCandidate 替换角色
@@ -633,14 +692,41 @@ export const useGameStore = create<GameState>()(
           : 'sit-death';
         // 1. 引擎评估：取传承池
         let evalRes: any = null;
+        let evalError: any = null;
         try {
           evalRes = triggerEndingEvaluation(prev, s.worldCalendar, cause);
-        } catch (_e) {
-          evalRes = null;
+        } catch (e: any) {
+          // P1 修复：不吞错 — 记录 telemetry 但保留原 ending 摘要（来自 settlementResult）作为信息源
+          // 避免玩家看到「衣钵未竟，待后人接续」却看不到实际生成的 ending 摘要。
+          // 仅 console.error，不抛 — 否则连选择继承人的入口都没有了
+          evalError = e;
+          // eslint-disable-next-line no-console
+          if (typeof console !== 'undefined' && console.error) {
+            try { console.error('[selectNextProtagonist] triggerEndingEvaluation failed:', (e && (e.message || e)) || e); } catch { /* swallow */ }
+          }
         }
         const pool = (evalRes && Array.isArray(evalRes.inheritancePool)) ? evalRes.inheritancePool : [];
+
+        // 构造 endingSummary：优先 evalRes.primaryEnding.summary，否则回退到 settlementResult.summary
+        // （settlementResult 在 SettlementModal 关闭后仍保留在 store），最后兜底为通用句
+        let endingSummary: string | null = null;
+        if (evalRes && evalRes.primaryEnding && typeof evalRes.primaryEnding.summary === 'string' && evalRes.primaryEnding.summary) {
+          endingSummary = evalRes.primaryEnding.summary;
+        } else if (s.settlementResult && typeof s.settlementResult.summary === 'string' && s.settlementResult.summary) {
+          endingSummary = s.settlementResult.summary;
+        } else if (evalError) {
+          endingSummary = '衣钵未竟，待后人接续。';
+        }
+
         if (pool.length === 0) {
-          return { ok: false, error: 'no-pool', narrative: '此生未留传承池，仙路轮转暂止。' };
+          return {
+            ok: false,
+            error: evalError ? 'eval-failed' : 'no-pool',
+            narrative: endingSummary || '此生未留传承池，仙路轮转暂止。',
+            settlementResult: s.settlementResult, // 保留供 UI 展示
+            endingSummary: endingSummary,
+            evalError: evalError ? { message: (evalError && (evalError.message || evalError)) ? String(evalError.message || evalError) : 'unknown' } : null,
+          };
         }
         // 2. 衍生候选：从 worldLegacies（仙界历代名册）取，再补 pool hostCharacterIds 兜底
         const legacyCandidates = (Array.isArray(s.worldLegacies) ? s.worldLegacies : [])
@@ -657,7 +743,12 @@ export const useGameStore = create<GameState>()(
             inherited: [],
             traitNarrative: (typeof w.summary === 'string' && w.summary) ? w.summary : '无名后辈',
           }));
-        const legacyIds = new Set(legacyCandidates.map((c) => c.id));
+        // P1-6 白名单过滤：候选 id 必须在 pool.hostCharacterIds 之内，或与 worldLegacies 关联；
+        // 防止 worldLegacies 中与本世传承无关的"前世仙人"被强行塞进候选池
+        const whitelistedLegacyCandidates = legacyCandidates.filter(
+          (c) => validateInheritanceCandidate(c, pool, s.worldLegacies)
+        );
+        const legacyIds = new Set(whitelistedLegacyCandidates.map((c) => c.id));
         const hostCandidates: any[] = [];
         for (const p of pool) {
           if (!p || !Array.isArray(p.hostCharacterIds)) continue;
@@ -676,9 +767,9 @@ export const useGameStore = create<GameState>()(
             });
           }
         }
-        const candidates = legacyCandidates.concat(hostCandidates);
+        const candidates = whitelistedLegacyCandidates.concat(hostCandidates);
         if (candidates.length === 0) {
-          return { ok: false, error: 'no-candidates', narrative: '无可继承之人，仙路轮转暂止。' };
+          return { ok: false, error: 'no-candidates', narrative: '本世未结善缘，传承池暂无可承之人。' };
         }
         // 3. 引擎选继承人
         const selection = selectNextProtagonist(pool, s.worldCalendar, candidates);
@@ -687,15 +778,20 @@ export const useGameStore = create<GameState>()(
           return { ok: false, error: 'no-pick', narrative: (selection && selection.narrative) || '无人可承此衣钵。' };
         }
         // 4. 设置池 + 候选 + 摘要（让现有面板可同步显示）
-        const summary = (evalRes && evalRes.primaryEnding && typeof evalRes.primaryEnding.summary === 'string')
-          ? evalRes.primaryEnding.summary
-          : '衣钵未竟，待后人接续。';
+        // 优先使用 endingSummary（已含 settlementResult 回退），避免 evalRes 缺失时降级为占位句
+        const summary = endingSummary || '衣钵未竟，待后人接续。';
         s.setInheritancePool(pool, candidates, summary);
         // 5. 替换 character
         s.claimInheritanceCandidate(picked);
         // 6. 关闭引导面板，让玩家重新开始推进
         set({ deathGuidanceDismissed: false });
-        return { ok: true, selectedId: picked, narrative: selection.narrative || '已承衣钵。' };
+        return {
+          ok: true,
+          selectedId: picked,
+          narrative: selection.narrative || '已承衣钵。',
+          endingSummary: endingSummary, // ← 新增：UI 可展示上一世摘要
+          evalError: evalError ? { message: (evalError && (evalError.message || evalError)) ? String(evalError.message || evalError) : 'unknown' } : null, // ← telemetry
+        };
       },
 
       // Phase-M #2: resetCharacterToMortalStart — 「回归入凡」
@@ -742,13 +838,10 @@ export const useGameStore = create<GameState>()(
         selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
         explorationOpen: false, lastExploration: null, settlementResult: null,
         heritageVault: [], selectedHeritage: {}, hallOfSimulations: [],
+        // Phase-M #3: 继承池清空
         inheritancePool: [], inheritanceCandidates: [], inheritanceEndingSummary: null,
         worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
         worldLegacies: [],
-      // Phase-M #3: 继承池初始为空（运行时由调用方填入）
-      inheritancePool: [],
-      inheritanceCandidates: [],
-      inheritanceEndingSummary: null,
       }),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
@@ -772,11 +865,36 @@ export const useGameStore = create<GameState>()(
           settlementResult: s.settlementResult,
           worldCalendar: s.worldCalendar,
           worldLegacies: s.worldLegacies,
+          // Phase-M #3: 继承池需持久化，否则刷新页面后池子消失导致轮回卡死
+          inheritancePool: s.inheritancePool,
+          inheritanceCandidates: s.inheritanceCandidates,
+          inheritanceEndingSummary: s.inheritanceEndingSummary,
+          // Phase-M #4: 上次自动存档时间也持久化（刷新后顶部仍能看到）
+          // 注意：lastAutoSaveError 不持久化（transient UI 状态）
+          lastAutoSaveAt: s.lastAutoSaveAt,
         }),
-        version: 1,
-        migrate: (persisted: any, _version: number) => {
+        version: 3,
+        migrate: (persisted: any, version: number) => {
           if (!persisted) return null;
           if (typeof persisted !== 'object') return null;
+          // v1 → v2: 补全继承池字段（v1 partialize 不包含这三个字段，老用户 localStorage 中缺失）
+          if (version < 2) {
+            persisted = {
+              ...persisted,
+              inheritancePool: Array.isArray(persisted.inheritancePool) ? persisted.inheritancePool : [],
+              inheritanceCandidates: Array.isArray(persisted.inheritanceCandidates) ? persisted.inheritanceCandidates : [],
+              inheritanceEndingSummary: typeof persisted.inheritanceEndingSummary === 'string'
+                ? persisted.inheritanceEndingSummary
+                : null,
+            };
+          }
+          // v2 → v3: 补全 lastAutoSaveAt（lastAutoSaveError 不持久化，无需迁移）
+          if (version < 3) {
+            persisted = {
+              ...persisted,
+              lastAutoSaveAt: typeof persisted.lastAutoSaveAt === 'string' ? persisted.lastAutoSaveAt : null,
+            };
+          }
           return persisted;
         },
       }

@@ -3,12 +3,24 @@ import { db } from '@/lib/db';
 import { dbToState } from '@/lib/xianxia/engine';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
 import { generateSettlementEvaluation } from '@/lib/xianxia/llm';
+import { getCurrentUser } from '@/lib/auth-helpers';
+
+// P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
   try {
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const characterId: string | undefined = body?.characterId;
     const reason: string | undefined = body?.reason;
@@ -16,7 +28,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
     }
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const char = await db.character.findUnique({
+      where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
+    });
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
 
     const eventRows = await db.eventLog.findMany({
@@ -42,7 +56,7 @@ export async function POST(req: NextRequest) {
       };
       if (char.alive || !char.causeOfDeath) {
         await db.character.update({
-          where: { id: characterId },
+          where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
           data: { alive: false, causeOfDeath: state.causeOfDeath || '' },
         });
       }

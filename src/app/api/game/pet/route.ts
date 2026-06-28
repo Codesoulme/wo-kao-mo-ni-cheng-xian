@@ -1,6 +1,9 @@
 ﻿// POST /api/game/pet
 // 灵宠操作：喂养 / 放归 / 召唤，并写入隐藏审计。
+// P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
+// ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
 
+import { getCurrentUser } from '@/lib/auth-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
@@ -131,7 +134,16 @@ export async function POST(req: NextRequest) {
     }
     const { characterId, action, petId, itemId, species, rarity } = parsed.data;
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
+    const char = await db.character.findUnique({ where: { id: characterId, userId: user?.id } });
     await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: '角色不存在' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
@@ -226,7 +238,7 @@ export async function POST(req: NextRequest) {
     const name = pet?.name || '灵宠';
     const titleMeta = eventAndResponseTitle(action, name);
 
-    await db.character.update({ where: { id: characterId }, data: persistablePetStateData(state) });
+    await db.character.update({ where: { id: characterId, userId: user?.id }, data: persistablePetStateData(state) });
     await db.eventLog.create({
       data: {
         characterId,

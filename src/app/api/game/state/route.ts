@@ -6,18 +6,35 @@ import { db } from '@/lib/db';
 import { dbToState, computeEffectiveCultivationRate, stateToResponse } from '@/lib/xianxia/engine';
 import { FATE_NODES, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
 import { extractEventMeta, normalizeWorldCalendar } from '@/lib/xianxia/world-time';
+import { getCurrentUser } from '@/lib/auth-helpers';
+
+// P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式（ADMIN_TOKEN 未设 / SKIP_AUTH=1）保持原行为，
+// 以避免破坏现有 446 smoke。Worker S2 负责收剩余 12 类 route。
 
 export const runtime = 'nodejs';
 
 export async function GET(req: NextRequest) {
   try {
+    // 生产模式（ADMIN_TOKEN 已设）→ 必须登录 + 收窄 where
+    // dev 模式（ADMIN_TOKEN 未设 / SKIP_AUTH=1）→ 跳过 userId check，保留旧行为
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
     const { searchParams } = new URL(req.url);
     const characterId = searchParams.get('characterId');
     if (!characterId) {
       return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
     }
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const char = await db.character.findUnique({
+      where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
+    });
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
 
     const events = await db.eventLog.findMany({

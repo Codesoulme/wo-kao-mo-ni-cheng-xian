@@ -4,6 +4,7 @@ import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { buildStateContext, executeAIEvent, stateToResponse } from '@/lib/xianxia/engine';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay } from '@/lib/xianxia/world-time';
+import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import {
   callLLMStream,
   buildAdvancePrompt,
@@ -13,6 +14,9 @@ import {
   sanitizeEventOutput,
   cleanNarrativeAge,
 } from '@/lib/xianxia/llm';
+import { getCurrentUser } from '@/lib/auth-helpers';
+
+// P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -90,6 +94,17 @@ export async function POST(req: NextRequest) {
       };
 
       try {
+        const isProdMode = !!process.env.ADMIN_TOKEN;
+        let user: { id: string } | null = null;
+        if (isProdMode) {
+          user = await getCurrentUser();
+          if (!user) {
+            send('error', { error: 'UNAUTHORIZED' });
+            close();
+            return;
+          }
+        }
+
         const body = await req.json().catch(() => ({}));
         const characterId: string | undefined = body?.characterId;
         const qualityMode: 'full' | 'light' = body?.qualityMode === 'light' ? 'light' : 'full';
@@ -101,7 +116,9 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        const char = await db.character.findUnique({ where: { id: characterId } });
+        const char = await db.character.findUnique({
+          where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
+        });
         if (!char) {
           send('error', { error: 'Character not found' });
           close();
@@ -142,7 +159,8 @@ export async function POST(req: NextRequest) {
         // 构建 worldCalendar
         let worldCalendar = char.worldCalendarJson ? JSON.parse(char.worldCalendarJson) : null;
         if (worldCalendar && timeAdvance) {
-          worldCalendar = advanceWorldCalendar(worldCalendar, timeAdvance.ageDeltaYears, timeAdvance.elapsedDays);
+          // 修复 P0-1：原代码以 3 参调用 → time.elapsedDays 拿到 undefined → NaN 写库 → "青岚仙历 NaN 年"
+          worldCalendar = advanceWorldCalendar(worldCalendar, timeAdvance);
         }
 
         // ★ 先 send(start)，此时已准备好 timeAdvance + worldTime
@@ -240,7 +258,7 @@ export async function POST(req: NextRequest) {
             const anchorJson = mergeStyleAnchor(char as any, newAnchor);
             const entityJson = mergeEntities(char as any, newEntities);
             await db.character.update({
-              where: { id: characterId },
+              where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
               data: { styleAnchorsJson: anchorJson, entityEntriesJson: entityJson },
             });
           }
@@ -294,36 +312,27 @@ export async function POST(req: NextRequest) {
           // 立即写回角色状态（不阻塞 done，但确保 event 保存）
           const ageBefore = char.age;
           if (finalState.age > ageBefore || (finalState as any).causeOfDeath || (finalState as any).deathReason || finalState.isAtChoice) {
+            // 修复 P1-1：SSE 路径补齐所有漏写字段——走与 non-SSE 同一个 buildAdvanceStateData
             await db.character.update({
-              where: { id: characterId, age: ageBefore },
-              data: {
-                age: finalState.age,
-                lifespan: finalState.lifespan,
-                realm: finalState.realm,
-                spiritualRoot: finalState.spiritualRoot,
-                rootDetail: finalState.rootDetail,
-                realmLevel: finalState.realmLevel,
-                cultivationExp: finalState.cultivationExp,
-                expToBreak: finalState.expToBreak,
-                hp: finalState.hp, maxHp: finalState.maxHp,
-                mp: finalState.mp, maxMp: finalState.maxMp,
-                attack: finalState.attack, defense: finalState.defense, speed: finalState.speed,
-                luck: finalState.luck, comprehension: finalState.comprehension,
-                spiritStones: finalState.spiritStones,
-                alive: finalState.alive, ascended: finalState.ascended,
-                isAtChoice: finalState.isAtChoice,
+              where: isProdMode
+                ? { id: characterId, userId: user!.id, age: ageBefore }
+                : { id: characterId, age: ageBefore },
+              data: buildAdvanceStateData(finalState, {
                 pendingChoiceJson,
-                worldCalendarJson: worldCalendar ? JSON.stringify(worldCalendar) : char.worldCalendarJson,
-              },
+                worldCalendar,
+                causeOfDeath: finalState.causeOfDeath || '',
+                lastEventAge: finalState.age,
+              }),
             });
           }
 
           } catch (e: any) {
           clearInterval(heartbeat);
           console.error('[SSE] executeAIEvent error:', e?.message, e?.stack);
-          send('error', { error: `engine error: ${e?.message}` });
+          // 修复：DB 错误不再静默吞，传播给上层 handler 决定（防止 SSE 推 done 但数据未落地）
+          send('error', { error: `engine error: ${e?.message}`, detail: String(e?.message || e) });
           close();
-          return;
+          throw e;
         }
 
         // 7) 推送 done（数据库已同步写入，刷新页面不会丢失气泡）

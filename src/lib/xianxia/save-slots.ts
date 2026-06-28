@@ -56,12 +56,33 @@ export function readSaveSlot(id: SlotId): SaveSlotData | null {
   }
 }
 
-export function writeSaveSlot(id: SlotId, payload: any, meta: Omit<SaveSlotMeta, 'slotId'>): SaveSlotMeta {
-  if (typeof window === 'undefined') throw new Error('Cannot write save slot on server');
+export interface WriteSaveSlotResult {
+  ok: boolean;
+  /** 永远回填（即便失败）—— 失败时仍可读 savedAt 等用于日志/UI 提示 */
+  meta: SaveSlotMeta;
+  /** 失败原因（中文，UI 可直接显示） */
+  error?: string;
+}
+
+export function writeSaveSlot(id: SlotId, payload: any, meta: Omit<SaveSlotMeta, 'slotId'>): WriteSaveSlotResult {
   const fullMeta: SaveSlotMeta = { slotId: id, ...meta };
+  if (typeof window === 'undefined') {
+    return { ok: false, meta: fullMeta, error: '存档不可在服务端执行' };
+  }
   const slotData: SaveSlotData = { meta: fullMeta, payload };
-  localStorage.setItem(SLOT_KEYS[id], JSON.stringify(slotData));
-  return fullMeta;
+  try {
+    localStorage.setItem(SLOT_KEYS[id], JSON.stringify(slotData));
+    return { ok: true, meta: fullMeta };
+  } catch (e: any) {
+    // QuotaExceededError / SecurityError / JSON 序列化失败等
+    const msg = (e && typeof e === 'object' && 'message' in e && typeof (e as any).message === 'string')
+      ? (e as any).message
+      : '存储失败';
+    // P0 修复: 不要把失败留到调用方 console，这里给出明确错误
+    // eslint-disable-next-line no-console
+    console.warn('[save-slots] writeSaveSlot failed:', { slot: id, err: msg });
+    return { ok: false, meta: fullMeta, error: msg };
+  }
 }
 
 export function deleteSaveSlot(id: SlotId): void {

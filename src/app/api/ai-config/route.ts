@@ -2,6 +2,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { resetGameAI } from '@/lib/xianxia/llm';
+import { requireAuth } from '@/lib/auth';
 
 // ===== 多接口配置数据结构 =====
 type AIProfile = {
@@ -91,7 +92,9 @@ async function writeMultiConfig(config: MultiConfig) {
 }
 
 // GET：返回所有接口配置 + 当前选中
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireAuth(req);
+  if (!auth.ok) return auth.response;
   const config = await readMultiConfig();
   if (!config) {
     return NextResponse.json({ configured: false, activeId: null, profiles: [] });
@@ -126,6 +129,9 @@ export async function GET() {
 // action=switch: 切换 activeId
 // action=delete: 删除某个接口
 export async function POST(req: NextRequest) {
+  const auth = requireAuth(req);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await req.json();
     const action = String(body?.action || 'save').trim();

@@ -24,6 +24,11 @@ import { registerItem, registerMany, registerThread } from '@/lib/xianxia/conten
 import type { AttributeChange, CombatLootAIOutcome } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
+// P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
+// ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
+
+import { getCurrentUser } from '@/lib/auth-helpers';
+
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
@@ -84,11 +89,22 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     const characterId: string | undefined = body?.characterId;
+    // P1-9: 前端可附带 aiLoot（来自战内 AI 校准），优先于服务端再算一次（避免重复）
+    const clientAiLoot: CombatLootAIOutcome | null = body?.aiLoot ?? null;
     if (!characterId) {
       return NextResponse.json({ success: false, error: '缺少 characterId' }, { status: 400 });
     }
 
-    const char = await db.character.findUnique({ where: { id: characterId } });
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
+    const char = await db.character.findUnique({ where: { id: characterId, userId: user?.id } });
     await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: '角色不存在' }, { status: 404 });
 
@@ -113,8 +129,8 @@ export async function POST(req: NextRequest) {
     const contentRegistryWarnings: string[] = [];
     const appliedChanges: AttributeChange[] = [];
 
-    let aiLoot: CombatLootAIOutcome | null = null;
-    if (endStatus === 'victory') {
+    let aiLoot: CombatLootAIOutcome | null = clientAiLoot;
+    if (endStatus === 'victory' && !aiLoot) {
       try {
         const recentDb = await db.eventLog.findMany({ where: { characterId }, orderBy: { age: 'desc' }, take: 3 });
         const recent = recentDb.reverse().map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType }));
@@ -124,7 +140,26 @@ export async function POST(req: NextRequest) {
 
     const endResult = endCombat(state, true, aiLoot);
     state = endResult.state;
-    const appliedDrops = endResult.drops || [];
+    let appliedDrops = endResult.drops || [];
+    // P1-9: engine 出的 drops 走 ContentRegistry 校验（防 AI/引擎产物绕开注册器）
+    // existingIds 排除 drops 自己（endCombat 已 addItems），避免 trace 假冲突
+    if (appliedDrops.length) {
+      const dropsIdSet = new Set(appliedDrops.map(d => d.id));
+      const registered = registerMany(appliedDrops, registerItem, {
+        source: 'combat-end-spoils',
+        age: state.age,
+        existingIds: [...state.inventory, ...(state.equipped || [])].map(item => item.id).filter(id => !dropsIdSet.has(id)),
+      });
+      contentRegistryTrace.push(...registered.trace);
+      contentRegistryWarnings.push(...registered.warnings);
+      // 若 registerMany 拒掉部分，用 accepted 替换 appliedDrops（同步 state.inventory）
+      if (registered.accepted.length !== appliedDrops.length) {
+        const acceptedIds = new Set(registered.accepted.map(d => d.id));
+        appliedDrops = registered.accepted;
+        // 从 inventory 中移走被拒的 drops（按 id）
+        state = { ...state, inventory: (state.inventory || []).filter(it => !dropsIdSet.has(it.id) || acceptedIds.has(it.id)) };
+      }
+    }
     const lootedSpiritStones = Math.max(0, Number(endResult.spiritStones || 0));
     if (lootedSpiritStones > 0) {
       appliedChanges.push({ attribute: 'spiritStones', delta: lootedSpiritStones, reason: '战斗缴获灵石' });
@@ -233,7 +268,7 @@ export async function POST(req: NextRequest) {
     });
 
     await db.character.update({
-      where: { id: characterId },
+      where: { id: characterId, userId: user?.id },
       data: persistableCombatEndStateData(state),
     });
 

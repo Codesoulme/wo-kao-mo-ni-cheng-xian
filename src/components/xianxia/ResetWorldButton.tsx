@@ -20,6 +20,17 @@ import { useGameStore } from '@/lib/xianxia/store';
 
 const CONFIRM_WORD = '重置';
 
+// 生产模式鉴权：服务端 requireAuth 需要 x-admin-token header。
+// dev 模式下 NEXT_PUBLIC_ADMIN_TOKEN 为空 → 不带 header → 后端走 dev 默认放行。
+function buildAuthHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...(extra || {}) };
+  const token = process.env.NEXT_PUBLIC_ADMIN_TOKEN;
+  if (token && token.length > 0) {
+    headers['x-admin-token'] = token;
+  }
+  return headers;
+}
+
 export function ResetWorldButton() {
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -36,7 +47,10 @@ export function ResetWorldButton() {
     }
     setBusy(true);
     try {
-      const res = await fetch('/api/game/reset-world', { method: 'POST' });
+      const res = await fetch('/api/game/reset-world', {
+        method: 'POST',
+        headers: buildAuthHeaders({ 'x-confirm': 'DELETE_ALL' }),
+      });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '重置世界失败');
 
@@ -58,7 +72,10 @@ export function ResetWorldButton() {
     if (cleanBusy) return;
     setCleanBusy(true);
     try {
-      const res = await fetch('/api/game/clean-test-artifacts', { method: 'POST' });
+      const res = await fetch('/api/game/clean-test-artifacts', {
+        method: 'POST',
+        headers: buildAuthHeaders(),
+      });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '清理失败');
       toast.success('测试残留已清理', { description: `已清空 ${data.cleared?.events || 0} 条事件 / ${data.cleared?.preload || 0} 条预读 / ${data.cleared?.interferences || 0} 条干扰。` });

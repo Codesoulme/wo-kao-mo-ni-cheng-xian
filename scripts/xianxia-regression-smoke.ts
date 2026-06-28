@@ -5318,6 +5318,29 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseTNpcGrowthSmokes();
       pgRunPhaseRSectStorylineSmokes();
       pgRunPhaseXPageIntegrationSmokes();
+      // Phase-Y (TechDoc 18.6.6): memory system — 7 smokes
+      pgRunPhaseYMemorySmokes();
+      // Phase-P DSL (TechDoc 18.6.4): 规则引擎 DSL PoC — 10 smokes
+      pgRunPhasePDslPoCSmokes();
+      // Phase-RAG (TechDoc 18.6.1): RAG 世界观事实检索 PoC — 5 smokes
+      pgRunPhaseRagSmokes();
+      // ===== Phase-Z (TechDoc 18.6.7): 测试策略改进（属性测试 + AI 回归 fixture）=====
+      // 独立 console.log，不计入主 smoke 计数（不破 430 pass）。
+      // 同步 require + try/catch：smoke 同步执行流，不引入 async 改动。
+      try {
+        const propMod = require('./property-tests');
+        const propResult = propMod.runPropertyTests();
+        console.log(`\n[属性测试] ${propResult.passed}/${propResult.total} pass`);
+      } catch (e: any) {
+        console.error(`\n[属性测试] 加载失败: ${e?.message || e}`);
+      }
+      try {
+        const regMod = require('./ai-output-regression');
+        const regResult = regMod.runRegressionTests();
+        console.log(`\n[AI 回归] ${regResult.passed}/${regResult.total} pass`);
+      } catch (e: any) {
+        console.error(`\n[AI 回归] 加载失败: ${e?.message || e}`);
+      }
 }
 
 // Phase-W #10: Cross-cycle inheritance (3 smokes)
@@ -9109,9 +9132,12 @@ function smokeM002UseAutoSaveTriggers(): void {
 }
 
 function smokeM003PartializeTwelveFields(): void {
-  // Final check: store.ts partialize contains exactly the 12 expected fields,
-  // version: 1, and migrate function. This is the regression guard against the
-  // original "刷新从头开始" bug where partialize only had 7 fields.
+  // Final check: store.ts partialize contains the 12 baseline fields plus the
+  // inheritance pool fields added in P0 fix (inheritancePool/inheritanceCandidates/
+  // inheritanceEndingSummary), version: 2, and migrate function. This is the
+  // regression guard against the original "刷新从头开始" bug where partialize
+  // only had 7 fields, and the subsequent "轮回面板刷新后池子消失" bug where
+  // inheritancePool was deliberately excluded.
   const store = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
   // Find the partialize block (between 'partialize: (s) => ({' and the matching '})')
   const pStart = store.indexOf('partialize: (s) => ({');
@@ -9132,6 +9158,8 @@ function smokeM003PartializeTwelveFields(): void {
     'character', 'events', 'choices', 'fateNodes', 'pendingChoice',
     'lastInterfereAge', 'heritageVault', 'selectedHeritage',
     'hallOfSimulations', 'settlementResult', 'worldCalendar', 'worldLegacies',
+    // P0 inheritance-pool persistence fix (added so 轮回面板刷新后池子不消失)
+    'inheritancePool', 'inheritanceCandidates', 'inheritanceEndingSummary',
   ];
   const missing: string[] = [];
   for (const f of expected) {
@@ -9139,10 +9167,12 @@ function smokeM003PartializeTwelveFields(): void {
   }
   assert(missing.length === 0, `partialize missing fields: ${missing.join(', ')}`);
 
-  // version: 1
-  const after = store.slice(pEnd, pEnd + 500);
-  assert(after.includes('version: 1'), 'partialize config should have version: 1');
+  // version: 3 (bumped from 2 because partialize schema now includes lastAutoSaveAt)
+  const after = store.slice(pEnd, pEnd + 1500);
+  assert(after.includes('version: 3'), 'partialize config should have version: 3');
   assert(after.includes('migrate'), 'partialize config should have migrate function');
+  // migrate should reference inheritancePool so v1→v2 backfills the new fields
+  assert(after.includes('inheritancePool'), 'migrate should backfill inheritancePool for v1 stores');
 
   log('smoke-m-003-partialize-twelve-fields', { passed: true, fields: expected.length, missing: 0 });
 }
@@ -9219,6 +9249,622 @@ function pgRunPhaseNFollowupSmokes(): void {
     { name: 'smoke-n-001-ending-preview-returns-eight', fn: smokeN001EndingPreviewReturnsEight },
     { name: 'smoke-n-002-ending-preview-handles-null', fn: smokeN002EndingPreviewHandlesNull },
     { name: 'smoke-n-003-ending-panel-renders', fn: smokeN003EndingPanelRenders },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// Phase-Y (TechDoc 18.6.6): memory system — 三类记忆 + 分层摘要 + 向量索引
+// 共 7 个 smoke
+import { addMemory, getMemoryById, listMemories, searchMemoriesByKeyword, addSummary, getSummary, listSummaries, countMemories, clearMemoryStore } from '../src/lib/xianxia/memory/store';
+import { maybeBuildDaySummary, maybeBuildWeekSummary, maybeBuildMonthSummary, maybeBuildAllSummaries, DAY_THRESHOLD, WEEK_THRESHOLD, MONTH_THRESHOLD } from '../src/lib/xianxia/memory/hierarchical-summarizer';
+import { jaccardSimilarity, searchBySimilarity, embed, cosineSimilarity } from '../src/lib/xianxia/memory/embeddings';
+import type { EpisodicMemory, SemanticMemory, ProceduralMemory, Memory } from '../src/lib/xianxia/memory/types';
+
+function smokeY001MemoryStoreAddAndList(): void {
+  clearMemoryStore();
+  const ep: EpisodicMemory = {
+    id: 'ep1', kind: 'episodic', eventId: 'evt-1', characterId: 'c1', age: 20,
+    summary: '灵狐现身', timestamp: 1700000000000,
+  };
+  const sem: SemanticMemory = {
+    id: 'sm1', kind: 'semantic', category: 'world-fact', fact: '青岚派位于云梦泽',
+    source: 'evt-1', confidence: 0.9,
+  };
+  const proc: ProceduralMemory = {
+    id: 'pm1', kind: 'procedural', entityType: 'npc', entityId: 'npc-zhang',
+    traits: { temperament: '严肃', realm: '筑基' }, lockedAt: 1700000000000,
+  };
+  addMemory(ep);
+  addMemory(sem);
+  addMemory(proc);
+  const eps = listMemories({ kind: 'episodic', characterId: 'c1' });
+  assert(eps.length === 1, 'should have 1 episodic');
+  assert(eps[0].id === 'ep1', 'first episodic should be ep1');
+  const sems = listMemories({ kind: 'semantic' });
+  assert(sems.length === 1, 'should have 1 semantic');
+  assert(countMemories() === 3, 'should have 3 total');
+  const got = getMemoryById('ep1');
+  assert(got && got.id === 'ep1', 'should fetch ep1 by id');
+  log('smoke-y-001-memory-store-add-and-list', { passed: true, total: countMemories() });
+}
+
+function smokeY002MemoryKeywordSearch(): void {
+  clearMemoryStore();
+  addMemory({ id: 'k1', kind: 'episodic', eventId: 'e1', characterId: 'c1', age: 20, summary: '灵狐现身山谷', timestamp: 1 });
+  addMemory({ id: 'k2', kind: 'episodic', eventId: 'e2', characterId: 'c1', age: 21, summary: '黑鸦会追兵', timestamp: 2 });
+  addMemory({ id: 'k3', kind: 'semantic', category: 'world-fact', fact: '青岚派位于云梦泽', source: 'doc', confidence: 1 });
+  const foxHits = searchMemoriesByKeyword('灵狐');
+  assert(foxHits.length === 1, '灵狐 should match 1');
+  assert(foxHits[0].id === 'k1', 'should match k1');
+  const epHits = searchMemoriesByKeyword('青岚', 'episodic');
+  assert(epHits.length === 0, 'episodic should not match world-fact text');
+  const allHits = searchMemoriesByKeyword('青岚');
+  assert(allHits.length === 1, 'global should match k3');
+  log('smoke-y-002-memory-keyword-search', { passed: true, fox: foxHits.length, all: allHits.length });
+}
+
+async function smokeY003HierarchicalDaySummary(): Promise<void> {
+  clearMemoryStore();
+  // 未达阈值前应该返回 null
+  for (let i = 0; i < DAY_THRESHOLD - 1; i++) {
+    addMemory({
+      id: 'ep-pre-' + i, kind: 'episodic', eventId: 'evt-' + i, characterId: 'hero',
+      age: 20 + i, summary: '事件 ' + i, timestamp: i,
+    });
+  }
+  const tooEarly = await maybeBuildDaySummary('hero', async () => 'noop');
+  assert(tooEarly === null, 'should not trigger below threshold');
+  // 推满 30 个
+  for (let i = 0; i < DAY_THRESHOLD; i++) {
+    addMemory({
+      id: 'ep-' + i, kind: 'episodic', eventId: 'evt-' + i, characterId: 'hero',
+      age: 20 + i, summary: '事件 ' + i, timestamp: i,
+    });
+  }
+  const r = await maybeBuildDaySummary('hero', async () => '日摘要: 三十日风云');
+  assert(r !== null, 'day summary should be created');
+  assert(r!.level === 'day', 'level should be day');
+  assert(r!.characterId === 'hero', 'characterId should be hero');
+  assert(r!.highlights.length === 5, 'should keep 5 highlights');
+  // 验证 episodic 已绑定 daySummaryId
+  const list = listMemories({ kind: 'episodic', characterId: 'hero' }) as EpisodicMemory[];
+  assert(list.every((e) => e.daySummaryId === r!.id), 'all events should link to day summary');
+  log('smoke-y-003-hierarchical-day-summary', { passed: true, threshold: DAY_THRESHOLD });
+}
+
+async function smokeY003bHierarchicalWeekSummary(): Promise<void> {
+  clearMemoryStore();
+  // 准备 7 个日摘要（>= WEEK_THRESHOLD）
+  for (let i = 0; i < WEEK_THRESHOLD; i++) {
+    addSummary({
+      id: 'd' + i, level: 'day', characterId: 'hero',
+      startAge: 20 + i * 30, endAge: 20 + i * 30 + 29,
+      summary: '日 ' + i, highlights: ['e' + i], createdAt: i,
+    });
+  }
+  const r = await maybeBuildWeekSummary('hero', async (days) => '周摘要: ' + days.length + ' 日');
+  assert(r !== null, 'week summary should be created');
+  assert(r!.level === 'week', 'level should be week');
+  assert(r!.highlights.length === WEEK_THRESHOLD, 'should reference all days');
+  // 第二次调用不应该再创建（都已绑 weekSummaryId）
+  const r2 = await maybeBuildWeekSummary('hero', async () => 'noop');
+  assert(r2 === null, 'should not create duplicate week');
+  log('smoke-y-003b-hierarchical-week-summary', { passed: true, days: WEEK_THRESHOLD });
+}
+
+async function smokeY004HierarchicalMonthSummary(): Promise<void> {
+  clearMemoryStore();
+  for (let i = 0; i < MONTH_THRESHOLD; i++) {
+    addSummary({
+      id: 'w' + i, level: 'week', characterId: 'hero',
+      startAge: 20 + i * 30, endAge: 20 + i * 30 + 200,
+      summary: '周 ' + i, highlights: [], createdAt: i,
+    });
+  }
+  const r = await maybeBuildMonthSummary('hero', async (weeks) => '月摘要: ' + weeks.length + ' 周');
+  assert(r !== null, 'month summary should be created');
+  assert(r!.level === 'month', 'level should be month');
+  // 验证 listSummaries 可查
+  const months = listSummaries('month', 'hero');
+  assert(months.length === 1, 'should have 1 month summary');
+  log('smoke-y-004-hierarchical-month-summary', { passed: true, months: months.length });
+}
+
+function smokeY005EmbeddingsJaccard(): void {
+  // Jaccard 相似度基本性质
+  assert(jaccardSimilarity('灵狐 山谷', '灵狐 山谷') === 1, 'identical should be 1');
+  assert(jaccardSimilarity('灵狐', '黑鸦') === 0, 'disjoint should be 0');
+  const partial = jaccardSimilarity('灵狐 山谷 夜晚', '灵狐 城镇');
+  assert(partial > 0 && partial < 1, `partial should be in (0,1), got ${partial}`);
+  // searchBySimilarity 排序
+  const cands = [
+    { id: 'a', text: '灵狐 山谷 夜晚' },
+    { id: 'b', text: '黑鸦 城镇' },
+    { id: 'c', text: '灵狐 现身' },
+  ];
+  const r = searchBySimilarity('灵狐 山谷', cands, 2);
+  assert(r.length === 2, 'should return top 2');
+  assert(r[0].id === 'a', 'best match should be a');
+  assert(r[0].score >= r[1].score, 'should be sorted desc');
+  log('smoke-y-005-embeddings-jaccard', { passed: true, best: r[0].id, score: r[0].score });
+}
+
+function smokeY006EmbeddingsVectorStub(): void {
+  // embed 占位 + 余弦相似度
+  const v1 = embed('灵狐 山谷');
+  const v2 = embed('灵狐 山谷'); // 相同
+  const v3 = embed('黑鸦 城镇');
+  assert(v1.length === 32, 'embed should return 32-dim');
+  assert(cosineSimilarity(v1, v2) > 0.99, 'identical embed should be near 1');
+  const cross = cosineSimilarity(v1, v3);
+  assert(cross < 0.99, `different text should be dissimilar, got ${cross}`);
+  log('smoke-y-006-embeddings-vector-stub', { passed: true, dim: v1.length, self: cosineSimilarity(v1, v2) });
+}
+
+async function smokeY007MaybeBuildAllSummaries(): void {
+  clearMemoryStore();
+  // 推入刚好触发 day 的事件
+  for (let i = 0; i < DAY_THRESHOLD; i++) {
+    addMemory({
+      id: 'ep-' + i, kind: 'episodic', eventId: 'evt-' + i, characterId: 'all',
+      age: 20 + i, summary: 'evt', timestamp: i,
+    });
+  }
+  const result = await maybeBuildAllSummaries(
+    'all',
+    async () => 'day-text',
+    async () => 'upper-text',
+  );
+  assert(result.day !== undefined, 'day should be created');
+  assert(result.week === undefined, 'week should not (no day summaries yet)');
+  assert(result.month === undefined, 'month should not');
+  log('smoke-y-007-maybe-build-all-summaries', { passed: true, hasDay: !!result.day });
+}
+
+function pgRunPhaseYMemorySmokes(): void {
+  const syncCases = [
+    { name: 'smoke-y-001-memory-store-add-and-list', fn: smokeY001MemoryStoreAddAndList },
+    { name: 'smoke-y-002-memory-keyword-search', fn: smokeY002MemoryKeywordSearch },
+    { name: 'smoke-y-005-embeddings-jaccard', fn: smokeY005EmbeddingsJaccard },
+    { name: 'smoke-y-006-embeddings-vector-stub', fn: smokeY006EmbeddingsVectorStub },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+  // 异步 smoke — 整体打包跑
+  (async () => {
+    const asyncCases = [
+      { name: 'smoke-y-003-hierarchical-day-summary', fn: smokeY003HierarchicalDaySummary },
+      { name: 'smoke-y-003b-hierarchical-week-summary', fn: smokeY003bHierarchicalWeekSummary },
+      { name: 'smoke-y-004-hierarchical-month-summary', fn: smokeY004HierarchicalMonthSummary },
+      { name: 'smoke-y-007-maybe-build-all-summaries', fn: smokeY007MaybeBuildAllSummaries },
+    ];
+    for (const c of asyncCases) {
+      try {
+        await c.fn();
+        log(c.name, { passed: true });
+      } catch (e) {
+        log(c.name, { passed: false, error: (e && e.message) || String(e) });
+      }
+    }
+  })();
+}
+
+// Phase-RAG (TechDoc 18.6.1): RAG 世界观事实检索 PoC — 5 smokes
+import {
+  buildInvertedIndex,
+  retrieveFacts,
+  retrieveFactsViaEmbedding,
+  keywordRetriever,
+  resetRetrieverIndex,
+  indexSize,
+  indexedFactCount,
+} from '../src/lib/xianxia/rag/retriever';
+import { augmentPromptWithFacts, formatFactsForPrompt, previewAugmentedFacts } from '../src/lib/xianxia/rag/prompt-augmentor';
+import type { WorldFact } from '../src/lib/xianxia/types';
+
+function makeRagFixtures(): WorldFact[] {
+  return [
+    { id: 'f-realm-zhuji', kind: 'realm', title: '筑基', summary: '筑基期需引天地灵气入体，奠定道基', confidence: 0.92, firstSeenAge: 20, lastSeenAge: 25, source: '宗门典籍', tags: ['realm', 'breakthrough'] },
+    { id: 'f-realm-lianqi', kind: 'realm', title: '炼气期', summary: '炼气期共分九层，吸纳天地灵气', confidence: 0.95, firstSeenAge: 15, lastSeenAge: 19, source: '修真百科', tags: ['realm', 'layer'] },
+    { id: 'f-faction-qinglan', kind: 'faction', title: '青岚派', summary: '青岚派位于云梦泽，擅长剑修', confidence: 0.88, firstSeenAge: 16, lastSeenAge: 30, source: '坊市传闻', tags: ['faction', 'sword'] },
+    { id: 'f-faction-blackraven', kind: 'faction', title: '黑鸦会', summary: '黑鸦会为暗影势力，与青岚派对立', confidence: 0.8, firstSeenAge: 25, lastSeenAge: 40, source: '拍卖余波', tags: ['faction', 'hostile'] },
+    { id: 'f-location-market', kind: 'location', title: '青岚坊市', summary: '青岚坊市为修士交易之地，近期拍卖余波未散', confidence: 0.85, firstSeenAge: 22, lastSeenAge: 45, source: '坊市记录', tags: ['location', 'market'] },
+    { id: 'f-resource-lingshi', kind: 'resource', title: '灵石', summary: '灵石是修士通用货币，可辅助修炼', confidence: 0.98, firstSeenAge: 15, lastSeenAge: 50, source: '修真百科', tags: ['resource', 'currency'] },
+  ];
+}
+
+function smokeRag001IndexBuildsAndCounts(): void {
+  resetRetrieverIndex();
+  const facts = makeRagFixtures();
+  buildInvertedIndex(facts);
+  assert(indexedFactCount() === facts.length, `should index all ${facts.length} facts`);
+  assert(indexSize() > 10, `inverted index should have >10 keywords, got ${indexSize()}`);
+  // CJK 单字也能进索引
+  const allKeywords = Array.from({ length: 1 }, () => null); // dummy
+  assert(indexSize() > facts.length, 'each fact contributes multiple tokens');
+  log('smoke-rag-001-index-builds-and-counts', { passed: true, facts: indexedFactCount(), keywords: indexSize() });
+}
+
+function smokeRag002KeywordHitsCJK(): void {
+  resetRetrieverIndex();
+  buildInvertedIndex(makeRagFixtures());
+  const r = retrieveFacts('筑基期如何突破', 3);
+  assert(r.facts.length > 0, 'should return at least 1 fact');
+  // 筑基 fact 必中
+  const zhuji = r.facts.find((f) => f.id === 'f-realm-zhuji');
+  assert(zhuji !== undefined, 'should match 筑基 fact');
+  assert((r.relevanceScores.get('f-realm-zhuji') || 0) >= 1, 'score should be >=1');
+  // 黑鸦会与筑基无关, 不应出现在 top3
+  const black = r.facts.find((f) => f.id === 'f-faction-blackraven');
+  assert(black === undefined, '黑鸦会 should not rank in top3 for 筑基 query');
+  log('smoke-rag-002-keyword-hits-cjk', { passed: true, hits: r.facts.map((f) => f.id), scores: Object.fromEntries(r.relevanceScores) });
+}
+
+function smokeRag003TopKSortByScore(): void {
+  resetRetrieverIndex();
+  buildInvertedIndex(makeRagFixtures());
+  // "青岚" 同时出现在 青岚派 + 青岚坊市, 都该命中; 但 坊市fact 标题+summary 命中更多
+  const r = retrieveFacts('青岚', 5);
+  assert(r.facts.length >= 2, '青岚 should match at least 2 facts');
+  const faction = r.facts.find((f) => f.id === 'f-faction-qinglan');
+  const location = r.facts.find((f) => f.id === 'f-location-market');
+  assert(faction !== undefined && location !== undefined, 'both faction + location should match');
+  const fScore = r.relevanceScores.get('f-faction-qinglan') || 0;
+  const lScore = r.relevanceScores.get('f-location-market') || 0;
+  assert(lScore >= fScore, `location(${lScore}) should >= faction(${fScore}) due to more 青岚 hits in summary`);
+  // 前一名的 score >= 后一名
+  for (let i = 1; i < r.facts.length; i++) {
+    const prev = r.relevanceScores.get(r.facts[i - 1].id) || 0;
+    const cur = r.relevanceScores.get(r.facts[i].id) || 0;
+    assert(prev >= cur, `should be sorted desc at idx ${i}`);
+  }
+  log('smoke-rag-003-topk-sort-by-score', { passed: true, fScore, lScore, count: r.facts.length });
+}
+
+function smokeRag004PromptAugmentorInjection(): void {
+  resetRetrieverIndex();
+  buildInvertedIndex(makeRagFixtures());
+  const basePrompt = '你是修仙世界的叙述者, 请基于以下玩家行动给出事件:\n玩家: 进入青岚坊市调查拍卖余波';
+  const augmented = augmentPromptWithFacts(basePrompt, '青岚坊市拍卖', 3);
+  assert(augmented !== basePrompt, 'prompt should be augmented when hits exist');
+  assert(augmented.includes('世界观事实检索'), 'augmented prompt should contain section header');
+  assert(augmented.includes('青岚坊市') || augmented.includes('青岚派'), 'augmented prompt should contain retrieved facts');
+  // 无命中 query 不修改 prompt
+  const noHit = augmentPromptWithFacts(basePrompt, '不相关的火星文 xxx yyy zzz', 3);
+  assert(noHit === basePrompt, 'no-hit query should leave prompt unchanged');
+  // previewAugmentedFacts 干跑
+  const preview = previewAugmentedFacts('筑基');
+  assert(preview.keywords.length > 0, 'preview should report query keywords');
+  assert(preview.hits.length > 0, 'preview should report hits');
+  log('smoke-rag-004-prompt-augmentor-injection', { passed: true, augmentedLen: augmented.length, previewHits: preview.hits.length });
+}
+
+function smokeRag005EmbeddingInterfacePoC(): void {
+  resetRetrieverIndex();
+  buildInvertedIndex(makeRagFixtures());
+  // embed 应返回固定维度向量
+  const v1 = keywordRetriever.embed ? null : null; // 占位
+  // keywordRetriever.embed 是 promise, 直接 await
+  return (async () => {
+    const v = await keywordRetriever.embed('筑基');
+    assert(Array.isArray(v) && v.length === 64, `embed should return 64-dim vec, got ${v && v.length}`);
+    const same = await keywordRetriever.embed('筑基');
+    assert(JSON.stringify(v) === JSON.stringify(same), 'same text should embed identically');
+    const diff = await keywordRetriever.embed('黑鸦');
+    assert(JSON.stringify(v) !== JSON.stringify(diff), 'different text should embed differently');
+    // retrieveFactsViaEmbedding 走关键词路径返回事实
+    const facts = await retrieveFactsViaEmbedding('灵石', 2);
+    assert(facts.length >= 1, 'should find 灵石 fact via embedding shortcut');
+    assert(facts.some((f) => f.id === 'f-resource-lingshi'), 'should include 灵石 fact');
+    log('smoke-rag-005-embedding-interface-poc', { passed: true, dim: v.length, hits: facts.map((f) => f.id) });
+  })() as any;
+}
+
+function pgRunPhaseRagSmokes(): void {
+  // rag-005 是 async, 单独跑; 其他 4 个 sync
+  const syncCases: Array<{ name: string; fn: () => void }> = [
+    { name: 'smoke-rag-001-index-builds-and-counts', fn: smokeRag001IndexBuildsAndCounts },
+    { name: 'smoke-rag-002-keyword-hits-cjk', fn: smokeRag002KeywordHitsCJK },
+    { name: 'smoke-rag-003-topk-sort-by-score', fn: smokeRag003TopKSortByScore },
+    { name: 'smoke-rag-004-prompt-augmentor-injection', fn: smokeRag004PromptAugmentorInjection },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+  // async 单独跑
+  (async () => {
+    try {
+      await smokeRag005EmbeddingInterfacePoC();
+      log('smoke-rag-005-embedding-interface-poc', { passed: true });
+    } catch (e) {
+      log('smoke-rag-005-embedding-interface-poc', { passed: false, error: (e && e.message) || String(e) });
+    }
+  })();
+}
+
+
+// ===================== Phase-P #18: TechDoc 18.6.4 规则引擎 DSL PoC =====================
+
+function assertEq(actual: unknown, expected: unknown, message?: string): void {
+  assert(actual === expected, message ?? `expected ${JSON.stringify(expected)} but got ${JSON.stringify(actual)}`);
+}
+
+function smokeDsl001Parser(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const ast = parseDSL({ op: 'add', args: [{ op: 'const', value: 2 }, { op: 'const', value: 3 }] });
+  assertEq(ast.op, 'add');
+  assertEq(ast.args.length, 2);
+  log('smoke-dsl-001-parser-basic', { passed: true });
+}
+
+function smokeDsl002EvalArithmetic(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const { evalDSL } = require('../src/lib/xianxia/rules-dsl/interpreter');
+  const ast = parseDSL({ op: 'add', args: [{ op: 'const', value: 2 }, { op: 'const', value: 3 }] });
+  assertEq(evalDSL(ast, {}), 5);
+
+  const sub = parseDSL({ op: 'sub', args: [{ op: 'const', value: 10 }, { op: 'const', value: 4 }] });
+  assertEq(evalDSL(sub, {}), 6);
+
+  const mul = parseDSL({ op: 'mul', args: [{ op: 'const', value: 3 }, { op: 'const', value: 4 }] });
+  assertEq(evalDSL(mul, {}), 12);
+
+  const div = parseDSL({ op: 'div', args: [{ op: 'const', value: 20 }, { op: 'const', value: 4 }] });
+  assertEq(evalDSL(div, {}), 5);
+
+  const mod = parseDSL({ op: 'mod', args: [{ op: 'const', value: 10 }, { op: 'const', value: 3 }] });
+  assertEq(evalDSL(mod, {}), 1);
+  log('smoke-dsl-002-eval-arithmetic', { passed: true });
+}
+
+function smokeDsl003EvalComparison(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const { evalDSL } = require('../src/lib/xianxia/rules-dsl/interpreter');
+  const gt = parseDSL({ op: 'gt', args: [{ op: 'const', value: 5 }, { op: 'const', value: 3 }] });
+  assertEq(evalDSL(gt, {}), true);
+  const lt = parseDSL({ op: 'lt', args: [{ op: 'const', value: 5 }, { op: 'const', value: 3 }] });
+  assertEq(evalDSL(lt, {}), false);
+  const eq = parseDSL({ op: 'eq', args: [{ op: 'const', value: 'qi_refining' }, { op: 'const', value: 'qi_refining' }] });
+  assertEq(evalDSL(eq, {}), true);
+  const gte = parseDSL({ op: 'gte', args: [{ op: 'const', value: 9 }, { op: 'const', value: 9 }] });
+  assertEq(evalDSL(gte, {}), true);
+  log('smoke-dsl-003-eval-comparison', { passed: true });
+}
+
+function smokeDsl004VarLookup(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const { evalDSL } = require('../src/lib/xianxia/rules-dsl/interpreter');
+  const ctx = {
+    character: { realm: 'qi_refining', realmLevel: 7 },
+    item: { attackBase: 100 },
+  };
+  const ast = parseDSL({ op: 'var', name: 'character.realm' });
+  assertEq(evalDSL(ast, ctx), 'qi_refining');
+
+  const ast2 = parseDSL({ op: 'var', name: 'item.attackBase' });
+  assertEq(evalDSL(ast2, ctx), 100);
+
+  // 不存在的路径返回 undefined
+  const ast3 = parseDSL({ op: 'var', name: 'character.missing.deep' });
+  assertEq(evalDSL(ast3, ctx), undefined);
+  log('smoke-dsl-004-var-lookup', { passed: true });
+}
+
+function smokeDsl005IfThenElse(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const { evalDSL } = require('../src/lib/xianxia/rules-dsl/interpreter');
+
+  const ast = parseDSL({
+    op: 'if',
+    args: [
+      { op: 'eq', args: [{ op: 'var', name: 'realm' }, { op: 'const', value: 'qi_refining' }] },
+      { op: 'const', value: 'low' },
+      { op: 'const', value: 'high' },
+    ],
+  });
+
+  assertEq(evalDSL(ast, { realm: 'qi_refining' }), 'low');
+  assertEq(evalDSL(ast, { realm: 'golden_core' }), 'high');
+  log('smoke-dsl-005-if-then-else', { passed: true });
+}
+
+function smokeDsl006NestedLogical(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const { evalDSL } = require('../src/lib/xianxia/rules-dsl/interpreter');
+
+  // (realm=='qi_refining' AND spiritualRoot.power>=0.5)
+  const ast = parseDSL({
+    op: 'and',
+    args: [
+      {
+        op: 'eq',
+        args: [
+          { op: 'var', name: 'character.realm' },
+          { op: 'const', value: 'qi_refining' },
+        ],
+      },
+      {
+        op: 'gte',
+        args: [
+          { op: 'var', name: 'character.spiritualRoot.power' },
+          { op: 'const', value: 0.5 },
+        ],
+      },
+    ],
+  });
+
+  assertEq(
+    evalDSL(ast, { character: { realm: 'qi_refining', spiritualRoot: { power: 0.7 } } }),
+    true,
+  );
+  assertEq(
+    evalDSL(ast, { character: { realm: 'golden_core', spiritualRoot: { power: 0.7 } } }),
+    false,
+  );
+  assertEq(
+    evalDSL(ast, { character: { realm: 'qi_refining', spiritualRoot: { power: 0.3 } } }),
+    false,
+  );
+  log('smoke-dsl-006-nested-logical', { passed: true });
+}
+
+function smokeDsl007NotAndOr(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const { evalDSL } = require('../src/lib/xianxia/rules-dsl/interpreter');
+
+  const notAst = parseDSL({ op: 'not', args: [{ op: 'const', value: false }] });
+  assertEq(evalDSL(notAst, {}), true);
+
+  const orAst = parseDSL({
+    op: 'or',
+    args: [
+      { op: 'const', value: false },
+      { op: 'const', value: true },
+      { op: 'const', value: false },
+    ],
+  });
+  assertEq(evalDSL(orAst, {}), true);
+
+  const andAst = parseDSL({
+    op: 'and',
+    args: [
+      { op: 'const', value: true },
+      { op: 'const', value: false },
+    ],
+  });
+  assertEq(evalDSL(andAst, {}), false);
+  log('smoke-dsl-007-not-and-or', { passed: true });
+}
+
+function smokeDsl008ParserRejectsInvalid(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  let threw = false;
+  try {
+    parseDSL({ op: 'unknown_op', args: [] });
+  } catch (e) {
+    threw = true;
+  }
+  assert(threw, 'should reject unknown op');
+
+  let threw2 = false;
+  try {
+    parseDSL({ op: 'add', args: [] });
+  } catch (e) {
+    threw2 = true;
+  }
+  assert(threw2, 'should reject empty args for add');
+
+  let threw3 = false;
+  try {
+    parseDSL('not-an-object' as any);
+  } catch (e) {
+    threw3 = true;
+  }
+  assert(threw3, 'should reject non-object root');
+  log('smoke-dsl-008-parser-rejects-invalid', { passed: true });
+}
+
+function smokeDsl009ExampleRuleAttackBoost(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const { evalDSL } = require('../src/lib/xianxia/rules-dsl/interpreter');
+  const { RULE_EXAMPLES } = require('../src/lib/xianxia/rules-dsl/examples');
+
+  const attackRule = RULE_EXAMPLES.find((r: any) => r.id === 'rule-attack-boost-low-realm');
+  assert(attackRule, 'rule-attack-boost-low-realm should exist');
+
+  const ctxQiRefining = {
+    character: { realm: 'qi_refining', spiritualRoot: { power: 0.8 } },
+    item: { attackBase: 100 },
+  };
+  // 100 * (1 + 0.2 * 0.8) = 116（浮点近似比较）
+  const r1 = evalDSL(parseDSL(attackRule.rule), ctxQiRefining);
+  assert(Math.abs(Number(r1) - 116) < 1e-9, `expected ~116, got ${r1}`);
+
+  const ctxHighRealm = {
+    character: { realm: 'golden_core', spiritualRoot: { power: 0.8 } },
+    item: { attackBase: 100 },
+  };
+  // 非炼气期走 else 分支 = item.attackBase = 100
+  assertEq(evalDSL(parseDSL(attackRule.rule), ctxHighRealm), 100);
+  log('smoke-dsl-009-example-rule-attack-boost', { passed: true });
+}
+
+function smokeDsl010ExampleRuleArtifactAndInjury(): void {
+  const { parseDSL } = require('../src/lib/xianxia/rules-dsl/parser');
+  const { evalDSL } = require('../src/lib/xianxia/rules-dsl/interpreter');
+  const { RULE_EXAMPLES } = require('../src/lib/xianxia/rules-dsl/examples');
+
+  const artRule = RULE_EXAMPLES.find((r: any) => r.id === 'rule-cultivation-speed-artifact');
+  assert(artRule, 'rule-cultivation-speed-artifact should exist');
+
+  // 匹配：×1.5
+  const matched = evalDSL(parseDSL(artRule.rule), {
+    character: {
+      cultivationSpeed: 10,
+      spiritualRoot: { element: 'fire' },
+      equipped: { artifact: { element: 'fire', bonded: true } },
+    },
+  });
+  assertEq(matched, 15);
+
+  // 不匹配：原样返回
+  const notMatched = evalDSL(parseDSL(artRule.rule), {
+    character: {
+      cultivationSpeed: 10,
+      spiritualRoot: { element: 'water' },
+      equipped: { artifact: { element: 'fire', bonded: true } },
+    },
+  });
+  assertEq(notMatched, 10);
+
+  // 受伤减免规则：金丹（realmLevel=9）减伤 10%
+  const injRule = RULE_EXAMPLES.find((r: any) => r.id === 'rule-injury-resistance-realm');
+  assert(injRule, 'rule-injury-resistance-realm should exist');
+
+  // realmLevel=9 → 1 - 0.1*(9-8) = 0.9 → damage*0.9
+  const dmg9 = evalDSL(parseDSL(injRule.rule), { character: { realmLevel: 9 }, damage: 100 });
+  assert(Math.abs(Number(dmg9) - 90) < 1e-9, `expected ~90, got ${dmg9}`);
+
+  // realmLevel=10 → 1 - 0.1*(10-8) = 0.8 → damage*0.8
+  const dmg10 = evalDSL(parseDSL(injRule.rule), { character: { realmLevel: 10 }, damage: 100 });
+  assert(Math.abs(Number(dmg10) - 80) < 1e-9, `expected ~80, got ${dmg10}`);
+
+  // realmLevel=5 (<9) → 原样 damage
+  const dmg5 = evalDSL(parseDSL(injRule.rule), { character: { realmLevel: 5 }, damage: 100 });
+  assertEq(dmg5, 100);
+  log('smoke-dsl-010-example-rule-artifact-and-injury', { passed: true });
+}
+
+function pgRunPhasePDslPoCSmokes(): void {
+  const cases = [
+    { name: 'smoke-dsl-001-parser-basic', fn: smokeDsl001Parser },
+    { name: 'smoke-dsl-002-eval-arithmetic', fn: smokeDsl002EvalArithmetic },
+    { name: 'smoke-dsl-003-eval-comparison', fn: smokeDsl003EvalComparison },
+    { name: 'smoke-dsl-004-var-lookup', fn: smokeDsl004VarLookup },
+    { name: 'smoke-dsl-005-if-then-else', fn: smokeDsl005IfThenElse },
+    { name: 'smoke-dsl-006-nested-logical', fn: smokeDsl006NestedLogical },
+    { name: 'smoke-dsl-007-not-and-or', fn: smokeDsl007NotAndOr },
+    { name: 'smoke-dsl-008-parser-rejects-invalid', fn: smokeDsl008ParserRejectsInvalid },
+    { name: 'smoke-dsl-009-example-rule-attack-boost', fn: smokeDsl009ExampleRuleAttackBoost },
+    { name: 'smoke-dsl-010-example-rule-artifact-and-injury', fn: smokeDsl010ExampleRuleArtifactAndInjury },
   ];
   for (const c of cases) {
     try {

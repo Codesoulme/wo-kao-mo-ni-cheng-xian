@@ -1,4 +1,6 @@
 ﻿// AI-68/AI-78: 飞升 UI;所有交互直接调用 useGameStore action
+// P1-2 修复：roll 改为后端确定性派生（POST /api/game/ascension/end 取 characterId 由服务端 hash 算），
+// 玩家无法通过 DevTools 重发请求直到 random >= 0.5 刷出好结果。
 'use client';
 import { useState } from 'react';
 import type { AscensionSession, WorldTier } from '@/lib/xianxia/types';
@@ -16,7 +18,8 @@ export function AscensionModal({
   onEnd,
 }: {
   session: AscensionSession;
-  onRoll?: (characterRoll: number) => Promise<void> | void;
+  // P1-2: onRoll 不再接 characterRoll——前端不传 roll；改为后端从 character 派生确定性值
+  onRoll?: () => Promise<void> | void;
   onEnd?: () => Promise<void> | void;
 }) {
   const [busy, setBusy] = useState(false);
@@ -27,19 +30,10 @@ export function AscensionModal({
   const handleRoll = async () => {
     setBusy(true);
     try {
-      const roll = Math.random();
-      resolveAscensionRoll(roll);
-      if (onRoll) await onRoll(roll);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleEnd = async () => {
-    setBusy(true);
-    try {
-      endAscension();
-      if (onEnd) await onEnd();
+      // P1-2: 不再在客户端用 Math.random()；store action 收到的是后端确定性 hash 结果。
+      // 这里传 0 仅作为占位——真正的 characterRoll 来自 /api/game/ascension/end 的服务端计算。
+      resolveAscensionRoll(0);
+      if (onRoll) await onRoll();
     } finally {
       setBusy(false);
     }

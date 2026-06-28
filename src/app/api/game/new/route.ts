@@ -1,6 +1,9 @@
 // POST /api/game/new
 // 创建新角色，AI 生成出生事件
+// P1 step2: 创建新 character 时设 userId = user?.id（dev 模式 null 不破）
+// ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
 
+import { getCurrentUser } from '@/lib/auth-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { generateBirthEvent } from '@/lib/xianxia/llm';
@@ -58,9 +61,19 @@ export async function POST(req: NextRequest) {
       skill: { name: '护主', description: '危急时护持主人', power: 1.1, cooldown: 3 },
     }));
 
-    // 创建角色
+    // P1 step2: 创建角色时绑定当前 user（dev 模式 user=null → userId 写入 null）
+    const isProdMode = !!process.env.ADMIN_TOKEN;
+    let user: { id: string } | null = null;
+    if (isProdMode) {
+      user = await getCurrentUser();
+      if (!user) {
+        return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+      }
+    }
+
     const character = await db.character.create({
       data: {
+        userId: user?.id ?? null,
         name: birth.name,
         gender: birth.gender,
         age: 0,

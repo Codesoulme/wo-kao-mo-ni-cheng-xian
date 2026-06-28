@@ -1,6 +1,9 @@
 // POST /api/game/tribulation/start
 // AI-67: 开劫入口——校验天劫触发条件，返回初始 TribulationSession
+// P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
+// ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
 
+import { getCurrentUser } from '@/lib/auth-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import {
@@ -26,7 +29,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: '参数错误' }, { status: 400 });
   }
   const { characterId, toRealm } = parsed.data;
-  const dbChar = await db.character.findUnique({ where: { id: characterId } });
+
+  const isProdMode = !!process.env.ADMIN_TOKEN;
+  let user: { id: string } | null = null;
+  if (isProdMode) {
+    user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    }
+  }
+
+  const dbChar = await db.character.findUnique({ where: { id: characterId, userId: user?.id } });
   if (!dbChar) return NextResponse.json({ ok: false, error: '角色不存在' }, { status: 404 });
 
   const state = dbToState(dbChar);

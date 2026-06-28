@@ -133,7 +133,7 @@ export function EndingPanel({ character, worldState, defaultCollapsed = true }: 
               </div>
 
               <div style={{ marginTop: '8px', fontSize: '10px', color: '#9a7a5a', fontStyle: 'italic' }}>
-                机运 — 引擎基于年岁/境界/死因/宗门权重推算；进境 — 当前角色满足此结局的进度。两者皆为命途一隅，仅供参考。
+                机运 — 命数依年岁/境界/死因/宗门权重推演；进境 — 此身与此结局的契合度。两者皆为命途一隅，仅供参考。
               </div>
             </>
           )}

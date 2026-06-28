@@ -1,0 +1,18 @@
+{
+  "id": "event-item-loot",
+  "prompt": "角色 golden_core, 战斗胜利后拾取物品",
+  "expectedSchema": {
+    "eventType": "string",
+    "narrative": "string",
+    "triggerCombat": "boolean",
+    "itemName": "string"
+  },
+  "expectedOutput": {
+    "eventType": "loot",
+    "narrative": "你在败敌遗骸旁发现一只古朴玉瓶,似非凡品。",
+    "triggerCombat": false,
+    "itemName": "玄玉瓶"
+  },
+  "tags": ["loot", "post-combat"],
+  "notes": "战利品叙事不应直接归属败敌名,避免过度归因"
+}

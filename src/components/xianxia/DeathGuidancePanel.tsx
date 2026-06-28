@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import type { CharacterState } from '@/lib/xianxia/store';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 interface DeathGuidancePanelProps {
   character: CharacterState;
@@ -33,6 +34,14 @@ export function DeathGuidancePanel({ character, defaultCollapsed = false }: Deat
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [busy, setBusy] = useState<null | '轮回重开' | '回归入凡'>(null);
   const [hint, setHint] = useState<string | null>(null);
+
+  // P1 修复: 死亡时最容易丢存档,在面板顶部也展示自动存档失败的红条
+  // 通过 store 直接读最新 snapshot(避免闭包陷阱: 玩家死亡瞬间字符对象可能被替换)
+  // P1 双写修复：不再调 useAutoSave，只从全局 store 读 lastAutoSaveError（避免 3 实例双写）
+  const autoSaveError = useGameStore((s) => s.lastAutoSaveError);
+  const clearAutoSaveError = useCallback(() => {
+    useGameStore.getState().setLastAutoSaveError(null);
+  }, []);
 
   if (!isDeadLike(character)) return null;
   if (deathGuidanceDismissed) return null;
@@ -109,6 +118,36 @@ export function DeathGuidancePanel({ character, defaultCollapsed = false }: Deat
           {eraLine}
         </span>
       </div>
+
+      {autoSaveError && (
+        <Alert
+          variant="destructive"
+          data-testid="death-guidance-autosave-error"
+          style={{ marginTop: '10px' }}
+        >
+          <AlertTitle>上次自动存档失败</AlertTitle>
+          <AlertDescription>
+            角色年龄 {autoSaveError.age} 岁时自动存档失败（{autoSaveError.reason}）：{autoSaveError.error}
+            <div style={{ marginTop: '6px' }}>
+              <button
+                type="button"
+                onClick={() => clearAutoSaveError()}
+                style={{
+                  fontSize: '11px',
+                  padding: '3px 10px',
+                  border: '1px solid currentColor',
+                  borderRadius: '4px',
+                  background: 'transparent',
+                  color: 'inherit',
+                  cursor: 'pointer',
+                }}
+              >
+                知道了
+              </button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {!collapsed && (
         <div style={{ marginTop: '10px' }}>

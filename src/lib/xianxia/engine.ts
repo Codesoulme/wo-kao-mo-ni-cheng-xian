@@ -150,7 +150,7 @@ import {
   SectTrajectory,
   SectInfluenceMap,
 } from './types';
-import { COMBAT_PROJECTION_LABELS, sanitizeLootName } from './display';
+import { COMBAT_PROJECTION_LABELS, sanitizeLootName, sanitizeNarrativeText } from './display';
 import { hasRealmEntryRequirement } from './secret-realm-utils';
 import { resolveAttributeChanges } from './effect-resolver';
 import { inferAttributeChangesFromNarrative } from './narrative-inference';
@@ -2859,9 +2859,20 @@ export function generateCharacterIntents(state: CharacterState, threads?: Pendin
 
 // ==================== CausalGraph Lite ====================
 
+/**
+ * \u7edf\u4e00\u7684\u5b9e\u4f53 ID \u751f\u6210 helper\uff1a\u540c\u6beb\u79d2\u5e76\u53d1\u4e0b\u4e0d\u4f1a\u51b2\u7a81\uff08\u7528 random \u540e\u7f00\u7834\u540c\u5206\uff09\u3002
+ * \u7528\u6cd5\uff1agenerateEntityId('formation', aiOutput.id) \u2014 \u6709 ai \u63d0\u4f9b\u7684 id \u5c31\u7528 ai \u7684\uff1b\u5426\u5219\u81ea\u52a8\u751f\u6210\u3002
+ */
+export function generateEntityId(prefix: string, safe?: string): string {
+  if (safe && typeof safe === 'string' && safe.length > 0) {
+    return prefix + '_' + safe;
+  }
+  return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
 export function causalId(prefix: string, seed: string): string {
   const safe = String(seed || '').replace(/[^a-zA-Z0-9_\u4e00-\u9fa5-]/g, '_').slice(0, 48);
-  return prefix + '_' + (safe || Date.now().toString(36));
+  return generateEntityId(prefix, safe);
 }
 
 export function normalizeCausalGraph(graph?: CausalGraph): CausalGraph {
@@ -3513,6 +3524,11 @@ function resolveConsumedCombatSceneThreads(state: CharacterState, trigger: NonNu
 
 // 启动战斗：从 AI 触发的 triggerCombat 创建 CombatSession
 export function startCombat(state: CharacterState, trigger: NonNullable<AIEventOutput['triggerCombat']>): CharacterState {
+  // P1-8 幼龄硬拦截：age<6 禁止战斗。return 原 state（不创建 CombatSession），
+  // 调用方（executeAIEvent / choose / interfere）会处理拒绝叙事。
+  if (state.age < 6) {
+    return state;
+  }
   if (hasSameAgeResolvedCombat(state, trigger)) {
     return resolveConsumedCombatSceneThreads(state, trigger, '同一场冲突已经了结，引擎拦截重复开战');
   }
@@ -3588,6 +3604,38 @@ export function startCombat(state: CharacterState, trigger: NonNullable<AIEventO
 
 function lowerText(...parts: (string | undefined | null)[]): string {
   return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+// P1-8 幼龄叙事重写：把 AI 误写的"独自/前往/追查/赶路/独行/寻访"等成人化动词
+// 改写为"被带去/看护下/懵懂盼头"等幼儿化口吻，保持叙事连续性又不会破坏沉浸。
+const INFANT_NARRATIVE_REWRITES: Array<{ pattern: RegExp; replacement: string }> = [
+  // "独自 + 动词" → "被带去 + 动词" 或 "懵懂地看着"
+  { pattern: /独自(?:前往|赶路|寻访|追踪|追查|探查|探访|赴约|出行|启程)/g, replacement: '懵懂地被抱在怀中、随长者前往' },
+  { pattern: /独自(?:追寻|寻找|寻找|追捕|行路|翻山)/g, replacement: '在长者怀中懵懂地望着' },
+  { pattern: /(?:他|她|你|角色)(?:独自|单独|一人)(?:前往|赶路|寻访|追踪|追查|探查|探访|赴约|出行|启程|上路)/g, replacement: '在长者看护下被抱去' },
+  { pattern: /(?:他|她|你|角色)(?:独自|单独|一人)(?:追寻|寻找|追捕|行路|翻山)/g, replacement: '在长者看护下懵懂张望' },
+  // 纯动词
+  { pattern: /(?:^|[，。；\s])(?:前往|赶路|追查|追踪|探查|探访|赴约|寻访|独行|赶赴|登程|启程|上路)/g, replacement: '$1在长者看护下被抱去' },
+];
+
+function rewriteInfantNarrative(text: string): string {
+  if (!text) return text;
+  let out = text;
+  for (const { pattern, replacement } of INFANT_NARRATIVE_REWRITES) {
+    pattern.lastIndex = 0;
+    out = out.replace(pattern, replacement);
+  }
+  // 句中独立"独自"也做柔和兜底
+  out = out.replace(/(?<![一-龥])(独自)(?![一-龥])/g, '在长者看护下');
+  return out;
+}
+
+// P1-10 cultivationInsight 清洗 wrapper：调用 sanitizeNarrativeText
+// 防止 AI 把"破境进度 +12""修为 +5"等内部机制词塞进修炼心得。
+export function applyCultivationInsight(state: CharacterState, rawInsight: string | undefined): CharacterState {
+  if (!rawInsight || !rawInsight.trim()) return state;
+  const cleaned = sanitizeNarrativeText(rawInsight.trim(), state.age);
+  return { ...state, cultivationInsight: cleaned };
 }
 
 function hasRestrainingStatus(state: CharacterState, session?: CombatSession): boolean {
@@ -4669,6 +4717,38 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   let next = { ...state };
   const rejected: AttributeChange[] = [];
   const contentRegistryTrace: ValidationTrace[] = [];
+  // P1-8 幼龄硬拦截：age<6 禁止 triggerCombat / 禁止独立赶路 / 禁止独立赴约
+  // prompt 已要求 AI 写幼龄口吻（见 llm.ts 572/990/1066），但 prompt 软约束可能被忽略；
+  // 引擎兜底：直接剥离 triggerCombat，并把 age<6 时的 hasChoice 改为 false。
+  if (next.age < 6) {
+    if (aiOutput.triggerCombat) {
+      contentRegistryTrace.push({
+        severity: 'warning',
+        code: 'infant_blocked_combat',
+        attribute: '*',
+        message: `age<6 (${next.age}) 幼龄引擎拦截 triggerCombat：幼龄不宜动武`,
+        source: aiOutput.title || 'executeAIEvent',
+      });
+      contentRegistryWarnings.push('幼龄角色不可触发战斗，已剥离 triggerCombat');
+      aiOutput.triggerCombat = undefined;
+    }
+    if (aiOutput.hasChoice) {
+      contentRegistryTrace.push({
+        severity: 'warning',
+        code: 'infant_blocked_choice',
+        attribute: '*',
+        message: `age<6 (${next.age}) 幼龄引擎拦截 hasChoice：幼龄不可独立抉择`,
+        source: aiOutput.title || 'executeAIEvent',
+      });
+      contentRegistryWarnings.push('幼龄角色不可独立抉择，已剥离 hasChoice/choice');
+      aiOutput.hasChoice = false;
+      aiOutput.choice = undefined;
+    }
+    // 幼龄叙事关键词重写：把"独自/前往/追查/赶路/独行/寻访"等成人化动词改写为看护下的口吻
+    if (typeof aiOutput.narrative === 'string' && aiOutput.narrative) {
+      aiOutput.narrative = rewriteInfantNarrative(aiOutput.narrative);
+    }
+  }
   const contentRegistryWarnings: string[] = [];
   const effectResolveTrace: EffectResolveTrace[] = [];
   const effectResolveWarnings: string[] = [];
@@ -5281,7 +5361,7 @@ export function tryHeartDemonTrial(state: CharacterState): { triggered: boolean;
   const realmIdx = REALMS.findIndex(r => r.id === state.realm);
   const scale = 1 + realmIdx * 0.5 + (hd - 60) / 30; // 60→1, 90→2
   const enemy = {
-    id: `enemy_heartdemon_${Date.now()}`,
+    id: generateEntityId('enemy_heartdemon'),
     name: hd >= 90 ? '心魔真身' : hd >= 75 ? '执念魔影' : '心魔幻影',
     description: `你内心深处的执念化作实体（心魔值 ${hd}/100），似我非我，反噬而来`,
     hp: Math.round(state.maxHp * 0.8 * scale),

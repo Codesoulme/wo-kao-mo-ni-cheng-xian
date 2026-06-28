@@ -1,6 +1,9 @@
 // POST /api/game/tribulation/end
 // AI-67: 渡劫结束——结算结果（passed/failed/abandoned）
+// P1 step2: 纯结算 route（无 db.character），但加 auth gate 防滥用
+// ADMIN_TOKEN 未设时跳过 auth（user=null），沿用原行为。
 
+import { getCurrentUser } from '@/lib/auth-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 
@@ -20,6 +23,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: '参数错误' }, { status: 400 });
   }
   const { sessionId, outcome, boltsCompleted } = parsed.data;
+
+  const isProdMode = !!process.env.ADMIN_TOKEN;
+  if (isProdMode) {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+    }
+  }
+
   // 纯结算——返回结构化结果，调用方负责持久化
   return NextResponse.json({
     ok: true,
