@@ -1,15 +1,5 @@
 'use client';
 
-
-              {/* Phase-M #1: Ending spectrum panel - 8 ending archetypes preview */}
-              <div className="shrink-0 px-3 pb-1" data-testid="ending-section">
-                <EndingPanel
-                  character={character}
-                  worldState={useGameStore.getState().worldCalendar}
-                  defaultCollapsed={true}
-                />
-              </div>client';
-
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { StartScreen } from '@/components/xianxia/StartScreen';
@@ -39,6 +29,22 @@ import { RestrictionModal } from '@/components/xianxia/RestrictionModal';
 import { TribulationModal } from '@/components/xianxia/TribulationModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, Scroll, Sparkles, Package } from 'lucide-react';
+import { YinyuanTimelinePanel } from '@/components/xianxia/YinyuanTimelinePanel';
+import { TechniqueCreatorPanel } from '@/components/xianxia/TechniqueCreatorPanel';
+import { NpcGrowthPanel } from '@/components/xianxia/NpcGrowthPanel';
+import { CrossCycleInheritancePanel } from '@/components/xianxia/CrossCycleInheritancePanel';
+import { SectStorylinePanel } from '@/components/xianxia/SectStorylinePanel';
+import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
+import { HeartIntentPanel } from '@/components/xianxia/HeartIntentPanel';
+import { PetPanel } from '@/components/xianxia/PetPanel';
+import { AlchemyFurnace } from '@/components/xianxia/AlchemyFurnace';
+import { FormationPanel } from '@/components/xianxia/FormationPanel';
+import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
+import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
+import { FateNodes } from '@/components/xianxia/FateNodes';
+import { CultivationSpeedCard } from '@/components/xianxia/CultivationSpeedCard';
+import { CharacterDetailSheet } from '@/components/xianxia/CharacterDetailSheet';
+import { RealmOrb } from '@/components/xianxia/RealmOrb';
 
 // 客户端 hydration 检测：避免 SSR/CSR mismatch
 // 用微任务延迟 setState，避免在 effect body 同步调用触发 react-hooks 规则
@@ -302,7 +308,47 @@ export default function Home() {
                 </div>
 
                 {/* Phase-M #2: 死亡后引导 — 三个选项（轮回重开 / 回归入凡 / 继续旁观） */}
-                <div className="shrink-0 px-3 pb-1" data-testid="death-guidance-section">
+                
+              {/* Phase-U #5: 因缘时间线 (4 archetype) */}
+              <div className="shrink-0 px-3 pb-1" data-testid="yinyuan-timeline-section">
+                <YinyuanTimelinePanel
+                  character={character}
+                  defaultCollapsed={true}
+                />
+              </div>
+
+              {/* Phase-V #6: 自创功法 */}
+              <div className="shrink-0 px-3 pb-1" data-testid="technique-creator-section">
+                <TechniqueCreatorPanel
+                  defaultCollapsed={true}
+                />
+              </div>
+
+              {/* Phase-T #9: NPC 自生长 */}
+              <div className="shrink-0 px-3 pb-1" data-testid="npc-growth-section">
+                <NpcGrowthPanel
+                  character={character}
+                  defaultCollapsed={true}
+                />
+              </div>
+
+              {/* Phase-R #8: 宗门剧情 */}
+              <div className="shrink-0 px-3 pb-1" data-testid="sect-storyline-section">
+                <SectStorylinePanel
+                  character={character}
+                  defaultCollapsed={true}
+                />
+              </div>
+
+              {/* Phase-W #10: 跨周目传承 */}
+              <div className="shrink-0 px-3 pb-1" data-testid="cross-cycle-section">
+                <CrossCycleInheritancePanel
+                  character={character}
+                  defaultCollapsed={true}
+                />
+              </div>
+
+              <div className="shrink-0 px-3 pb-1" data-testid="death-guidance-section">
                   <DeathGuidancePanel character={character} defaultCollapsed={false} />
                 </div>
 

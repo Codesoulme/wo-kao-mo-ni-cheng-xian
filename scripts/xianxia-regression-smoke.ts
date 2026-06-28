@@ -5317,6 +5317,7 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseWCrossCycleInheritanceSmokes();
       pgRunPhaseTNpcGrowthSmokes();
       pgRunPhaseRSectStorylineSmokes();
+      pgRunPhaseXPageIntegrationSmokes();
 }
 
 // Phase-W #10: Cross-cycle inheritance (3 smokes)
@@ -5367,6 +5368,67 @@ function pgRunPhaseWCrossCycleInheritanceSmokes(): void {
     { name: 'smoke-w-001-cross-cycle-inheritance-lib-exports', fn: smokeW001CrossCycleInheritanceLibExports },
     { name: 'smoke-w-002-cross-cycle-inheritance-compute', fn: smokeW002CrossCycleInheritanceCompute },
     { name: 'smoke-w-003-cross-cycle-inheritance-panel-renders', fn: smokeW003CrossCycleInheritancePanelRenders },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
+// Phase-X: page.tsx 接入全部面板 (1 smoke)
+
+function smokeX001PageIntegratesAllPanels(): void {
+  const src = readFileSync('src/app/page.tsx', 'utf-8');
+  // Required testids in page.tsx
+  const required = [
+    'world-legacy-section',
+    'cycle-projection-section',
+    'save-slot-section',
+    'ending-section',
+    'yinyuan-timeline-section',
+    'technique-creator-section',
+    'npc-growth-section',
+    'sect-storyline-section',
+    'cross-cycle-section',
+    'death-guidance-section',
+    'inheritance-section-wrapper',
+    'ascension-section',
+    'restriction-section',
+    'tribulation-section',
+  ];
+  const missing = required.filter((id) => !src.includes('data-testid="' + id + '"'));
+  assert(missing.length === 0, 'missing testids in page.tsx: ' + missing.join(', '));
+
+  // Required imports
+  const requiredImports = [
+    'YinyuanTimelinePanel',
+    'TechniqueCreatorPanel',
+    'NpcGrowthPanel',
+    'SectStorylinePanel',
+    'CrossCycleInheritancePanel',
+    'EndingPanel',
+    'DeathGuidancePanel',
+    'InheritancePoolPanel',
+    'SaveSlotPanel',
+  ];
+  const missingImports = requiredImports.filter((name) => !src.includes(name));
+  assert(missingImports.length === 0, 'missing imports in page.tsx: ' + missingImports.join(', '));
+
+  // Top of file should be clean 'use client';
+  const firstLine = src.split(/\r?\n/)[0];
+  assert(firstLine === "'use client';", 'page.tsx L1 should be use client, got: ' + JSON.stringify(firstLine));
+
+  log('smoke-x-001-page-integrates-all-panels', { passed: true, testidCount: required.length, importCount: requiredImports.length });
+}
+
+function pgRunPhaseXPageIntegrationSmokes(): void {
+  const cases = [
+    { name: 'smoke-x-001-page-integrates-all-panels', fn: smokeX001PageIntegratesAllPanels },
   ];
   for (const c of cases) {
     try {
