@@ -418,7 +418,7 @@ export async function POST(req: NextRequest) {
                 lastEventAge: finalState.age,
               }),
             });
-          }
+        }
 
         // 7) 推送 done（数据库已同步写入，刷新页面不会丢失气泡）
         clearInterval(heartbeat);
