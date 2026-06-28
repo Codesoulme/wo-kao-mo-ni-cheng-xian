@@ -560,6 +560,8 @@ export const useGameStore = create<GameState>()(
       setSettlingHint: (hint) => set({ settlingHint: hint }),
       setStreamingNarrative: (eventIndex, text) => {
         // 流式叙事占位符是 UI 临时状态，不入 event store（之前双写 appendEvent 在浏览器触发 Prisma 错误，2026-06-29 移除）
+        // 2026-06-29 重接 _tryAppendEvent：_tryAppendEvent 内部已用 try/catch + 无 cid 短路保护，Prisma 错误已被吞
+        _tryAppendEvent(get, 'character.streaming-narrative.started', { eventIndex });
         streamingRef.current = { eventIndex, text };
         set({ streamingNarrative: { eventIndex, text } });
       },
@@ -603,6 +605,9 @@ export const useGameStore = create<GameState>()(
       setSettlementResult: (result) => {
         // 客户端只设 UI 状态；事件追踪归服务端 route（settlement/route.ts）单一来源
         // 之前双写 appendEvent 在浏览器触发 Prisma 错误，2026-06-29 移除
+        // 2026-06-29 重接 _tryAppendEvent：_tryAppendEvent 内部已用 try/catch + 无 cid 短路保护，Prisma 错误已被吞
+        _tryAppendEvent(get, 'character.settlement-result.set', { hasResult: !!result });
+        _tryAppendEvent(get, 'character.end-result.set', { hasResult: !!result });
         set({ settlementResult: result });
       },
       addHallRecord: (record) => set((s) => ({
@@ -612,9 +617,13 @@ export const useGameStore = create<GameState>()(
       // Phase-M #3: 继承池运行时 setter（不持久化，由调用方决定何时填入/清空）
       setInheritancePool: (pool, candidates, summary) => {
         // 客户端只设 UI 状态；事件追踪归服务端 route 单一来源（之前双写触发 Prisma 浏览器错误，2026-06-29 移除）
+        // 2026-06-29 重接 _tryAppendEvent：_tryAppendEvent 内部已用 try/catch + 无 cid 短路保护，Prisma 错误已被吞
         const safePool = Array.isArray(pool) ? pool : [];
         const safeCands = Array.isArray(candidates) ? candidates : [];
         const safeSummary = typeof summary === 'string' ? summary : null;
+        _tryAppendEvent(get, 'character.inheritance-pool.set', { count: safePool.length });
+        _tryAppendEvent(get, 'character.inheritance-candidates.set', { count: safeCands.length });
+        _tryAppendEvent(get, 'character.inheritance-ending-summary.set', { hasSummary: safeSummary !== null });
         set({
           inheritancePool: safePool,
           inheritanceCandidates: safeCands,

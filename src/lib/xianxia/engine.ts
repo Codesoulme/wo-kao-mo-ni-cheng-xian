@@ -11404,13 +11404,44 @@ export function verifyLLMPromptAugmentation(
   let registryPresent = false;
   let sampleSnippet = "";
   let wiredCount = 0;
+  // Phase-K k-624 修复：smoke 传 (undefined, 'src/lib/xianxia/llm.ts') 时也要能读到 marker。
+  // 仅在 node 环境（require('fs') 可用）走文件读取；client bundle 走 catch fallback 保持空结果。
+  const _fsModule: { readFileSync?: (p: string, enc: string) => string } | null = (() => {
+    try {
+      // @ts-ignore -- 动态 require 仅 server 端生效,client bundle 抛错被 catch
+      return (typeof require === 'function' ? require('fs') : null) as any;
+    } catch {
+      return null;
+    }
+  })();
   try {
-    // 客户端 bundle 不读文件：只有传 llmSource 才走 hook 检测；不传直接返回空结果
     if (typeof llmSource === 'string') {
       // Explicit string (including empty '') is honored as-is - no file fallback.
       source = llmSource;
+    } else if (
+      _fsModule &&
+      typeof _fsModule.readFileSync === 'function' &&
+      typeof llmPath === 'string' &&
+      llmPath.length > 0
+    ) {
+      // 未传 source 但传了 path：server/node 环境同步读文件（smoke 默认走这条）。
+      try {
+        // @ts-ignore -- 动态 require 同上
+        const _path = (typeof require === 'function' ? require('path') : null) as
+          | { isAbsolute: (p: string) => boolean; resolve: (...a: string[]) => string }
+          | null;
+        const absPath =
+          _path && _path.isAbsolute(llmPath)
+            ? llmPath
+            : _path
+              ? _path.resolve(process.cwd(), llmPath)
+              : llmPath;
+        source = _fsModule.readFileSync(absPath, 'utf8') || '';
+      } catch {
+        source = '';
+      }
     } else {
-      // 未传 source：直接返回空（避免 client bundle require('fs') 报错；smoke 必须传 source 才能测）
+      // client bundle 走这里：直接返回空结果
       source = "";
     }
   } catch (_err) {

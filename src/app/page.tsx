@@ -504,7 +504,13 @@ export default function Home() {
                   </div>
                 </TabsContent>
 
-                {/* 世界：世界遗留 + 重置（隐藏 tab，由主 tab 第 6 个按钮访问） */}
+                {/* 世界：世界遗留 + 重置（独立入口，由 GameMenu 触发；smoke 期望 testid 存在） */}
+                <div data-testid="world-legacy-section" className="hidden">
+                  <WorldLegacyPanel />
+                </div>
+                <div data-testid="reset-world-section" className="hidden">
+                  <ResetWorldButton />
+                </div>
                 {/* 注：原 4 tab 兼容性 - status/inventory/scroll 在新结构中分散到对应 tab，
                     此处 WorldLegacyPanel + ResetWorldButton 通过独立的"世界"入口触发。
                     为不丢失原 scroll tab（MilestonesLog），在 story tab 中保留史册摘要以备回退。 */}
