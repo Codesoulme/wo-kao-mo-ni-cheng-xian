@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
               where: isProdMode ? { id: characterId, userId: user!.id } : { id: characterId },
               data: { styleAnchorsJson: anchorJson, entityEntriesJson: entityJson },
             });
-          }
+            }
         } catch {}
 
         // 6) executeAIEvent + 写库
@@ -418,7 +418,7 @@ export async function POST(req: NextRequest) {
                 lastEventAge: finalState.age,
               }),
             });
-        }
+          }
 
         // 7) 推送 done（数据库已同步写入，刷新页面不会丢失气泡）
         clearInterval(heartbeat);
@@ -439,6 +439,10 @@ export async function POST(req: NextRequest) {
         });
 
         close();
+        } catch (err: any) {
+          console.error('[SSE] executeAIEvent error:', err?.message, err?.stack);
+          // 不阻断 done 推送
+        }
       } catch (err: any) {
         console.error('[SSE] Top error:', err?.message, err?.stack);
         try {

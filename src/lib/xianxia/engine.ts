@@ -11401,19 +11401,13 @@ export function verifyLLMPromptAugmentation(
   let sampleSnippet = "";
   let wiredCount = 0;
   try {
+    // 客户端 bundle 不读文件：只有传 llmSource 才走 hook 检测；不传直接返回空结果
     if (typeof llmSource === 'string') {
       // Explicit string (including empty '') is honored as-is - no file fallback.
       source = llmSource;
     } else {
-      try {
-        const fs = require("fs") as typeof import("fs");
-        const path = typeof llmPath === 'string' && llmPath.length > 0
-          ? llmPath
-          : "src/lib/xianxia/llm.ts";
-        source = fs.readFileSync(path, "utf-8");
-      } catch {
-        source = "";
-      }
+      // 未传 source：直接返回空（避免 client bundle require('fs') 报错；smoke 必须传 source 才能测）
+      source = "";
     }
   } catch (_err) {
     return {
