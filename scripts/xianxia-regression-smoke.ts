@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from 'fs';
+﻿import { readFileSync, existsSync } from 'fs';
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
@@ -2490,6 +2490,50 @@ function smokeO005AliveHidesPanel(): void {
   log('smoke-o-005-alive-hides-panel', { passed: true });
 }
 
+
+
+// Phase-O #2 (Worker #2): 死亡后引导 UI 额外 smokes
+// 与 Worker #3 的 5 个 smoke 不冲突，名字错开。
+
+function smokeO001BDeathGuidanceExists(): void {
+  const f = 'src/components/xianxia/DeathGuidancePanel.tsx';
+  assert(existsSync(f), `DeathGuidancePanel.tsx should exist at ${f}`);
+  const src = readFileSync(f, 'utf-8');
+  assert(src.includes('轮回重开'), 'DeathGuidancePanel should contain 轮回重开 button label');
+  assert(src.includes('回归入凡'), 'DeathGuidancePanel should contain 回归入凡 button label');
+  assert(src.includes('继续旁观'), 'DeathGuidancePanel should contain 继续旁观 button label');
+  assert(src.includes('export function DeathGuidancePanel'), 'DeathGuidancePanel should export DeathGuidancePanel');
+  assert(!src.includes('????'), 'DeathGuidancePanel must not contain ????');
+  log('smoke-o-001-death-guidance-exists', { passed: true });
+}
+
+function smokeO002BPageUsesDeathGuidance(): void {
+  const page = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(page.includes('import { DeathGuidancePanel }'), 'page.tsx should import DeathGuidancePanel');
+  assert(page.includes('death-guidance-section'), 'page.tsx should contain death-guidance-section testid');
+  assert(page.includes('<DeathGuidancePanel'), 'page.tsx should render DeathGuidancePanel component');
+  log('smoke-o-002-page-uses-death-guidance', { passed: true });
+}
+
+function smokeO003BStoreHasResetAction(): void {
+  const store = readFileSync('src/lib/xianxia/store.ts', 'utf-8');
+  assert(store.includes('resetCharacterToMortalStart: () => void;'),
+    'store should declare resetCharacterToMortalStart signature');
+  assert(store.includes('resetCharacterToMortalStart: () => set('),
+    'store should implement resetCharacterToMortalStart action');
+  log('smoke-o-003-store-has-reset-action', { passed: true });
+}
+
+function smokeO004BInheritancePoolHasTestid(): void {
+  const f = 'src/components/xianxia/InheritancePoolPanel.tsx';
+  assert(existsSync(f), `InheritancePoolPanel.tsx should exist at ${f}`);
+  const src = readFileSync(f, 'utf-8');
+  assert(src.includes('inheritance-pool-section'),
+    'InheritancePoolPanel should expose inheritance-pool-section identifier');
+  log('smoke-o-004-inheritance-pool-has-testid', { passed: true });
+}
+
+
 function pgRunPhaseODeathGuidanceSmokes(): void {
   const cases = [
     { name: 'smoke-o-001-death-guidance-panel-exists', fn: smokeO001DeathGuidancePanelExists },
@@ -2497,6 +2541,11 @@ function pgRunPhaseODeathGuidanceSmokes(): void {
     { name: 'smoke-o-003-reincarnate-calls-select-next', fn: smokeO003ReincarnateCallsSelectNext },
     { name: 'smoke-o-004-reset-clears-character', fn: smokeO004ResetClearsCharacter },
     { name: 'smoke-o-005-alive-hides-panel', fn: smokeO005AliveHidesPanel },
+    // Phase-O #2 (Worker #2): 死亡后引导 UI 验证
+    { name: 'smoke-o-001-death-guidance-exists', fn: smokeO001BDeathGuidanceExists },
+    { name: 'smoke-o-002-page-uses-death-guidance', fn: smokeO002BPageUsesDeathGuidance },
+    { name: 'smoke-o-003-store-has-reset-action', fn: smokeO003BStoreHasResetAction },
+    { name: 'smoke-o-004-inheritance-pool-has-testid', fn: smokeO004BInheritancePoolHasTestid },
   ];
   for (const c of cases) {
     try {
@@ -8549,4 +8598,6 @@ function pgRunPhaseNFollowupSmokes(): void {
     }
   }
 }
+
+
 

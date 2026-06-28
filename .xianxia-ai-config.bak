@@ -1,0 +1,33 @@
+{
+  "activeId": "p_mqwwtlms_92cv",
+  "profiles": [
+    {
+      "id": "legacy_default",
+      "name": "MINIMAX月卡",
+      "baseUrl": "https://api.minimaxi.com/anthropic",
+      "apiKey": "sk-cp-Apj0ZMTG_EOO0nndfczuctwhFmUo31RpBFGjxF0OUb3aFf0MFT9vZUMKQHQmB75PvvtsVpIhiI70kK-eD4zockb07gx99rf7XauyF3woUxr1dxlSPPHUYxA",
+      "model": "MiniMax-M3"
+    },
+    {
+      "id": "p_mqssry6k_46h3",
+      "name": "超算月卡MiniMax-M3",
+      "baseUrl": "https://api.scnet.cn/api/llm/v1",
+      "apiKey": "sk-tp-OTgwLTExNzk3NTA1NDMxLTE3ODIzNDgxMTg5NDI=",
+      "model": "MiniMax-M3"
+    },
+    {
+      "id": "p_mqtlcdnz_pram",
+      "name": "DeepSeek-V4-Flash",
+      "baseUrl": "https://api.scnet.cn/api/llm/anthropic",
+      "apiKey": "sk-tp-OTgwLTExNzk3NTA1NDMxLTE3ODIzNDgxMTg5NDI=",
+      "model": "DeepSeek-V4-Flash"
+    },
+    {
+      "id": "p_mqwwtlms_92cv",
+      "name": "智谱",
+      "baseUrl": "https://open.bigmodel.cn/api",
+      "apiKey": "67f54da40c8f488cad0e645203224cf7.kKv0QKq1DETnt77k",
+      "model": "GLM-4.1V-FlashX"
+    }
+  ]
+}
