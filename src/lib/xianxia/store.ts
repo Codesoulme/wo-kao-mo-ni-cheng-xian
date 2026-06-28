@@ -551,15 +551,25 @@ export const useGameStore = create<GameState>()(
     {
       name: 'xianxia-game',
       partialize: (s) => ({
-        character: s.character,
-        lastInterfereAge: s.lastInterfereAge,
-        heritageVault: s.heritageVault,
-        selectedHeritage: s.selectedHeritage,
-        hallOfSimulations: s.hallOfSimulations,
-        settlementResult: s.settlementResult,
-        worldCalendar: s.worldCalendar,
-        worldLegacies: s.worldLegacies,
-      }),
-    }
-  )
-);
+          character: s.character,
+          events: s.events,
+          choices: s.choices,
+          fateNodes: s.fateNodes,
+          pendingChoice: s.pendingChoice,
+          lastInterfereAge: s.lastInterfereAge,
+          heritageVault: s.heritageVault,
+          selectedHeritage: s.selectedHeritage,
+          hallOfSimulations: s.hallOfSimulations,
+          settlementResult: s.settlementResult,
+          worldCalendar: s.worldCalendar,
+          worldLegacies: s.worldLegacies,
+        }),
+        version: 1,
+        migrate: (persisted: any, _version: number) => {
+          if (!persisted) return null;
+          if (typeof persisted !== 'object') return null;
+          return persisted;
+        },
+      }
+    )
+  );

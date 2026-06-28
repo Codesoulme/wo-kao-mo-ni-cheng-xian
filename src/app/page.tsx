@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { StartScreen } from '@/components/xianxia/StartScreen';
 import { StatusPanel } from '@/components/xianxia/StatusPanel';
@@ -9,6 +9,9 @@ import { CycleProjectionPanel } from '@/components/xianxia/CycleProjectionPanel'
 import { EventTimeline } from '@/components/xianxia/EventTimeline';
 import { StatusList } from '@/components/xianxia/StatusList';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
+import { SaveSlotPanel } from '@/components/xianxia/SaveSlotPanel';
+import { useAutoSave } from '@/lib/xianxia/useAutoSave';
+import { readSaveSlot, listSaveSlots, type SaveSlotMeta } from '@/lib/xianxia/save-slots';
 import { InterfereInput } from '@/components/xianxia/InterfereInput';
 import { ChoiceModal } from '@/components/xianxia/ChoiceModal';
 import { CombatModal } from '@/components/xianxia/CombatModal';
@@ -49,6 +52,58 @@ export default function Home() {
   const [tab, setTab] = useState('story');
   const [showHome, setShowHome] = useState(false);
   const hydrated = useHydrated();
+  // Phase-M: 自动存档（年龄推进、突破、死亡、关键剧情时自动写入槽 3）
+  const lastBreakthrough = character?.lastBreakthrough;
+  const lastDeath = character?.causeOfDeath ?? null;
+  useAutoSave({
+    character,
+    worldCalendar: useGameStore.getState().worldCalendar,
+    events,
+    pendingChoice,
+    watchForBreakthrough: lastBreakthrough,
+    watchForDeath: lastDeath,
+    refreshSignal: settlementResult ? 1 : 0,
+  });
+
+  // Phase-M: 持久化快照（所有 persistable 字段）
+  const fullSnapshot = useMemo(() => {
+    const s = useGameStore.getState();
+    return {
+      character: s.character,
+      events: s.events,
+      choices: s.choices,
+      fateNodes: s.fateNodes,
+      pendingChoice: s.pendingChoice,
+      lastInterfereAge: s.lastInterfereAge,
+      heritageVault: s.heritageVault,
+      selectedHeritage: s.selectedHeritage,
+      hallOfSimulations: s.hallOfSimulations,
+      settlementResult: s.settlementResult,
+      worldCalendar: s.worldCalendar,
+      worldLegacies: s.worldLegacies,
+    };
+  }, [
+    character, events, pendingChoice, settlementResult,
+    character?.age, character?.realm, character?.causeOfDeath,
+  ]);
+
+  const handleLoadSlot = useCallback((payload: any, _meta: SaveSlotMeta) => {
+    if (!payload) return;
+    if (payload.character !== undefined) useGameStore.setState({ character: payload.character });
+    if (payload.events !== undefined) useGameStore.setState({ events: payload.events });
+    if (payload.choices !== undefined) useGameStore.setState({ choices: payload.choices });
+    if (payload.fateNodes !== undefined) useGameStore.setState({ fateNodes: payload.fateNodes });
+    if (payload.pendingChoice !== undefined) useGameStore.setState({ pendingChoice: payload.pendingChoice });
+    if (payload.settlementResult !== undefined) useGameStore.setState({ settlementResult: payload.settlementResult });
+    if (payload.worldCalendar !== undefined) useGameStore.setState({ worldCalendar: payload.worldCalendar });
+    if (payload.heritageVault !== undefined) useGameStore.setState({ heritageVault: payload.heritageVault });
+    if (payload.hallOfSimulations !== undefined) useGameStore.setState({ hallOfSimulations: payload.hallOfSimulations });
+    if (payload.worldLegacies !== undefined) useGameStore.setState({ worldLegacies: payload.worldLegacies });
+  }, []);
+
+  const [slotRefresh, setSlotRefresh] = useState(0);
+  const slotRefreshCallback = useCallback(() => setSlotRefresh((n) => n + 1), []);
+
   const combatSession = character?.combatSession;
   const combatResultPending = Boolean(combatSession && combatSession.status !== 'ongoing');
   const effectiveTab = pendingChoice || combatResultPending ? 'story' : tab;
@@ -214,6 +269,15 @@ export default function Home() {
                 defaultCollapsed={true}
               />
             </div>
+
+              {/* Phase-M: da cf cao ping mian */}
+              <div className="shrink-0 px-3 pb-1" data-testid="save-slot-section">
+                <SaveSlotPanel
+                  snapshot={fullSnapshot}
+                  onLoadSlot={handleLoadSlot}
+                  refreshKey={slotRefresh}
+                />
+              </div>
 
             {/* AI-72: L3 modals 占位（飞升/禁制），按 character 状态条件渲染 */}
             {character.ascensionPending && (
