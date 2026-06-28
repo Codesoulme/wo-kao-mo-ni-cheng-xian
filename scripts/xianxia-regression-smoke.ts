@@ -1,4 +1,114 @@
 ﻿import { readFileSync, existsSync } from 'fs';
+
+// Phase-T #9: NPC self-growth (3 smokes)
+
+function smokeT001NpcGrowthHelperExists(): void {
+  const mod = require('../src/lib/xianxia/npc-growth.ts');
+  assert(typeof mod.tickAllNpcsForYear === 'function', 'should export tickAllNpcsForYear');
+  assert(typeof mod.summarizeNpcChanges === 'function', 'should export summarizeNpcChanges');
+  log('smoke-t-001-npc-growth-helper-exists', { passed: true });
+}
+
+function smokeT002NpcGrowthAdvancesAge(): void {
+  const mod = require('../src/lib/xianxia/npc-growth.ts');
+  const npcs = [
+    { id: 'npc-1', name: '张师', lastSeenAge: 25, realm: 'qi_refining', attitude: 'friendly' as any, relationshipScore: 50, memory: '' },
+    { id: 'npc-2', name: '李女', lastSeenAge: 18, realm: 'mortal', attitude: 'neutral' as any, relationshipScore: 0, memory: '' },
+  ];
+  const result = mod.tickAllNpcsForYear(npcs, 5, 25);
+  assert(result && Array.isArray(result.nextNpcs), 'should return nextNpcs array');
+  assert(result.nextNpcs[0].lastSeenAge === 30, `npc-1 should be 30, got ${result.nextNpcs[0].lastSeenAge}`);
+  assert(result.nextNpcs[1].lastSeenAge === 23, `npc-2 should be 23, got ${result.nextNpcs[1].lastSeenAge}`);
+  log('smoke-t-002-npc-growth-advances-age', { passed: true });
+}
+
+function smokeT003NpcGrowthCanDie(): void {
+  const mod = require('../src/lib/xianxia/npc-growth.ts');
+  // Mortal at 85 with high dieChance (>= 0.25)
+  // Run multiple seeds to ensure deterministic die
+  let diedAny = false;
+  for (let seed = 1; seed <= 30 && !diedAny; seed++) {
+    const npcs = [{ id: 'npc-old-' + seed, name: '老翁' + seed, lastSeenAge: 90, realm: 'mortal', attitude: 'neutral' as any, relationshipScore: 0, memory: '' }];
+    const result = mod.tickAllNpcsForYear(npcs, 1, 0);
+    if (result.changes.some((c) => c.kind === 'died')) {
+      diedAny = true;
+    }
+  }
+  assert(diedAny, 'mortal age 91 should die in some seed');
+  log('smoke-t-003-npc-growth-can-die', { passed: true });
+}
+
+function smokeT004NpcGrowthPanelRenders(): void {
+  const src = readFileSync('src/components/xianxia/NpcGrowthPanel.tsx', 'utf-8');
+  assert(src.includes('npc-growth-panel') || src.includes('NpcGrowth'), 'panel should exist');
+  assert(src.includes('tickAllNpcsForYear') || src.includes('npc-growth') || src.includes('character.npcs'), 'panel should reference NPC data');
+  log('smoke-t-004-npc-growth-panel-renders', { passed: true });
+}
+
+function pgRunPhaseTNpcGrowthSmokes(): void {
+  const cases = [
+    { name: 'smoke-t-001-npc-growth-helper-exists', fn: smokeT001NpcGrowthHelperExists },
+    { name: 'smoke-t-002-npc-growth-advances-age', fn: smokeT002NpcGrowthAdvancesAge },
+    { name: 'smoke-t-003-npc-growth-can-die', fn: smokeT003NpcGrowthCanDie },
+    { name: 'smoke-t-004-npc-growth-panel-renders', fn: smokeT004NpcGrowthPanelRenders },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// Phase-R #8: Sect storyline panel + Phase-T #9 NPC self-growth (consolidated smokes)
+
+function smokeR001SectPanelExists(): void {
+  const path = 'src/components/xianxia/SectStorylinePanel.tsx';
+  assert(existsSync(path), 'SectStorylinePanel should exist');
+  const src = readFileSync(path, 'utf-8');
+  assert(src.includes('buildQuestEntriesFromThreads'), 'panel should import buildQuestEntriesFromThreads');
+  assert(src.includes('evaluateSectPhase'), 'panel should import evaluateSectPhase');
+  assert(src.includes('summarizeSectTrajectoryForPrompt'), 'panel should import summarizeSectTrajectoryForPrompt');
+  assert(src.includes('QuestEntry') || src.includes('quests'), 'panel should reference quests');
+  log('smoke-r-001-sect-panel-exists', { passed: true });
+}
+
+function smokeR002EngineHasSectFunctions(): void {
+  const src = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  assert(src.includes('function buildQuestEntriesFromThreads') || src.includes('export function buildQuestEntriesFromThreads'), 'engine should export buildQuestEntriesFromThreads');
+  assert(src.includes('function evaluateSectPhase') || src.includes('export function evaluateSectPhase'), 'engine should export evaluateSectPhase');
+  assert(src.includes('function summarizeSectTrajectoryForPrompt') || src.includes('export function summarizeSectTrajectoryForPrompt'), 'engine should export summarizeSectTrajectoryForPrompt');
+  log('smoke-r-002-engine-has-sect-functions', { passed: true });
+}
+
+function smokeR003SectPanelRendersCharacters(): void {
+  const src = readFileSync('src/components/xianxia/SectStorylinePanel.tsx', 'utf-8');
+  // Should handle SectHistoryEntry (either imported or local fallback)
+  const hasHistoryType = src.includes('type SectHistoryEntry') || src.includes('SectHistoryEntry[]');
+  assert(hasHistoryType, 'panel should have SectHistoryEntry type available');
+  assert(src.includes('character.sectHistory') || src.includes('sectHistory'), 'panel should read sectHistory');
+  assert(src.includes('progress') || src.includes('Progress'), 'panel should show progress');
+  log('smoke-r-003-sect-panel-renders-characters', { passed: true });
+}
+
+function pgRunPhaseRSectStorylineSmokes(): void {
+  const cases = [
+    { name: 'smoke-r-001-sect-panel-exists', fn: smokeR001SectPanelExists },
+    { name: 'smoke-r-002-engine-has-sect-functions', fn: smokeR002EngineHasSectFunctions },
+    { name: 'smoke-r-003-sect-panel-renders-characters', fn: smokeR003SectPanelRendersCharacters },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
@@ -2757,11 +2867,11 @@ function smokeV002CustomTechniqueValidateAndCreate(): void {
 function smokeV003TechniqueCreatorPanelRenders(): void {
   const src = readFileSync('src/components/xianxia/TechniqueCreatorPanel.tsx', 'utf-8');
   assert(src.includes('technique-creator-panel'), 'panel should have technique-creator-panel testid');
-  assert(src.includes('technique-name-input'), 'panel should have name input testid');
-  assert(src.includes('technique-category-select'), 'panel should have category select testid');
-  assert(src.includes('technique-element-select'), 'panel should have element select testid');
-  assert(src.includes('technique-realm-select'), 'panel should have realm select testid');
-  assert(src.includes('technique-submit'), 'panel should have submit button testid');
+  assert(src.includes('data-testid="technique-name-input"'), 'panel should have name input testid');
+  assert(src.includes('data-testid="technique-category-select"'), 'panel should have category select testid');
+  assert(src.includes('data-testid="technique-element-select"'), 'panel should have element select testid');
+  assert(src.includes('data-testid="technique-realm-select"'), 'panel should have realm select testid');
+  assert(src.includes('data-testid="technique-submit"'), 'panel should have submit button testid');
   assert(src.includes('validateTechniqueInput'), 'panel should validate input');
   assert(src.includes('剑') || src.includes('剑法'), 'panel should render category labels in Chinese');
   log('smoke-v-003-technique-creator-panel-renders', { passed: true });
@@ -5204,7 +5314,70 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseQEndToEndSmokes();
       pgRunPhaseUYinyuanTimelineSmokes();
       pgRunPhaseVTechniqueCreatorSmokes();
+      pgRunPhaseWCrossCycleInheritanceSmokes();
+      pgRunPhaseTNpcGrowthSmokes();
+      pgRunPhaseRSectStorylineSmokes();
 }
+
+// Phase-W #10: Cross-cycle inheritance (3 smokes)
+
+function smokeW001CrossCycleInheritanceLibExports(): void {
+  const mod = require('../src/lib/xianxia/cross-cycle-inheritance.ts');
+  assert(typeof mod.listAvailableInheritance === 'function', 'should export listAvailableInheritance');
+  assert(typeof mod.summarizeInheritanceForDisplay === 'function', 'should export summarizeInheritanceForDisplay');
+  log('smoke-w-001-cross-cycle-inheritance-lib-exports', { passed: true });
+}
+
+function smokeW002CrossCycleInheritanceCompute(): void {
+  const mod = require('../src/lib/xianxia/cross-cycle-inheritance.ts');
+  const vault = [
+    { sourceCharacterId: 'char-prev', acquiredAtAge: 18, pool: { id: 'pool-A', name: '青岚剑诀', kind: 'technique', availableSlots: 1, lockedUntilAge: 20 } },
+    { sourceCharacterId: 'char-prev', acquiredAtAge: 18, pool: { id: 'pool-B', name: '玄玉佩', kind: 'artifact', availableSlots: 1, lockedUntilAge: 50 } },
+    { sourceCharacterId: 'char-prev2', acquiredAtAge: 10, pool: { id: 'pool-C', name: '碧波诀', kind: 'technique', availableSlots: 1, lockedUntilAge: 5 } },
+  ];
+  const result = mod.listAvailableInheritance({
+    heritageVault: vault,
+    currentCharacterAge: 25,
+    claimedPoolIds: ['pool-C'],
+  });
+  assert(result.length === 3, 'should return 3 entries');
+  const a = result.find((e) => e.poolId === 'pool-A');
+  assert(a && a.isUnlocked && !a.isClaimed, 'pool-A should be unlocked');
+  const b = result.find((e) => e.poolId === 'pool-B');
+  assert(b && !b.isUnlocked && !b.isClaimed, 'pool-B should be locked');
+  const c = result.find((e) => e.poolId === 'pool-C');
+  assert(c && c.isClaimed && !c.isUnlocked, 'pool-C should be claimed');
+  const s = mod.summarizeInheritanceForDisplay(result);
+  assert(s.total === 3 && s.unlocked === 1 && s.claimed === 1 && s.locked === 1, 'summary wrong');
+  log('smoke-w-002-cross-cycle-inheritance-compute', { passed: true, summary: s });
+}
+
+function smokeW003CrossCycleInheritancePanelRenders(): void {
+  const src = readFileSync('src/components/xianxia/CrossCycleInheritancePanel.tsx', 'utf-8');
+  assert(src.includes('cross-cycle-inheritance-panel'), 'panel should have testid');
+  assert(src.includes('inheritance-item-'), 'panel should render per-entry testid');
+  assert(src.includes('listAvailableInheritance'), 'panel should call listAvailableInheritance');
+  assert(src.includes('可承'), 'panel should have unlock label');
+  assert(src.includes('已承'), 'panel should have claimed label');
+  log('smoke-w-003-cross-cycle-inheritance-panel-renders', { passed: true });
+}
+
+function pgRunPhaseWCrossCycleInheritanceSmokes(): void {
+  const cases = [
+    { name: 'smoke-w-001-cross-cycle-inheritance-lib-exports', fn: smokeW001CrossCycleInheritanceLibExports },
+    { name: 'smoke-w-002-cross-cycle-inheritance-compute', fn: smokeW002CrossCycleInheritanceCompute },
+    { name: 'smoke-w-003-cross-cycle-inheritance-panel-renders', fn: smokeW003CrossCycleInheritancePanelRenders },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
 
 main().catch(error => {
   console.error(JSON.stringify({ passed: false, suite: 'xianxia-regression-smoke', error: error?.message || String(error) }));

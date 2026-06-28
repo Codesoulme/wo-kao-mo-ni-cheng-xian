@@ -1,10 +1,11 @@
-'use client';
+﻿'use client';
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { TribulationSession, AscensionSession, Restriction, HeartDemonType } from './types';
 import { selectNextProtagonist } from './engine';
 import { triggerEndingEvaluation } from './engine';
+import { tickAllNpcsForYear as libTickAllNpcsForYear } from './npc-growth';
 
 // 流式叙事：绕过 React 状态系统，直接更新 DOM
 export interface StreamingState {
@@ -600,6 +601,20 @@ export const useGameStore = create<GameState>()(
           settlementResult: null,
           pendingChoice: null,
         });
+      },
+
+      // Phase-T #9: NPC 自生长 — 玩家年龄推进时调一次，把所有 NPC 推进 yearDelta 年（年龄 + 偶发破境 + 偶发寿终 + 关系衰减）。不读 Math.random；确定性 hash 随机。
+      tickNpcsForYear: (yearDelta: number) => {
+        const safeDelta = Math.max(0, Math.floor(Number(yearDelta) || 0));
+        if (!Number.isFinite(safeDelta) || safeDelta <= 0) return;
+        const s = get();
+        const ch = s.character;
+        if (!ch || typeof ch !== 'object') return;
+        const prevNpcs = Array.isArray(ch.npcs) ? ch.npcs : [];
+        if (prevNpcs.length === 0) return;
+        const result = libTickAllNpcsForYear(prevNpcs, safeDelta, typeof ch.age === 'number' ? ch.age : 0);
+        if (!result || !Array.isArray(result.nextNpcs)) return;
+        set({ character: { ...ch, npcs: result.nextNpcs } });
       },
 
       // Phase-M #2: dismissDeathGuidance — 玩家选择「继续旁观」后关闭死亡引导
