@@ -5,6 +5,7 @@ import { useGameStore } from '@/lib/xianxia/store';
 import { StartScreen } from '@/components/xianxia/StartScreen';
 import { StatusPanel } from '@/components/xianxia/StatusPanel';
 import { WorldLegacyPanel } from '@/components/xianxia/WorldLegacyPanel';
+import { CycleProjectionPanel } from '@/components/xianxia/CycleProjectionPanel';
 import { EventTimeline } from '@/components/xianxia/EventTimeline';
 import { StatusList } from '@/components/xianxia/StatusList';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
@@ -204,6 +205,14 @@ export default function Home() {
             {/* AI-60: WorldLegacyPanel 折叠区（默认折叠，限 3 条，展开全部） */}
             <div className="shrink-0 px-3 pb-1" data-testid="world-legacy-section">
               <WorldLegacyPanel character={character} defaultCollapsed={true} maxCollapsed={3} />
+            </div>
+
+            {/* Phase-L: 轮回投影面板 - 接入 phase-k B 的 4 个 UI 投影函数 */}
+            <div className="shrink-0 px-3 pb-1" data-testid="cycle-projection-section">
+              <CycleProjectionPanel
+                character={character}
+                defaultCollapsed={true}
+              />
             </div>
 
             {/* AI-72: L3 modals 占位（飞升/禁制），按 character 状态条件渲染 */}

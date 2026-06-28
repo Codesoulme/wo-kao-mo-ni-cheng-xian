@@ -2860,6 +2860,7 @@ function smokeAi103RumorReliability(): void {
   pgRunPhaseJAWorkerASmokes();
   pgRunPhaseKCWorkerCSmokes();
   pgRunPhaseKAWorkerASmokes();
+  pgRunPhaseLSmokes();
 }
 
 function smokeCombatLabelsDisplay(): void {
@@ -7959,6 +7960,93 @@ function pgRunPhaseKBWorkerBSmokes(): void {
     { name: 'smoke-k-612-project-sect-trajectory-for-ui', fn: smokeK612ProjectSectTrajectoryForUI },
     { name: 'smoke-k-613-project-fate-echo-for-ui', fn: smokeK613ProjectFateEchoForUI },
     { name: 'smoke-k-614-project-ending-for-ui', fn: smokeK614ProjectEndingForUI },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+
+// ======================== Phase-L: Cycle Projection Panel integration (smoke) ========================
+// Additive only. Validates that the 4 projection funcs called by the panel
+// return non-null projections with the shape expected by the React component.
+
+function smokeL001PanelProjectionShapes(): void {
+  const ch: any = { id: 'c-l1', age: 25, realm: 'zhuji', master: 'master-y', faction: 'shenluo' };
+  const inheritanceChain = {
+    rootCharacterId: 'c0',
+    generations: [{ characterId: 'c0' }, { characterId: 'c1' }],
+    activeClaims: [{ claimId: 'cl1' }],
+    lostTechniques: [{ name: '残篇' }],
+  };
+  const sectState = { phase: 'growth', currentPower: 0.7, history: [{}] };
+  const fateEchoes = [
+    { echoId: 'e1', resolved: false, linkedThreadId: 'th1' },
+    { echoId: 'e2', resolved: true },
+  ];
+  const worldState = {
+    possibleEndings: [{ archetype: 'ascend-immortal', weight: 0.4 }],
+    fixedEndings: [],
+    irreversibleChoices: [{}],
+    endgameMeter: 0.65,
+  };
+
+  const projections = {
+    inheritance: projectInheritanceForUI(ch, inheritanceChain),
+    sect: projectSectTrajectoryForUI(ch, sectState),
+    fate: projectFateEchoForUI(ch, fateEchoes),
+    ending: projectEndingForUI(ch, worldState),
+  };
+
+  for (const [key, p] of Object.entries(projections)) {
+    assert(p && typeof p === 'object', key + ' should return object');
+    assert(typeof p.kind === 'string' && p.kind.length > 0, key + ' should have kind');
+    assert(Array.isArray(p.slots), key + ' slots should be array');
+    assert(typeof p.narrative === 'string' && p.narrative.length > 0, key + ' narrative should be non-empty');
+    for (const slot of p.slots) {
+      assert(typeof slot.slot === 'string', key + ' slot.slot should be string');
+      assert(typeof slot.displayLabel === 'string' && slot.displayLabel.length > 0, key + ' slot.displayLabel should be non-empty');
+      assert(['good', 'neutral', 'danger', 'mystery'].indexOf(slot.tone) >= 0, key + ' slot.tone invalid: ' + slot.tone);
+      assert(['card', 'meter', 'chip', 'timeline', 'list'].indexOf(slot.renderHint) >= 0, key + ' slot.renderHint invalid: ' + slot.renderHint);
+      assert(typeof slot.priority === 'number' && slot.priority >= 0 && slot.priority <= 10, key + ' slot.priority should be 0-10, got=' + slot.priority);
+    }
+  }
+
+  // Tally: all 4 should produce at least 1 slot given the rich test data
+  assert(projections.inheritance.slots.length >= 1, 'inheritance should have >=1 slot');
+  assert(projections.sect.slots.length >= 1, 'sect should have >=1 slot');
+  assert(projections.fate.slots.length >= 1, 'fate should have >=1 slot');
+  assert(projections.ending.slots.length >= 1, 'ending should have >=1 slot');
+
+  // Empty / null should still produce safe projections (for SSR no-character placeholder)
+  const nullInheritance = projectInheritanceForUI(null, null);
+  const nullSect = projectSectTrajectoryForUI(null, null);
+  const nullFate = projectFateEchoForUI(null, null);
+  const nullEnding = projectEndingForUI(null, null);
+  assert(nullInheritance && Array.isArray(nullInheritance.slots), 'null inheritance safe');
+  assert(nullSect && Array.isArray(nullSect.slots), 'null sect safe');
+  assert(nullFate && Array.isArray(nullFate.slots), 'null fate safe');
+  assert(nullEnding && Array.isArray(nullEnding.slots), 'null ending safe');
+
+  log('smoke-l-001-panel-projection-shapes', {
+    passed: true,
+    inheritanceSlots: projections.inheritance.slots.length,
+    sectSlots: projections.sect.slots.length,
+    fateSlots: projections.fate.slots.length,
+    endingSlots: projections.ending.slots.length,
+    totalSlots: projections.inheritance.slots.length + projections.sect.slots.length +
+                projections.fate.slots.length + projections.ending.slots.length,
+  });
+}
+
+function pgRunPhaseLSmokes(): void {
+  const cases = [
+    { name: 'smoke-l-001-panel-projection-shapes', fn: smokeL001PanelProjectionShapes },
   ];
   for (const c of cases) {
     try {
