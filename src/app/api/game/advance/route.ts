@@ -13,6 +13,11 @@ import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, format
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import { appendEvent } from '@/lib/xianxia/events/store';
 import { getCurrentUser } from '@/lib/auth-helpers';
+// 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 advance 路径上额外跑一次 world.tick()
+import { World } from '@/lib/xianxia/ecs/core';
+import { createCharacterEntity, entityToSnapshot } from '@/lib/xianxia/ecs/character-entity';
+import { AgingSystem } from '@/lib/xianxia/ecs/systems/aging-system';
+import { CultivationSystem } from '@/lib/xianxia/ecs/systems/cultivation-system';
 
 
 // P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
@@ -288,6 +293,43 @@ ${breakthroughText}`;
         }
       } catch (e) {
         console.error('[advance] event append failed (non-fatal):', e);
+        // 不阻断 advance 主流程
+      }
+
+      // 批 20: ECS 集成 advance —— 额外跑一次 world.tick()，让 AgingSystem / CultivationSystem 处理 age/cultivation
+      // PoC 简化：不替换 advance 主流程；失败仅 console.error，不阻断主流程
+      try {
+        const ecsWorld = new World();
+        const ecsBaseSnapshot = {
+          characterId,
+          name: char.name || '',
+          age: finalState.age,
+          realm: finalState.realm,
+          cultivationExp: finalState.cultivationExp,
+          hp: finalState.hp,
+          maxHp: finalState.maxHp,
+          spiritStones: finalState.spiritStones,
+          alive: finalState.alive,
+          lifespan: finalState.lifespan || 100,
+          inventory: [],
+        };
+        createCharacterEntity(ecsWorld, ecsBaseSnapshot);
+        ecsWorld.addSystem(AgingSystem);
+        ecsWorld.addSystem(CultivationSystem);
+        ecsWorld.tick();
+        const tickedEntity = ecsWorld.getEntity(`character-${characterId}`);
+        if (tickedEntity) {
+          const tickedSnapshot = entityToSnapshot(tickedEntity);
+          // PoC：把 ECS tick 的 age + cultivationExp 合并回 finalState
+          finalState.age = tickedSnapshot.age;
+          finalState.cultivationExp = tickedSnapshot.cultivationExp;
+          if (!tickedSnapshot.alive && finalState.alive) {
+            finalState.alive = false;
+            finalState.causeOfDeath = finalState.causeOfDeath || 'ecs-aging-natural';
+          }
+        }
+      } catch (e) {
+        console.error('[advance] ECS tick failed (non-fatal):', e);
         // 不阻断 advance 主流程
       }
 

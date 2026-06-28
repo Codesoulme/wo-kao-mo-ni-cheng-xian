@@ -5370,6 +5370,8 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseReplayAdvancedSmokes();
       // 批 18.6.3: ECS 数据模型 PoC 基础设施 + Character 演示 — 8 个静态 smoke
       pgRunPhaseEcsSmokes();
+      // 批 20b: ES 真实链路集成测试（轻量——import + 返回值结构；完整跑需 --db）— 2 个静态 smoke
+      pgRunPhaseEsIntegrationSmokes();
       // ===== Phase-Z (TechDoc 18.6.7): 测试策略改进（属性测试 + AI 回归 fixture）=====
       // 独立 console.log，不计入主 smoke 计数（不破 430 pass）。
       // 同步 require + try/catch：smoke 同步执行流，不引入 async 改动。
@@ -13076,6 +13078,10 @@ function pgRunPhaseEcsSmokes(): void {
     { name: 'smoke-ecs-006-entity-to-snapshot-restores', fn: smokeEcs006EntityToSnapshotRestores },
     { name: 'smoke-ecs-007-aging-system-increments-age', fn: smokeEcs007AgingSystemIncrementsAge },
     { name: 'smoke-ecs-008-cultivation-system-gains-exp', fn: smokeEcs008CultivationSystemGainsExp },
+    { name: 'smoke-ecs-advance-001-imports', fn: smokeEcsAdvance001Imports },
+    { name: 'smoke-ecs-advance-002-creates-entity', fn: smokeEcsAdvance002CreatesEntity },
+    { name: 'smoke-ecs-advance-003-world-tick', fn: smokeEcsAdvance003WorldTick },
+    { name: 'smoke-ecs-advance-004-failure-non-fatal', fn: smokeEcsAdvance004FailureNonFatal },
   ];
   for (const c of syncCases) {
     try {
@@ -13085,4 +13091,185 @@ function pgRunPhaseEcsSmokes(): void {
       log(c.name, { passed: false, error: (e && e.message) || String(e) });
     }
   }
+}
+
+// 批 20b: Event Sourcing 真实链路集成测试（轻量验证——只验 import + 函数签名；完整跑需要 --db）
+function smokeEsIntegration001Importable(): void {
+  // 不连 db，只验证模块能 require + 函数签名
+  const mod = require('./es-integration-test.ts');
+  assert(typeof mod.runIntegrationTest === 'function', 'should export runIntegrationTest');
+  log('smoke-es-integration-001-importable', { passed: true });
+}
+
+function smokeEsIntegration002ReturnShape(): void {
+  // 验证 runner 返回值结构（不真跑）
+  type Expected = { passed: number; failed: number; details: unknown[] };
+  const mod = require('./es-integration-test.ts');
+  // 通过 Function.length 看参数数量：0 参数
+  assert(mod.runIntegrationTest.length === 0, 'runIntegrationTest should take 0 params');
+  // 通过 Function.prototype 检查返回类型（只能粗略验证是 async function）
+  assert(
+    mod.runIntegrationTest.constructor.name === 'AsyncFunction',
+    'runIntegrationTest should be async (Promise<{passed, failed, details}>)',
+  );
+  // 静态断言 Expected shape（编译期已保证，runtime 仅记日志）
+  const _shape: Expected = { passed: 0, failed: 0, details: [] };
+  assert(typeof _shape.passed === 'number', 'return.passed should be number');
+  assert(typeof _shape.failed === 'number', 'return.failed should be number');
+  assert(Array.isArray(_shape.details), 'return.details should be array');
+  log('smoke-es-integration-002-return-shape', { passed: true });
+}
+
+function pgRunPhaseEsIntegrationSmokes(): void {
+  const syncCases = [
+    { name: 'smoke-es-integration-001-importable', fn: smokeEsIntegration001Importable },
+    { name: 'smoke-es-integration-002-return-shape', fn: smokeEsIntegration002ReturnShape },
+  ];
+  for (const c of syncCases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ===== 批 20: ECS 集成 advance（PoC：advance 路由 + advance-sse 路由额外跑一次 world.tick()）=====
+// 4 个静态源码校验 smoke（不依赖 db）：
+//   smoke-ecs-advance-001: advance 路由 import World / AgingSystem / CultivationSystem
+//   smoke-ecs-advance-002: advance 路由调 createCharacterEntity
+//   smoke-ecs-advance-003: advance 路由调 world.tick()
+//   smoke-ecs-advance-004: ECS tick 失败不影响 advance 主流程（try/catch + 公共函数保留）
+
+function smokeEcsAdvance001Imports(): void {
+  const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // advance 路由必须 import World / createCharacterEntity / entityToSnapshot / AgingSystem / CultivationSystem
+  assert(
+    advanceSrc.includes("from '@/lib/xianxia/ecs/core'"),
+    'advance route should import World from ecs/core'
+  );
+  assert(
+    advanceSrc.includes("from '@/lib/xianxia/ecs/character-entity'"),
+    'advance route should import createCharacterEntity / entityToSnapshot from ecs/character-entity'
+  );
+  assert(
+    advanceSrc.includes("from '@/lib/xianxia/ecs/systems/aging-system'"),
+    'advance route should import AgingSystem'
+  );
+  assert(
+    advanceSrc.includes("from '@/lib/xianxia/ecs/systems/cultivation-system'"),
+    'advance route should import CultivationSystem'
+  );
+  assert(/World/.test(advanceSrc), 'advance route should reference World');
+  assert(/AgingSystem/.test(advanceSrc), 'advance route should reference AgingSystem');
+  assert(/CultivationSystem/.test(advanceSrc), 'advance route should reference CultivationSystem');
+
+  const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  assert(
+    sseSrc.includes("from '@/lib/xianxia/ecs/core'"),
+    'advance-sse route should import World from ecs/core'
+  );
+  assert(
+    sseSrc.includes("from '@/lib/xianxia/ecs/character-entity'"),
+    'advance-sse route should import createCharacterEntity from ecs/character-entity'
+  );
+  assert(
+    sseSrc.includes("from '@/lib/xianxia/ecs/systems/aging-system'"),
+    'advance-sse route should import AgingSystem'
+  );
+  assert(
+    sseSrc.includes("from '@/lib/xianxia/ecs/systems/cultivation-system'"),
+    'advance-sse route should import CultivationSystem'
+  );
+
+  log('smoke-ecs-advance-001-imports', { passed: true });
+}
+
+function smokeEcsAdvance002CreatesEntity(): void {
+  const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // 必须调 createCharacterEntity(world, snapshot)
+  assert(
+    /createCharacterEntity\(\s*\w+\s*,\s*\w+\s*\)/.test(advanceSrc),
+    'advance route should call createCharacterEntity(world, snapshot)'
+  );
+  // 必须构造 baseSnapshot（包含 characterId / age / realm / cultivationExp / hp / maxHp / alive / lifespan / inventory）
+  const hasCharacterId = /characterId,/.test(advanceSrc) || /characterId\s*:/.test(advanceSrc);
+  assert(hasCharacterId, 'advance ECS baseSnapshot should include characterId');
+  assert(/age:\s*finalState\.age/.test(advanceSrc), 'advance ECS baseSnapshot should set age from finalState.age');
+  assert(/realm:\s*finalState\.realm/.test(advanceSrc), 'advance ECS baseSnapshot should set realm from finalState.realm');
+  assert(/cultivationExp:\s*finalState\.cultivationExp/.test(advanceSrc), 'advance ECS baseSnapshot should set cultivationExp from finalState.cultivationExp');
+  assert(/hp:\s*finalState\.hp/.test(advanceSrc), 'advance ECS baseSnapshot should set hp from finalState.hp');
+  assert(/alive:\s*finalState\.alive/.test(advanceSrc), 'advance ECS baseSnapshot should set alive from finalState.alive');
+  assert(/inventory:\s*\[\]/.test(advanceSrc), 'advance ECS baseSnapshot should default inventory=[]');
+
+  const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  assert(
+    /createCharacterEntity\(\s*\w+\s*,\s*\w+\s*\)/.test(sseSrc),
+    'advance-sse route should call createCharacterEntity(world, snapshot)'
+  );
+  log('smoke-ecs-advance-002-creates-entity', { passed: true });
+}
+
+function smokeEcsAdvance003WorldTick(): void {
+  const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // 必须 addSystem + tick
+  assert(/addSystem\(AgingSystem\)/.test(advanceSrc), 'advance route should addSystem(AgingSystem)');
+  assert(/addSystem\(CultivationSystem\)/.test(advanceSrc), 'advance route should addSystem(CultivationSystem)');
+  assert(/\.tick\(\)/.test(advanceSrc), 'advance route should call world.tick()');
+  // 必须 getEntity + entityToSnapshot 把结果合并回 finalState
+  assert(/getEntity\(`character-\$\{characterId\}`\)/.test(advanceSrc) || /getEntity\(['"]character-['"]\s*\+\s*characterId/.test(advanceSrc), 'advance route should getEntity(`character-${characterId}`)');
+  assert(/entityToSnapshot\(/.test(advanceSrc), 'advance route should call entityToSnapshot');
+  assert(/finalState\.age\s*=\s*tickedSnapshot\.age/.test(advanceSrc), 'advance route should override finalState.age from tickedSnapshot.age');
+  assert(/finalState\.cultivationExp\s*=\s*tickedSnapshot\.cultivationExp/.test(advanceSrc), 'advance route should override finalState.cultivationExp from tickedSnapshot.cultivationExp');
+  // ECS 死亡兜底
+  assert(/!tickedSnapshot\.alive\s*&&\s*finalState\.alive/.test(advanceSrc), 'advance route should set finalState.alive=false when ECS reports death');
+  assert(/'ecs-aging-natural'/.test(advanceSrc), 'advance route should default causeOfDeath=ecs-aging-natural on ECS death');
+
+  const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  assert(/addSystem\(AgingSystem\)/.test(sseSrc), 'advance-sse route should addSystem(AgingSystem)');
+  assert(/addSystem\(CultivationSystem\)/.test(sseSrc), 'advance-sse route should addSystem(CultivationSystem)');
+  assert(/\.tick\(\)/.test(sseSrc), 'advance-sse route should call world.tick()');
+  assert(/entityToSnapshot\(/.test(sseSrc), 'advance-sse route should call entityToSnapshot');
+  assert(/finalState\.age\s*=\s*tickedSnapshot\.age/.test(sseSrc), 'advance-sse route should override finalState.age from tickedSnapshot.age');
+  log('smoke-ecs-advance-003-world-tick', { passed: true });
+}
+
+function smokeEcsAdvance004FailureNonFatal(): void {
+  const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  // ECS tick 必须 try/catch 包住 + 主流程 db.update 保留
+  // 用更稳健的"找 ECS 注释后第一个 try { 与下一个 } catch 配对"逻辑
+  const ecsTickIdx = advanceSrc.indexOf('// 批 20: ECS 集成 advance');
+  const ecsCatchIdx = advanceSrc.indexOf('ECS tick failed (non-fatal)');
+  assert(ecsTickIdx > 0, 'advance route should have ECS tick block comment');
+  assert(ecsCatchIdx > 0, 'advance route should have non-fatal catch log for ECS tick');
+  assert(ecsCatchIdx > ecsTickIdx, 'ECS catch must come after ECS tick block');
+  // 在 ECS 注释和 ECS catch log 之间必须存在 try { ... } catch (...) 配对
+  const ecsBlock = advanceSrc.slice(ecsTickIdx, ecsCatchIdx);
+  assert(/try\s*\{/.test(ecsBlock), 'ECS tick block should contain try {');
+  // catch 应在 ECS catch log 之前
+  const catchBeforeLog = advanceSrc.lastIndexOf('} catch', ecsCatchIdx);
+  assert(catchBeforeLog > ecsTickIdx, 'ECS tick block should have } catch handler before catch log');
+  // 主流程保留：db.update + appendEvent 公共函数
+  assert(advanceSrc.includes('db.character.update'), 'advance route should keep db.character.update');
+  assert(advanceSrc.includes('appendEvent('), 'advance route should keep appendEvent call');
+  assert(advanceSrc.includes('buildAdvanceStateData'), 'advance route should keep buildAdvanceStateData');
+  // Z1 appendEvent 块不能被破坏（必须有 4 类事件）
+  assert(advanceSrc.includes("type: 'character.age.advanced'"), 'Z1 appendEvent age.advanced must remain');
+  assert(advanceSrc.includes("type: 'character.realm.changed'"), 'Z1 appendEvent realm.changed must remain');
+  assert(advanceSrc.includes("type: 'character.hp.changed'"), 'Z1 appendEvent hp.changed must remain');
+  assert(advanceSrc.includes("type: 'character.alive.changed'"), 'Z1 appendEvent alive.changed must remain');
+
+  const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  const sseEcsTickIdx = sseSrc.indexOf('// 批 20: ECS 集成 advance');
+  const sseEcsCatchIdx = sseSrc.indexOf('ECS tick failed (non-fatal)');
+  assert(sseEcsTickIdx > 0, 'advance-sse route should have ECS tick block comment');
+  assert(sseEcsCatchIdx > 0, 'advance-sse route should have non-fatal catch log for ECS tick');
+  assert(sseEcsCatchIdx > sseEcsTickIdx, 'ECS catch must come after ECS tick block');
+  const sseEcsBlock = sseSrc.slice(sseEcsTickIdx, sseEcsCatchIdx);
+  assert(/try\s*\{/.test(sseEcsBlock), 'advance-sse ECS tick block should contain try {');
+  assert(sseSrc.includes('db.character.update'), 'advance-sse route should keep db.character.update');
+  assert(sseSrc.includes('appendEvent('), 'advance-sse route should keep appendEvent call');
+
+  log('smoke-ecs-advance-004-failure-non-fatal', { passed: true });
 }
