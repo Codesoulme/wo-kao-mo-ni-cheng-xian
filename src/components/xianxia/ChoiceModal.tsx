@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mountain, Sparkles, BookOpen, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
@@ -175,11 +176,14 @@ export function ChoiceModal() {
             ))}
           </div>
 
-          {busy && (
-            <div className="absolute bottom-2 left-0 right-0 text-center text-xs text-muted-foreground animate-pulse pointer-events-none">
-              <Sparkles className="w-3 h-3 inline mr-1" />
-              因果流转中...
-            </div>
+          {busy && createPortal(
+            <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
+              <div className="rounded-lg bg-background/95 border border-primary/40 shadow-2xl px-6 py-3 flex items-center gap-2 text-sm text-foreground backdrop-blur-sm animate-pulse">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="font-serif-cn">因果流转中...</span>
+              </div>
+            </div>,
+            document.body
           )}
         </CardContent>
       </Card>
