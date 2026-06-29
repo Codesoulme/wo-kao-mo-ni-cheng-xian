@@ -335,4 +335,24 @@ archive/YYYY-MM-DD-<short-task-name>.md
 ## 八、紧急联系
 
 - 紧急情况（owner 拍板要立刻生效）：直接 IM 找小虾米，不走本目录。
+
+---
+
+## 九、Mojibake 历史快照（2026-06-29 扫描）
+
+`scripts/write-handoff.ps1` 已就绪（`[System.IO.File]::WriteAllText` + UTF-8 BOM + Base64Content 路径），未来写 handoff 文件全部走它。
+
+但**历史 handoff 文件**有 4 个被早期 PowerShell heredoc 损坏（中文被替换成 `?`），git 第一次 commit 就是 `?`（`97c71e6` 验证），**无原版可恢复**。标 read-only 历史快照，不修复：
+
+| 文件 | 状态 |
+|---|---|
+| `.handoff/combat-labels-rollback-and-category-enum-fix/task.md` | 内容已损（PS heredoc 写入时损坏）|
+| `.handoff/current-task.md` | 内容已损 |
+| `.handoff/meeting/kickoff-and-handover/agenda.md` | 内容已损 |
+| `.handoff/meeting/kickoff-and-handover/xiaoxia-to-xiaoxin.md` | 内容已损 |
+
+**应对**：
+- 这 4 个文件不再尝试修复（不可逆丢失）
+- 后续 handoff 文件**必须用** `scripts/write-handoff.ps1` 写
+- 验证脚本：写入后跑 `head -c 3 file.md | xxd` 看首 3 字节是 `EF BB BF`（UTF-8 BOM）
 - 阻塞（任何一步卡超过 24 小时）：在当前任务的 `task.md` 里写 `[BLOCKED: reason]`，等 owner 决定。

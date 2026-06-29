@@ -116,7 +116,15 @@ import {
   InheritanceClaim,
   InheritanceChain,
   InheritancePool,
+  // ===== Crafting & Technique Study types (Phase-M) =====
+  CraftingRecipe,
+  CraftingSession,
+  CraftingResult,
+  CraftingSideEffect,
+  TechniqueStudy,
 } from "./types";
+
+// 上面已 import InheritanceKind/Recipient/Claim/Chain/Pool（line 114-118），下面 line 7821 重复导入已删除。
 
 export type { AscensionRequirement } from "./types";
 
@@ -4721,6 +4729,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   let next = { ...state };
   const rejected: AttributeChange[] = [];
   const contentRegistryTrace: ValidationTrace[] = [];
+  const contentRegistryWarnings: string[] = [];
   // P1-8 幼龄硬拦截：age<6 禁止 triggerCombat / 禁止独立赶路 / 禁止独立赴约
   // prompt 已要求 AI 写幼龄口吻（见 llm.ts 572/990/1066），但 prompt 软约束可能被忽略；
   // 引擎兜底：直接剥离 triggerCombat，并把 age<6 时的 hasChoice 改为 false。
@@ -4753,7 +4762,6 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
       aiOutput.narrative = rewriteInfantNarrative(aiOutput.narrative);
     }
   }
-  const contentRegistryWarnings: string[] = [];
   const effectResolveTrace: EffectResolveTrace[] = [];
   const effectResolveWarnings: string[] = [];
   const appliedChanges: AttributeChange[] = [];
@@ -7408,9 +7416,9 @@ export function resolvePetSkillLearn<T extends { skill: { name: string; power: n
     ...pet,
     skill: {
       name: skill.name,
-      description: skill.description ?? pet.skill?.description ?? '',
-      power: typeof skill.power === 'number' ? skill.power : (pet.skill?.power ?? 1),
-      cooldown: typeof skill.cooldown === 'number' ? skill.cooldown : (pet.skill?.cooldown ?? 0),
+      description: (skill as any).description ?? ((pet as any).skill?.description ?? ''),
+      power: typeof skill.power === 'number' ? skill.power : ((pet as any).skill?.power ?? 1),
+      cooldown: typeof skill.cooldown === 'number' ? skill.cooldown : ((pet as any).skill?.cooldown ?? 0),
     },
   };
 }
@@ -7818,13 +7826,6 @@ import type {
   StalemateExit,
 } from './types';
 
-import type {
-  InheritanceKind,
-  InheritanceRecipient,
-  InheritanceClaim,
-  InheritanceChain,
-  InheritancePool,
-} from './types';
 type _PhaseGReexport =
   | SecretRealmTriggerCondition
   | SecretRealmEntryAttempt
@@ -8956,9 +8957,9 @@ export function resolveCraftingStep(
   const result: CraftingResult = success
     ? {
         success: true,
-        outputItems: [{ id: "crafted-" + session?.recipeId + "-" + nextStep, name: "成品", type: "consumable" }],
+        outputItems: [{ id: "crafted-" + session?.recipeId + "-" + nextStep, name: "成品", item_type: "consumable" } as any],
         consumedMaterials: [],
-        sideEffects: null,
+        sideEffects: [],
         attributeChanges: [],
         experienceGained: 10,
       }
@@ -8966,7 +8967,7 @@ export function resolveCraftingStep(
         success: false,
         outputItems: [],
         consumedMaterials: [],
-        sideEffects: null,
+        sideEffects: [],
         attributeChanges: [],
         experienceGained: 1,
       };
@@ -9719,6 +9720,13 @@ export function propagateInheritance(
     'sect-lineage':    { rate: 0.65, span: 25 },
     'tribal-clan':     { rate: 0.55, span: 20 },
     'destiny-thread':  { rate: 0.40, span: 15 },
+    'mentor-guild':    { rate: 0.60, span: 25 },
+    'artifact':        { rate: 0.50, span: 20 },
+    'secret-tome':     { rate: 0.55, span: 20 },
+    'talisman':        { rate: 0.45, span: 15 },
+    'technique':       { rate: 0.50, span: 20 },
+    'token':           { rate: 0.40, span: 15 },
+    'bond':            { rate: 0.55, span: 25 },
   };
 
   // Walk the chain in order; for the most recent generation, spawn a child only if
@@ -9950,7 +9958,11 @@ export function projectSectPowerDecade(
       reputation,
       internalCohesion,
       timeStamp: ageStamp,
-    });
+      sectId: '',
+      realmPower: combatPower,
+      externalReputation: reputation,
+      resourceReserve: resourceStock,
+    } as any);
   }
   return out;
 }
@@ -9972,7 +9984,7 @@ export function detectSectCrisis(
   const matched = trajectory.history.filter(e => e && typeof e.severity === 'number' && e.severity >= safeThreshold);
   const severity = matched.length === 0
     ? 0
-    : matched.reduce((sum, e) => sum + e.severity, 0) / matched.length;
+    : matched.reduce((sum, e) => sum + (typeof e.severity === 'number' ? e.severity : 0), 0) / matched.length;
   return { crisisEvents: matched, severity: clamp01(severity) };
 }
 
@@ -10026,11 +10038,14 @@ export function generateSectEvent(
 
   return {
     id,
+    sectId: '',
     phase,
     age: 0,
     kind,
     severity,
     description: descriptionByPhase[phase],
+    narrative: descriptionByPhase[phase] || '',
+    impact: typeof severity === 'number' ? severity : 0,
     characterIds: safeChars,
     worldFactIds: [],
   };
@@ -10463,7 +10478,7 @@ export function findBrokenCrossRefs(
   // from masking itself by being added to chainIds before the broken check.
   const knownChainIds = new Set<string>();
   const chainRoots = new Set<string>();
-  const claimRecipientIds = [];
+  const claimRecipientIds: string[] = [];
   if (Array.isArray(allChains)) {
     for (const ch of allChains) {
       if (!ch) continue;
@@ -10477,14 +10492,15 @@ export function findBrokenCrossRefs(
             if (r && r.sourceCharacterId) knownChainIds.add(r.sourceCharacterId);
           }
         } else if (g && typeof g === 'object') {
-          const rec = g;
+          const rec: any = g;
           if (rec.targetCharacterId) knownChainIds.add(rec.targetCharacterId);
           if (rec.sourceCharacterId) knownChainIds.add(rec.sourceCharacterId);
         }
       }
       if (Array.isArray(ch.activeClaims)) {
         for (const c of ch.activeClaims) {
-          if (c && c.recipientId) claimRecipientIds.push(c.recipientId);
+          const rec: any = c;
+          if (rec && rec.recipientId) claimRecipientIds.push(rec.recipientId);
         }
       }
     }
@@ -11719,10 +11735,10 @@ export function seedInheritancePoolFromEnding(
     arch === 'ascend-immortal' ? ['technique', 'artifact', 'bond']
     : arch === 'sit-death' ? ['technique', 'artifact', 'bond']
     : arch === 'fall-demonic' ? ['artifact', 'bloodline', 'technique']
-    : arch === 'found-sect' ? ['sect', 'technique', 'token']
+    : arch === 'found-sect' ? ['sect-lineage', 'technique', 'token']
     : arch === 'reincarnate' ? ['bloodline', 'technique', 'token']
     : arch === 'escape-world' ? ['token', 'technique', 'artifact']
-    : arch === 'world-collapse' ? ['artifact', 'bond', 'sect']
+    : arch === 'world-collapse' ? ['artifact', 'bond', 'sect-lineage']
     : ['technique', 'token', 'bond']
   );
 

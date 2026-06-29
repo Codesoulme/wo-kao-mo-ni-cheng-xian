@@ -1,6 +1,9 @@
 // @ts-nocheck - api route, types not critical
 
 import { NextRequest } from 'next/server';
+
+// ★ 任务 E 修复：heartbeat 改为模块作用域变量，避免并发请求共享 globalThis 单例互相清理
+let sseHeartbeat: NodeJS.Timeout | null = null;
 import { db } from '@/lib/db';
 import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { buildStateContext, executeAIEvent, stateToResponse } from '@/lib/xianxia/engine';
@@ -182,7 +185,7 @@ export async function POST(req: NextRequest) {
         });
 
         // ★ 心跳：每 3 秒推一个 comment 行（防止 Trae IDE 浏览器 30 秒无数据断开）
-        (globalThis as any).__sseHeartbeat = setInterval(() => {
+        sseHeartbeat = setInterval(() => {
           try {
             send('heartbeat', { type: 'heartbeat', time: Date.now() });
           } catch {}
@@ -226,11 +229,11 @@ export async function POST(req: NextRequest) {
           }, { qualityMode });
         } catch (e: any) {
           send('error', { error: `AI generation failed: ${e?.message}` });
-          try { if (typeof (globalThis as any).__sseHeartbeat !== 'undefined') clearInterval((globalThis as any).__sseHeartbeat); } catch {}
+          try { if (sseHeartbeat) { clearInterval(sseHeartbeat); sseHeartbeat = null; } } catch {}
           close();
           return;
         }
-        try { if (typeof (globalThis as any).__sseHeartbeat !== 'undefined') clearInterval((globalThis as any).__sseHeartbeat); } catch {};
+        try { if (sseHeartbeat) { clearInterval(sseHeartbeat); sseHeartbeat = null; } } catch {};
         console.log('[SSE] LLM done, rawText length:', rawText.length, 'extracted narrative:', prevNarrative.length);
 
         // 解析完整 rawText 为 aiOutput
@@ -423,7 +426,7 @@ export async function POST(req: NextRequest) {
           }
 
         // 7) 推送 done（数据库已同步写入，刷新页面不会丢失气泡）
-        try { if (typeof (globalThis as any).__sseHeartbeat !== "undefined") clearInterval((globalThis as any).__sseHeartbeat); } catch {}
+        try { if (sseHeartbeat) { clearInterval(sseHeartbeat); sseHeartbeat = null; } } catch {}
         send('done', {
           type: 'done',
           eventId: createdEvent?.id,
@@ -455,7 +458,7 @@ export async function POST(req: NextRequest) {
             detail: String(err?.stack || err?.message || err),
           });
         } catch {}
-        try { if (typeof (globalThis as any).__sseHeartbeat !== 'undefined') clearInterval((globalThis as any).__sseHeartbeat); } catch {}
+        try { if (sseHeartbeat) { clearInterval(sseHeartbeat); sseHeartbeat = null; } } catch {}
         try { close(); } catch {}
       }
     },

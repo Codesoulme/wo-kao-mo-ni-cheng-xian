@@ -142,13 +142,13 @@ export function assembleZonePrompt(parts: ZonePromptParts): { systemPrompt: stri
     parts.includeFewShot !== false ? `# Few-shot 合规/违规示例\n\n${renderFewShotExamples()}` : '',
   ].filter(Boolean);
 
-  const userChunks: string[] = [
+  const userChunks: string[] = ([
     parts.userPrefix,
     parts.userState ? `# State 区\n\n${parts.userState}` : '',
     parts.userMemories ? `# Memory 区\n\n${parts.userMemories}` : '',
     parts.userDialogue ? `# Dialogue 区\n\n${parts.userDialogue}` : '',
     parts.userSuffix,
-  ].filter(Boolean);
+  ] as (string | undefined)[]).filter(Boolean) as string[];
 
   return {
     systemPrompt: systemChunks.join('\n\n'),

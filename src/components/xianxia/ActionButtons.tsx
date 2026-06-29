@@ -300,9 +300,9 @@ export function ActionButtons() {
       // ★ 更新角色状态
       const latestCharacter = useGameStore.getState().character;
       if (doneData.state) {
-        setCharacter({ ...latestCharacter, ...doneData.state, worldCalendar: doneData.worldTime || doneData.worldCalendar });
+        setCharacter({ ...(latestCharacter as any), ...doneData.state, worldCalendar: doneData.worldTime || doneData.worldCalendar });
       } else if (doneData.worldCalendar || doneData.worldTime) {
-        setCharacter({ ...latestCharacter, worldCalendar: doneData.worldTime || doneData.worldCalendar });
+        setCharacter({ ...(latestCharacter as any), worldCalendar: doneData.worldTime || doneData.worldCalendar });
       }
       if (doneData.worldCalendar) setWorldCalendar(doneData.worldCalendar);
       setLastChange(doneData.changes || null);
@@ -364,7 +364,7 @@ export function ActionButtons() {
       if (doneData.breakthrough) {
         if (doneData.breakthrough.major) {
           toast.success('大境界突破！', { description: `踏入新境界` });
-          triggerBreakthroughCeremony(doneData.state, latestCharacter);
+          triggerBreakthroughCeremony(doneData.state, latestCharacter as CharacterState);
         } else {
           toast.success('小境界突破！', { description: `晋至${doneData.state.realmLevel + 1}层` });
         }
@@ -382,7 +382,7 @@ export function ActionButtons() {
       }
       if (!doneData.hasChoice && doneData.state && doneData.state.alive) {
         preloadRef.current.key = null;
-        prepareNextTurn(latestCharacter?.id);
+        prepareNextTurn(latestCharacter?.id || '');
       }
     } catch (err: any) {
       // 主动取消（刷新/离开页面/重复点击）不显示错误提示

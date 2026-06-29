@@ -25,24 +25,25 @@ export function evalDSL(node: DSLNode, ctx: EvalContext): any {
       if (node.args.length < 2) {
         throw new Error('DSL: op "div" requires at least 2 args');
       }
-      return node.args
-        .map((a) => Number(evalDSL(a, ctx)))
-        .reduce<number>((a, b) => {
-          if (b === 0) throw new Error('DSL: division by zero');
-          return a / b;
-        });
+      const values = node.args.map((a) => Number(evalDSL(a, ctx)));
+      // BUGFIX: 之前用 reduce(..., 1) 在 args=[80] 时返回 1/80=0.0125 而非 80
+      // 修法：取 args[0] 作为初值，从 args[1] 开始 reduce
+      return values.slice(1).reduce<number>((a, b) => {
+        if (b === 0) throw new Error('DSL: division by zero');
+        return a / b;
+      }, values[0]);
     }
 
     case 'mod': {
       if (node.args.length < 2) {
         throw new Error('DSL: op "mod" requires at least 2 args');
       }
-      return node.args
-        .map((a) => Number(evalDSL(a, ctx)))
-        .reduce<number>((a, b) => {
-          if (b === 0) throw new Error('DSL: modulo by zero');
-          return a % b;
-        });
+      const values = node.args.map((a) => Number(evalDSL(a, ctx)));
+      // BUGFIX: 同 div —— init 不能是 1
+      return values.slice(1).reduce<number>((a, b) => {
+        if (b === 0) throw new Error('DSL: modulo by zero');
+        return a % b;
+      }, values[0]);
     }
 
     case 'gt':

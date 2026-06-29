@@ -9,16 +9,9 @@ import {
   buildQuestEntriesFromThreads,
   evaluateSectPhase,
   summarizeSectTrajectoryForPrompt,
-  type QuestEntry,
 } from '@/lib/xianxia/engine';
+import type { QuestEntry, SectHistoryEntry } from '@/lib/xianxia/types';
 
-type SectHistoryEntry = {
-  age: number;
-  event: string;
-  phase?: string;
-  promotion?: string;
-  narrative?: string;
-};
 import { ChevronDown, ChevronUp, Mountain, Scroll, Shield, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 

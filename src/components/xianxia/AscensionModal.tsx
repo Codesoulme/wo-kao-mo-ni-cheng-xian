@@ -72,7 +72,7 @@ export function AscensionModal({
         <button
           data-testid="ascension-action-end"
           disabled={busy}
-          onClick={handleEnd}
+          onClick={endAscension}
           className="px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white text-sm"
         >
           了结

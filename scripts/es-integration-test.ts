@@ -23,6 +23,7 @@
 import { db } from '../src/lib/db';
 import {
   appendEvent,
+  appendEventsBatch,
   getEvents,
   getLatestEvent,
 } from '../src/lib/xianxia/events/store';
@@ -280,6 +281,101 @@ export async function runIntegrationTest(): Promise<IntegrationTestResult> {
       );
       passed++;
       results.push({ test: 'timeline-export', passed: true });
+    }
+
+    // 8. appendEventsBatch 批量提交
+    {
+      // 拿当前最新 version（前面 4 个 event 后 → v3）
+      const before = await getLatestEvent(testChar.id);
+      const startVersion = before?.aggregateVersion ?? -1;
+
+      // 一次事务提交 3 个事件
+      const created = await appendEventsBatch(testChar.id, [
+        {
+          type: 'character.cultivation-exp.changed',
+          data: { type: 'character.cultivation-exp.changed', delta: 50, newValue: 60, reason: 'batch-1' },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: 22,
+        },
+        {
+          type: 'character.hp.changed',
+          data: { type: 'character.hp.changed', delta: -10, newValue: 90, reason: 'batch-2' },
+          source: 'system-tick',
+          triggerActor: 'system',
+          createdAtAge: 22,
+        },
+        {
+          type: 'character.item.added',
+          data: { type: 'character.item.added', itemId: 'batch-item-3', item: { name: '批量剑' } },
+          source: 'user-action',
+          triggerActor: 'player',
+          createdAtAge: 22,
+        },
+      ]);
+      if (created.length !== 3) {
+        throw new Error(`Batch should create 3 events, got ${created.length}`);
+      }
+      // 链式引用 + aggregateVersion 连续
+      if (created[0].aggregateVersion !== startVersion + 1) {
+        throw new Error(`Batch[0] version should be ${startVersion + 1}, got ${created[0].aggregateVersion}`);
+      }
+      if (created[1].aggregateVersion !== startVersion + 2) {
+        throw new Error(`Batch[1] version should be ${startVersion + 2}, got ${created[1].aggregateVersion}`);
+      }
+      if (created[2].aggregateVersion !== startVersion + 3) {
+        throw new Error(`Batch[2] version should be ${startVersion + 3}, got ${created[2].aggregateVersion}`);
+      }
+      if (created[0].previousEventId !== before?.id) {
+        throw new Error(`Batch[0] prev should be latest (${before?.id}), got ${created[0].previousEventId}`);
+      }
+      if (created[1].previousEventId !== created[0].id) {
+        throw new Error(`Batch[1] prev should be Batch[0].id, got ${created[1].previousEventId}`);
+      }
+      if (created[2].previousEventId !== created[1].id) {
+        throw new Error(`Batch[2] prev should be Batch[1].id, got ${created[2].previousEventId}`);
+      }
+      // 总数应该是 4 + 3 = 7
+      const all = await getEvents(testChar.id);
+      if (all.length !== 7) {
+        throw new Error(`After batch, total events should be 7, got ${all.length}`);
+      }
+      // reducer 验证 batch 后 state 正确
+      const reduced = reduceCharacterState(
+        {
+          characterId: testChar.id,
+          name: testChar.name ?? '',
+          age: testChar.age,
+          realm: testChar.realm,
+          cultivationExp: 0,
+          hp: 100,
+          maxHp: 100,
+          spiritStones: testChar.spiritStones,
+          alive: testChar.alive,
+          lifespan: testChar.lifespan,
+          inventory: [] as Array<{ id: string; item: any }>,
+        },
+        all
+      );
+      if (reduced.cultivationExp !== 60) {
+        throw new Error(`After batch, cultivationExp should be 60, got ${reduced.cultivationExp}`);
+      }
+      if (reduced.hp !== 90) {
+        throw new Error(`After batch, hp should be 90, got ${reduced.hp}`);
+      }
+      if (reduced.inventory.length !== 2) {
+        throw new Error(`After batch, inventory should have 2 items, got ${reduced.inventory.length}`);
+      }
+      // 空数组边界
+      const empty = await appendEventsBatch(testChar.id, []);
+      if (empty.length !== 0) {
+        throw new Error(`Empty batch should return [], got length ${empty.length}`);
+      }
+      console.log(
+        `[8] Batch append validated (3 events chain v${created[0].aggregateVersion}..v${created[2].aggregateVersion}, total=${all.length}, empty batch returns [])`,
+      );
+      passed++;
+      results.push({ test: 'batch-append', passed: true });
     }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);

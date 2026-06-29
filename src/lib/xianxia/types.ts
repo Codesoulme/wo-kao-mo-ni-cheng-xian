@@ -8,10 +8,16 @@ export type Realm =
   | 'mortal'           // 凡人
   | 'qi_refining'      // 炼气
   | 'foundation'       // 筑基
+  | 'foundation_building' // 筑基(旧)
+  | 'soul_formation'   // 结丹(旧)
   | 'golden_core'      // 金丹
   | 'nascent_soul'     // 元婴
   | 'spirit_severing'  // 化神
   | 'great_vehicle'    // 大乘
+  | 'mahayana'         // 大乘(旧)
+  | 'deity_transformation' // 神化(旧)
+  | 'void_refinement'  // 虚炼(旧)
+  | 'unity'            // 合一(旧)
   | 'tribulation'      // 渡劫
   | 'ascension';       // 飞升
 
@@ -269,6 +275,43 @@ export const REALM_TRAITS: Record<Realm, RealmTraits> = {
     combatStyle: ['\u4e0d\u4ee5\u5e38\u89c4\u6597\u6cd5\u8bb0\u5f55'],
     resourceNeeds: ['\u4f20\u627f\u843d\u70b9', '\u4e16\u754c\u9057\u54cd\u627f\u63a5'],
     riskTags: ['\u9057\u54cd\u88ab\u66f2\u89e3', '\u9053\u7edf\u5931\u4f20'],
+  },
+  // ===== Phase-M\uff1a\u4ee5\u4e0b\u4e3a\u522b\u540d/\u65e7\u79f0\uff08\u4fdd\u6301 REALM_TRAITS \u8986\u76d6 Realm union \u5168\u96c6\uff09 =====
+  foundation_building: {
+    cultivationMode: '\u4e0e foundation \u540c\u4e49\u65e7\u79f0',
+    bottleneck: '\u540c foundation',
+    breakthroughTrial: '\u540c foundation',
+    capabilities: [], limitations: [], worldAccess: [], socialWeight: '', combatStyle: [], resourceNeeds: [], riskTags: [],
+  },
+  soul_formation: {
+    cultivationMode: '\u4e0e golden_core \u540c\u4e49\u65e7\u79f0',
+    bottleneck: '\u540c golden_core',
+    breakthroughTrial: '\u540c golden_core',
+    capabilities: [], limitations: [], worldAccess: [], socialWeight: '', combatStyle: [], resourceNeeds: [], riskTags: [],
+  },
+  mahayana: {
+    cultivationMode: '\u4e0e great_vehicle \u540c\u4e49\u65e7\u79f0',
+    bottleneck: '\u540c great_vehicle',
+    breakthroughTrial: '\u540c great_vehicle',
+    capabilities: [], limitations: [], worldAccess: [], socialWeight: '', combatStyle: [], resourceNeeds: [], riskTags: [],
+  },
+  deity_transformation: {
+    cultivationMode: '\u5316\u795e\u4e4b\u4e0a\u7684\u795e\u8f6c\u4e4b\u5883',
+    bottleneck: '\u795e\u8f6c\u540e\u9700\u91cd\u5851\u9053\u679c',
+    breakthroughTrial: '\u5929\u9053\u53cd\u54fa\u4e0e\u795e\u6027\u955c\u8bd5',
+    capabilities: [], limitations: [], worldAccess: [], socialWeight: '', combatStyle: [], resourceNeeds: [], riskTags: [],
+  },
+  void_refinement: {
+    cultivationMode: '\u865a\u7a7a\u4e2d\u7ec3\u9b42\u4e0e\u9053\u679c',
+    bottleneck: '\u865a\u7a7a\u5fc3\u9b42\u754c\u9650',
+    breakthroughTrial: '\u865a\u7a7a\u98ce\u9769\u4e0e\u5fc3\u9b42\u91cd\u5851',
+    capabilities: [], limitations: [], worldAccess: [], socialWeight: '', combatStyle: [], resourceNeeds: [], riskTags: [],
+  },
+  unity: {
+    cultivationMode: '\u4e0e\u9053\u5408\u4e00\u4e4b\u5883',
+    bottleneck: '\u4e0e\u9053\u5408\u4e00\u540e\u9700\u786e\u8ba4\u672c\u4f53',
+    breakthroughTrial: '\u9053\u6212\u53cd\u54fa',
+    capabilities: [], limitations: [], worldAccess: [], socialWeight: '', combatStyle: [], resourceNeeds: [], riskTags: [],
   },
 };
 
@@ -1144,6 +1187,9 @@ export interface AIEventOutput {
   // ===== Task 23 新增 =====
   // AI 授予玩家灵宠（如收服妖兽幼崽、前辈相赠、灵宠店购买）
   newPets?: Pet[];
+
+  // ===== Phase-M：fallback 标记 =====
+  isFallbackGenerated?: boolean;
 }
 
 export interface AttributeChange {
@@ -1342,6 +1388,9 @@ export interface EngineStateContext {
   // 当前正在探索的秘境（仅 explore route 调用时设置，让 AI 围绕此秘境生成探索事件）
   currentExploration?: SecretRealm;
   discoveredRealms?: SecretRealm[];
+  // ===== Phase-M: 风格锚定 + 实体库 prompt 注入（advance-preload 写入） =====
+  styleAnchorsPrompt?: string;
+  entityEntriesPrompt?: string;
 }
 
 // ==================== 命节点 ====================
@@ -1462,6 +1511,24 @@ export interface CharacterState {
   // ===== AI-74: Tribulation session 持久化 =====
   tribulationPending?: TribulationSession | null;   // 待渡劫会话
   tribulationResult?: { passed: boolean; narrative: string } | null;  // 最近渡劫结果
+  // ===== Phase-M: statuses 别名（engine.ts 中引用，部分逻辑以 character.statuses 表达） =====
+  statuses?: StatusEntry[];
+  // ===== Task D 合并：store.ts 原 CharacterState 独有字段（保持 optional 以兼容 dbToState） =====
+  // 展示用境界名/色（由 stateToResponse 在 engine.ts:5119 注入）
+  realmName?: string;
+  realmColor?: string;
+  // 展示用境界最大级（profile override 后）
+  realmMaxLevel?: number;
+  // 境界整体强度倍率（profile override 后）
+  realmPowerMultiplier?: number;
+  // 每岁固定修为加成（来自 equipped + activeStatuses add cultivationExp 之和）
+  cultivationFlatBonus?: number;
+  // 最近一次突破记录（最近状态用）
+  lastBreakthrough?: { newRealm: string } | null;
+  // 世界历（与 db.Character.worldCalendar 镜像）
+  worldCalendar?: { eraName: string; calendarYear: number; elapsedDays: number };
+  // alive 的别名（UI 部分代码用 dead 表达）
+  dead?: boolean;
 }
 
 // ==================== AI-66: 宗门历史条目 ====================
@@ -1471,6 +1538,52 @@ export interface SectHistoryEntry {
   joinedAge: number;
   leftAge?: number;            // 未离开则为 undefined
   reason: 'joined' | 'left' | 'banished' | 'ascended' | 'retired' | 'martyred';
+}
+
+// ==================== AI-I4xx: 宗门兴衰系统类型 ====================
+export type SectPhase = 'founding' | 'prosperous' | 'stable' | 'declining' | 'crisis' | 'scattered' | 'remnant';
+export interface SectEvent {
+  id: string;
+  sectId: string;
+  age: number;
+  kind: string;
+  phase: SectPhase;
+  narrative: string;
+  impact: number;
+  description?: string;
+  severity?: 'info' | 'warning' | 'critical' | number;
+  characterIds?: string[];
+  worldFactIds?: string[];
+}
+export interface SectPowerMetric {
+  sectId: string;
+  realmPower: number;
+  internalCohesion: number;
+  externalReputation: number;
+  resourceReserve: number;
+  resourceStock?: number;
+  reputation?: number;
+  memberCount: number;
+  combatPower?: number;
+  timeStamp?: number;
+}
+export interface SectTrajectory {
+  sectId: string;
+  factionId?: string;
+  fromPhase: SectPhase;
+  toPhase: SectPhase;
+  phase?: SectPhase;
+  startedAge: number;
+  endedAge?: number;
+  triggers: string[];
+  currentLeader?: string;
+  fate?: string;
+  history?: SectEvent[];
+  powerCurve?: SectPowerMetric[];
+}
+export interface SectInfluenceMap {
+  sectId: string;
+  influence: Record<string, number>;
 }
 
 // ==================== Task 21: 阵法系统 ====================
@@ -2809,7 +2922,14 @@ export type InheritanceKind =
   | 'tribal-clan'
   | 'sect-lineage'
   | 'blood-oath'
-  | 'destiny-thread';
+  | 'destiny-thread'
+  | 'mentor-guild'
+  | 'artifact'
+  | 'secret-tome'
+  | 'talisman'
+  | 'technique'
+  | 'token'
+  | 'bond';
 
 /**
  * AI-I401: 传承接收人（被传承者）的结构化记录。
@@ -2948,4 +3068,9 @@ export interface FatePredictedOutcome {
   probability: number;
   rationale: string;
   alternativeBranches: string[];
+  predictedAge?: number;
+  title?: string;
+  eventKind?: string;
+  narrative?: string;
+  urgency?: 'low' | 'normal' | 'high' | 'critical';
 }

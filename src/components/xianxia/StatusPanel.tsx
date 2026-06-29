@@ -120,10 +120,10 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 className="relative rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 transition-transform active:scale-95"
               >
                 <RealmOrb
-                  realmColor={character.realmColor}
-                  realmName={character.realmName}
+                  realmColor={character.realmColor ?? '#6b7280'}
+                  realmName={character.realmName ?? '凡人'}
                   realmLevel={character.realmLevel}
-                  realmMaxLevel={character.realmMaxLevel}
+                  realmMaxLevel={character.realmMaxLevel ?? 0}
                   cultivationExp={character.cultivationExp}
                   expToBreak={character.expToBreak}
                   size="sm"
@@ -228,7 +228,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                     style={{ color: character.realmColor }}
                     className="font-semibold font-serif-cn truncate max-w-[118px]"
                   >
-                    {character.realmName}{character.realmMaxLevel > 0 ? ` ${character.realmLevel + 1}层` : ''}
+                    {character.realmName ?? '凡人'}{(character.realmMaxLevel ?? 0) > 0 ? ` ${character.realmLevel + 1}层` : ''}
                   </span>
                   <div className="flex-1 h-1.5 bg-muted/60 rounded-full overflow-hidden min-w-[56px]">
                     <div

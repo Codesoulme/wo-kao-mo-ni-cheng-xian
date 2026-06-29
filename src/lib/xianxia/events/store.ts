@@ -79,6 +79,48 @@ export async function getLatestEvent(characterId: string): Promise<Event | null>
   return row ? toEvent(row) : null;
 }
 
+// appendEventsBatch：批量 append（一次事务内）。
+// 价值：character.create / settlement / 多事件触发场景一次提交 N 个 event，
+//       共享同一个事务 + 同一段链（aggregateVersion 连续递增 + previousEventId 链式闭环）。
+// 约束：events 按入参顺序写入；aggregateVersion 在 latest 基础上 +1..+N。
+//       失败时整批回滚——调用方拿到的要么是全部 N 条 event，要么是 0 条。
+export async function appendEventsBatch(
+  characterId: string,
+  events: Array<Omit<AppendEventInput, 'characterId'>>
+): Promise<Event[]> {
+  if (!Array.isArray(events) || events.length === 0) return [];
+  return await db.$transaction(async (tx) => {
+    const latest = await tx.event.findFirst({
+      where: { characterId },
+      orderBy: { aggregateVersion: 'desc' },
+      select: { id: true, aggregateVersion: true },
+    });
+    let prevId: string | null = latest?.id ?? null;
+    let version: number = (latest?.aggregateVersion ?? -1) + 1;
+    const created: Event[] = [];
+    for (const e of events) {
+      const row = await tx.event.create({
+        data: {
+          id: generateEntityId('evt'),
+          characterId,
+          type: e.type,
+          data: e.data as any,
+          previousEventId: prevId,
+          aggregateVersion: version,
+          source: e.source,
+          aiPromptHash: e.aiPromptHash ?? null,
+          triggerActor: e.triggerActor,
+          createdAtAge: e.createdAtAge ?? null,
+        },
+      });
+      created.push(toEvent(row));
+      prevId = row.id;
+      version += 1;
+    }
+    return created;
+  });
+}
+
 // getEventsByType：按类型筛事件（审计、调试用）。
 export async function getEventsByType(characterId: string, type: EventType): Promise<Event[]> {
   return getEvents(characterId, { type });

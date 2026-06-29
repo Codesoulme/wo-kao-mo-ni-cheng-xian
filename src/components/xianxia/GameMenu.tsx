@@ -145,9 +145,9 @@ export function GameMenu() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">境界</span>
-                  <span className="text-foreground" style={{ color: character.realmColor }}>
-                    {character.realmName}
-                    {character.realmMaxLevel > 0 ? ` ${character.realmLevel + 1}层` : ''}
+                  <span className="text-foreground" style={{ color: character.realmColor ?? '#6b7280' }}>
+                    {character.realmName ?? '凡人'}
+                    {(character.realmMaxLevel ?? 0) > 0 ? ` ${character.realmLevel + 1}层` : ''}
                   </span>
                 </div>
                 <div className="flex justify-between">

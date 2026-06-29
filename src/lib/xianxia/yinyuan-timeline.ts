@@ -92,7 +92,7 @@ export function buildYinyuanTimeline(input: {
     archetype: 'predicted',
     title: p.title || p.eventKind || '预兆',
     narrative: p.narrative || '命途渐露征兆',
-    urgency: (['low', 'normal', 'high', 'critical'].includes(p.urgency) ? p.urgency : 'normal') as any,
+    urgency: ((['low', 'normal', 'high', 'critical'] as string[]).includes(p.urgency as string) ? p.urgency : 'normal') as any,
   }));
 
   // 4. 未触发命运节点（伏笔）

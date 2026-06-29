@@ -23,7 +23,7 @@ export function reduceCharacterState(
 // applyEvent：单事件 reducer。纯函数，返回新 state（不修改入参）。
 // 注意 case 顺序与 EventType union 一一对应；未来加新 type 必须在这里加 case。
 export function applyEvent(state: CharacterStateSnapshot, event: Event): CharacterStateSnapshot {
-  const data = event.data as EventData;
+  const data: any = event.data;
   switch (event.type) {
     case 'character.created':
       // 初始创建事件：覆盖 name + realm（其他字段由 initial state 提供）

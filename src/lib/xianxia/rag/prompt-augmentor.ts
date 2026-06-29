@@ -11,7 +11,7 @@ export function formatFactsForPrompt(facts: WorldFact[]): string {
   if (facts.length === 0) return '(无相关世界观事实)';
   return facts
     .map((f, i) => {
-      const tags = (f.tags || []).length ? ` [tags: ${f.tags.join(',')}]` : '';
+      const tags = ((f.tags as string[] | undefined) || []).length ? ` [tags: ${(f.tags as string[]).join(',')}]` : '';
       return `${i + 1}. [${f.kind}] ${f.title} — ${f.summary} (置信度 ${f.confidence.toFixed(2)}, 来源 ${f.source}${tags})`;
     })
     .join('\n');

@@ -66,9 +66,9 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
               }}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="font-serif-cn font-bold text-lg" style={{ color: current.realmColor }}>
-                  {current.realmName}
-                  {current.realmMaxLevel > 0 && (
+                <span className="font-serif-cn font-bold text-lg" style={{ color: current.realmColor ?? '#6b7280' }}>
+                  {current.realmName ?? '凡人'}
+                  {(current.realmMaxLevel ?? 0) > 0 && (
                     <span className="text-xs ml-1 text-muted-foreground">
                       {current.realmLevel + 1} / {current.realmMaxLevel} 层
                     </span>
@@ -92,7 +92,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
                 label="修为进度"
                 current={current.cultivationExp}
                 max={current.expToBreak}
-                color={current.realmColor}
+                color={current.realmColor ?? '#6b7280'}
                 showText={`${current.cultivationExp} / ${current.expToBreak}`}
                 icon={<Sparkles className="w-3 h-3" />}
                 onClick={() => setSelectedAttr(ATTRIBUTE_INFO.cultivationExp)}

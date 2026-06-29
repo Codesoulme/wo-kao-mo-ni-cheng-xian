@@ -263,7 +263,7 @@ function sanitizeThreadText(text: string): string {
     .replace(new RegExp('\\u4e0d\\u80fd\\u88ab\\u540e\\u7eed\\u6d41\\u5e74\\u9057\\u5fd8', 'g'), '\u4ecd\u4e0d\u53ef\u8f7b\u653e')
     .replace(new RegExp('\\u540e\\u7eed\\u6d41\\u5e74', 'g'), '\u6765\u5e74\u5c81\u6708')
     // AI-20: 委托给 display.ts 统一 sanitize
-    .replace(/^.*$/s, (m) => sanitizeClueText(m))
+    .replace(/[\s\S]*/, (m) => sanitizeClueText(m))
     .trim();
 }
 

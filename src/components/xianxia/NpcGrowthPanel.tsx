@@ -9,6 +9,7 @@ import { realmLabel, attitudeLabel } from '@/lib/xianxia/npc-growth';
 interface NpcGrowthPanelProps {
   className?: string;
   defaultCollapsed?: boolean;
+  character?: any;
 }
 
 function testid(prefix, id) {

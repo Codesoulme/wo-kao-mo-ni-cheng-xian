@@ -143,7 +143,7 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   const recentBlueprintCategories = (state as any)._recentBlueprintCategories || [];
   const sameYearThreads = getSameYearThreads(state);
   const sameYearThread = sameYearThreads[0];
-  let blueprint = sameYearThread
+  let blueprint: EventBlueprint | null = sameYearThread
     ? buildSameYearContinuationBlueprint(sameYearThread.title)
     : pickEventBlueprint(state, recentBlueprintCategories);
 

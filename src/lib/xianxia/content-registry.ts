@@ -24,13 +24,17 @@ export type ValidationTraceCode =
   | 'empty_effect_removed'
   | 'value_clamped'
   | 'field_normalized'
-  | 'accepted';
+  | 'accepted'
+  | 'infant_blocked_combat'
+  | 'infant_blocked_choice';
 
 export interface ValidationTrace {
   severity: ValidationSeverity;
   code: ValidationTraceCode;
   field?: string;
+  attribute?: string;
   message: string;
+  source?: string;
 }
 
 export interface RegisteredContent<T> {

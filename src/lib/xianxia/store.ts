@@ -2,7 +2,10 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { TribulationSession, AscensionSession, Restriction, HeartDemonType } from './types';
+import type { TribulationSession, AscensionSession, Restriction, HeartDemonType, CharacterState } from './types';
+// ★ 任务 D 修复：消除 CharacterState 双份定义，canonical 来自 types.ts（更完整）
+//   store 层 re-export 保持旧 import 路径（`from '@/lib/xianxia/store'`）不破坏
+export type { CharacterState } from './types';
 import { selectNextProtagonist } from './engine';
 import { triggerEndingEvaluation } from './engine';
 import { tickAllNpcsForYear as libTickAllNpcsForYear } from './npc-growth';
@@ -129,72 +132,6 @@ export interface SettlementResult {
   options: SettlementOption[];
   hallRecord: SimulationHallRecord;
   createdAt: string;
-}
-
-export interface CharacterState {
-  id: string;
-  name: string;
-  gender: string;
-  age: number;
-  lifespan: number;
-  spiritualRoot: string;
-  rootDetail: string;
-  rootMultiplier: number;
-  realm: string;
-  realmName: string;
-  realmColor: string;
-  realmLevel: number;
-  realmMaxLevel: number;
-  realmProfile?: any;
-  realmPowerMultiplier?: number;
-  cultivationExp: number;
-  expToBreak: number;
-  elements: { metal: number; wood: number; water: number; fire: number; earth: number };
-  hp: number; maxHp: number;
-  mp: number; maxMp: number;
-  attack: number; defense: number; speed: number;
-  luck: number; comprehension: number;
-  spiritStones: number; reputation: number;
-  alive: boolean; ascended: boolean;
-  causeOfDeath: string;
-  faction: string; master: string; location: string;
-  fateNodes: number[];
-  isAtChoice: boolean;
-  activeStatuses: any[];
-  inventory: any[];
-  // 已装备物品数组（无槽位上限，AI 可创造性放置）
-  equipped: any[];
-  // 储物袋容量上限（无袋 5；获得储物袋后增加）
-  storageCapacity: number;
-  cultivationMultiplier: number;
-  // 每岁固定修为加成之和（来自 equipped + activeStatuses 的 add cultivationExp 效果，如聚灵佩 +5）
-  cultivationFlatBonus?: number;
-  cultivationInsight?: string;
-  // 修炼速度来源条目（引擎权威计算：灵根 + 已装备功法 + 状态词条；前端按 rarity 给来源名称上色 + 具体数字）
-  cultivationFactors?: { name: string; value: number; operation: 'multiply' | 'add'; rarity?: string; note?: string }[];
-  // AI/事件生成的非常规属性，由引擎从状态与事件投影而来，面板自动展示。
-  cultivationAttributes?: any[];
-  // ===== Task 20 新增（前端方便访问，也放在 character 上；advance/choose/interfere 返回的 state 已包含这些字段） =====
-  // 未决线索（重要剧情线索，会在后续推进/到期触发）
-  pendingThreads?: any[];
-  questEntries?: any[];
-  // 角色主动意图（引擎根据处境生成，AI 必须在事件中体现）
-  characterIntents?: any[];
-  // 进行中的战斗（若有；combatSession.status='ongoing' 时 CombatModal 全屏显示）
-  combatSession?: any | null;
-  // ===== Task 22 新增 =====
-  // 心魔值 0-100
-  heartDemon?: number;
-  // ===== Task 23 新增 =====
-  // 灵宠列表
-  pets?: any[];
-  // ===== Task 24 关联 NPC 列表（NPC growth 模块写入）
-  npcs?: any[];
-  // ===== Task 24 新增 =====
-  // 已探秘境记录（ExplorationRecord[]）—— 用于秘境面板显示冷却状态
-  exploredRealms?: any[];
-  // 当前剧情中发现的秘境入口（从未决线索/信物/状态推导）
-  discoveredRealms?: any[];
 }
 
 export interface GameEvent {
@@ -400,6 +337,7 @@ interface GameState {
   // 流式结束后、结算完成前的提示文字（'calculating' = 收获结算中）
   settlingHint: 'calculating' | null;
   setNewEventRange: (range: { start: number; end: number } | null) => void;
+  setSettlingHint: (hint: 'calculating' | null) => void;
   setSettlementResult: (result: SettlementResult | null) => void;
   addHallRecord: (record: SimulationHallRecord) => void;
   setWorldCalendar: (world: WorldCalendarState) => void;

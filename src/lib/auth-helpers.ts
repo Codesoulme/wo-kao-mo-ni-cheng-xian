@@ -21,7 +21,7 @@ export interface CurrentUser {
 
 /** 从 cookie 读 session，返回当前 user（无效/过期返回 null） */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
-  const token = cookies().get(SESSION_COOKIE_NAME)?.value;
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
 
   const session = await db.userSession.findUnique({
@@ -83,8 +83,8 @@ export async function loginUser(email: string, password: string): Promise<string
 }
 
 /** 写 session cookie（httpOnly + sameSite=lax） */
-export function setSessionCookie(token: string) {
-  cookies().set(SESSION_COOKIE_NAME, token, {
+export async function setSessionCookie(token: string) {
+  (await cookies()).set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -94,8 +94,8 @@ export function setSessionCookie(token: string) {
 }
 
 /** 清 session cookie */
-export function clearSessionCookie() {
-  cookies().delete(SESSION_COOKIE_NAME);
+export async function clearSessionCookie() {
+  (await cookies()).delete(SESSION_COOKIE_NAME);
 }
 
 /** 登出：按 token 删 session */

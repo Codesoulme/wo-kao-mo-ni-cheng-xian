@@ -64,4 +64,8 @@ export interface HierarchicalSummary {
   createdAt: number;
   /** 指向上一层（day → week → month） */
   parentId?: string;
+  /** Phase-M: 指向下一层（day → week 链） */
+  weekSummaryId?: string;
+  /** Phase-M: 指向下一层（week → month 链） */
+  monthSummaryId?: string;
 }
