@@ -249,20 +249,19 @@ export async function POST(req: NextRequest) {
             //   1. 末尾完整性检查（必须有 。！？!? 等句末标点）
             //   2. truncateNarrativeAtSentence 兜底（虽然流式已闭合但 narrative 可能 > 400 字）
             if (closed && !narrativeClosedSent) {
-              // 完整性检查：以句末标点结尾（。！？!?；；）
+              // emit narrative 完整（绝不截断玩家内容）
+              // 之前 truncateNarrativeAtSentence(400) 截断是错的——会丢重要信息（剧情转折、玉佩、机缘等）
+              // 现在 emit 完整 narrative，让玩家看到所有内容
+              // prompt 约束 LLM 写简短完整（400-600 字）来控制长度
+              // max_tokens 截断是 LLM 真实上限问题，不是客户端能截断解决的
               const lastChar = prevNarrative.trim().slice(-1);
               const isComplete = /[。！？!?;；]/.test(lastChar);
               if (!isComplete) {
-                // 不完整（LLM 被 max_tokens 截断，如"...说" / "...喊你搬柴"）
-                // 不能 return 延后（LLM 不会继续输出 rawText, client 会永远卡在"收获结算中"）
-                // 必须主动 truncateNarrativeAtSentence 截到最近完整句 + emit
-                console.warn('[SSE] narrative 字段闭合但末尾不完整（可能 LLM 被 max_tokens 截断），强制截到最近完整句:', prevNarrative.slice(-50));
+                console.warn('[SSE] narrative 末尾不完整（可能被 max_tokens 截断），保留全部内容 emit:', prevNarrative.slice(-50));
               }
-              // 兜底截断：> 400 字强制截到最近完整句；不完整时也截到最近完整句（不是 return 延后）
-              const finalNarrative = truncateNarrativeAtSentence(prevNarrative, 400);
               narrativeClosedSent = true;
-              console.log('[SSE] narrative field closed, sent narrative_complete event (len:', finalNarrative.length, ')');
-              send('narrative_complete', { type: 'narrative_complete', narrative: finalNarrative });
+              console.log('[SSE] narrative field closed, sent narrative_complete event (len:', prevNarrative.length, ', complete:', isComplete, ')');
+              send('narrative_complete', { type: 'narrative_complete', narrative: prevNarrative });
             }
           }, { qualityMode });
         } catch (e: any) {
