@@ -319,26 +319,31 @@ export async function POST(req: NextRequest) {
         try {
           const execResult = executeAIEvent(state, aiOutput);
           finalState = execResult.state;
-          // 凡人基础属性按年龄强制 baseline（修 user 反馈"基础属性一出生给全部值不合理"）
-          // 凡人阶段（realm=mortal）按 age 自然成长：婴儿(0岁)=0, 12岁=12, 50岁=30 等
-          // 引入期（realm=引气/...）不覆盖（属性由 LLM 事件 + 初始值 + realm 进阶决定）
+          // 凡人基础属性补底（修 user 反馈"基础属性一出生给全部值不合理"+"强制给值不合理"）
+          // 不是强制覆盖（仙人孩子应继承父母根骨），而是补底 max(LLM给的值, age_baseline × rootMultiplier)：
+          //   - LLM 给的值被尊重（不强制覆盖）
+          //   - 补底公式按 age 和 rootMultiplier（灵根倍率）计算"凡人年龄应有的最低值"
+          //   - 灵根 0.3（凡人杂灵根）= 年龄基础 × 0.3（弱）
+          //   - 灵根 1.0（单灵根）= 年龄基础 × 1.0（标准）
+          //   - 灵根 2.0+（天灵根/异灵根）= 年龄基础 × 2.0+（仙人孩子，可能一出生就有基础）
+          // 引入期（realm=引气）不补底（realm 进阶时 LLM/引擎自己管）
           if (finalState.realm === 'mortal') {
             const age = finalState.age;
-            finalState.physicalFoundation = Math.round(5 + age * 1.5);
-            finalState.attack = Math.floor(age * 0.6);
-            finalState.defense = Math.floor(age * 0.3);
-            finalState.speed = 3 + Math.floor(age * 0.4);
-            finalState.spiritualSense = 3 + Math.floor(age * 0.4);
-            finalState.soulStrength = 3 + Math.floor(age * 0.3);
-            finalState.comprehension = Math.floor(age * 0.3);
-            // 凡人无修为
-            finalState.cultivationExp = 0;
-            finalState.expToBreak = 100;
-            // 凡人 maxHp 按年龄涨（避免 0 岁 maxHp 100 不合理）
-            finalState.maxHp = 30 + age * 3;
-            finalState.maxMp = 10 + Math.floor(age * 0.5);
-            if (finalState.hp > finalState.maxHp) finalState.hp = finalState.maxHp;
-            if (finalState.mp > finalState.maxMp) finalState.mp = finalState.maxMp;
+            const mul = Number(finalState.rootMultiplier ?? 0.3);  // 默认凡人 0.3 倍
+            // 补底：年龄基础 × 灵根倍率
+            finalState.attack = Math.max(finalState.attack ?? 0, Math.floor(age * 0.6 * mul));
+            finalState.defense = Math.max(finalState.defense ?? 0, Math.floor(age * 0.3 * mul));
+            finalState.speed = Math.max(finalState.speed ?? 0, 3 + Math.floor(age * 0.4 * mul));
+            finalState.physicalFoundation = Math.max(finalState.physicalFoundation ?? 0, Math.round(5 + age * 1.5 * mul));
+            finalState.spiritualSense = Math.max(finalState.spiritualSense ?? 0, 3 + Math.floor(age * 0.4 * mul));
+            finalState.soulStrength = Math.max(finalState.soulStrength ?? 0, 3 + Math.floor(age * 0.3 * mul));
+            // maxHp / maxMp 补底（避免 0 岁 maxHp 100 不合理）
+            const newMaxHp = Math.max(finalState.maxHp ?? 0, 30 + age * 3);
+            const newMaxMp = Math.max(finalState.maxMp ?? 0, 10 + Math.floor(age * 0.5));
+            finalState.maxHp = newMaxHp;
+            finalState.maxMp = newMaxMp;
+            if ((finalState.hp ?? 0) > finalState.maxHp) finalState.hp = finalState.maxHp;
+            if ((finalState.mp ?? 0) > finalState.maxMp) finalState.mp = finalState.maxMp;
           }
           displayEffects = buildEventDisplayEffects({
             before: state,
