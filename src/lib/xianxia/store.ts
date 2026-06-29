@@ -21,11 +21,16 @@ export const streamingRef: { current: StreamingState | null } = { current: null 
 
 // 批 15: 内部 helper —— setter 在 closure 内传入 get()，helper 自己取 character.id
 // 无 character 时跳过 appendEvent；appendEvent 失败仅 console.error（不抛）
+// 关键架构约束：ES (appendEvent) 是服务端权威 —— 客户端 streaming 只更新本地 store，
+// 不直接写 ES 事件（避免 client bundle 跑 Prisma）。服务端 API (advance route) 完成后会单独
+// 调 appendEvent 记录 ES 事件，客户端 _tryAppendEvent 在浏览器是 no-op。
 function _tryAppendEvent(
   get: () => any,
   type: 'character.inheritance-pool.set' | 'character.inheritance-candidates.set' | 'character.inheritance-ending-summary.set' | 'character.end-result.set' | 'character.settlement-result.set' | 'character.streaming-narrative.started',
   data: any
 ): void {
+  // 客户端守卫：Prisma 不能在浏览器跑，ES 事件由服务端 API 统一写入
+  if (typeof window !== 'undefined') return;
   try {
     const cid = get()?.character?.id;
     if (!cid || typeof cid !== 'string') return;

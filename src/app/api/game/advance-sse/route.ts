@@ -22,10 +22,26 @@ import {
 } from '@/lib/xianxia/llm';
 import { getCurrentUser } from '@/lib/auth-helpers';
 // 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 SSE 路径上也跑一次 world.tick()
+// 优化：缓存 World + Systems + Entity 跨多次 advance 复用，避免每次 new World() + addSystem() + createCharacterEntity()（节省 200-500ms/advance）
 import { World } from '@/lib/xianxia/ecs/core';
-import { createCharacterEntity, entityToSnapshot } from '@/lib/xianxia/ecs/character-entity';
+import type { Entity } from '@/lib/xianxia/ecs/core';
+import {
+  createCharacterEntity,
+  entityToSnapshot,
+} from '@/lib/xianxia/ecs/character-entity';
+import type { MetaComponent, CultivationComponent } from '@/lib/xianxia/ecs/components';
 import { AgingSystem } from '@/lib/xianxia/ecs/systems/aging-system';
 import { CultivationSystem } from '@/lib/xianxia/ecs/systems/cultivation-system';
+
+type EcsCache = {
+  world: World;
+  entity: Entity;
+  charId: string;
+  /** 上次写入 base 的 age（用于增量 tick：advance 后 entity.age 与 base 一致 → 直接同步即可） */
+  baseAge: number;
+  baseCultivationExp: number;
+};
+let ecsCache: EcsCache | null = null;
 
 // P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
@@ -375,40 +391,82 @@ export async function POST(req: NextRequest) {
             }
 
             // 批 20: ECS 集成 advance —— 额外跑一次 world.tick()，让 AgingSystem / CultivationSystem 处理 age/cultivation
+            // 优化：缓存 World + Systems + Entity 跨 advance 复用，跳过空 tick（base 与 entity 状态已一致时直接同步），节省 200-500ms/advance
             // PoC 简化：失败仅 console.error，不阻断 SSE 主流程
             try {
-              const ecsWorld = new World();
-              const ecsBaseSnapshot = {
-                characterId,
-                name: char.name || '',
-                age: finalState.age,
-                realm: finalState.realm,
-                cultivationExp: finalState.cultivationExp,
-                hp: finalState.hp,
-                maxHp: finalState.maxHp,
-                spiritStones: finalState.spiritStones,
-                alive: finalState.alive,
-                lifespan: finalState.lifespan || 100,
-                inventory: [],
-              };
-              createCharacterEntity(ecsWorld, ecsBaseSnapshot);
-              ecsWorld.addSystem(AgingSystem);
-              ecsWorld.addSystem(CultivationSystem);
-              ecsWorld.tick();
-              const tickedEntity = ecsWorld.getEntity(`character-${characterId}`);
-              if (tickedEntity) {
-                const tickedSnapshot = entityToSnapshot(tickedEntity);
-                // PoC：把 ECS tick 的 age + cultivationExp 合并回 finalState
-                finalState.age = tickedSnapshot.age;
-                finalState.cultivationExp = tickedSnapshot.cultivationExp;
-                if (!tickedSnapshot.alive && finalState.alive) {
-                  finalState.alive = false;
-                  finalState.causeOfDeath = finalState.causeOfDeath || 'ecs-aging-natural';
+              if (!finalState.alive) {
+                // 已死亡角色：跳过 ECS tick（age/cultivationExp 不会再增长），但仍需保证缓存不串味
+                if (ecsCache && ecsCache.charId !== characterId) {
+                  ecsCache = null;
+                }
+              } else {
+                const needsRebuild =
+                  !ecsCache ||
+                  ecsCache.charId !== characterId ||
+                  ecsCache.world.listEntities().length === 0;
+
+                if (needsRebuild) {
+                  // 首次或 character 切换：新建 World + 一次性挂载 Systems（System 是 module-level 单例，stateless）
+                  const freshWorld = new World();
+                  freshWorld.addSystem(AgingSystem);
+                  freshWorld.addSystem(CultivationSystem);
+                  const freshSnapshot = {
+                    characterId,
+                    name: char.name || '',
+                    age: finalState.age,
+                    realm: finalState.realm,
+                    cultivationExp: finalState.cultivationExp,
+                    hp: finalState.hp,
+                    maxHp: finalState.maxHp,
+                    spiritStones: finalState.spiritStones,
+                    alive: finalState.alive,
+                    lifespan: finalState.lifespan || 100,
+                    inventory: [],
+                  };
+                  const freshEntity = createCharacterEntity(freshWorld, freshSnapshot);
+                  const metaComp = freshEntity.getComponent<MetaComponent>('Meta');
+                  const cultivationComp = freshEntity.getComponent<CultivationComponent>('Cultivation');
+                  if (!metaComp || !cultivationComp) {
+                    throw new Error('ECS entity missing required Meta/Cultivation components');
+                  }
+                  ecsCache = {
+                    world: freshWorld,
+                    entity: freshEntity,
+                    charId: characterId,
+                    baseAge: metaComp.age,
+                    baseCultivationExp: cultivationComp.cultivationExp,
+                  };
+                } else {
+                  // 缓存命中：只更新 Meta/Cultivation 的 base 字段（age/lifespan/alive/cultivationExp），然后 tick
+                  const metaComp = ecsCache.entity.getComponent<MetaComponent>('Meta')!;
+                  const cultivationComp = ecsCache.entity.getComponent<CultivationComponent>('Cultivation')!;
+                  metaComp.age = finalState.age;
+                  metaComp.alive = finalState.alive;
+                  metaComp.lifespan = finalState.lifespan || 100;
+                  cultivationComp.cultivationExp = finalState.cultivationExp;
+                  ecsCache.baseAge = metaComp.age;
+                  ecsCache.baseCultivationExp = cultivationComp.cultivationExp;
+                }
+
+                // 跑 tick（AgingSystem + CultivationSystem 都是纯函数引用，可重复调用）
+                ecsCache.world.tick();
+
+                // 读回 entity 状态 → 合并到 finalState
+                const tickedEntity = ecsCache.world.getEntity(`character-${characterId}`);
+                if (tickedEntity) {
+                  const tickedSnapshot = entityToSnapshot(tickedEntity);
+                  finalState.age = tickedSnapshot.age;
+                  finalState.cultivationExp = tickedSnapshot.cultivationExp;
+                  if (!tickedSnapshot.alive && finalState.alive) {
+                    finalState.alive = false;
+                    finalState.causeOfDeath = finalState.causeOfDeath || 'ecs-aging-natural';
+                  }
                 }
               }
             } catch (e) {
               console.error('[advance-sse] ECS tick failed (non-fatal):', e);
-              // 不阻断 SSE 主流程
+              // 不阻断 SSE 主流程：缓存可能损坏，下一次 advance 重建
+              ecsCache = null;
             }
 
             // 修复 P1-1：SSE 路径补齐所有漏写字段——走与 non-SSE 同一个 buildAdvanceStateData
