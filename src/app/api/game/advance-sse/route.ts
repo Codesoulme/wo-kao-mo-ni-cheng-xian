@@ -319,6 +319,27 @@ export async function POST(req: NextRequest) {
         try {
           const execResult = executeAIEvent(state, aiOutput);
           finalState = execResult.state;
+          // 凡人基础属性按年龄强制 baseline（修 user 反馈"基础属性一出生给全部值不合理"）
+          // 凡人阶段（realm=mortal）按 age 自然成长：婴儿(0岁)=0, 12岁=12, 50岁=30 等
+          // 引入期（realm=引气/...）不覆盖（属性由 LLM 事件 + 初始值 + realm 进阶决定）
+          if (finalState.realm === 'mortal') {
+            const age = finalState.age;
+            finalState.physicalFoundation = Math.round(5 + age * 1.5);
+            finalState.attack = Math.floor(age * 0.6);
+            finalState.defense = Math.floor(age * 0.3);
+            finalState.speed = 3 + Math.floor(age * 0.4);
+            finalState.spiritualSense = 3 + Math.floor(age * 0.4);
+            finalState.soulStrength = 3 + Math.floor(age * 0.3);
+            finalState.comprehension = Math.floor(age * 0.3);
+            // 凡人无修为
+            finalState.cultivationExp = 0;
+            finalState.expToBreak = 100;
+            // 凡人 maxHp 按年龄涨（避免 0 岁 maxHp 100 不合理）
+            finalState.maxHp = 30 + age * 3;
+            finalState.maxMp = 10 + Math.floor(age * 0.5);
+            if (finalState.hp > finalState.maxHp) finalState.hp = finalState.maxHp;
+            if (finalState.mp > finalState.maxMp) finalState.mp = finalState.maxMp;
+          }
           displayEffects = buildEventDisplayEffects({
             before: state,
             after: finalState,
