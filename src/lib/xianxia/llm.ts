@@ -101,6 +101,7 @@ import {
   validateOrFallback,
 } from './prompt-schema';
 import { renderFewShotExamples } from './prompt-examples';
+import { buildFallbackBackground, buildOriginPrompt, rollOrigin, type OriginRoll } from './origins';
 
 /**
  * 6 区 Prompt 架构（TechDoc 18.6.5）：
@@ -3096,13 +3097,87 @@ function generateFallbackName(): string {
   return `${pickRandom(FALLBACK_SURNAMES)}${pickRandom(FALLBACK_GIVEN_NAMES)}`;
 }
 
-export async function generateBirthEvent(name?: string): Promise<BirthResult> {
+// 轮回带入的遗产条目（与 api/game/new/route.ts 中 previousWorldLegacies 形状对齐）
+export interface PreviousWorldLegacy {
+  name?: string;
+  category?: string;
+  type?: string;
+  description?: string;
+  rarity?: string;
+  payload?: any;
+  [key: string]: any;
+}
+
+/**
+ * 从轮回带入的 legacy 列表抽出 LLM 可读的简短描述行。
+ * - 仅截取前 N 条避免 token 爆炸
+ * - 缺失字段用占位文本，避免 LLM 看到 undefined
+ */
+function summarizeLegaciesForPrompt(legacies: PreviousWorldLegacy[] | undefined, max = 6): string {
+  if (!Array.isArray(legacies) || legacies.length === 0) return '（无轮回带入）';
+  const lines: string[] = [];
+  for (let i = 0; i < Math.min(legacies.length, max); i++) {
+    const it = legacies[i] || {};
+    const name = String(it.name || it.payload?.name || `遗物${i + 1}`).slice(0, 16);
+    const category = String(it.category || it.type || it.kind || 'unknown').slice(0, 16);
+    const desc = String(it.description || it.payload?.description || '前世因果随身之物').slice(0, 80);
+    const rarity = String(it.rarity || it.payload?.rarity || 'rare').slice(0, 12);
+    lines.push(`${i + 1}. ${name}（${category}/${rarity}）— ${desc}`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * LLM 失败时的兜底：依据 legacy 列表拼一段简短的前世暗示叙事。
+ * 每件 legacy 至少给出 1 句暗示（异象 / 直觉 / 巧合），不直说"前世"二字。
+ * - 输出约 80-160 字，适合拼到 birth.background 后面
+ */
+export function buildPreviousLifeBackground(legacies: PreviousWorldLegacy[] | undefined): string {
+  if (!Array.isArray(legacies) || legacies.length === 0) return '';
+
+  const hints: string[] = [];
+  for (let i = 0; i < legacies.length; i++) {
+    const it = legacies[i] || {};
+    const name = String(it.name || it.payload?.name || '此物').slice(0, 12);
+    const category = String(it.category || it.type || it.kind || '').toLowerCase();
+    const desc = String(it.description || it.payload?.description || '').slice(0, 40);
+
+    if (category.includes('scripture') || category.includes('功法') || category.includes('technique')) {
+      hints.push(`梦中常有玄奥符文流转，醒时唯余几笔，疑是久远前的手泽。`);
+    } else if (category.includes('artifact') || category.includes('法宝') || category.includes('weapon') || category.includes('armor')) {
+      hints.push(`此子落地时左掌紧握一缕寒光，似器似刃，父母不敢强取。`);
+    } else if (category.includes('pet') || category.includes('灵宠')) {
+      hints.push(`伴生有灵物相随，见之者皆言其目光老成，不似初生。`);
+    } else if (category.includes('bond') || category.includes('命格') || category.includes('fate')) {
+      hints.push(`村中老人偶尔低语："这孩子的命数，似在哪儿见过。"`);
+    } else if (desc) {
+      hints.push(`襁褓之中偶有异香，似与"${name}"暗合，村人啧啧称奇。`);
+    } else {
+      hints.push(`此子周岁抓周时，独取那物不放，旁人皆笑。`);
+    }
+  }
+
+  // 取前 3 条避免 narrative 膨胀
+  const picked = hints.slice(0, 3);
+  return `降生之夜另有异处：${picked.join(' ') || '似有旧缘未散。'}`;
+}
+
+export async function generateBirthEvent(
+  name?: string,
+  previousWorldLegacies?: PreviousWorldLegacy[],
+  origin?: OriginRoll,
+): Promise<BirthResult> {
   // 1. 引擎权威：后端先 roll 灵根类型和五行组合（LLM 不可自由发挥）
   const root = rollSpiritualRoot();
   const { elements, picked } = rollElements(root);
   const rootInfo = SPIRITUAL_ROOTS[root];
   const pickedZh = elementsToZh(picked);
   const seededName = name && name.trim() ? name.trim() : generateFallbackName();
+  const hasLegacies = Array.isArray(previousWorldLegacies) && previousWorldLegacies.length > 0;
+  const legacyBlock = hasLegacies ? summarizeLegaciesForPrompt(previousWorldLegacies, 6) : '';
+  // 族裔 / 出身 / 伴生灵物 / 封印命格（若未传入则后端 roll）
+  const effectiveOrigin: OriginRoll = origin || rollOrigin({});
+  const originBlock = buildOriginPrompt(effectiveOrigin);
 
   // 给 LLM 的灵根类型说明 + 已确定的五行组合
   const rootTypeHint: Record<SpiritualRoot, string> = {
@@ -3122,10 +3197,22 @@ export async function generateBirthEvent(name?: string): Promise<BirthResult> {
 - 性别：随机 male 或 female。
 - 灵根：已由天道判定为「${rootInfo.name}」，灵根详情请基于以下信息生成：${rootTypeHint[root]}。
 - 灵根详情 rootDetail 格式：如"${pickedZh}凡灵根"、"${pickedZh}真灵根"、"五行杂灵根"、"无灵根"、"${pickedZh}天灵根"、"混沌灵根"。必须与上述灵根类型和突出属性一致。
-- 出生地：修仙世界地点（如"青云山下一处凡人村落"、"东海之滨渔村"、"北荒边陲小镇"等）。
-- 家世：凡人家庭/落魄修士之后/书香门第/农户/猎户/商户等。
-- 背景：100-200字描写出生时的情境、天象、家世氛围，可暗示灵根特征（如天灵根降生时有异象）。
-
+${originBlock}
+- 出生地：修仙世界地点（如"青云山下一处凡人村落"、"东海之滨渔村"、"北荒边陲小镇"等），需与族裔/出身契合。
+- 家世：凡人家庭/落魄修士之后/书香门第/农户/猎户/商户等。尽量选择**非农非猎户**的家庭（如落魄散修之后/书香门第/前朝遗族/边境驿丞/退隐老兵/药商/故旧之后等），增加家世多样性；若出身为妖族/巫族/羽族/海族/灵族，请按其族裔特征描写（妖族可能带鳞片/角/异瞳，巫族可能带纹身/灵巫之力）。
+- 背景：100-200字描写出生时的情境、天象、家世氛围，可暗示灵根特征（如天灵根降生时有异象）。若附带伴生灵物，请叙述其来历（胎里带来/出生异象/父母遗物）；若附带先天封印/命格，请暗示角色被封印的特殊命格与解封契机。
+${hasLegacies ? `
+【前世因果——必须遵守】
+天道传入 previousWorldLegacies（轮回带入），你必须为每件遗产生成前世故事，并在 narrative 中自然呈现：
+- 前世身份（如"前朝剑修/边陲小派掌门/灭门遗孤/散修/魔门弃徒/坊市老药师/洞府守墓人..."）
+- 死亡原因（如"渡劫失败/被人暗算/与敌同归于尽/寿终正寝/坐化/为护弟子而亡/心魔反噬..."）
+- 携带物品来历（与前世身份/死亡原因挂钩，不要凭空出现；物品自带"旧主残意"）
+- 残留执念（如"未竟的仇怨/未修成的功法/未能相守的人/未了的心愿/未找到的真相"）
+- 与今生的巧合（如"转世投到仇人村/父母是前世旧识/灵根与前世功法契合/幼时常做同一个梦/家乡地名与前世山门相近"）
+- 前世故事在 narrative 中要**自然暗示**（不要直接说"前世"二字，用巧合/直觉/梦境/旧物相认/老人隐约低语/出生异象等方式呈现）
+- 必须给主角安排**至少 2-3 处与前世相关的小细节**（异象/直觉/巧合/梦中声音/老物相认），分散嵌在背景叙事中
+- legacy 在 narrative 中可以是"父母口中传下来的旧物/梦中反复出现的符号/周岁抓周时独取之物/邻家老者一句嘀咕"，避免直白叙述
+` : ''}
 严格 JSON 输出。`;
 
   const user = `请生成主角出生信息 JSON：
@@ -3138,7 +3225,17 @@ export async function generateBirthEvent(name?: string): Promise<BirthResult> {
   "background": "出生背景叙事（100-200字）"
 }
 
-注意：不要输出 spiritualRoot 字段，灵根类型已由天道判定为「${root}」，你只需生成对应的 rootDetail 文字描述。`;
+注意：不要输出 spiritualRoot 字段，灵根类型已由天道判定为「${root}」，你只需生成对应的 rootDetail 文字描述。${hasLegacies ? `
+
+【前世带入（previousWorldLegacies）—— 必须落实到 narrative】
+以下为天道传入的轮回带入清单（最多 6 件）：
+${legacyBlock}
+
+要求：
+- 在 narrative 中**自然呈现前世因果**（前面原则）
+- 至少 2-3 处与前世相关的小细节（异象/直觉/巧合/梦中声音/老物相认/老人低语）
+- legacy 在 narrative 中用暗示方式嵌入（不要罗列、不要直接说"前世"二字）
+- 每件 legacy 至少对应 1 处暗示（物品来历 / 旧主残意 / 与今生的巧合）` : ''}`;
 
   // AI-61: 在出生事件 user prompt 注入 L1 世界观知识
   const worldKnowledge = await loadWorldKnowledge();
@@ -3161,7 +3258,20 @@ export async function generateBirthEvent(name?: string): Promise<BirthResult> {
     };
   } catch (err) {
     console.error('Birth generation failed:', err);
-    // fallback：仍使用后端 roll 的结果，保证灵根随机性
+    // fallback：仍使用后端 roll 的结果，保证灵根随机性；按族裔/出身选模板，如有轮回带入拼前世暗示
+    const previousLifeHint = buildPreviousLifeBackground(previousWorldLegacies);
+    const originFallback = buildFallbackBackground(effectiveOrigin);
+    const fallbackFamily = hasLegacies ? '没落散修之后' : originFallback.family;
+    const fallbackBirthplace = hasLegacies ? '旧朝故地一处山中村落' : originFallback.birthplace;
+    const companionHint = effectiveOrigin.companionItems.length
+      ? `生而伴有${effectiveOrigin.companionItems.map((c) => c.name).join('、')}。`
+      : '';
+    const sealedHint = effectiveOrigin.sealedFate
+      ? `命数另有异处：${effectiveOrigin.sealedFate.name}，${effectiveOrigin.sealedFate.unlockHint}`
+      : '';
+    const fallbackBackground = hasLegacies
+      ? `${originFallback.background}${companionHint}${sealedHint}${previousLifeHint}`
+      : `${originFallback.background}${companionHint}${sealedHint}`;
     return {
       name: name?.trim() || generateFallbackName(),
       gender: Math.random() > 0.5 ? 'male' : 'female',
@@ -3171,9 +3281,9 @@ export async function generateBirthEvent(name?: string): Promise<BirthResult> {
         : pickedZh
           ? `${pickedZh}${rootInfo.name}`
           : rootInfo.name,
-      birthplace: '青云山下一处凡人村落',
-      family: '农户之家',
-      background: '降生之夜，天降甘霖，万物复苏。父母见此子目有灵光，心下大喜，取名为此。家虽清贫，然天性温良，邻里称善。',
+      birthplace: fallbackBirthplace,
+      family: fallbackFamily,
+      background: fallbackBackground,
       elements,
     };
   }

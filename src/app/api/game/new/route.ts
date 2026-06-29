@@ -8,9 +8,10 @@
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { generateBirthEvent } from '@/lib/xianxia/llm';
+import { generateBirthEvent, buildPreviousLifeBackground } from '@/lib/xianxia/llm';
 import { rollBirthConstitution, heritageToStatus } from '@/lib/xianxia/constitutions';
 import { formatWorldTimeDisplay, hiddenEventMeta, normalizeWorldCalendar, worldTimeStamp } from '@/lib/xianxia/world-time';
+import { rollOrigin, type Ethnicity, type Lineage } from '@/lib/xianxia/origins';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -32,7 +33,19 @@ export async function POST(req: NextRequest) {
     const worldTime = { ...worldTimeBase, displayLabel: formatWorldTimeDisplay({ age: 0, worldTime: worldTimeBase, includeAge: true }) };
     const previousWorldLegacies = Array.isArray(body?.previousWorldLegacies) ? body.previousWorldLegacies.slice(0, 6) : [];
 
-    const birth = await generateBirthEvent(customName);
+    // 角色背景多样性：族裔 / 出身 / 伴生灵物 / 先天封印
+    const origin = rollOrigin({
+      ethnicity: (body?.ethnicity as Ethnicity) || undefined,
+      lineage: (body?.lineage as Lineage) || undefined,
+      companionItems: body?.companionItems !== false,
+      sealedFate: body?.sealedFate !== false,
+      previousLivesCount: typeof body?.previousLivesCount === 'number' ? body.previousLivesCount : 1,
+    });
+
+    const birth = await generateBirthEvent(customName, previousWorldLegacies, origin);
+
+    // 双保险：即使 LLM 漏掉前世暗示，narrative 也至少拼一段前世背景兜底
+    const previousLifeNarrative = buildPreviousLifeBackground(previousWorldLegacies);
 
     // 五行初始值由后端 roll（依据灵根类型），不再固定 20/20/20/20/20
     const el = birth.elements;
@@ -40,6 +53,38 @@ export async function POST(req: NextRequest) {
     const birthConstitution = rollBirthConstitution();
     const inheritedStatuses = selectedHeritage.map(heritageToStatus).filter(Boolean);
     const statusList = [birthConstitution, ...inheritedStatuses].filter(Boolean);
+
+    // 伴生灵物 → 写入 inventory；先天封印/命格 → 写入 status
+    const originItems = origin.companionItems.map((c, idx) => ({
+      id: `item_origin_${Date.now().toString(36)}_${idx}`,
+      name: c.name.slice(0, 16),
+      description: `${c.description}（${c.origin}）`.slice(0, 120),
+      item_type: c.category === 'sword_shard' ? 'weapon'
+        : c.category === 'spirit_seal' ? 'artifact'
+        : c.category === 'spirit_egg' ? 'accessory'
+        : 'accessory',
+      rarity: 'epic',
+      effects: [{ target_attribute: 'luck', operation: 'add', value: 3, description: '伴生灵物之缘' }],
+      source: '天生伴随',
+      equipNote: '胎里带来',
+    }));
+    // 先天封印/命格 → 入 status（避免和 LLM 自报重复，去重同名）
+    if (origin.sealedFate) {
+      const sealedName = origin.sealedFate.name;
+      const alreadyHasSealed = statusList.some((s: any) => s?.name === sealedName && s?.source === '先天封印');
+      if (!alreadyHasSealed) {
+        statusList.push({
+          id: `status_sealed_${Date.now().toString(36)}`,
+          name: sealedName,
+          description: origin.sealedFate.description,
+          category: 'special',
+          rarity: 'legendary',
+          duration: -1,
+          source: '先天封印',
+          effects: [{ target_attribute: 'comprehension', operation: 'add', value: 4, description: '命格暗伏' }],
+        });
+      }
+    }
     const inheritedItems = selectedHeritage.filter((h: any) => h && ['scripture','artifact','item','weapon','armor','accessory','treasure'].includes(h.kind)).map((h: any, idx: number) => ({
       id: `item_herit_${Date.now().toString(36)}_${idx}`,
       name: String(h.name || '轮回遗物').slice(0, 16),
@@ -112,7 +157,7 @@ export async function POST(req: NextRequest) {
         isAtChoice: false,
         lastEventAge: 0,
         statusJson: JSON.stringify(statusList),
-        inventoryJson: JSON.stringify(inheritedItems),
+        inventoryJson: JSON.stringify([...inheritedItems, ...originItems]),
         memoryJson: JSON.stringify([`${birth.name}降生于${birth.birthplace}，${birth.family}。${birth.rootDetail}。${statusList.length ? `天生或轮回带有${statusList.map((s: any) => s.name).join('、')}。` : ''}`]),
         petsJson: JSON.stringify(inheritedPets),
         worldCalendarJson: JSON.stringify(normalizeWorldCalendar(worldCalendar)),
@@ -129,9 +174,15 @@ export async function POST(req: NextRequest) {
 
 此生命数另有异处：${statusList.map((s: any) => `${s.name}，${s.description}`).join('；')}。` : ''}${inheritedItems.length ? `
 
-轮回余泽随身而来：${inheritedItems.map((i: any) => i.name).join('、')}。` : ''}${inheritedPets.length ? `
+轮回余泽随身而来：${inheritedItems.map((i: any) => i.name).join('、')}。` : ''}${originItems.length ? `
 
-尚有灵宠因果相随：${inheritedPets.map((p: any) => p.name).join('、')}。` : ''}`,
+伴生灵物随胎而至：${originItems.map((i: any) => i.name).join('、')}。` : ''}${origin.sealedFate ? `
+
+先天封印暗伏：${origin.sealedFate.name}，${origin.sealedFate.unlockHint}` : ''}${inheritedPets.length ? `
+
+尚有灵宠因果相随：${inheritedPets.map((p: any) => p.name).join('、')}。` : ''}${previousLifeNarrative ? `
+
+前世因果暗合：${previousLifeNarrative}` : ''}`,
         eventType: 'normal',
         effects: JSON.stringify([hiddenEventMeta({ worldTime, actionProjections: [] })]),
       },
@@ -142,6 +193,7 @@ export async function POST(req: NextRequest) {
       characterId: character.id,
       name: character.name,
       birth,
+      origin,
       event: {
         age: 0,
         title: event.title,
