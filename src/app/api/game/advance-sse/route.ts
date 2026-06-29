@@ -25,7 +25,7 @@ import { getCurrentUser } from '@/lib/auth-helpers';
 // 修真界感改进 - 任务 D：寿元压力
 import { lifespanPressure, lifespanPressureStatus, nearLifespan } from '@/lib/xianxia/realm-lifespan';
 // 修真界感改进 - 任务 E：世界级事件调度器
-import { rollWorldEvent, applyWorldEvent, decayWorldEvents, type WorldEvent } from '@/lib/xianxia/world-event-scheduler';
+import { rollWorldEvent, applyWorldEvent, decayWorldEvents, parseWorldEventMarkers, buildAvailableWorldEventsPrompt, type WorldEvent } from '@/lib/xianxia/world-event-scheduler';
 // 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 SSE 路径上也跑一次 world.tick()
 // 优化：缓存 World + Systems + Entity 跨多次 advance 复用，避免每次 new World() + addSystem() + createCharacterEntity()（节省 200-500ms/advance）
 import { World } from '@/lib/xianxia/ecs/core';
@@ -216,6 +216,13 @@ export async function POST(req: NextRequest) {
         const ctx: any = buildStateContext(state, recentEvents.slice(qualityMode === 'light' ? -3 : -5), narrativeContractFeedback.slice(-3));
         ctx.blueprint = blueprint;
         ctx.suggestedTimeAdvance = timeAdvance;
+        // 任务 E v2：把可触发的世界级事件模板注入 prompt（按 age/realm/族裔/cooldown/prereq 过滤后）
+        try {
+          const historyWE = (state as any)?.worldEvent?.history ?? [];
+          ctx.worldEventAvailablePrompt = buildAvailableWorldEventsPrompt(state, worldCalendar || undefined, historyWE, { maxItems: 8 });
+        } catch {
+          ctx.worldEventAvailablePrompt = '';
+        }
 
         // 3) 真流式：直接调 callLLMStream，累积 rawText，实时提取 narrative 字段
         //    LLM 边生成 token，我们边从累积 rawText 中抽出 narrative 字符串推给前端
@@ -520,22 +527,45 @@ export async function POST(req: NextRequest) {
               ecsCache = null;
             }
 
-            // 修真界感改进 - 任务 E：世界级事件调度器
-            // 在 ECS tick 完成、db.update 之前 roll 世界事件；
-            // 触发后注入 finalState.statusList / cultivationMultiplier / lifespan / pendingThread 等。
+            // 修真界感改进 - 任务 E v2：世界级事件调度器（LLM 决策 + fallback）
+            // 优先级：
+            //   1) decay 已有 active 事件
+            //   2) 从 aiOutput.narrative 解析 [WORLD_EVENT:type]...[/WORLD_EVENT] 标记（LLM 自主决定触发）
+            //   3) 若无标记 → fallback rollWorldEvent（向后兼容旧 random roll 逻辑）
             // 失败仅 console.error，不阻断 SSE 主流程。
             try {
               const ageAfterTick = Number((finalState as any).age ?? 0);
               const yearsAdvanced = Math.max(1, ageAfterTick - Number(ageBefore ?? ageAfterTick));
 
-              // 1. decay 已有 active 事件（先移除已结束的，避免 roll 时去重冲突）
+              // 1. decay 已有 active 事件
               finalState = decayWorldEvents(finalState, yearsAdvanced);
 
-              // 2. roll 新事件
-              const worldEvent: WorldEvent | null = rollWorldEvent(finalState, worldCalendar || undefined);
+              let worldEvent: WorldEvent | null = null;
+
+              // 2. 优先解析 LLM 输出中的 [WORLD_EVENT] 标记
+              try {
+                const historyWE = ((finalState as any)?.worldEvent?.history ?? []) as WorldEvent[];
+                const llmNarrative = String((aiOutput as any)?.narrative ?? '');
+                const markerResult = parseWorldEventMarkers(llmNarrative, finalState, worldCalendar || undefined, historyWE);
+                if (markerResult) {
+                  worldEvent = markerResult.event;
+                  console.log('[advance-sse] 世界级事件（LLM 决策）触发:', worldEvent.type, 'at age', worldEvent.triggeredAge);
+                }
+              } catch (e) {
+                console.warn('[advance-sse] parseWorldEventMarkers failed:', e);
+              }
+
+              // 3. 无标记时 fallback 走 random roll
+              if (!worldEvent) {
+                worldEvent = rollWorldEvent(finalState, worldCalendar || undefined);
+                if (worldEvent) {
+                  console.log('[advance-sse] 世界级事件（fallback）触发:', worldEvent.type, 'at age', worldEvent.triggeredAge);
+                }
+              }
+
               if (worldEvent) {
                 finalState = applyWorldEvent(finalState, worldEvent);
-                console.log('[advance-sse] 世界级事件触发:', worldEvent.type, 'at age', worldEvent.triggeredAge, 'duration', worldEvent.duration, '年');
+                console.log('[advance-sse] 世界级事件注入:', worldEvent.type, 'at age', worldEvent.triggeredAge, 'duration', worldEvent.duration, '年');
                 // 把世界级事件追加到本次 eventLog.effects（前端展示）
                 try {
                   const evt = (aiOutput as any)?.choice ? null : aiOutput;

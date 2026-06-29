@@ -721,6 +721,8 @@ ${ctx.currentExploration.elementAffinity ? `五行亲和：${{metal:'金',wood:'
 8. 严禁每岁重复探索同一秘境（引擎有冷却机制，AI 无需处理）
 ` : ''}
 
+${(ctx as any).worldEventAvailablePrompt ? `\n${(ctx as any).worldEventAvailablePrompt}\n` : ''}
+
 【角色牵挂与主动意图区】（这是 AI 的提示池：高优先级必须承接；低优先级应在合适时自然回响）
 ${ctx.characterIntents && ctx.characterIntents.length
   ? ctx.characterIntents.map(i => `- [优先级${i.priority}] ${i.title}：${i.description}${i.relatedThreadId ? `（关联线索 ${i.relatedThreadId}）` : ''}`).join('\n')
