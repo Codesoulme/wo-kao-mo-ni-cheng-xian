@@ -228,8 +228,14 @@ export async function POST(req: NextRequest) {
             rawText += delta;
             const { content: extracted, closed } = extractNarrativeField(rawText);
             if (extracted && extracted.length > prevNarrative.length) {
-              const newDelta = extracted.slice(prevNarrative.length);
-              prevNarrative = extracted;
+              // 兜底正则替换：LLM 偶尔在 narrative 里写"变化+1"等占位符，prompt 虽约束但仍可能漏出
+              // 这里服务端先 replace 成"（属性变化，详见结算）"占位，让客户端不直接看到"变化+1不知道是什么"
+              const sanitized = extracted
+                .replace(/变化\s*\+\s*\d+/g, '（属性见结算）')
+                .replace(/属性\s*\+\s*\d+/g, '（属性见结算）')
+                .replace(/(修为|悟性|灵根|根骨|福缘|机缘|气运|天赋|命格|血脉|体魄|神识|魂魄)\s*\+\s*\d+/g, '（$1见结算）');
+              const newDelta = sanitized.slice(prevNarrative.length);
+              prevNarrative = sanitized;
               if (!firstDeltaSent) {
                 firstDeltaSent = true;
                 console.log('[SSE] First narrative delta sent, total raw:', rawText.length, 'narrative:', extracted.length);
