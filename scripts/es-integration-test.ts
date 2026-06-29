@@ -15,7 +15,10 @@
 //   5. getProjectedState 走缓存路径（验证 hits / misses）
 //   6. event-replay replayAdvanced 跑 replay + diff
 //   7. event-timeline showTimelineAdvanced 导出 md + json
-//   8. finally 清理测试数据（Event + Character）
+//   8. appendEventsBatch 批量提交
+//   9. Sprint 2: setter event reducer meta trace
+//   10. Sprint 2: getEvents 范围过滤（createdAtAge + limit/offset）
+//   11. finally 清理测试数据（Event + Character）
 //
 // 默认需要 --db flag（参考 choose / interfere 真实链路模式）。
 // 在 bun 命令下：bun --db scripts/es-integration-test.ts
@@ -377,17 +380,179 @@ export async function runIntegrationTest(): Promise<IntegrationTestResult> {
       passed++;
       results.push({ test: 'batch-append', passed: true });
     }
+
+    // 9. Sprint 2: setter event reducer meta trace
+    // 追加 3 个 setter 事件（settlement / end-result / streaming-narrative），
+    // 验证 applyEvent 不崩 + meta 字段被回写。
+    {
+      const t0 = Date.now();
+      // 用单条 append 而非 batch——setter 事件各自独立来源（_tryAppendEvent 在 store.ts 单条触发）
+      const settlementEvt = await appendEvent({
+        characterId: testChar.id,
+        type: 'character.settlement-result.set',
+        data: {
+          type: 'character.settlement-result.set',
+          settlement: { week: 12, alive: true, score: 88 },
+        },
+        source: 'system-tick',
+        triggerActor: 'system',
+        createdAtAge: 23,
+      });
+      const endEvt = await appendEvent({
+        characterId: testChar.id,
+        type: 'character.end-result.set',
+        data: {
+          type: 'character.end-result.set',
+          status: 'alive',
+          narrative: '渡劫成功，寿元未尽',
+        },
+        source: 'system-tick',
+        triggerActor: 'system',
+        createdAtAge: 23,
+      });
+      const narrEvt = await appendEvent({
+        characterId: testChar.id,
+        type: 'character.streaming-narrative.started',
+        data: {
+          type: 'character.streaming-narrative.started',
+          eventIndex: 99,
+          placeholderId: 'ph-99',
+        },
+        source: 'user-action',
+        triggerActor: 'player',
+        createdAtAge: 23,
+      });
+
+      // 拿全量事件，喂 reducer
+      const allEvents = await getEvents(testChar.id);
+      const baseSnapshot = {
+        characterId: testChar.id,
+        name: testChar.name ?? '',
+        age: testChar.age,
+        realm: testChar.realm,
+        cultivationExp: 0,
+        hp: 100,
+        maxHp: 100,
+        spiritStones: testChar.spiritStones,
+        alive: testChar.alive,
+        lifespan: testChar.lifespan,
+        inventory: [] as Array<{ id: string; item: any }>,
+      };
+      const reduced = reduceCharacterState(baseSnapshot, allEvents);
+
+      // settlement 事件应被 reducer 捕获 → meta 字段被设置
+      if (reduced.latestSettlementAt === undefined) {
+        throw new Error(`Reducer should set latestSettlementAt after settlement event`);
+      }
+      if (reduced.latestSettlementAt !== endEvt.timestamp) {
+        throw new Error(
+          `latestSettlementAt should match endEvt.timestamp (end overrides settlement); got ${reduced.latestSettlementAt} vs ${endEvt.timestamp}`,
+        );
+      }
+      if (reduced.latestSettlementStatus !== 'alive') {
+        throw new Error(`latestSettlementStatus should be 'alive' (from endEvt), got ${reduced.latestSettlementStatus}`);
+      }
+      if (reduced.latestNarrativeAt !== narrEvt.timestamp) {
+        throw new Error(`latestNarrativeAt should match narrEvt.timestamp; got ${reduced.latestNarrativeAt} vs ${narrEvt.timestamp}`);
+      }
+      // 前面的 cultivation/realm/item batch 事件不应被 setter meta 覆盖错
+      if (reduced.cultivationExp !== 60) {
+        throw new Error(`Reducer should preserve cultivationExp=60 after setter events, got ${reduced.cultivationExp}`);
+      }
+      if (reduced.inventory.length !== 2) {
+        throw new Error(`Reducer should preserve inventory.length=2 after setter events, got ${reduced.inventory.length}`);
+      }
+
+      console.log(
+        `[9] Setter reducer meta trace validated (latestSettlementAt=${reduced.latestSettlementAt}, status=${reduced.latestSettlementStatus}, latestNarrativeAt=${reduced.latestNarrativeAt}, t0=${t0})`,
+      );
+      passed++;
+      results.push({ test: 'setter-replay', passed: true });
+    }
+
+    // 10. Sprint 2: getEvents 范围过滤（createdAtAge + limit/offset）
+    {
+      // 现状：testChar 现在有 4 (case 2) + 3 (case 8) + 3 (case 9) = 10 个事件
+      const all = await getEvents(testChar.id);
+      if (all.length !== 10) {
+        throw new Error(`Expected 10 events before range filter test, got ${all.length}`);
+      }
+
+      // createdAtAge = 23 的事件：case 9 的 3 个 setter（settlement/end/narrative 都是 createdAtAge=23）
+      const ageFiltered = await getEvents(testChar.id, { createdAtAge: { gte: 23, lte: 23 } });
+      if (ageFiltered.length !== 3) {
+        throw new Error(`createdAtAge=23 filter should return 3 events, got ${ageFiltered.length}`);
+      }
+      // 全部应该是 setter 类型
+      const setterTypes = new Set(['character.settlement-result.set', 'character.end-result.set', 'character.streaming-narrative.started']);
+      for (const e of ageFiltered) {
+        if (!setterTypes.has(e.type)) {
+          throw new Error(`Age-filtered event should be setter, got type=${e.type}`);
+        }
+      }
+
+      // createdAtAge = 22：case 8 的 3 个 batch 事件
+      const age22 = await getEvents(testChar.id, { createdAtAge: { gte: 22, lte: 22 } });
+      if (age22.length !== 3) {
+        throw new Error(`createdAtAge=22 filter should return 3 events, got ${age22.length}`);
+      }
+
+      // createdAtAge = 21：case 2 的 4 个事件
+      const age21 = await getEvents(testChar.id, { createdAtAge: { gte: 21, lte: 21 } });
+      if (age21.length !== 4) {
+        throw new Error(`createdAtAge=21 filter should return 4 events, got ${age21.length}`);
+      }
+
+      // 范围 [21, 22]：4 + 3 = 7
+      const ageRange = await getEvents(testChar.id, { createdAtAge: { gte: 21, lte: 22 } });
+      if (ageRange.length !== 7) {
+        throw new Error(`createdAtAge[21,22] filter should return 7 events, got ${ageRange.length}`);
+      }
+
+      // limit/offset 分页
+      const page1 = await getEvents(testChar.id, { limit: 4, offset: 0 });
+      const page2 = await getEvents(testChar.id, { limit: 4, offset: 4 });
+      const page3 = await getEvents(testChar.id, { limit: 4, offset: 8 });
+      if (page1.length !== 4 || page2.length !== 4 || page3.length !== 2) {
+        throw new Error(`Pagination wrong: page1=${page1.length}, page2=${page2.length}, page3=${page3.length}`);
+      }
+      // 拼接后应等于全量（aggregateVersion 升序一致）
+      const concat = [...page1, ...page2, ...page3];
+      if (concat.length !== all.length) {
+        throw new Error(`Concatenated pages should equal total, got ${concat.length} vs ${all.length}`);
+      }
+      for (let i = 0; i < all.length; i++) {
+        if (concat[i].id !== all[i].id) {
+          throw new Error(`Page concat mismatch at index ${i}: ${concat[i].id} vs ${all[i].id}`);
+        }
+      }
+
+      // type + createdAtAge 组合过滤
+      const typeAndAge = await getEvents(testChar.id, {
+        type: 'character.settlement-result.set',
+        createdAtAge: { gte: 23 },
+      });
+      if (typeAndAge.length !== 1) {
+        throw new Error(`type+age filter should return 1, got ${typeAndAge.length}`);
+      }
+
+      console.log(
+        `[10] Range filter validated (age=21:4, age=22:3, age=23:3, range[21,22]:7, pagination 4+4+2=10, type+age:1)`,
+      );
+      passed++;
+      results.push({ test: 'range-filter', passed: true });
+    }
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[FAIL] ${msg}`);
     failed++;
     results.push({ test: 'integration-error', passed: false, error: msg });
   } finally {
-    // 8. 清理测试数据
+    // 11. 清理测试数据
     try {
       await db.event.deleteMany({ where: { characterId: testChar.id } });
       await db.character.delete({ where: { id: testChar.id } });
-      console.log(`[8] Cleanup done (characterId=${testChar.id})`);
+      console.log(`[11] Cleanup done (characterId=${testChar.id})`);
     } catch (cleanupErr) {
       console.error(
         `[WARN] cleanup failed: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`,
@@ -410,7 +575,7 @@ function printUsage(): void {
   console.log('  5. getProjectedState 走缓存路径');
   console.log('  6. event-replay replayAdvanced + diff');
   console.log('  7. event-timeline 导出 md + json');
-  console.log('  8. 清理测试数据');
+  console.log('  11. 清理测试数据');
 }
 
 if (import.meta.main) {

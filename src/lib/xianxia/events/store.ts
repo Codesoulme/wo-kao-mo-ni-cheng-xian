@@ -47,11 +47,20 @@ export async function appendEvent(input: AppendEventInput): Promise<Event> {
   return toEvent(result);
 }
 
-// getEvents：按 character 查事件流（可按 version 范围、type 过滤）。
+// getEvents：按 character 查事件流（可按 version 范围、type / 年龄 / 时间戳过滤 + limit/offset 分页）。
 // 默认按 aggregateVersion 升序——replay 需要这个顺序。
+// Sprint 2: 新增 createdAtAge 范围 / timestamp 范围 / limit / offset 过滤，避免 event-timeline 全表扫描。
 export async function getEvents(
   characterId: string,
-  options?: { fromVersion?: number; toVersion?: number; type?: EventType }
+  options?: {
+    fromVersion?: number;
+    toVersion?: number;
+    type?: EventType;
+    createdAtAge?: { gte?: number; lte?: number };
+    timestamp?: { gte?: Date; lte?: Date };
+    limit?: number;
+    offset?: number;
+  }
 ): Promise<Event[]> {
   const where: any = { characterId };
   if (options?.fromVersion !== undefined && options?.toVersion !== undefined) {
@@ -63,10 +72,34 @@ export async function getEvents(
   }
   if (options?.type) where.type = options.type;
 
-  const rows = await db.event.findMany({
+  // createdAtAge 范围：Prisma Event 表有 createdAtAge Int? 字段，直接 where。
+  if (options?.createdAtAge) {
+    const { gte, lte } = options.createdAtAge;
+    if (gte !== undefined || lte !== undefined) {
+      where.createdAtAge = {};
+      if (gte !== undefined) where.createdAtAge.gte = gte;
+      if (lte !== undefined) where.createdAtAge.lte = lte;
+    }
+  }
+
+  // timestamp 范围：Prisma Event 表有 timestamp DateTime 字段。
+  if (options?.timestamp) {
+    const { gte, lte } = options.timestamp;
+    if (gte !== undefined || lte !== undefined) {
+      where.timestamp = {};
+      if (gte !== undefined) where.timestamp.gte = gte;
+      if (lte !== undefined) where.timestamp.lte = lte;
+    }
+  }
+
+  const findOpts: any = {
     where,
     orderBy: { aggregateVersion: 'asc' },
-  });
+  };
+  if (options?.limit !== undefined) findOpts.take = options.limit;
+  if (options?.offset !== undefined) findOpts.skip = options.offset;
+
+  const rows = await db.event.findMany(findOpts);
   return rows.map(toEvent);
 }
 

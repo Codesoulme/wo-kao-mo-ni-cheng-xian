@@ -58,6 +58,34 @@ export function applyEvent(state: CharacterStateSnapshot, event: Event): Charact
     case 'character.item.removed':
       return { ...state, inventory: state.inventory.filter((i) => i.id !== data.itemId) };
 
+    // ---- Sprint 2: 6 个 setter event type ----
+    // 这 6 类事件由 _tryAppendEvent 在 store.ts 触发，用于记录"settlement / inheritance / ending"
+    // 等全量 setter 的事件痕迹。完整 state 重建风险大（需重算 inheritance pool / candidate /
+    // ending summary），所以 reducer 只回写 meta 字段，让 replay 不丢"setter 是否发生过 + 何时发生"
+    // 的痕迹；真正的 setter 数据走 projector / 专门路径读取。
+    case 'character.inheritance-pool.set':
+    case 'character.inheritance-candidates.set':
+    case 'character.inheritance-ending-summary.set':
+      // 这 3 个不写 meta（避免 inheritance 计算中间产物污染 latestSettlementAt）。
+      return state;
+
+    case 'character.settlement-result.set':
+      return {
+        ...state,
+        latestSettlementAt: event.timestamp,
+        latestSettlementStatus: 'settlement',
+      };
+
+    case 'character.end-result.set':
+      return {
+        ...state,
+        latestSettlementAt: event.timestamp,
+        latestSettlementStatus: data.status,
+      };
+
+    case 'character.streaming-narrative.started':
+      return { ...state, latestNarrativeAt: event.timestamp };
+
     default:
       // 未知 / 尚未实现的 event type——forward-compatible，原样返回。
       return state;

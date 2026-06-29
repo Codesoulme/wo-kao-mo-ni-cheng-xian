@@ -61,9 +61,17 @@ export function StatusPanel({ character }: StatusPanelProps) {
     { label: '\u8fd0', value: character.luck, icon: <Clover className="w-2.5 h-2.5" />, color: '#22c55e' },
     { label: '\u609f', value: character.comprehension, icon: <Brain className="w-2.5 h-2.5" />, color: '#a855f7' },
   ];
+  const coreCultivationAttributeIds = new Set(['spiritualSense', 'soulStrength', 'physicalFoundation']);
+  const coreCultivationAttributeNames = new Set(['神识', '魂魄', '体魄']);
+  // 核心属性 + 别名（避免顶部信息栏 / 状态下 / 展开面板 任何一处重复显示同一属性）
+  const coreStatusNames = new Set([
+    ...coreCultivationAttributeNames,
+    '体质', '先天体质', '神识', '魂魄', '体魄',
+  ]);
   const meaningfulStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
   const constitutionStatuses = meaningfulStatuses
     .filter(isConstitutionStatus)
+    .filter((s: any) => !coreStatusNames.has(s.name))
     .sort((a: any, b: any) => (RARITY_ORDER[b.rarity] || 0) - (RARITY_ORDER[a.rarity] || 0));
   const topConstitutions = constitutionStatuses.slice(0, 2);
   const constitutionExtraCount = Math.max(0, constitutionStatuses.length - topConstitutions.length);
@@ -71,10 +79,9 @@ export function StatusPanel({ character }: StatusPanelProps) {
   const topStatuses = visibleStatuses
     .map((s: any, __idx: number) => ({ ...s, __idx }))
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
+    .filter((s: any) => !coreStatusNames.has(s.name))
     .sort((a: any, b: any) => b.__idx - a.__idx)
     .slice(0, 3);
-  const coreCultivationAttributeIds = new Set(['spiritualSense', 'soulStrength', 'physicalFoundation']);
-  const coreCultivationAttributeNames = new Set(['\u795e\u8bc6', '\u9b42\u9b44', '\u4f53\u9b44']);
   const dynamicAttributes = (character.cultivationAttributes || [])
     .filter((attr: any) => attr && attr.visible !== false && attr.name)
     .filter((attr: any) => !coreCultivationAttributeIds.has(attr.id) && !coreCultivationAttributeNames.has(attr.name))

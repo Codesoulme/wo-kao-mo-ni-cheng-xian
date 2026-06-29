@@ -85,4 +85,9 @@ export interface CharacterStateSnapshot {
   alive: boolean;
   lifespan: number;
   inventory: Array<{ id: string; item: any }>;
+  // Sprint 2: setter event meta trace（optional，向后兼容；dbToState / entityToSnapshot 不感知）。
+  // reducer 写入 set 事件时同步 timestamp + type，让 replay 不丢"setter 是否发生过"的痕迹。
+  latestSettlementAt?: number;   // 最后一次 settlement/end-result set 事件的时间戳（ms）
+  latestSettlementStatus?: string; // settlement / end-result 的 status 字符串（ending、alive、dead 等）
+  latestNarrativeAt?: number;     // 最后一次 streaming-narrative.started 的时间戳
 }
