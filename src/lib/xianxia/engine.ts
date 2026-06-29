@@ -2,6 +2,8 @@
 // 引擎权威：所有 AI 提议的变更必须经引擎校验与执行
 // AI Proposes：AI 输出是"提议"，引擎有权拒绝、修改、钳制
 
+// 修真界感改进 - 任务 B（境界碾压）：连接境界差胜率判定
+import { combatVerdict, realmDiff } from './realm-power';
 import {
   CharacterState,
   AttributeChange,
@@ -4066,6 +4068,68 @@ export function executeCombatRound(
       ended: true,
       endStatus: 'victory',
     };
+  }
+
+  // 修真界感改进 - 任务 B：境界碾压判定。
+  // 仅当敌我双方境界都已知时才介入；缺数据时保持原算法不动。
+  // 玩家境界高于敌人 ≥2 阶 → 第一回合直接判定为玩家胜出，敌人败逃；narrative 显式标"境界碾压"。
+  // （凡人/修士与 NPC 战斗时，rebel_risk 由下层负责关掉）
+  if (state.realm && enemy.realm) {
+    const playerVsEnemyDiff = realmDiff(state.realm, enemy.realm); // attacker=player
+    if (playerVsEnemyDiff >= 2) {
+      // 一击不胜之碾压：玩家无伤，敌人瞬间崩盘
+      const updatedEnemies = session.enemies.map((e, i) => i === session.currentEnemyIdx ? { ...e, hp: 0 } : e);
+      const endSession: CombatSession = {
+        ...session,
+        enemies: updatedEnemies,
+        status: 'fled', // 敌人被碾压→败逃
+        playerHp: session.playerHp,
+        playerMp: session.playerMp,
+      };
+      const verdict = combatVerdict(state.realm, enemy.realm);
+      return {
+        state: { ...state, combatSession: endSession, hp: session.playerHp, mp: session.playerMp },
+        round: {
+          round: session.round,
+          playerAction: '境界碾压',
+          playerActionType: 'attack',
+          playerDamage: enemy.hp,
+          narrative: `${enemy.name}被你随手一挥的灵压击溃。${verdict.reason}——对方连遁逃的念头都未来得及生出，便已踉跄而退。`,
+          playerHpAfter: session.playerHp,
+          enemyHpAfter: 0,
+          playerMpAfter: session.playerMp,
+        },
+        ended: true,
+        endStatus: 'fled',
+      };
+    }
+    // 反方向：敌人境界高 玩家 ≥2 阶 → 玩家被碾压、强制败逃
+    const enemyVsPlayerDiff = -playerVsEnemyDiff; // 此时为正，等价于 realmDiff(enemy.realm, state.realm)
+    if (enemyVsPlayerDiff >= 2) {
+      const updatedEnemies = session.enemies.map((e, i) => i === session.currentEnemyIdx ? { ...e, hp: e.maxHp } : e);
+      const endSession: CombatSession = {
+        ...session,
+        enemies: updatedEnemies,
+        status: 'fled', // 玩家被碾压→只能逃
+        playerHp: 0,
+        playerMp: session.playerMp,
+      };
+      return {
+        state: { ...state, combatSession: endSession, hp: 0, mp: session.playerMp },
+        round: {
+          round: session.round,
+          playerAction: '不可抗衡',
+          playerActionType: 'flee',
+          playerDamage: 0,
+          narrative: `${enemy.name}灵压如山倾落，你身体未及抵挡便已口吐鲜血。对方那等境界，根本不是凡人能够直视的。你拼尽最后一丝气力，踉跄遁走。`,
+          playerHpAfter: 0,
+          enemyHpAfter: enemy.hp,
+          playerMpAfter: session.playerMp,
+        },
+        ended: true,
+        endStatus: 'fled',
+      };
+    }
   }
   session.playerSkills = repairCombatArtsFromState(state, session.playerSkills);
   session.actionPalette = buildCombatActionPalette(state, session);

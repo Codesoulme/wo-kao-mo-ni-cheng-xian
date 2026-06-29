@@ -22,6 +22,8 @@ import {
   cleanNarrativeAge,
 } from '@/lib/xianxia/llm';
 import { getCurrentUser } from '@/lib/auth-helpers';
+// 修真界感改进 - 任务 D：寿元压力
+import { lifespanPressure, lifespanPressureStatus, nearLifespan } from '@/lib/xianxia/realm-lifespan';
 // 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 SSE 路径上也跑一次 world.tick()
 // 优化：缓存 World + Systems + Entity 跨多次 advance 复用，避免每次 new World() + addSystem() + createCharacterEntity()（节省 200-500ms/advance）
 import { World } from '@/lib/xianxia/ecs/core';
@@ -529,6 +531,46 @@ export async function POST(req: NextRequest) {
               }),
             });
           }
+
+        // 修真界感改进 - 任务 D：寿元边界检查。
+        // 仅在 age 接近 lifespan 时将强信号叠入 finalState.statusJson 与 statusList，
+        // 避免另起 status type schema 让客户端多分支处理。
+        try {
+          const ageAfter = (finalState as any).age;
+          const lifespanAfter = (finalState as any).lifespan;
+          if (typeof ageAfter === 'number' && typeof lifespanAfter === 'number') {
+            const signal = lifespanPressureStatus(ageAfter, lifespanAfter);
+            if (signal) {
+              const statusList: any[] = Array.isArray((finalState as any).statusList)
+                ? (finalState as any).statusList
+                : [];
+              if (!statusList.some((s: any) => s && (s.name === signal || s.id === 'lifespan-pressure'))) {
+                statusList.push({
+                  id: 'lifespan-pressure',
+                  name: signal,
+                  category: 'identity',
+                  rarity: 'common',
+                  description: nearLifespan(ageAfter, lifespanAfter)
+                    ? `寿元将尽：角色当前 ${ageAfter} 岁，距寿终 ${lifespanAfter - ageAfter} 年。`
+                    : `寿元已尽：角色已超过寿元上限 ${ageAfter - lifespanAfter} 年。`,
+                  source: 'engine-lifespan-check',
+                  duration: -1,
+                });
+                (finalState as any).statusList = statusList;
+                (finalState as any).statusJson = JSON.stringify(statusList);
+              }
+            }
+            // 寿元已尽：强制 death
+            if (lifespanPressure(ageAfter, lifespanAfter) === 'expired' && (finalState as any).alive !== false) {
+              (finalState as any).alive = false;
+              (finalState as any).causeOfDeath = (finalState as any).causeOfDeath || '寿终正寝';
+              (finalState as any).hp = 0;
+            }
+          }
+        } catch (e) {
+          console.error('[advance-sse] lifespan pressure check failed (non-fatal):', e);
+          // 不阻断 SSE 主流程
+        }
 
         // 7) 推送 done（数据库已同步写入，刷新页面不会丢失气泡）
         try { if (sseHeartbeat) { clearInterval(sseHeartbeat); sseHeartbeat = null; } } catch {}
