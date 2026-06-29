@@ -63,15 +63,18 @@ export function StatusPanel({ character }: StatusPanelProps) {
   ];
   const coreCultivationAttributeIds = new Set(['spiritualSense', 'soulStrength', 'physicalFoundation']);
   const coreCultivationAttributeNames = new Set(['神识', '魂魄', '体魄']);
-  // 核心属性 + 别名（避免顶部信息栏 / 状态下 / 展开面板 任何一处重复显示同一属性）
-  const coreStatusNames = new Set([
-    ...coreCultivationAttributeNames,
-    '体质', '先天体质', '神识', '魂魄', '体魄',
-  ]);
+  // 架构正确路径：
+  // - coreDerived attribute（神识/魂魄/体魄，id∈coreCultivationAttributeIds）：在 coreCultivationStats 展开面板 + characterDetail 显示
+  // - AI 创造的 attribute（id∉core，如"先天道体"/"雷灵根"）：架构安排在 topTags 显示（这是 AI 的位置）
+  // - constitution status（如"五行杂灵根"，kind='status'）：在 topConstitutions 显示（顶部信息栏名字旁）
+  // - 其他 status（增益/负面/线索）：在 topStatuses 显示
+  // 真正的"重复"来源：display-registry 的 byId Map 按 id 去重，但 status 和 attribute id 前缀不同（status-i-label vs attribute-i-label），
+  // 同名 status + attribute 都会进 Map → topTags 会同时显示 kind='status' 和 kind='attribute' 同名 entry。
+  // 因此 isExcludedTopTag 应按 kind 区分：核心属性按 id 排除（避免与 coreCultivationStats 展开面板重复），
+  // status 类型整体排除（避免与 topConstitutions 重复），让 AI 创造的 attribute 正常在 topTags 显示。
   const meaningfulStatuses = filterMeaningfulStatuses(character.activeStatuses || []);
   const constitutionStatuses = meaningfulStatuses
     .filter(isConstitutionStatus)
-    .filter((s: any) => !coreStatusNames.has(s.name))
     .sort((a: any, b: any) => (RARITY_ORDER[b.rarity] || 0) - (RARITY_ORDER[a.rarity] || 0));
   const topConstitutions = constitutionStatuses.slice(0, 2);
   const constitutionExtraCount = Math.max(0, constitutionStatuses.length - topConstitutions.length);
@@ -79,24 +82,26 @@ export function StatusPanel({ character }: StatusPanelProps) {
   const topStatuses = visibleStatuses
     .map((s: any, __idx: number) => ({ ...s, __idx }))
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
-    .filter((s: any) => !coreStatusNames.has(s.name))
     .sort((a: any, b: any) => b.__idx - a.__idx)
     .slice(0, 3);
   const dynamicAttributes = (character.cultivationAttributes || [])
     .filter((attr: any) => attr && attr.visible !== false && attr.name)
     .filter((attr: any) => !coreCultivationAttributeIds.has(attr.id) && !coreCultivationAttributeNames.has(attr.name))
     .slice(0, 3);
-  // AI-46: topTags slot 消费 — AI 创造的 attribute/status 若标记 topTags 也在此呈现
+  // AI-46: topTags slot 消费 — AI 创造的 attribute 若标记 topTags 也在此呈现
   const allDisplayEntries = characterDisplayEntries(character);
-  // 过滤已在别处显示的条目，避免重复：
-  // - 神识/魂魄/体魄 → 在展开面板的 coreCultivationStats 显示
-  // - 体质 → 在角色名旁的 topConstitutions 显示
-  // - 身份（宗门/师承/声望/灵石） → 在 AI-22 独立分组显示
+  // 架构去重（按 kind 区分，避免破坏 AI 体质 attribute 在 topTags 的合法位置）：
+  // - coreDerived attribute（神识/魂魄/体魄，id∈coreCultivationAttributeIds）：在展开面板 coreCultivationStats 显示 → 从 topTags 排除
+  // - kind='status' 类型：constitution status 已在 topConstitutions 显示，其他 status 已在 topStatuses 显示 → 从 topTags 排除（避免同名同源 status 既在 topConstitutions/topStatuses 又在 topTags 显示）
+  // - group='身份'：在 AI-22 独立分组显示 → 从 topTags 排除
+  // - group='体质' 且 kind='attribute'（AI 体质 attribute）：架构安排在 topTags 显示 → **保留**（这是用户明确要求"AI 放的位置"）
   const isExcludedTopTag = (entry: any) => {
-    const label = entry?.displayLabel || '';
-    if (label === '神识' || label === '魂魄' || label === '体魄') return true;
-    const group = entry?.displayGroup || '';
-    if (group === '体质' || group === '身份') return true;
+    // 核心属性（神识/魂魄/体魄）在展开面板 characterDetail 都已显示
+    if (coreCultivationAttributeIds.has(entry?.id)) return true;
+    // status 类型的所有 entry 都在 topConstitutions 或 topStatuses 显示过，topTags 不再重复
+    if (entry?.kind === 'status') return true;
+    // 身份独立分组显示
+    if (entry?.displayGroup === '身份') return true;
     return false;
   };
   const topTagEntries = entriesForSlot(allDisplayEntries, 'topTags', 20)
