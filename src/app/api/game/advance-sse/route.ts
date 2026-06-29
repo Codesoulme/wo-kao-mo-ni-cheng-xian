@@ -24,6 +24,8 @@ import {
 import { getCurrentUser } from '@/lib/auth-helpers';
 // 修真界感改进 - 任务 D：寿元压力
 import { lifespanPressure, lifespanPressureStatus, nearLifespan } from '@/lib/xianxia/realm-lifespan';
+// 修真界感改进 - 任务 E：世界级事件调度器
+import { rollWorldEvent, applyWorldEvent, decayWorldEvents, type WorldEvent } from '@/lib/xianxia/world-event-scheduler';
 // 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 SSE 路径上也跑一次 world.tick()
 // 优化：缓存 World + Systems + Entity 跨多次 advance 复用，避免每次 new World() + addSystem() + createCharacterEntity()（节省 200-500ms/advance）
 import { World } from '@/lib/xianxia/ecs/core';
@@ -516,6 +518,35 @@ export async function POST(req: NextRequest) {
               console.error('[advance-sse] ECS tick failed (non-fatal):', e);
               // 不阻断 SSE 主流程：缓存可能损坏，下一次 advance 重建
               ecsCache = null;
+            }
+
+            // 修真界感改进 - 任务 E：世界级事件调度器
+            // 在 ECS tick 完成、db.update 之前 roll 世界事件；
+            // 触发后注入 finalState.statusList / cultivationMultiplier / lifespan / pendingThread 等。
+            // 失败仅 console.error，不阻断 SSE 主流程。
+            try {
+              const ageAfterTick = Number((finalState as any).age ?? 0);
+              const yearsAdvanced = Math.max(1, ageAfterTick - Number(ageBefore ?? ageAfterTick));
+
+              // 1. decay 已有 active 事件（先移除已结束的，避免 roll 时去重冲突）
+              finalState = decayWorldEvents(finalState, yearsAdvanced);
+
+              // 2. roll 新事件
+              const worldEvent: WorldEvent | null = rollWorldEvent(finalState, worldCalendar || undefined);
+              if (worldEvent) {
+                finalState = applyWorldEvent(finalState, worldEvent);
+                console.log('[advance-sse] 世界级事件触发:', worldEvent.type, 'at age', worldEvent.triggeredAge, 'duration', worldEvent.duration, '年');
+                // 把世界级事件追加到本次 eventLog.effects（前端展示）
+                try {
+                  const evt = (aiOutput as any)?.choice ? null : aiOutput;
+                  if (evt && typeof evt === 'object') {
+                    (evt as any).worldEvent = worldEvent;
+                  }
+                } catch {}
+              }
+            } catch (e) {
+              console.error('[advance-sse] world event scheduler failed (non-fatal):', e);
+              // 不阻断 SSE 主流程
             }
 
             // 修复 P1-1：SSE 路径补齐所有漏写字段——走与 non-SSE 同一个 buildAdvanceStateData
