@@ -253,11 +253,12 @@ export async function POST(req: NextRequest) {
               const lastChar = prevNarrative.trim().slice(-1);
               const isComplete = /[。！？!?;；]/.test(lastChar);
               if (!isComplete) {
-                console.warn('[SSE] narrative 字段闭合但末尾不完整，等待下一个 delta / done 兜底:', prevNarrative.slice(-50));
-                // 不 emit narrative_complete，延后到 done 兜底
-                return;
+                // 不完整（LLM 被 max_tokens 截断，如"...说" / "...喊你搬柴"）
+                // 不能 return 延后（LLM 不会继续输出 rawText, client 会永远卡在"收获结算中"）
+                // 必须主动 truncateNarrativeAtSentence 截到最近完整句 + emit
+                console.warn('[SSE] narrative 字段闭合但末尾不完整（可能 LLM 被 max_tokens 截断），强制截到最近完整句:', prevNarrative.slice(-50));
               }
-              // 兜底截断：> 400 字强制截到最近完整句
+              // 兜底截断：> 400 字强制截到最近完整句；不完整时也截到最近完整句（不是 return 延后）
               const finalNarrative = truncateNarrativeAtSentence(prevNarrative, 400);
               narrativeClosedSent = true;
               console.log('[SSE] narrative field closed, sent narrative_complete event (len:', finalNarrative.length, ')');
