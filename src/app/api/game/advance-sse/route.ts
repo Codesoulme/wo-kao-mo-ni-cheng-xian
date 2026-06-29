@@ -10,6 +10,7 @@ import { buildStateContext, executeAIEvent, stateToResponse } from '@/lib/xianxi
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
+import { truncateNarrativeAtSentence } from '@/lib/xianxia/display';
 import { appendEvent } from '@/lib/xianxia/events/store';
 import {
   callLLMStream,
@@ -237,10 +238,24 @@ export async function POST(req: NextRequest) {
             }
             // ★ narrative 字符串字段闭合时（LLM 写完 narrative 在准备下一个字段），立即通知前端
             // → 玩家立刻看到"收获结算中..."提示，不再干等 LLM 写剩余 changes/items/npcs
+            // 修复截断 bug: LLM 写 narrative 时被 max_tokens 截断（line 1302 警告），"narrative" 字段可能以半句话闭合
+            // （如"你爹喻大山从窑口探出头来，喊你搬柴"无句号）。emit 前必须：
+            //   1. 末尾完整性检查（必须有 。！？!? 等句末标点）
+            //   2. truncateNarrativeAtSentence 兜底（虽然流式已闭合但 narrative 可能 > 400 字）
             if (closed && !narrativeClosedSent) {
+              // 完整性检查：以句末标点结尾（。！？!?；；）
+              const lastChar = prevNarrative.trim().slice(-1);
+              const isComplete = /[。！？!?;；]/.test(lastChar);
+              if (!isComplete) {
+                console.warn('[SSE] narrative 字段闭合但末尾不完整，等待下一个 delta / done 兜底:', prevNarrative.slice(-50));
+                // 不 emit narrative_complete，延后到 done 兜底
+                return;
+              }
+              // 兜底截断：> 400 字强制截到最近完整句
+              const finalNarrative = truncateNarrativeAtSentence(prevNarrative, 400);
               narrativeClosedSent = true;
-              console.log('[SSE] narrative field closed, sent narrative_complete event');
-              send('narrative_complete', { type: 'narrative_complete', narrative: prevNarrative });
+              console.log('[SSE] narrative field closed, sent narrative_complete event (len:', finalNarrative.length, ')');
+              send('narrative_complete', { type: 'narrative_complete', narrative: finalNarrative });
             }
           }, { qualityMode });
         } catch (e: any) {
