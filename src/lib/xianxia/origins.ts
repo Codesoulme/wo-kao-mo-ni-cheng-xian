@@ -369,7 +369,11 @@ export function rollCompanionItem(
   enabled = true,
 ): CompanionItem[] {
   if (!enabled) return [];
-  // 1-2 个伴生灵物
+  // 伴生灵物是稀有出生异象，**默认 5-10% 概率**才有，AI 还会再判断一次
+  // 只有少数命数极贵之人（神明转世/魔道遗孤/封印之子等）才在开局自带
+  // 普通凡人孩子（农户/渔民/商贾/书生/猎户等）开局 roll 几乎为 0
+  if (Math.random() > 0.08) return [];
+  // 触发后再在 65%/35% 比例里决定 1 个或 2 个
   const count = Math.random() < 0.65 ? 1 : 2;
   const shuffled = [...COMPANION_POOL].sort(() => Math.random() - 0.5);
   const picked: CompanionItem[] = [];
@@ -418,6 +422,7 @@ export function rollSealedFate(
 export interface RollOriginOptions {
   ethnicity?: Ethnicity;
   lineage?: Lineage;
+  /** 默认不 roll；显式 true 才开局 roll 伴生灵物。AI 在剧情里自然给的是主路径 */
   companionItems?: boolean;
   sealedFate?: boolean;
   previousLivesCount?: number;
@@ -429,7 +434,7 @@ export function rollOrigin(opts: RollOriginOptions = {}): OriginRoll {
   const companionItems = rollCompanionItem(
     ethnicity,
     lineage,
-    opts.companionItems !== false,
+    opts.companionItems === true,
   );
   const sealedFate = rollSealedFate(lineage, opts.sealedFate !== false);
   return { ethnicity, lineage, companionItems, sealedFate };
