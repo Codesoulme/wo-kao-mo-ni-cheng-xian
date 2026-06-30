@@ -13476,6 +13476,43 @@ function smokeP5EcsTickAuction001RouteCallsHelper(): void {
   log('smoke-p5-ecs-tick-auction-001-route-calls-helper', { passed: true });
 }
 
+// Phase 7: 把 ECS tick-helper 推广到 combat 路由（combat.action + combat.end）。
+// 战斗后 ECS tick（战斗影响修为/年龄），与 settle/market/alchemy/auction 风格对齐——tick 放在 db.character.update 之前（不进事务），失败 try/catch 不阻断主流程。
+// deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖战斗陨落等显式原因。
+
+function smokeP5EcsTickCombat001RouteCallsHelper(): void {
+  const actionSrc = readFileSync('src/app/api/game/combat/action/route.ts', 'utf-8');
+  const endSrc = readFileSync('src/app/api/game/combat/end/route.ts', 'utf-8');
+
+  // 1. 两个子路由都 import helper（各一次）
+  assert(actionSrc.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'combat.action route should import tick-helper');
+  assert(endSrc.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'combat.end route should import tick-helper');
+
+  // 2. combat.action 调用 helper
+  assert(/tickEcsForCharacter\(/.test(actionSrc), 'combat.action route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(actionSrc), 'combat.action route should call applyEcsTickToState');
+
+  // 3. combat.end 调用 helper
+  assert(/tickEcsForCharacter\(/.test(endSrc), 'combat.end route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(endSrc), 'combat.end route should call applyEcsTickToState');
+
+  // 4. 非致命 try/catch + ECS 失败日志
+  assert(/\[combat\]\s+action ECS tick failed \(non-fatal\)/.test(actionSrc), 'combat.action route should have non-fatal ECS catch log');
+  assert(/\[combat\]\s+end ECS tick failed \(non-fatal\)/.test(endSrc), 'combat.end route should have non-fatal ECS catch log');
+
+  // 5. baseSnapshot 含 name + inventory=[]
+  assert(/name:\s*state\.name/.test(actionSrc), 'combat.action ECS baseSnapshot should include name from state');
+  assert(/inventory:\s*\[\]/.test(actionSrc), 'combat.action ECS baseSnapshot should default inventory=[]');
+  assert(/name:\s*state\.name/.test(endSrc), 'combat.end ECS baseSnapshot should include name from state');
+  assert(/inventory:\s*\[\]/.test(endSrc), 'combat.end ECS baseSnapshot should default inventory=[]');
+
+  // 6. source 参数标记区分 combat-action / combat-end（路由定位用）
+  assert(/source:\s*'combat-action'/.test(actionSrc), 'combat.action tick should pass source="combat-action" for log prefix');
+  assert(/source:\s*'combat-end'/.test(endSrc), 'combat.end tick should pass source="combat-end" for log prefix');
+
+  log('smoke-p5-ecs-tick-combat-001-route-calls-helper', { passed: true });
+}
+
 function smokeP5EcsTickHelper003ChooseAndInterfereRouteCallHelper(): void {
   // 验证 choose / interfere / advance 三个路由都调用了 helper
   const chooseSrc = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
@@ -13518,6 +13555,8 @@ function pgRunPhaseP5EcsTickHelperSmokes(): void {
     { name: 'smoke-p5-ecs-tick-market-001-route-calls-helper', fn: smokeP5EcsTickMarket001RouteCallsHelper },
     { name: 'smoke-p5-ecs-tick-alchemy-001-route-calls-helper', fn: smokeP5EcsTickAlchemy001RouteCallsHelper },
     { name: 'smoke-p5-ecs-tick-auction-001-route-calls-helper', fn: smokeP5EcsTickAuction001RouteCallsHelper },
+    // Phase 7: helper 推广到 combat.action / combat.end 2 子路由
+    { name: 'smoke-p5-ecs-tick-combat-001-route-calls-helper', fn: smokeP5EcsTickCombat001RouteCallsHelper },
   ];
   for (const c of cases) {
     try {

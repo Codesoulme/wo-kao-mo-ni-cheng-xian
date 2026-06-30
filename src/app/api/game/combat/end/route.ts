@@ -26,6 +26,10 @@ import { registerItem, registerMany, registerThread } from '@/lib/xianxia/conten
 // 批 16: combat end 路由接 Event Sourcing — alive/hp/item 事件。
 // appendEvent 失败不影响战斗结算主流程（保留 Worker I ContentRegistry 校验 + Worker S2 鉴权）。
 import { appendEvent } from '@/lib/xianxia/events/store';
+// Phase 7: 把 ECS tick-helper 推广到 combat.end 路由。
+// 战斗结束后 ECS tick（结算后修为沉淀 + 寿元推进），与 choose/interfere/advance/settle/market/alchemy/auction 风格对齐——tick 放在 db.character.update 之前（不进事务），失败 try/catch 不阻断主流程。
+// deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖战斗陨落等显式原因。
+import { tickEcsForCharacter, applyEcsTickToState } from '@/lib/xianxia/ecs/tick-helper';
 import type { AttributeChange, CombatLootAIOutcome } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
@@ -271,6 +275,29 @@ export async function POST(req: NextRequest) {
       effectResolveTrace: [],
       aiBoundaryTrace: [],
     });
+
+    // Phase 7: combat.end 接 ECS tick（战斗结算后修为沉淀 + 寿元推进）。
+    // tick 放在 db.character.update 之前（不进事务），failure 仅 console.error 不阻断主流程。
+    // deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖战斗陨落等显式原因。
+    try {
+      const ecsBaseSnapshot = {
+        characterId,
+        name: state.name || '',
+        age: state.age,
+        realm: state.realm,
+        cultivationExp: state.cultivationExp,
+        hp: state.hp,
+        maxHp: state.maxHp,
+        spiritStones: state.spiritStones,
+        alive: state.alive,
+        lifespan: state.lifespan || 100,
+        inventory: [],
+      };
+      const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'combat-end' });
+      applyEcsTickToState(state, ecsResult);
+    } catch (e) {
+      console.error('[combat] end ECS tick failed (non-fatal):', e);
+    }
 
     await db.character.update({
       where: { id: characterId, userId: user?.id },
