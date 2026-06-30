@@ -13480,6 +13480,71 @@ function smokeP5EcsTickAuction001RouteCallsHelper(): void {
 // 战斗后 ECS tick（战斗影响修为/年龄），与 settle/market/alchemy/auction 风格对齐——tick 放在 db.character.update 之前（不进事务），失败 try/catch 不阻断主流程。
 // deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖战斗陨落等显式原因。
 
+// Phase 7 W4: 把 ECS tick-helper 推广到 breakthrough (tribulation/end) + discover (exploration) 2 router。
+// breakthrough 语义：突破成功修为暴涨 / 失败 / 放弃 都触发 tick——修为自然沉淀。
+// discover 语义：奇遇通常只增年龄（不主动推进修为）——tick 仍跑一次保持修为沉淀节奏。
+
+function smokeP5EcsTickBreakthrough001RouteCallsHelper(): void {
+  const src = readFileSync('src/app/api/game/tribulation/end/route.ts', 'utf-8');
+
+  // 1. import helper
+  assert(src.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'tribulation/end route should import tick-helper');
+
+  // 2. 调用 tickEcsForCharacter + applyEcsTickToState
+  assert(/tickEcsForCharacter\(/.test(src), 'tribulation/end route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(src), 'tribulation/end route should call applyEcsTickToState');
+
+  // 3. 非致命 try/catch + ECS 失败日志
+  assert(/\[tribulation\/end\]\s+ECS tick failed \(non-fatal\)/.test(src), 'tribulation/end route should have non-fatal ECS catch log');
+  assert(/\[tribulation\/end\]\s+ECS tick persist failed \(non-fatal\)/.test(src), 'tribulation/end route should have non-fatal ECS persist catch log');
+
+  // 4. baseSnapshot 用 owningChar（含 characterId + name + inventory=[]）
+  assert(/name:\s*owningChar\.name/.test(src), 'tribulation/end ECS baseSnapshot should include name from owningChar');
+  assert(/inventory:\s*\[\]/.test(src), 'tribulation/end ECS baseSnapshot should default inventory=[]');
+
+  // 5. source 参数按 outcome 区分（tribulation-pass / tribulation-fail / tribulation-abandon）——三元表达式字符串
+  assert(/'tribulation-pass'/.test(src), 'tribulation ascended should use source="tribulation-pass"');
+  assert(/'tribulation-fail'/.test(src), 'tribulation failed should use source="tribulation-fail"');
+  assert(/'tribulation-abandon'/.test(src), 'tribulation abandoned should use source="tribulation-abandon"');
+
+  // 6. 持久化回 db.character：tick 结果必须落库，不能只 mutate state
+  assert(/db\.character\.update\(\{[\s\S]*?where:\s*\{\s*id:\s*eventedCharacterId/.test(src), 'tribulation/end should persist ECS tick result via db.character.update');
+
+  log('smoke-p5-ecs-tick-breakthrough-001-route-calls-helper', { passed: true });
+}
+
+function smokeP5EcsTickDiscover001RouteCallsHelper(): void {
+  const src = readFileSync('src/app/api/game/exploration/route.ts', 'utf-8');
+
+  // 1. import helper
+  assert(src.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'exploration route should import tick-helper');
+
+  // 2. 调用 tickEcsForCharacter + applyEcsTickToState
+  assert(/tickEcsForCharacter\(/.test(src), 'exploration route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(src), 'exploration route should call applyEcsTickToState');
+
+  // 3. 非致命 try/catch + ECS 失败日志
+  assert(/\[exploration\]\s+ECS tick failed \(non-fatal\)/.test(src), 'exploration route should have non-fatal ECS catch log');
+
+  // 4. baseSnapshot 用 finalState（含 characterId + name + inventory=[]）
+  assert(/name:\s*finalState\.name/.test(src), 'exploration ECS baseSnapshot should include name from finalState');
+  assert(/inventory:\s*\[\]/.test(src), 'exploration ECS baseSnapshot should default inventory=[]');
+
+  // 5. source 参数标记为 'exploration'
+  assert(/source:\s*'exploration'/.test(src), 'exploration tick should pass source="exploration"');
+
+  // 6. tick 放在 db.character.update 之前（与其他 router 风格一致：tick 不进事务但要在 update 前）
+  const tickIdx = src.search(/tickEcsForCharacter\(/);
+  const updateIdx = src.search(/db\.character\.update\(/);
+  assert(tickIdx > 0 && updateIdx > 0 && tickIdx < updateIdx, `exploration tick should be before db.character.update (tick=${tickIdx}, update=${updateIdx})`);
+
+  // 7. db.update 必须包含 age + cultivationExp 字段持久化（让 tick 推进的修为/年龄落库）
+  assert(/age:\s*finalState\.age/.test(src), 'exploration db.update should persist age from finalState');
+  assert(/cultivationExp:\s*finalState\.cultivationExp/.test(src), 'exploration db.update should persist cultivationExp from finalState');
+
+  log('smoke-p5-ecs-tick-discover-001-route-calls-helper', { passed: true });
+}
+
 function smokeP5EcsTickCombat001RouteCallsHelper(): void {
   const actionSrc = readFileSync('src/app/api/game/combat/action/route.ts', 'utf-8');
   const endSrc = readFileSync('src/app/api/game/combat/end/route.ts', 'utf-8');
@@ -13555,6 +13620,9 @@ function pgRunPhaseP5EcsTickHelperSmokes(): void {
     { name: 'smoke-p5-ecs-tick-market-001-route-calls-helper', fn: smokeP5EcsTickMarket001RouteCallsHelper },
     { name: 'smoke-p5-ecs-tick-alchemy-001-route-calls-helper', fn: smokeP5EcsTickAlchemy001RouteCallsHelper },
     { name: 'smoke-p5-ecs-tick-auction-001-route-calls-helper', fn: smokeP5EcsTickAuction001RouteCallsHelper },
+    // Phase 7 W4: helper 推广到 breakthrough (tribulation/end) + discover (exploration) 2 router
+    { name: 'smoke-p5-ecs-tick-breakthrough-001-route-calls-helper', fn: smokeP5EcsTickBreakthrough001RouteCallsHelper },
+    { name: 'smoke-p5-ecs-tick-discover-001-route-calls-helper', fn: smokeP5EcsTickDiscover001RouteCallsHelper },
     // Phase 7: helper 推广到 combat.action / combat.end 2 子路由
     { name: 'smoke-p5-ecs-tick-combat-001-route-calls-helper', fn: smokeP5EcsTickCombat001RouteCallsHelper },
   ];

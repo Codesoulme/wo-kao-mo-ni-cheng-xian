@@ -29,6 +29,11 @@ import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { appendStateChangeAuditEffect } from '@/lib/xianxia/state-change-log';
 import { appendEvent } from '@/lib/xianxia/events/store';
+// Phase 7 W4: 秘境探索（discover/奇遇）接 ECS tick-helper——探索后修为沉淀 + 寿元推进。
+// tick 放在 db.character.update 之前（不进事务），failure 仅 console.error，不阻断探索主流程。
+// deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖秘境殒落等显式原因。
+// 探索通常不主动推进年龄（见 generateAgeEvent false 参数），但 ECS tick 仍跑一次保持修为沉淀节奏。
+import { tickEcsForCharacter, applyEcsTickToState } from '@/lib/xianxia/ecs/tick-helper';
 import type { SecretRealm } from '@/lib/xianxia/types';
 
 // P1 step2: 收 where: { id, userId }（dev 模式 userId: undefined，Prisma 自动忽略 → 不破 dev/smoke）
@@ -218,10 +223,36 @@ export async function POST(req: NextRequest) {
 
     finalState = recordExploration(finalState, realm.id, bestReward);
 
+    // Phase 7 W4: exploration 接 ECS tick（秘境探索后修为沉淀 + 寿元推进）。
+    // 放在 db.character.update 之前——tick 不进事务；failure 仅 console.error，不阻断探索主流程。
+    // deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖秘境殒落等显式原因。
+    // 探索不主动推进年龄（generateAgeEvent(false)），但 ECS tick 仍跑一次保持修为沉淀节奏——与已有 7 router 风格一致。
+    try {
+      const ecsBaseSnapshot = {
+        characterId,
+        name: finalState.name || '',
+        age: finalState.age,
+        realm: finalState.realm,
+        cultivationExp: finalState.cultivationExp,
+        hp: finalState.hp,
+        maxHp: finalState.maxHp,
+        spiritStones: finalState.spiritStones,
+        alive: finalState.alive,
+        lifespan: finalState.lifespan || 100,
+        inventory: [],
+      };
+      const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'exploration' });
+      applyEcsTickToState(finalState, ecsResult);
+    } catch (e) {
+      console.error('[exploration] ECS tick failed (non-fatal):', e);
+    }
+
     // 持久化（不推进年龄，不修改 fateNodes/lastEventAge）
     await db.character.update({
       where: { id: characterId, userId: user?.id },
       data: {
+        age: finalState.age,
+        cultivationExp: finalState.cultivationExp,
         hp: finalState.hp,
         maxHp: finalState.maxHp,
         mp: finalState.mp,
