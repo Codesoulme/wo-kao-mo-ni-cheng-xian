@@ -26,6 +26,168 @@ export interface RealmInfo {
   description: string;
 }
 
+// 境界画像：默认境界体系之上的显示/强度覆盖层。
+// 底层 realm 仍用于系统兼容；AI 可在重大因果下通过特殊状态或突破输出改写此画像。
+export interface RealmProfile {
+  name?: string;         // 显示名称，如「练气四十二层」「九转金丹」「完美筑基」
+  shortName?: string;    // 境界球单字/短名
+  color?: string;
+  maxLevel?: number;     // 当前境界的显示层数上限，允许如练气999层
+  powerMultiplier?: number; // 强度倍率，仅在合理范围内影响战斗/属性展示
+  expMultiplier?: number;   // 突破/升层修为需求倍率
+  reason?: string;       // 叙事因果
+  traits?: Partial<RealmTraits>; // 衍生境界特性（与 REALM_TRAITS 默认合并）
+}
+
+export interface RealmTraits {
+  cultivationMode: string;
+  bottleneck: string;
+  breakthroughTrial: string;
+  capabilities: string[];
+  limitations: string[];
+  worldAccess: string[];
+  socialWeight: string;
+  combatStyle: string[];
+  resourceNeeds: string[];
+  riskTags: string[];
+}
+
+export interface CombatProjectionTraits {
+  force: number;
+  guard: number;
+  agility: number;
+  spiritualAwareness: number;
+  soulStability: number;
+  bodyTenacity: number;
+  forceLabel: string;
+  guardLabel: string;
+  agilityLabel: string;
+  summary: string;
+  advantages: string[];
+  vulnerabilities: string[];
+}
+
+export interface CultivationAttributeEntry {
+  id: string;
+  name: string;
+  value?: number | string;
+  description: string;
+  source?: string;
+  category?: 'body' | 'spirit' | 'dao' | 'combat' | 'fate' | 'custom';
+  visible?: boolean;
+}
+
+export const REALM_TRAITS: Record<Realm, RealmTraits> = {
+  mortal: {
+    cultivationMode: '尚未引气，以生计、根骨打磨和寻觅仙缘为主',
+    bottleneck: '不识灵机，难辨仙物真价，受凡俗病痛与生计所困',
+    breakthroughTrial: '需得灵根显化、引路之人或真正入道机缘',
+    capabilities: ['凡俗谋生', '江湖武艺', '辨识粗浅仙缘'],
+    limitations: ['不能自主驱使法器', '难以辨识高阶灵物', '寿元与疾病束缚明显'],
+    worldAccess: ['凡俗村镇', '江湖门派', '低频仙缘传闻'],
+    socialWeight: '在修士眼中近乎凡尘，但奇根骨或奇物可引来关注',
+    combatStyle: ['体力搏杀', '借物脱身', '依靠他人庇护'],
+    resourceNeeds: ['入道功法', '启灵之物', '安身之所'],
+    riskTags: ['疾病', '饥寒', '被修士注及'],
+  },
+  qi_refining: {
+    cultivationMode: '引气入体，稳定法力循环，以低阶功法、灵石、符箓和丹药为要',
+    bottleneck: '法力浅薄，神识初萌且难长时间外放',
+    breakthroughTrial: '需打通周天、得合适功法后续与筑基机缘',
+    capabilities: ['使用低阶符箓', '短时驱使低阶法器', '辨识常见灵物'],
+    limitations: ['不宜长途御器横行', '难破高阶禁制', '易受筑基以上神识压制'],
+    worldAccess: ['低阶坊市', '宗门外门', '小型灵地', '凡俗与修行边界'],
+    socialWeight: '初入修行者，凡人眼中已有仙家威仪，高阶修士眼中仍属后辈',
+    combatStyle: ['符箓试探', '低阶法器护身', '借地形退避'],
+    resourceNeeds: ['灵石', '聚气丹', '入门功法后续', '筑基丹线索'],
+    riskTags: ['灵力枯竭', '功法不合', '被高阶神识锁定'],
+  },
+  foundation: {
+    cultivationMode: '道基初成，法力凝实，以稳固道基、神识初放和洞府经营为要',
+    bottleneck: '道基稳固度、功法后续与结丹资源缺口',
+    breakthroughTrial: '需结丹因缘、丹药、心性与道基成色相合',
+    capabilities: ['稳定御器远行', '神识探查周身', '开辟或经营洞府'],
+    limitations: ['难驾驭本命法宝', '金丹禁制仍难硬破', '长途斗法耗损明显'],
+    worldAccess: ['宗门核心外围', '洞府经营', '秘境外层', '筑基坊市'],
+    socialWeight: '已算低阶骨干，烬气修士多有忌惮，小宗门开始重视',
+    combatStyle: ['御器斗法', '神识预判', '护体灵光维持'],
+    resourceNeeds: ['结丹灵物', '高阶功法后续', '洞府灵脉', '稳固道基的丹药'],
+    riskTags: ['道基受损', '神识反噬', '结丹失败'],
+  },
+  golden_core: {
+    cultivationMode: '金丹成就，以丹火、本命法宝雏形和金丹品阶为核心',
+    bottleneck: '金丹成色、本命法宝祭炼与结婴机缘',
+    breakthroughTrial: '需破丹成婴，资源、心魔、神魂成色缺一不可',
+    capabilities: ['祭炼本命法宝雏形', '以丹火炼物或对效', '神识压制低阶修士'],
+    limitations: ['元婴秘术尚不可轻用', '高阶大能仍可碾压', '金丹受损代价极大'],
+    worldAccess: ['高阶拍卖会', '宗门镇守之位', '金丹秘境', '小宗门权力层'],
+    socialWeight: '可镇一方、被拉拢或忌惮，也更容易被围杀夺宝',
+    combatStyle: ['本命法宝雏形', '丹火焚炼', '阵法与法宝联动'],
+    resourceNeeds: ['本命法宝材料', '结婴灵物', '神魂温养之物'],
+    riskTags: ['丹毁道消', '心魔劫', '被高阶修士猎杀'],
+  },
+  nascent_soul: {
+    cultivationMode: '元婴凝成，神魂与法力相合，以元婴秘术、神识远游和肉身安否为要',
+    bottleneck: '元婴稳固、肉身与神魂的互相承载，以及化神契机',
+    breakthroughTrial: '需神魂足以承受天地元气压力，否则易被反噬或封禁',
+    capabilities: ['元婴出窍或遥感', '肉身毁坏后有机会遁逃', '高阶神识秘术'],
+    limitations: ['元婴离体风险极高', '夺舍或转修必须有强因果', '界面压力已开始显化'],
+    worldAccess: ['大能交易会', '空间禁制', '宗门兴衰之争', '元婴秘府'],
+    socialWeight: '已是大能之列，一举一动足以改变小势力格局',
+    combatStyle: ['神识重压', '元婴秘术', '肉身与元婴双层风险'],
+    resourceNeeds: ['温养元婴之物', '空间灵材', '化神契机'],
+    riskTags: ['元婴被封', '夺舍失败', '肉身毁损'],
+  },
+  spirit_severing: {
+    cultivationMode: '神意与天地元气相应，以法则雏形、因果压力和神魂稳固为要',
+    bottleneck: '神魂承压、天地元气契合与界面排斥',
+    breakthroughTrial: '需稳住元神与法则雏形，不可将法则之力当作随手技艺',
+    capabilities: ['感应法则雏形', '长距离神念探查', '改变局部天地元气流势'],
+    limitations: ['不可随意改写天地法则', '高阶出手会留下明显因果', '低阶地界难承长时间威压'],
+    worldAccess: ['高阶秘市', '法则遗迹', '界面裂隙', '大能同盟或猎杀'],
+    socialWeight: '行走一方即会被大势力记录，非常人能忽视',
+    combatStyle: ['天地元气压制', '神念锁敌', '法则雏形余波'],
+    resourceNeeds: ['法则感悟', '界面线索', '稳魂之物'],
+    riskTags: ['界面排斥', '因果反噬', '神魂裂痕'],
+  },
+  great_vehicle: {
+    cultivationMode: '道行近圆，以界面压力、飞升通道和道统承负为主',
+    bottleneck: '界面容纳、飞升契机与一身因果清算',
+    breakthroughTrial: '需应对界面牵引与天地因果，不宜再用低阶事件模式推进',
+    capabilities: ['牵动天地气机', '开辟或寻觅飞升通道', '布置长期道统后手'],
+    limitations: ['出手代价极大', '不应频繁滋扰低阶尘世', '受天劫与界面监视'],
+    worldAccess: ['飞升通道', '大能道统争夺', '界面边缘', '天劫布置'],
+    socialWeight: '已越出寻常势力格局，一念可成传说或大祸',
+    combatStyle: ['道统后手', '界面气机牵制', '天劫风险参与斗法'],
+    resourceNeeds: ['飞升信物', '界面节点', '清算因果的契机'],
+    riskTags: ['天劫', '界面压力', '道统反噬'],
+  },
+  tribulation: {
+    cultivationMode: '身处劫数，一切修行都围绕渡劫、因果清算与飞升准备',
+    bottleneck: '天劫强度、肉身承载、神魂稳固和一生因果',
+    breakthroughTrial: '渡劫即为核心试炼，成则飞升，败则身死道消或留下余波',
+    capabilities: ['调动毕生道行应劫', '留下传承后手', '以劫数改写世界记忆'],
+    limitations: ['难以逃避核心劫数', '出手会牵动天劫提前', '不宜再局限于低阶争斗'],
+    worldAccess: ['天劫之地', '飞升前的道统清算', '世界遗响'],
+    socialWeight: '举世瞩目，成败都会成为后世传说或禁地根源',
+    combatStyle: ['应劫护道', '天雷余波', '临终或飞升之战'],
+    resourceNeeds: ['渡劫大阵', '护道之物', '一生因果了结'],
+    riskTags: ['天劫降临', '身死道消', '遗响反噬'],
+  },
+  ascension: {
+    cultivationMode: '已超脱此界常规修行，以仙路遗响、道统传承和后世回响为主',
+    bottleneck: '不再以此界小境界衡量',
+    breakthroughTrial: '此境不应再生成常规突破',
+    capabilities: ['成为世界传说', '遗留道统种子', '影响后世仙缘'],
+    limitations: ['不应以凡界常规事件追演', '不再以普通背包或坊市资源作为核心'],
+    worldAccess: ['仙路传说', '后世遗迹', '传承池'],
+    socialWeight: '在此界已是传说与遗响',
+    combatStyle: ['不以常规斗法记录'],
+    resourceNeeds: ['传承落点', '世界遗响承接'],
+    riskTags: ['遗响被曲解', '道统失传'],
+  },
+};
+
 export const REALMS: RealmInfo[] = [
   {
     id: 'mortal',
@@ -227,6 +389,24 @@ export interface CultivationFactor {
   note?: string;                  // 简短说明（如「修为流转加速」「灵气汇聚」）
 }
 
+// ==================== 器灵觉醒阶段 (Phase-α α-5) ====================
+// 三阶段：sleeping(未启 0-33) → awakened(初醒 34-66) → sentient(启智 67-100)
+// 阶段名由 AI 在 narrative 自然叙出；UI 仅展示；不存在"指定器灵名"输入表单
+export type AwakeningStage = 'sleeping' | 'awakened' | 'sentient';
+
+export const AWAKENING_STAGE_LABEL: Record<AwakeningStage, string> = {
+  sleeping: '未启',
+  awakened: '初醒',
+  sentient: '启智',
+};
+
+// 阶段阈值（闭区间右开；与 engine.computeAwakening 保持一致）
+export const AWAKENING_THRESHOLDS = {
+  sleeping: { min: 0,  max: 33 },
+  awakened: { min: 34, max: 66 },
+  sentient: { min: 67, max: 100 },
+} as const;
+
 export interface ItemEntry {
   id: string;
   name: string;
@@ -239,6 +419,21 @@ export interface ItemEntry {
   // 例：「左手」「右手中指」「项链·储物戒指×5」「腰悬」「头戴」
   // 不再限制每种类型装备数量上限——玩家可戴十个戒指、脖挂一串储物戒指等
   equipNote?: string;
+  // ===== Phase-α α-5: 法宝养灵 / 器灵觉醒 =====
+  // 养灵进度 0..100（引擎累加；AI 提议 delta 由引擎限幅 [0..10]/事件）
+  nurtureProgress?: number;
+  // 觉醒阶段（由 nurtureProgress 自动判定；首次跨 stage 由引擎落回 state）
+  awakeningStage?: AwakeningStage;
+  // 器灵名（AI 在 narrative 自然起名；UI 不提供输入；首次跨 sentient 阶段时落定）
+  sentientName?: string;
+  // ===== Phase-α α-4: 功法三段（经/诀/神通）=====
+  // 阶段：practiced(初习 0-33) / awakened(觉意 34-66) / transcendent(神通/大成 67-100)
+  // 旧存档无字段视为初习 + 0 exp；不报错；UI 按色阶 chip 投影（不暴露机制词）
+  scriptureStage?: 'practiced' | 'awakened' | 'transcendent';
+  // 功法熟练度累计 0..100；引擎权威累计，AI 的 scriptureProgress.delta 仅作建议（被限幅 [0..30]/事件）
+  scriptureExp?: number;
+  // 跨段觉醒时 AI 留下的中文叙事钩子（如「血海悟剑」「与《吞日真经》融合」），用于 detail 弹窗
+  scriptureAwakeningHook?: string;
 }
 
 // ==================== 事件蓝图系统 (Task 20 - 解决事件单一化) ====================
@@ -332,7 +527,7 @@ export interface PendingThread {
   id: string;
   title: string;             // 线索标题
   description: string;       // 线索描述（人/事/时/地/因）
-  category: 'competition' | 'enemy' | 'quest' | 'promise' | 'mystery' | 'romance' | 'debt' | 'inheritance';
+  category: 'competition' | 'enemy' | 'quest' | 'promise' | 'mystery' | 'romance' | 'debt' | 'inheritance' | 'exploration';
   startAge: number;          // 触发年龄
   deadlineAge: number;       // 截止年龄（到期必须触发对应事件）
   status: 'pending' | 'urgent' | 'resolved' | 'failed';
@@ -340,6 +535,10 @@ export interface PendingThread {
   relatedMemoryIds?: string[]; // 关联的长期记忆
   reward?: string;           // 完成奖励描述
   failureCost?: string;      // 失败代价描述
+  dueInSameYear?: boolean;   // 同年内后续：如“三月后”“不久后”“今年比试”，advance 后应追加同岁续写
+  followUpHint?: string;     // 后续应如何承接，例如“入仙门比试”“持潮湿玉片再探潮隙浮阁”
+  sourceEventTitle?: string; // 来源事件标题，帮助 AI/引擎保持因果
+  realmId?: string;          // 若该线索指向秘境，填秘境 id
 }
 
 // ==================== 战斗系统 (Task 20) ====================
@@ -356,6 +555,9 @@ export interface CombatEnemy {
   nextAction?: string;
   nextActionDesc?: string;
   drops?: { name: string; chance: number; rarity: string }[];
+  // 敌方随身财物：被击败后，未毁掉者会作为战利品结算。
+  lootItems?: ItemEntry[];
+  lootSpiritStones?: number;
 }
 
 export interface CombatRound {
@@ -468,8 +670,19 @@ export interface AIEventOutput {
   hasChoice: boolean;
   choice?: ChoicePrompt;
 
-  // 是否触发突破
+  // 是否触发突破。AI 只能提出突破请求，具体突破层数由引擎按因果与数值校验。
   triggeredBreakthrough?: boolean;
+  // 连破/大幅突破由头：若 AI 想让角色一次连破多层或跨大境界，必须给出足够具体的原因。
+  breakthroughReason?: string;
+  // AI 希望突破到的目标小层（1 基显示层数）；引擎会按资质、修为、由头强弱限制。
+  breakthroughTargetLevel?: number;
+  // AI 希望突破到的目标大境界；没有充分由头时引擎会拒绝跨大境界。
+  breakthroughTargetRealm?: Realm;
+  // 合理特殊突破时，AI 可提议境界画像覆盖；引擎会校验并限制倍率/层数。
+  realmProfilePatch?: RealmProfile;
+
+  // 同一岁内的补充事件文本，用于把复杂年份拆成多段史册记录，避免一段叙事过长或漏写关键过程。
+  extraEvents?: { title: string; narrative: string; eventType?: AIEventOutput['eventType'] }[];
 
   // 是否死亡
   causedDeath?: boolean;
@@ -504,6 +717,52 @@ export interface AIEventOutput {
   // ===== Task 23 新增 =====
   // AI 授予玩家灵宠（如收服妖兽幼崽、前辈相赠、灵宠店购买）
   newPets?: Pet[];
+  // ===== Phase-α 批 1 α-1/α-2 新增（可选） =====
+  // AI 可感知角色当前是否处于「首次大境界突破」或「连破失败」语境，给出劫难叙事触发提示
+  // 引擎据此在 tryBreakthrough 时联动 computeTribulationOutcome 判定下场
+  // 可填 'first_major_breakthrough' | 'consecutive_failed_breakthrough' | null
+  tribulationTrigger?: 'first_major_breakthrough' | 'consecutive_failed_breakthrough' | null;
+  // AI 在叙事中点出本轮因杀生/屠戮/滥杀等产生的杀业时，可填一句「杀业因由」（引擎不强制解析）
+  // 仅用于 engine 在审计时把叙事与 sin 累加对齐
+  sinReason?: string;
+  // ===== Phase-α 批 2 α-5 新增：法宝养灵 =====
+  // AI 在 narrative 自然产生「心血祭炼/神识交流/器灵苏醒」时输出 nurtureOutput；
+  // 引擎 addNurtureProgress 自动累加（delta 限幅 [0..10]/事件）并判定跨 stage。
+  // itemId 优先；若缺则按 itemName 在 inventory/equipped 中精确匹配。
+  // awakenedName 仅在跨越 sentient 阶段（首次启智）时由引擎落定为该次名字。
+  nurtureOutput?: Array<{
+    itemId?: string;
+    itemName: string;
+    delta: number;
+    reason: string;
+    awakenedName?: string;
+  }>;
+  // ===== Phase-α 批 1 α-4 功法三段（经/诀/神通）=====
+  // AI 在 narrative 自然产生「精熟运转 / 参悟法意 / 推演下一阶 / 与另一经融合」时输出 scriptureProgress；
+  // 引擎 addScriptureProgress 自动累加（delta 限幅 [0..30]/条 / 事件），跨段自动落 stage + awakeningHook。
+  // itemId 优先；若缺则按 itemName 在 inventory/equipped 中精确匹配 scripture。
+  // reason 用于跨段时落 scriptureAwakeningHook（≤80 字），便于 detail 弹窗展示因由。
+  scriptureProgress?: Array<{
+    itemId?: string;
+    itemName: string;
+    expDelta: number;
+    reason: string;
+  }>;
+  // ===== Phase-α 批 2 α-7 新增：灵田 / 灵植 / 物候 =====
+  // AI 在 narrative 自然产生「翻土/抽薹/采收/落霜」事件时按 schema 给出 gardenOutput
+  // 引擎 addGardenZone / harvestZone / atmosphere 微调，由 advanceGarden 兜底到期采收
+  // - action: 'plant'(播种/翻土新一块) / 'tend'(照料既有 zone，仅追加 atmosphere 注释) / 'harvest'(采收)
+  // - zoneId: 仅 tend/harvest 用；plant 不需要；harvest 缺省时自动采首个到期 zone
+  // - seed: 仅 plant 用；中文种子名（凝元草/玉髓芝/九幽兰/血藤等）
+  // - quality: 仅 plant 用；灵土品质 0..100（默认 50）
+  // - note: 自然叙出"翻土时节气 + 气机 + 物候"短描述（≤80 字；引擎自动落 atmosphere）
+  gardenOutput?: Array<{
+    action: 'plant' | 'harvest' | 'tend';
+    zoneId?: string;
+    seed?: string;
+    quality?: number;
+    note: string;
+  }>;
 }
 
 export interface AttributeChange {
@@ -529,6 +788,8 @@ export interface ChoiceResultOutput {
   changes: AttributeChange[];
   newStatuses: StatusEntry[];
   newItems: ItemEntry[];
+  // 选择结果后若仍需玩家继续决定（如拍卖会出价），可继续挂起下一段抉择。
+  nextChoice?: ChoicePrompt;
   removedItemIds?: string[];
   newEquippedItems?: ItemEntry[];
   equipItemIds?: string[];
@@ -608,6 +869,26 @@ export interface EngineStateContext {
     mp: number; maxMp: number;
     attack: number; defense: number; speed: number;
     luck: number; comprehension: number;
+    // 修真三宝（引擎派生：神识/魂魄/体魄——境界提升与时间累积自然增长）
+    spiritualSense: number;
+    soulStrength: number;
+    physicalFoundation: number;
+    // 神魂境界（未凝神 / 灵感初萌 / 神识初成 / 神魂稳固 / 元神出窍 / 元神显化 / 神意通玄）
+    soulRealmName: string;
+    soulRealmRank: number;
+    soulRealmGap: string;
+    // 战斗投影（破势/护持/机变）—— 由 attack/defense/speed + 三宝派生
+    combatProjection?: {
+      force: number;
+      guard: number;
+      agility: number;
+      spiritualAwareness: number;
+      soulStability: number;
+      bodyTenacity: number;
+      summary: string;
+      advantages: string[];
+      vulnerabilities: string[];
+    };
     spiritStones: number; reputation: number;
     faction: string; master: string; location: string;
     alive: boolean; ascended: boolean;
@@ -651,6 +932,11 @@ export interface EngineStateContext {
   exploredRealms: ExplorationRecord[];
   // 当前正在探索的秘境（仅 explore route 调用时设置，让 AI 围绕此秘境生成探索事件）
   currentExploration?: SecretRealm;
+  discoveredRealms?: SecretRealm[];
+  // ===== Phase-α 批 2 α-7：灵田 / 节气（AI 可在 narrative 自然产出翻土/抽薹/采收事件） =====
+  spiritGarden: { zones: SpiritGardenZone[] };
+  // 当前节气（中文：立春/惊蛰/.../大寒）—— 与 age % 24 对应；让 AI 按时序推进
+  solarTerm: string;
 }
 
 // ==================== 命节点 ====================
@@ -719,6 +1005,23 @@ export interface CharacterState {
   cultivationInsight: string;
   // 修炼速度来源结构化条目（前端按 rarity 给来源上色 + 显示具体倍率数字）
   cultivationFactors: CultivationFactor[];
+  // 境界画像：默认境界体系基础上的 AI/奇遇覆盖显示与强度信息
+  realmProfile?: RealmProfile;
+  // ===== Phase-Y 八维神魂派生字段（来自 publish） =====
+  // 修炼属性条目（神识/魂魄/体魄等）
+  cultivationAttributes?: CultivationAttributeEntry[];
+  // 神识 / 魂魄 / 体魄 三宝
+  spiritualSense?: number;
+  soulStrength?: number;
+  physicalFoundation?: number;
+  // 神魂境界元数据
+  soulRealmName?: string;
+  soulRealmRank?: number;
+  soulRealmGap?: string;
+  // 境界特性（与 REALM_TRAITS 默认合并后）
+  realmTraits?: RealmTraits;
+  // 战斗投影（破势/护持/机变 + 神识/魂魄/体魄）
+  combatProjection?: CombatProjectionTraits;
   longTermMemory: string[];
   // ===== Task 20 新增 =====
   // 未决线索列表（重要剧情线索，会在后续推进/到期触发）
@@ -737,6 +1040,112 @@ export interface CharacterState {
   // ===== Task 24 新增 =====
   // 秘境探索记录（ExplorationRecord[]）—— 玩家探索过的秘境 + 冷却追踪
   exploredRealms: ExplorationRecord[];
+  discoveredRealms?: SecretRealm[]; // 从未决线索/物品/事件中解析出的剧情秘境
+
+  // ===== Phase-α 批 1 α-1/α-2 新增 =====
+  // 天劫档案：每个大境界的劫难史 + 最近一次结果
+  tribulationProfile: TribulationProfile;
+  // 因果业力：善恶连续值（-1..+1），默认 0；极端值影响部分天劫判定与 AI 反馈
+  karma: number;
+  // 功德累计（救/渡/济等正向业）
+  merit: number;
+  // 杀业累计（杀生/屠戮等负向业）
+  sin: number;
+
+  // ===== Phase-α 批 2 α-7 新增：灵田 / 灵植 / 物候 =====
+  // 角色灵田：zones[] —— AI 在 narrative 自然产出"翻土/抽薹/采收/落霜"事件时注册
+  // 引擎按节气推进，到期自动采收入 addItems 入口（统一物品清单）
+  // 旧角色没 spiritGarden 字段 → 默认 { zones: [] }
+  spiritGarden: { zones: SpiritGardenZone[] };
+}
+
+// ==================== Phase-α 批 2 α-7：灵田 / 24 节气 / 物候 ====================
+
+// 游戏时间投影（用于灵田节气绑定）
+// 当前游戏是整数岁推进（age 是整数），节气与岁对应：age % 24 映射到 1..24 节气
+// 用 GameTime 把"何时播种/何时可收"以节气名锚定，避免暴露机制词（"cron/YYYY-MM-DD"）
+// eraName/calendarYear 来自 advance-preload 的 worldTime stamp 投影；缺省时不阻塞，仅记 age
+export interface GameTime {
+  age: number;                  // 游戏内年龄（岁，整数推进）
+  solarTerm?: string;           // 当前节气（中文：立春/惊蛰/.../大寒）；缺省时引擎按 age % 24 推算
+  eraName?: string;             // 仙历名（如"青岚仙历"），用于"青岚仙历 5005 年惊蛰"叙事投影
+  calendarYear?: number;        // 仙历年号
+}
+
+// 24 节气（中文修仙物候用词）—— 顺序按春夏秋冬；1=立春, ..., 24=大寒
+// 修真叙事中以"节气"作为"天地气机节点"，灵植成熟/翻土/落霜皆与之对应
+export const TWENTY_FOUR_SOLAR_TERMS: readonly string[] = [
+  '立春',   // 1
+  '雨水',   // 2
+  '惊蛰',   // 3
+  '春分',   // 4
+  '清明',   // 5
+  '谷雨',   // 6
+  '立夏',   // 7
+  '小满',   // 8
+  '芒种',   // 9
+  '夏至',   // 10
+  '小暑',   // 11
+  '大暑',   // 12
+  '立秋',   // 13
+  '处暑',   // 14
+  '白露',   // 15
+  '秋分',   // 16
+  '寒露',   // 17
+  '霜降',   // 18
+  '立冬',   // 19
+  '小雪',   // 20
+  '大雪',   // 21
+  '冬至',   // 22
+  '小寒',   // 23
+  '大寒',   // 24
+];
+
+// 节气名 → 序号 1..24；用于节气排序与"距收获节气数"计算
+export const SOLAR_TERM_INDEX: Record<string, number> = Object.fromEntries(
+  TWENTY_FOUR_SOLAR_TERMS.map((name, idx) => [name, idx + 1])
+);
+
+// 节气季节（春夏秋冬）—— 用于灵田物候叙事（"正值暮春/盛夏/深秋"）
+export const SOLAR_TERM_SEASON: Record<string, 'spring' | 'summer' | 'autumn' | 'winter'> = {
+  '立春': 'spring', '雨水': 'spring', '惊蛰': 'spring', '春分': 'spring', '清明': 'spring', '谷雨': 'spring',
+  '立夏': 'summer', '小满': 'summer', '芒种': 'summer', '夏至': 'summer', '小暑': 'summer', '大暑': 'summer',
+  '立秋': 'autumn', '处暑': 'autumn', '白露': 'autumn', '秋分': 'autumn', '寒露': 'autumn', '霜降': 'autumn',
+  '立冬': 'winter', '小雪': 'winter', '大雪': 'winter', '冬至': 'winter', '小寒': 'winter', '大寒': 'winter',
+};
+
+// 灵田中的一块地 —— AI 自然产出"翻土/播种"时由引擎注册；到期自动采收
+export interface SpiritGardenZone {
+  id: string;                              // 唯一 id（zone_<随机6位>）
+  seed: string;                            // 种子名（中文：凝元草/玉髓芝/九幽兰/血藤等，AI 在 narrative 自然给出）
+  seededAt: GameTime;                      // 播种时的游戏时间（节气锚定）
+  expectedHarvestAt: GameTime;             // 预计可采收的游戏时间（节气锚定）
+  quality: number;                         // 灵土品质 0..100（影响产出物品 rarity 与数量；AI 在 narrative 自然给出）
+  atmosphere: string;                      // 灵田气机描述（自由文本："灵气充沛/伴妖兽残息/灵脉上游"等，AI 在 narrative 自然给出）
+}
+
+// 天劫档案（α-1）
+export interface TribulationProfile {
+  // 最近一次渡劫时的年龄
+  lastTribulationAge?: number;
+  // 最近一次渡劫的目标境界
+  lastTribulationTargetRealm?: Realm;
+  // 最近一次渡劫的结果描述
+  lastTribulationResult?: string;
+  // 历次渡劫史（成功淬体 / 失败跌境 / 陨落 / 跳过……）
+  tribulationHistory: TribulationHistoryEntry[];
+}
+
+export interface TribulationHistoryEntry {
+  age: number;
+  targetRealm: Realm;
+  result: 'passed_with_refinement' | 'passed_barely' | 'failed_fall_realm' | 'failed_fatal' | 'skipped';
+  // 引擎侧附加：进入新境界的淬体加成（attack/defense/hp/mp 等）
+  refinementBonus?: { maxHp?: number; maxMp?: number; attack?: number; defense?: number; speed?: number };
+  // 因果残响：karma 在劫难时的偏移
+  karmaShift?: number;
+  // 一句因果描述
+  reason?: string;
 }
 
 // ==================== Task 21: 阵法系统 ====================
@@ -894,7 +1303,11 @@ export interface SecretRealm {
   // 进入条件
   minRealm: number;            // 最低境界 idx（0=mortal, 1=qi_refining...）
   minAge: number;              // 最低年龄
-  spiritStoneCost: number;     // 进入所需灵石（用作"路费+护身符")
+  spiritStoneCost: number;     // 进入所需灵石；剧情秘境通常为 0，普通游历可作路费/护身符
+  discoveredByThreadId?: string; // 剧情秘境来源线索；有值时只在对应线索/物品存在时显示
+  entryRequirement?: string;     // 入境前置，如“潮湿玉片”“水禁钥纹”“宗门令牌”
+  entryAlternatives?: string[];  // 其他可行入境方式，避免只有买钥匙一条路
+  isStoryRealm?: boolean;        // 是否为剧情中发现的秘境
   // 探索特性
   dangerLevel: number;         // 危险度 1-10（影响战斗触发率/伤害）
   rewardMultiplier: number;    // 奖励倍率（影响物品稀有度/数量）
@@ -1028,5 +1441,131 @@ export interface ExplorationRecord {
   lastExploredAge: number;     // 上次探索时的角色年龄
   timesExplored: number;       // 累计探索次数
   bestReward?: string;         // 最佳奖励描述（AI 给出）
+}
+
+// ==================== Phase-Z: 世界长期事实 / 任务索引 / 事件调度 ====================
+// 这些类型由 event-scheduler.ts 等修真感连续性模块共享。
+// 设计原则：修真叙事优先，类型字段保持中立（id/title/reason 等），
+// 调用方在 reason/summary 中使用中文修仙口吻，禁止暴露"概率/算法/字段名"等机制词。
+
+// WorldFact: 世界中已确认的长期事实（地点/势力/秘境/事件/NPC 关系/物品/传说）
+export type WorldFactKind =
+  | 'location'   // 地点：坊市/洞府/宗门等
+  | 'faction'    // 势力：宗门/家族/商帮/魔门
+  | 'realm'      // 秘境：洞府/遗迹/灵脉/险境
+  | 'event'      // 大事件：拍卖/比试/劫难等已发生事件余波
+  | 'npc'        // 重要人物：非 pendingThread 而已落定的 NPC 印记
+  | 'relationship' // 人际关系：师徒/盟友/仇怨等长期关系
+  | 'item'       // 重要物品：长期身份标识的物品
+  | 'lore';      // 传说/典故/预言
+
+export interface WorldFact {
+  id: string;
+  kind: WorldFactKind;
+  title: string;            // 事实标题（中文：青岚坊市/黑鸦会/旧洞府铜钥）
+  summary: string;          // 事实摘要（中文叙事口吻）
+  confidence?: number;      // 确认度 0-1（默认 0.6）
+  firstSeenAge?: number;    // 首次被记录时的角色年龄
+  lastSeenAge?: number;     // 最近被回响的角色年龄
+  source?: string;          // 来源：auction/auction-bid/smoke/ai 等
+  tags?: string[];          // 标签：market/auction/hostile/danger/realm-hint/event-consequence 等
+}
+
+// QuestEntry: 由 pendingThread 规范化而来的"任务索引"，便于调度器排序与投影
+export interface QuestEntry {
+  id: string;
+  title: string;
+  summary?: string;
+  kind?: 'quest' | 'enemy' | 'mystery' | 'competition' | 'promise' | 'inheritance' | 'exploration' | 'romance' | 'debt';
+  stage?: 'open' | 'escalating' | 'cooling' | 'background' | 'resolved' | 'failed';
+  progress?: number;        // 0-100
+  startedAtAge?: number;
+  dueAge?: number;
+  urgency?: number;         // 0-100 调度权重
+  sourceThreadId?: string;
+  currentHook?: string;     // 修真叙事钩子（中文）
+  rewardHint?: string;      // 完成可能所得
+  failureHint?: string;     // 错失代价
+  tags?: string[];
+}
+
+// ScheduleHintKind: 调度项分类
+export type ScheduleHintKind =
+  | 'quest'      // 任务线索
+  | 'npc'        // 人物/势力自主倾向
+  | 'world'      // 世界事实/地点/秘境
+  | 'faction'    // 势力画像
+  | 'location'   // 地点画像
+  | 'echo'       // 因果回响/旧怨余波
+  | 'opportunity'; // 机遇/机缘
+
+// ScheduleHint: 调度器对 AI 的具体承接建议
+export interface ScheduleHint {
+  id: string;               // 唯一 id（格式 seh_<kind>_<refId>）
+  kind: ScheduleHintKind;
+  title: string;            // 承接标题（中文）
+  reason: string;           // 承接原因（修真叙事口吻；含"余波/记忆潮汐/地点画像/势力画像/追责/承接不足"等关键词）
+  priority: number;         // 0-100 调度优先级
+  requiredAction?: string;  // AI 应如何承接：advance | resolve | fail | defer | echo | carryover | echo_or_develop
+  resolutionStage?: 'open' | 'escalating' | 'cooling' | 'background' | 'resolved' | 'failed';
+  resolutionHint?: string;  // 修真叙事结算提示（"完成则……"或"失败则……"）
+  sourceThreadId?: string;
+  relatedFactIds?: string[];
+  relatedNpcIds?: string[];
+}
+
+// ScheduleFocus: 调度器最强建议（AI 必须承接或解释为何暂缓）
+export interface ScheduleFocus {
+  id: string;
+  kind: ScheduleHintKind;
+  title: string;
+  reason: string;
+  priority: number;          // 通常 ≥ 60
+  requiredAction?: string;
+}
+
+// PressureMap: 世界压力与机会舆图
+export type PressureEventType = '威胁回响' | '势力施压' | '机缘推进' | '秘境异动' | '日常回响';
+
+export interface PressureMap {
+  topThreat: string;          // 当前最大威胁（NPC/势力/事件名）
+  topOpportunity: string;      // 当前最大机会（地点/机缘/人物）
+  focalLocation: string;       // 焦点地点（坊市/洞府/秘境）
+  focalActor: string;          // 焦点人物/势力
+  likelyEventTypes: PressureEventType[];  // 事件倾向（修真叙事口吻）
+  summary: string;            // 一句话中文修真叙事（"最大威胁：……；最大机会：……；事件倾向：……"）
+}
+
+// EventSchedule: 调度器完整输出（注入到 state.eventSchedule 供 AI 与审计使用）
+export interface EventSchedule {
+  generatedAtAge: number;
+  focus: ScheduleFocus | null;
+  hints: ScheduleHint[];
+  pressureMap: PressureMap | null;
+  warnings: string[];          // 修真叙事警告（"承接不足……"等）
+}
+
+// EventSchedulerPlan: 调度器对外返回的轻量结构
+export interface EventSchedulerPlan {
+  focus: ScheduleFocus | null;
+  hints: ScheduleHint[];
+  pressureMap: PressureMap | null;
+  warnings: string[];
+}
+
+// NarrativeContractFeedback: AI 上轮的叙事契约自报，调度器用于"记忆潮汐"调整
+export interface NarrativeContractFeedback {
+  age: number;
+  title?: string;
+  narrativeFocus?: string;
+  narrativeOutcome?: 'advanced' | 'resolved' | 'deferred' | 'complicated' | 'ignored' | string;
+  focusHintId?: string;
+  focusHintTitle?: string;
+  usedNpcIds?: string[];
+  usedScheduleHintIds?: string[];
+  usedWorldFactIds?: string[];
+  topThreat?: string;
+  topOpportunity?: string;
+  warningCodes?: string[];
 }
 

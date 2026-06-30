@@ -1,9 +1,10 @@
 'use client';
 
-import { CharacterState } from '@/lib/xianxia/store';
+import { CharacterState, useGameStore } from '@/lib/xianxia/store';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Heart, Sparkles, Sword, Shield, Zap, Clover, Brain, Coins, Star, MapPin, Users, GraduationCap, Flame } from 'lucide-react';
 import { REALMS, ELEMENTS, SPIRITUAL_ROOTS } from '@/lib/xianxia/types';
+import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 
 interface CharacterDetailSheetProps {
   open: boolean;
@@ -12,19 +13,23 @@ interface CharacterDetailSheetProps {
 }
 
 export function CharacterDetailSheet({ open, onOpenChange, character }: CharacterDetailSheetProps) {
-  const realmInfo = REALMS.find(r => r.id === character.realm);
-  const rootInfo = SPIRITUAL_ROOTS[character.spiritualRoot as keyof typeof SPIRITUAL_ROOTS];
-  const lifespanLeft = character.lifespan - character.age;
+  const liveCharacter = useGameStore(s => s.character);
+  const current = liveCharacter?.id === character.id ? liveCharacter : character;
+  const realmInfo = REALMS.find(r => r.id === current.realm);
+  const rootInfo = SPIRITUAL_ROOTS[current.spiritualRoot as keyof typeof SPIRITUAL_ROOTS];
+  const lifespanLeft = current.lifespan - current.age;
+  const genderLabel = current.gender === 'male' ? '男' : current.gender === 'female' ? '女' : current.gender || '未知';
+  const visibleStatuses = filterMeaningfulStatuses(current.activeStatuses || []);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto xianxia-scroll p-0">
-        <SheetHeader className="px-4 pt-4 pb-2 border-b border-border/40 bg-gradient-to-b from-secondary/40 to-transparent">
-          <SheetTitle className="font-serif-cn flex items-center gap-2">
-            <span className="seal">道</span>
-            <span>{character.name}</span>
-            <span className="text-xs font-normal text-muted-foreground ml-auto">
-              {character.gender === 'male' ? '男' : '女'} · {character.age}岁
+        <SheetHeader className="px-4 pt-4 pb-2 pr-12 border-b border-border/40 bg-gradient-to-b from-secondary/40 to-transparent">
+          <SheetTitle className="font-serif-cn flex items-center gap-2 min-w-0">
+            <span className="seal shrink-0">道</span>
+            <span className="truncate">{current.name}</span>
+            <span className="shrink-0 text-[10px] font-normal text-muted-foreground rounded-full border border-border/60 bg-background/60 px-1.5 py-0.5">
+              {genderLabel} · {current.age}岁
             </span>
           </SheetTitle>
         </SheetHeader>
@@ -36,24 +41,24 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             <div
               className="rounded-lg border p-3 mt-1.5"
               style={{
-                borderColor: `${character.realmColor}50`,
-                background: `linear-gradient(135deg, ${character.realmColor}10, transparent)`,
+                borderColor: `${current.realmColor}50`,
+                background: `linear-gradient(135deg, ${current.realmColor}10, transparent)`,
               }}
             >
               <div className="flex items-center justify-between mb-2">
-                <span className="font-serif-cn font-bold text-lg" style={{ color: character.realmColor }}>
-                  {character.realmName}
-                  {character.realmMaxLevel > 0 && (
+                <span className="font-serif-cn font-bold text-lg" style={{ color: current.realmColor }}>
+                  {current.realmName}
+                  {current.realmMaxLevel > 0 && (
                     <span className="text-xs ml-1 text-muted-foreground">
-                      {character.realmLevel + 1} / {character.realmMaxLevel} 层
+                      {current.realmLevel + 1} / {current.realmMaxLevel} 层
                     </span>
                   )}
                 </span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded" style={{
-                  background: `${character.realmColor}20`,
-                  color: character.realmColor,
+                  background: `${current.realmColor}20`,
+                  color: current.realmColor,
                 }}>
-                  寿元上限 {character.lifespan}
+                  寿元上限 {current.lifespan}
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
@@ -65,18 +70,18 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             <div className="mt-2 space-y-2">
               <ProgressBar
                 label="修为进度"
-                current={character.cultivationExp}
-                max={character.expToBreak}
-                color={character.realmColor}
-                showText={`${character.cultivationExp} / ${character.expToBreak}`}
+                current={current.cultivationExp}
+                max={current.expToBreak}
+                color={current.realmColor}
+                showText={`${current.cultivationExp} / ${current.expToBreak}`}
                 icon={<Sparkles className="w-3 h-3" />}
               />
               <ProgressBar
                 label="寿元"
-                current={character.age}
-                max={character.lifespan}
+                current={current.age}
+                max={current.lifespan}
                 color="#c8453c"
-                showText={`${character.age} / ${character.lifespan}（余 ${lifespanLeft} 年）`}
+                showText={`${current.age} / ${current.lifespan}（余 ${lifespanLeft} 年）`}
                 icon={<Heart className="w-3 h-3" />}
               />
             </div>
@@ -88,13 +93,13 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             <div className="rounded-lg border border-border/60 p-3 mt-1.5 bg-card/40">
               <div className="flex items-center justify-between mb-1">
                 <span className="font-serif-cn font-semibold text-sm" style={{
-                  color: character.rootMultiplier >= 1.5 ? '#c8453c' : character.rootMultiplier >= 0.8 ? '#2e5c8a' : undefined,
+                  color: current.rootMultiplier >= 1.5 ? '#c8453c' : current.rootMultiplier >= 0.8 ? '#2e5c8a' : undefined,
                 }}>
-                  {character.rootDetail}
+                  {current.rootDetail}
                 </span>
-                {character.rootMultiplier > 0 && (
+                {current.rootMultiplier > 0 && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                    修炼 ×{character.rootMultiplier}
+                    修炼 ×{current.rootMultiplier}
                   </span>
                 )}
               </div>
@@ -104,7 +109,7 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             {/* 五行 */}
             <div className="grid grid-cols-5 gap-1.5 mt-2">
               {(['metal', 'wood', 'water', 'fire', 'earth'] as const).map(el => {
-                const v = character.elements[el];
+                const v = current.elements[el];
                 return (
                   <div key={el} className="text-center">
                     <div className="text-[10px]" style={{ color: ELEMENTS[el].color }}>
@@ -129,18 +134,18 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
             <div className="space-y-2 mt-1.5">
               <ProgressBar
                 label="生命"
-                current={character.hp}
-                max={character.maxHp}
+                current={current.hp}
+                max={current.maxHp}
                 color="#dc2626"
-                showText={`${character.hp} / ${character.maxHp}`}
+                showText={`${current.hp} / ${current.maxHp}`}
                 icon={<Heart className="w-3 h-3" />}
               />
               <ProgressBar
                 label="灵力"
-                current={character.mp}
-                max={character.maxMp}
+                current={current.mp}
+                max={current.maxMp}
                 color="#2e5c8a"
-                showText={`${character.mp} / ${character.maxMp}`}
+                showText={`${current.mp} / ${current.maxMp}`}
                 icon={<Sparkles className="w-3 h-3" />}
               />
             </div>
@@ -150,16 +155,36 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
           <section>
             <SectionTitle icon={<Sword className="w-3.5 h-3.5" />} title="武学·属性" />
             <div className="grid grid-cols-2 gap-2 mt-1.5">
-              <StatCard icon={<Sword className="w-3 h-3" />} label="攻击" value={character.attack} color="#c8453c" />
-              <StatCard icon={<Shield className="w-3 h-3" />} label="防御" value={character.defense} color="#2e5c8a" />
-              <StatCard icon={<Zap className="w-3 h-3" />} label="速度" value={character.speed} color="#d4af37" />
-              <StatCard icon={<Clover className="w-3 h-3" />} label="气运" value={character.luck} color="#22c55e" />
-              <StatCard icon={<Brain className="w-3 h-3" />} label="悟性" value={character.comprehension} color="#a855f7" />
-              <StatCard icon={<Coins className="w-3 h-3" />} label="灵石" value={character.spiritStones} color="#d4af37" />
-              <StatCard icon={<Star className="w-3 h-3" />} label="声望" value={character.reputation} color="#f97316" />
+              <StatCard icon={<Sword className="w-3 h-3" />} label="攻击" value={current.attack} color="#c8453c" />
+              <StatCard icon={<Shield className="w-3 h-3" />} label="防御" value={current.defense} color="#2e5c8a" />
+              <StatCard icon={<Zap className="w-3 h-3" />} label="速度" value={current.speed} color="#d4af37" />
+              <StatCard icon={<Clover className="w-3 h-3" />} label="气运" value={current.luck} color="#22c55e" />
+              <StatCard icon={<Brain className="w-3 h-3" />} label="悟性" value={current.comprehension} color="#a855f7" />
+              <StatCard icon={<Coins className="w-3 h-3" />} label="灵石" value={current.spiritStones} color="#d4af37" />
+              <StatCard icon={<Star className="w-3 h-3" />} label="声望" value={current.reputation} color="#f97316" />
               <StatCard icon={<Flame className="w-3 h-3" />} label="心魔" value={(character as any).heartDemon ?? 0} color={(character as any).heartDemon >= 60 ? '#dc2626' : (character as any).heartDemon >= 30 ? '#d97706' : '#65a30d'} />
-              <StatCard icon={<Users className="w-3 h-3" />} label="阵营" value={character.faction || '散修'} color="#6b7280" isText />
+              <StatCard icon={<Users className="w-3 h-3" />} label="阵营" value={current.faction || '散修'} color="#6b7280" isText />
             </div>
+          </section>
+
+          {/* 修真三宝 · 身神分化（境界提升时自然增长） */}
+          <section>
+            <SectionTitle icon={<Sparkles className="w-3.5 h-3.5" />} title="修真三宝·身神" />
+            <div className="grid grid-cols-2 gap-2 mt-1.5">
+              <StatCard icon={<Brain className="w-3 h-3" />} label="神识" value={(current as any).spiritualSense ?? 0} color="#7c3aed" />
+              <StatCard icon={<Sparkles className="w-3 h-3" />} label="魂魄" value={(current as any).soulStrength ?? 0} color="#9333ea" />
+              <StatCard icon={<Shield className="w-3 h-3" />} label="体魄" value={(current as any).physicalFoundation ?? 0} color="#0f766e" />
+              <StatCard icon={<Sword className="w-3 h-3" />} label="破势" value={(current as any).combatProjection?.force ?? current.attack} color="#c8453c" />
+              <StatCard icon={<Shield className="w-3 h-3" />} label="护持" value={(current as any).combatProjection?.guard ?? current.defense} color="#2e5c8a" />
+              <StatCard icon={<Zap className="w-3 h-3" />} label="机变" value={(current as any).combatProjection?.agility ?? current.speed} color="#d4af37" />
+            </div>
+            {(current as any).soulRealmName && (
+              <p className="mt-2 text-[10px] text-muted-foreground leading-relaxed">
+                神魂境界：<span className="font-serif-cn font-semibold" style={{ color: '#9333ea' }}>{(current as any).soulRealmName}</span>
+                <span className="mx-1 opacity-50">·</span>
+                {(current as any).soulRealmGap}
+              </p>
+            )}
           </section>
 
           {/* 师承·所在 */}
@@ -170,32 +195,32 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
                 <span className="text-muted-foreground flex items-center gap-1">
                   <GraduationCap className="w-3 h-3" /> 师承
                 </span>
-                <span className="font-serif-cn">{character.master || '无'}</span>
+                <span className="font-serif-cn">{current.master || '无'}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground flex items-center gap-1">
                   <MapPin className="w-3 h-3" /> 所在
                 </span>
-                <span className="font-serif-cn">{character.location}</span>
+                <span className="font-serif-cn">{current.location}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground flex items-center gap-1">
                   <Users className="w-3 h-3" /> 宗门
                 </span>
-                <span className="font-serif-cn">{character.faction || '散修'}</span>
+                <span className="font-serif-cn">{current.faction || '散修'}</span>
               </div>
             </div>
           </section>
 
-          {/* 状态词条摘要 */}
+          {/* 状态摘要 */}
           <section>
-            <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title={`状态词条 (${character.activeStatuses.length})`} />
+            <SectionTitle icon={<Star className="w-3.5 h-3.5" />} title={`状态 (${visibleStatuses.length})`} />
             <div className="rounded-lg border border-border/60 p-2 mt-1.5 bg-card/40">
-              {character.activeStatuses.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-2">尚无状态词条</p>
+              {visibleStatuses.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-2">尚无状态</p>
               ) : (
                 <div className="flex flex-wrap gap-1">
-                  {character.activeStatuses.map((s: any, i: number) => (
+                  {visibleStatuses.map((s: any, i: number) => (
                     <span
                       key={i}
                       className="text-[10px] px-1.5 py-0.5 rounded border"
@@ -215,13 +240,13 @@ export function CharacterDetailSheet({ open, onOpenChange, character }: Characte
 
           {/* 背包摘要 */}
           <section className="pb-4">
-            <SectionTitle icon={<Coins className="w-3.5 h-3.5" />} title={`储物袋 (${character.inventory.length})`} />
+            <SectionTitle icon={<Coins className="w-3.5 h-3.5" />} title={`储物袋 (${current.inventory.length})`} />
             <div className="rounded-lg border border-border/60 p-2 mt-1.5 bg-card/40">
-              {character.inventory.length === 0 ? (
+              {current.inventory.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-2">储物袋空空如也</p>
               ) : (
                 <div className="space-y-1">
-                  {character.inventory.map((item: any, i: number) => (
+                  {current.inventory.map((item: any, i: number) => (
                     <div key={i} className="flex items-center justify-between text-xs">
                       <span className="font-serif-cn" style={{ color: RARITY_COLORS[item.rarity] || '#6b7280' }}>
                         {item.name}

@@ -8,8 +8,11 @@ import {
   StatusEntry,
   ItemEntry,
   Realm,
+  RealmProfile,
   REALMS,
+  REALM_TRAITS,
   getRealmInfo,
+  CombatProjectionTraits,
   getNextRealm,
   SpiritualRoot,
   SPIRITUAL_ROOTS,
@@ -40,7 +43,24 @@ import {
   SecretRealm,
   SECRET_REALMS,
   ExplorationRecord,
+  // ===== Phase-α 批 1 α-1/α-2 新增
+  TribulationProfile,
+  TribulationHistoryEntry,
+  // ===== Phase-α 批 2 α-5 新增：器灵觉醒
+  AwakeningStage,
+  AWAKENING_STAGE_LABEL,
+  AWAKENING_THRESHOLDS,
+  // ===== Phase-α 批 2 α-7 新增：灵田 / 24 节气
+  SpiritGardenZone,
+  GameTime,
+  TWENTY_FOUR_SOLAR_TERMS,
+  SOLAR_TERM_INDEX,
+  SOLAR_TERM_SEASON,
+  CultivationAttributeEntry,
+  RealmTraits,
 } from './types';
+import { COMBAT_PROJECTION_LABELS } from './display';
+import { hasRealmEntryRequirement } from './secret-realm-utils';
 
 // ==================== 角色状态序列化 ====================
 
@@ -70,26 +90,46 @@ export interface DBCharacter {
   petsJson?: string;
   // ===== Task 24 新增 =====
   exploredRealmsJson?: string;
+  // ===== Phase-α 批 1 α-1/α-2 新增 =====
+  tribulationProfileJson?: string;
+  karma?: number;
+  merit?: number;
+  sin?: number;
+  // ===== Phase-α 批 2 α-7 新增：灵田（zones[] JSON） =====
+  spiritGardenJson?: string;
 }
 
 // 旧存档 equippedJson 可能是 slot-map（{weapon: {...}}）或已是数组（[{...}]）
 // 本函数将其统一转为数组；旧 slot-map 会带上默认 equipNote（如「兵器」「功法」）
+// 同时对每个 item 兜底补全 α-5 器灵觉醒三字段（缺失 → 0 / sleeping / 无名），
+// 确保旧装备加载不报错，UI 也能正常展示"未启"图标
 function parseEquippedJson(raw: string): ItemEntry[] {
   if (!raw) return [];
   const parsed = safeParse<any>(raw, []);
-  if (Array.isArray(parsed)) return parsed as ItemEntry[];
+  if (Array.isArray(parsed)) return parsed.map(normalizeItemNurture);
   // 旧 slot-map 格式：转换为数组
   if (typeof parsed === 'object' && parsed !== null) {
     const out: ItemEntry[] = [];
     for (const slot of Object.keys(parsed) as EquipSlot[]) {
       const it = (parsed as EquippedMap)[slot];
       if (it) {
-        out.push({ ...it, equipNote: it.equipNote || SLOT_LABEL[slot] });
+        out.push(normalizeItemNurture({ ...it, equipNote: it.equipNote || SLOT_LABEL[slot] }));
       }
     }
     return out;
   }
   return [];
+}
+
+// 给单个 item 兜底 α-5 nurture 三字段；旧装备没 nurture 字段视作 0 + sleeping
+function normalizeItemNurture(it: ItemEntry): ItemEntry {
+  const progress = Math.max(0, Math.min(100, Number(it.nurtureProgress) || 0));
+  return {
+    ...it,
+    nurtureProgress: progress,
+    awakeningStage: it.awakeningStage || computeAwakening(progress),
+    // 已有 sentientName 保留；否则 undefined（UI 仅在 sentient 阶段显示）
+  };
 }
 
 // 判定一个物品是否是「储物袋」（含 storageCapacity 效果的 tool）
@@ -99,14 +139,108 @@ export function isStorageBag(item: ItemEntry): boolean {
   return (item.effects || []).some(e => e.target_attribute === 'storageCapacity' && e.operation === 'add' && e.value > 0);
 }
 
+// ==================== Phase-α α-5 法宝养灵 / 器灵觉醒 ====================
+
+// 单次事件养灵增量上限（防 AI 提议过大溢出）
+export const NURTURE_DELTA_CAP_PER_EVENT = 10;
+
+// 计算当前养灵进度对应的觉醒阶段（纯函数）
+// 阈值与 AWAKENING_THRESHOLDS 保持一致：0-33 sleeping / 34-66 awakened / 67-100 sentient
+export function computeAwakening(progress: number): AwakeningStage {
+  const p = Math.max(0, Math.min(100, Number(progress) || 0));
+  if (p >= AWAKENING_THRESHOLDS.sentient.min) return 'sentient';
+  if (p >= AWAKENING_THRESHOLDS.awakened.min) return 'awakened';
+  return 'sleeping';
+}
+
+// 在指定物品上累计养灵进度，引擎权威：
+// - delta 限幅 [0..NURTURE_DELTA_CAP_PER_EVENT]（仅接受非负；防负数洗白）
+// - 自动钳制 progress 到 [0..100]
+// - 跨 stage 触发：首次跨 awakening / sentient 时，落回 awakeningStage；sentient 时记录 awakenedName
+// - 若 AI 同一次事件中给出 awakenedName，统一落定为该次的 sentientName（仅首次 sentient 时生效）
+// - 物品若不在 inventory/equipped 中，直接返回原 state（无效输入静默丢弃）
+export function addNurtureProgress(
+  state: CharacterState,
+  itemId: string,
+  delta: number,
+  reason?: string,
+  awakenedName?: string
+): { state: CharacterState; item: ItemEntry; stageAdvanced: boolean } {
+  const clampedDelta = Math.max(0, Math.min(NURTURE_DELTA_CAP_PER_EVENT, Number(delta) || 0));
+  let stageAdvanced = false;
+  let next = { ...state };
+
+  const targetList: Array<'inventory' | 'equipped'> = ['inventory', 'equipped'];
+  let updatedItem: ItemEntry | null = null;
+
+  for (const listKey of targetList) {
+    const list = (next as any)[listKey] as ItemEntry[] | undefined;
+    if (!Array.isArray(list)) continue;
+    const idx = list.findIndex(it => it && it.id === itemId);
+    if (idx < 0) continue;
+    const before = list[idx];
+    const beforeProgress = Math.max(0, Math.min(100, Number(before.nurtureProgress) || 0));
+    const beforeStage = before.awakeningStage || computeAwakening(beforeProgress);
+    const afterProgress = Math.max(0, Math.min(100, beforeProgress + clampedDelta));
+    const afterStage = computeAwakening(afterProgress);
+    const crossedStage = afterStage !== beforeStage;
+    const reachedSentient = afterStage === 'sentient' && beforeStage !== 'sentient';
+    if (crossedStage) stageAdvanced = true;
+
+    // 器灵名只在首次进入 sentient 时落定（避免后续每岁被覆盖）
+    let nextSentientName = before.sentientName;
+    if (reachedSentient) {
+      // 优先采用 AI 提议的 awakenedName；否则保留旧名（极少出现）；都无则不写
+      if (typeof awakenedName === 'string' && awakenedName.trim()) {
+        nextSentientName = awakenedName.trim().slice(0, 24);
+      }
+    }
+
+    const updated: ItemEntry = {
+      ...before,
+      nurtureProgress: afterProgress,
+      awakeningStage: afterStage,
+      sentientName: nextSentientName,
+    };
+
+    const newList = [...list];
+    newList[idx] = updated;
+    (next as any)[listKey] = newList;
+    updatedItem = updated;
+    break;
+  }
+
+  if (!updatedItem) {
+    // 物品不在背包/已装备——返回原 state；不抛错以免破坏 advance 流程
+    return { state, item: { id: itemId, name: '', description: '', item_type: 'tool', rarity: 'common', effects: [], source: '' } as ItemEntry, stageAdvanced: false };
+  }
+
+  // 把跨 stage 的剧情落点同时写入长期记忆，便于后续 AI 承接（"宝剑初显灵性"等）
+  if (stageAdvanced) {
+    const stageLabel = AWAKENING_STAGE_LABEL[updatedItem.awakeningStage!];
+    const namePart = updatedItem.sentientName ? `，自名「${updatedItem.sentientName}」` : '';
+    const reasonPart = reason ? `（${String(reason).slice(0, 60)}）` : '';
+    const mem = `器灵进阶：${updatedItem.name} 养灵至${stageLabel}${namePart}${reasonPart}`;
+    next = addMemory(next, mem);
+  }
+
+  return { state: next, item: updatedItem, stageAdvanced };
+}
+
 export function dbToState(c: DBCharacter): CharacterState {
   const rootInfo = SPIRITUAL_ROOTS[c.spiritualRoot as SpiritualRoot];
-  const equipped = parseEquippedJson(c.equippedJson || '[]');
-  const inventory = safeParse<ItemEntry[]>(c.inventoryJson, []);
+  const equippedRaw = parseEquippedJson(c.equippedJson || '[]');
+  const rawInventory = safeParse<ItemEntry[]>(c.inventoryJson, []);
+  // α-4 兜底：旧物品无 scripture 三段字段也按 practiced+0 加载；normalizeCultivationBearingItem 同时含 scripture 三段默认 + α-5 nurture 无关
+  const equipped = Array.isArray(equippedRaw) ? equippedRaw.map(normalizeCultivationBearingItem) : [];
+  // α-5 兜底：旧物品无 nurture 字段也按 0/sleeping 加载，不报错
+  const inventory = Array.isArray(rawInventory) ? rawInventory.map(normalizeCultivationBearingItem).map(normalizeItemNurture) : [];
   const storageCapacity = c.storageCapacity ?? 5;
   // Task 20: 解析新字段
-  const pendingThreads = safeParse<PendingThread[]>(c.pendingThreadsJson || '[]', []);
-  const characterIntents = safeParse<CharacterIntent[]>(c.characterIntentsJson || '[]', []);
+  const parsedPendingThreads = safeParse<PendingThread[]>(c.pendingThreadsJson || '[]', []);
+  const pendingThreads = Array.isArray(parsedPendingThreads) ? parsedPendingThreads : [];
+  const parsedCharacterIntents = safeParse<CharacterIntent[]>(c.characterIntentsJson || '[]', []);
+  const characterIntents = Array.isArray(parsedCharacterIntents) ? parsedCharacterIntents : [];
   const combatSession = c.combatStateJson ? safeParse<CombatSession | null>(c.combatStateJson, null) : null;
   const recentEventTypes = safeParse<string[]>(c.recentEventTypesJson || '[]', []);
   const recentBlueprintCategories = safeParse<string[]>(c.recentBlueprintCategoriesJson || '[]', []);
@@ -126,7 +260,7 @@ export function dbToState(c: DBCharacter): CharacterState {
     faction: c.faction, master: c.master, location: c.location,
     fateNodes: c.fateNodes ? c.fateNodes.split(',').filter(Boolean).map(Number) : [],
     isAtChoice: c.isAtChoice, lastEventAge: c.lastEventAge,
-    activeStatuses: safeParse<StatusEntry[]>(c.statusJson, []),
+    activeStatuses: filterMeaningfulStatuses(safeParse<StatusEntry[]>(c.statusJson, [])),
     inventory,
     equipped,
     storageCapacity,
@@ -146,6 +280,20 @@ export function dbToState(c: DBCharacter): CharacterState {
     pets: safeParse<Pet[]>((c as any).petsJson || '[]', []),
     // Task 24 新字段
     exploredRealms: safeParse<ExplorationRecord[]>((c as any).exploredRealmsJson || '[]', []),
+    // ===== Phase-α 批 1 α-1/α-2 兜底 =====
+    // 旧档缺省 tribulationProfile/karma/merit/sin → 兜底为空档案 + 0；不破坏既有存档
+    tribulationProfile: safeParse<TribulationProfile>((c as any).tribulationProfileJson || '{}', {
+      tribulationHistory: [],
+    } as TribulationProfile),
+    karma: typeof (c as any).karma === 'number' ? (c as any).karma : 0,
+    merit: typeof (c as any).merit === 'number' ? (c as any).merit : 0,
+    sin: typeof (c as any).sin === 'number' ? (c as any).sin : 0,
+    // ===== Phase-α 批 2 α-7 兜底：灵田 =====
+    // 旧档无 spiritGardenJson → 默认空 zones[]；不破坏既有存档
+    spiritGarden: (() => {
+      const parsed = safeParse<{ zones?: SpiritGardenZone[] }>((c as any).spiritGardenJson || '', { zones: [] });
+      return { zones: Array.isArray(parsed?.zones) ? parsed.zones : [] };
+    })(),
   };
   // 持久化的 recentEventTypes / recentBlueprintCategories 不进 state（仅 ctx 用），但需要保留
   // 这里通过闭包变量传给 buildStateContext（在 advance route 中调用）
@@ -154,12 +302,278 @@ export function dbToState(c: DBCharacter): CharacterState {
   const rate = computeEffectiveCultivationRate(state);
   state.cultivationMultiplier = rate.multiplier;
   state.cultivationFactors = computeCultivationFactors(state);
+  state.realmProfile = getRealmProfile(state);
+  state.cultivationAttributes = deriveCultivationAttributes(state);
+  const coreAttrs = deriveCoreCultivationAttributes(state);
+  const soulRealm = deriveSoulRealm({ ...state, ...coreAttrs });
+  Object.assign(state, {
+    ...coreAttrs,
+    soulRealmName: soulRealm.name,
+    soulRealmRank: soulRealm.rank,
+    soulRealmGap: soulRealm.gap,
+    realmTraits: deriveRealmTraits(state),
+    combatProjection: deriveCombatProjection({ ...state, ...coreAttrs }),
+  });
   return state;
 }
 
 function safeParse<T>(s: string, fallback: T): T {
   if (!s) return fallback;
   try { return JSON.parse(s) as T; } catch { return fallback; }
+}
+
+
+function clampProfileNumber(n: any, min: number, max: number, fallback: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.max(min, Math.min(max, v));
+}
+
+function sanitizeRealmProfile(raw: any): RealmProfile | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const profile: RealmProfile = {};
+  if (raw.name) profile.name = String(raw.name).slice(0, 16);
+  if (raw.shortName) profile.shortName = String(raw.shortName).slice(0, 3);
+  if (/^#[0-9a-fA-F]{6}$/.test(String(raw.color || ''))) profile.color = String(raw.color);
+  if (raw.maxLevel !== undefined) profile.maxLevel = Math.round(clampProfileNumber(raw.maxLevel, 0, 999, 9));
+  if (raw.powerMultiplier !== undefined) profile.powerMultiplier = clampProfileNumber(raw.powerMultiplier, 0.5, 9, 1);
+  if (raw.expMultiplier !== undefined) profile.expMultiplier = clampProfileNumber(raw.expMultiplier, 0.2, 20, 1);
+  if (raw.reason) profile.reason = String(raw.reason).slice(0, 120);
+  return Object.keys(profile).length ? profile : undefined;
+}
+
+export function getRealmProfile(state: CharacterState): RealmProfile | undefined {
+  const explicit = sanitizeRealmProfile((state as any).realmProfile);
+  if (explicit) return explicit;
+
+  const status = (state.activeStatuses || []).find(st =>
+    (st.category === 'special' || st.category === 'identity') &&
+    /境界|道基|金丹|筑基|炼气|練氣|元婴|元嬰|化神|大乘|渡劫|飞升|飛升|九转|完美|叠层|道果/.test(`${st.name} ${st.description}`)
+  );
+  if (!status) return undefined;
+
+  const profile: RealmProfile = {
+    name: status.name?.slice(0, 16),
+    reason: status.description?.slice(0, 120),
+  };
+  for (const eff of status.effects || []) {
+    if (eff.target_attribute === 'realmMaxLevel') profile.maxLevel = Math.round(clampProfileNumber(eff.value, 0, 999, 9));
+    if (eff.target_attribute === 'realmPower') profile.powerMultiplier = clampProfileNumber(eff.value, 0.5, 9, 1);
+    if (eff.target_attribute === 'realmExp') profile.expMultiplier = clampProfileNumber(eff.value, 0.2, 20, 1);
+  }
+  return sanitizeRealmProfile(profile);
+}
+
+function applyRealmProfilePatch(state: CharacterState, patch?: RealmProfile): CharacterState {
+  const profile = sanitizeRealmProfile(patch);
+  if (!profile) return state;
+  const current = getRealmProfile(state) || {};
+  return { ...state, realmProfile: { ...current, ...profile } };
+}
+
+function realmPowerMultiplier(state: CharacterState): number {
+  return clampProfileNumber(getRealmProfile(state)?.powerMultiplier, 0.5, 9, 1);
+}
+
+function scaleByRealmPower(value: number, mult: number): number {
+  return Math.max(1, Math.floor(value * mult));
+}
+
+// ==================== 八维神魂派生（来自 publish）====================
+
+function cultivationAttributeCategory(category?: string): CultivationAttributeEntry['category'] {
+  if (!category) return 'custom';
+  const map: Record<string, CultivationAttributeEntry['category']> = {
+    body: 'body',
+    spirit: 'spirit',
+    dao: 'dao',
+    combat: 'combat',
+    fate: 'fate',
+    custom: 'custom',
+    // 旧存档中文 category 兼容
+    '身体': 'body',
+    '神魂': 'spirit',
+    '道德': 'dao',
+    '战斗': 'combat',
+    '天运': 'fate',
+  };
+  return map[category] || 'custom';
+}
+
+export function deriveCultivationAttributes(state: CharacterState): CultivationAttributeEntry[] {
+  const byId = new Map<string, CultivationAttributeEntry>();
+  for (const attr of state.cultivationAttributes || []) {
+    if (!attr || !attr.name || attr.visible === false) continue;
+    byId.set(attr.id || attr.name, { ...attr, id: attr.id || attr.name, category: cultivationAttributeCategory(attr.category) });
+  }
+  for (const status of state.activeStatuses || []) {
+    if (!status || status.category !== 'attribute' || !status.name) continue;
+    const firstEffect = Array.isArray(status.effects) ? status.effects.find(e => e && e.value !== undefined) : undefined;
+    const id = status.id || `attr-${status.name}`;
+    byId.set(id, {
+      id,
+      name: status.name,
+      value: firstEffect?.description || firstEffect?.value,
+      description: status.description || firstEffect?.description || status.name,
+      source: status.source,
+      category: cultivationAttributeCategory((status as any).attributeCategory),
+      visible: true,
+    });
+  }
+  const core = deriveCoreCultivationAttributes(state);
+  const soul = deriveSoulRealm({ ...state, ...core });
+  byId.set('spiritualSense', {
+    id: 'spiritualSense',
+    name: '神识',
+    value: core.spiritualSense,
+    description: '感知、探查、神念压制与高阶禁制判断的基础。',
+    source: '境界与神魂派生',
+    category: 'spirit',
+    visible: true,
+  });
+  byId.set('soulStrength', {
+    id: 'soulStrength',
+    name: '魂魄',
+    value: core.soulStrength,
+    description: `当前神魂境界：${soul.name}（${soul.gap}），影响元婴出窍、夺舍风险、心魔承受和神识秘术。`,
+    source: '境界与心性派生',
+    category: 'spirit',
+    visible: true,
+  });
+  byId.set('physicalFoundation', {
+    id: 'physicalFoundation',
+    name: '体魄',
+    value: core.physicalFoundation,
+    description: '肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。',
+    source: '肉身与境界派生',
+    category: 'body',
+    visible: true,
+  });
+  return [...byId.values()].slice(0, 24);
+}
+
+
+function firstNumber(...values: any[]) {
+  for (const value of values) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
+function attributeNumber(state: CharacterState, ids: string[]) {
+  const wanted = new Set(ids);
+  for (const attr of state.cultivationAttributes || []) {
+    if (!attr) continue;
+    if (!wanted.has(String(attr.id || '')) && !ids.some(id => String(attr.name || '').includes(id))) continue;
+    const n = Number(attr.value);
+    if (Number.isFinite(n)) return n;
+  }
+  for (const status of state.activeStatuses || []) {
+    const text = `${status.name || ''} ${status.description || ''}`;
+    if (!ids.some(id => text.includes(id))) continue;
+    const effect = (status.effects || []).find(e => Number.isFinite(Number(e.value)));
+    if (effect) return Number(effect.value);
+  }
+  return undefined;
+}
+
+export function deriveCoreCultivationAttributes(state: CharacterState) {
+  const realmIdx = Math.max(0, REALMS.findIndex(r => r.id === state.realm));
+  const levelRatio = Math.max(0, Number(state.realmLevel || 0)) / Math.max(1, Number(getRealmInfo(state.realm).levels || 1));
+  const profilePower = realmPowerMultiplier(state);
+  const spiritualSense = Math.round(firstNumber(
+    (state as any).spiritualSense,
+    attributeNumber(state, ['spiritualSense', '神识']),
+    5 + realmIdx * 24 + levelRatio * 18 + (state.comprehension || 0) * 0.45 + (state.maxMp || 0) * 0.04,
+  )! * profilePower);
+  const soulStrength = Math.round(firstNumber(
+    (state as any).soulStrength,
+    attributeNumber(state, ['soulStrength', '魂魄', '神魂', '元神']),
+    8 + realmIdx * 22 + levelRatio * 16 + (state.comprehension || 0) * 0.35 - (state.heartDemon || 0) * 0.15,
+  )! * profilePower);
+  const physicalFoundation = Math.round(firstNumber(
+    (state as any).physicalFoundation,
+    attributeNumber(state, ['physicalFoundation', '体魄', '肉身', '根骨']),
+    20 + realmIdx * 18 + levelRatio * 12 + (state.maxHp || 0) * 0.08 + (state.defense || 0) * 0.2,
+  )! * profilePower);
+  return {
+    spiritualSense: Math.max(0, Math.min(9999, spiritualSense)),
+    soulStrength: Math.max(0, Math.min(9999, soulStrength)),
+    physicalFoundation: Math.max(0, Math.min(9999, physicalFoundation)),
+  };
+}
+
+export function deriveSoulRealm(state: CharacterState) {
+  const core = deriveCoreCultivationAttributes(state);
+  const score = core.soulStrength + core.spiritualSense * 0.65;
+  const tiers = [
+    { name: '未凝神', rank: 0, min: 0 },
+    { name: '灵感初萌', rank: 1, min: 45 },
+    { name: '神识初成', rank: 2, min: 85 },
+    { name: '神魂稳固', rank: 3, min: 150 },
+    { name: '元神出窍', rank: 4, min: 260 },
+    { name: '元神显化', rank: 5, min: 420 },
+    { name: '神意通玄', rank: 6, min: 680 },
+  ];
+  const tier = [...tiers].reverse().find(t => score >= t.min) || tiers[0];
+  const bodyRank = Math.max(0, REALMS.findIndex(r => r.id === state.realm));
+  const gap = tier.rank > bodyRank + 1
+    ? '神魂超前'
+    : tier.rank + 1 < bodyRank
+      ? '神魂落后'
+      : '身神相称';
+  return { ...tier, gap, score: Math.round(score), ...core };
+}
+
+export function deriveRealmTraits(state: CharacterState): RealmTraits {
+  const base = REALM_TRAITS[state.realm] || REALM_TRAITS.mortal;
+  const patch = getRealmProfile(state)?.traits || {};
+  return {
+    ...base,
+    ...patch,
+    capabilities: [...new Set([...(base.capabilities || []), ...(patch.capabilities || [])])].slice(0, 8),
+    limitations: [...new Set([...(base.limitations || []), ...(patch.limitations || [])])].slice(0, 8),
+    worldAccess: [...new Set([...(base.worldAccess || []), ...(patch.worldAccess || [])])].slice(0, 8),
+    combatStyle: [...new Set([...(base.combatStyle || []), ...(patch.combatStyle || [])])].slice(0, 8),
+    resourceNeeds: [...new Set([...(base.resourceNeeds || []), ...(patch.resourceNeeds || [])])].slice(0, 8),
+    riskTags: [...new Set([...(base.riskTags || []), ...(patch.riskTags || [])])].slice(0, 8),
+  };
+}
+
+export function deriveCombatProjection(state: CharacterState): CombatProjectionTraits {
+  const core = deriveCoreCultivationAttributes(state);
+  const realmTraits = deriveRealmTraits(state);
+  const force = Math.max(0, Math.round((state.attack || 0) + core.spiritualSense * 0.12 + (state.comprehension || 0) * 0.08));
+  const guard = Math.max(0, Math.round((state.defense || 0) + core.physicalFoundation * 0.16 + core.soulStrength * 0.06));
+  const agility = Math.max(0, Math.round((state.speed || 0) + core.spiritualSense * 0.10 + (state.luck || 0) * 0.04));
+  const advantages = [
+    force >= guard && force >= agility ? '破势偏盛' : '',
+    guard >= force && guard >= agility ? '护持稳厚' : '',
+    agility >= force && agility >= guard ? '机变灵动' : '',
+    core.spiritualSense >= core.physicalFoundation + 30 ? '神识超前' : '',
+    core.physicalFoundation >= core.spiritualSense + 30 ? '体魄承压强' : '',
+  ].filter(Boolean).slice(0, 4);
+  const vulnerabilities = [
+    core.soulStrength + 25 < core.spiritualSense ? '神识锐而魂魄承载不足' : '',
+    guard + 20 < force ? '攻锋过盛，护持偏薄' : '',
+    agility + 20 < guard ? '承压有余，转挪偏慢' : '',
+    (state.heartDemon || 0) >= 60 ? '心魔牵动神魂' : '',
+  ].filter(Boolean).slice(0, 4);
+  return {
+    force,
+    guard,
+    agility,
+    spiritualAwareness: core.spiritualSense,
+    soulStability: core.soulStrength,
+    bodyTenacity: core.physicalFoundation,
+    forceLabel: COMBAT_PROJECTION_LABELS.force,
+    guardLabel: COMBAT_PROJECTION_LABELS.guard,
+    agilityLabel: COMBAT_PROJECTION_LABELS.agility,
+    summary: `${realmTraits.combatStyle?.[0] || '循势斗法'}：${COMBAT_PROJECTION_LABELS.force}${force}、${COMBAT_PROJECTION_LABELS.guard}${guard}、${COMBAT_PROJECTION_LABELS.agility}${agility}`,
+    advantages,
+    vulnerabilities,
+  };
 }
 
 // ==================== 属性变更应用 (引擎权威) ====================
@@ -190,6 +604,9 @@ const ATTRIBUTE_BOUNDS: Record<string, { min: number; max: number }> = {
   elementEarth:    { min: 0,    max: 100 },
   // Task 22: 心魔值（0-100）
   heartDemon:      { min: 0,    max: 100 },
+  spiritualSense:  { min: 0,    max: 9999 },
+  soulStrength:    { min: 0,    max: 9999 },
+  physicalFoundation: { min: 0, max: 9999 },
 };
 
 export function applyChanges(state: CharacterState, changes: AttributeChange[]): CharacterState {
@@ -292,7 +709,7 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
             value: eff.value,
             operation: 'add',
             rarity: it.rarity as any,
-            note: '修为加成',
+            note: '额外修为/岁',
           });
         }
       }
@@ -394,10 +811,170 @@ export function computeEffectiveCultivationRate(state: CharacterState): { multip
   return { multiplier, flatBonus };
 }
 
+
+// 引擎权威：把修炼速度倍率与来源条目重算回状态。
+// 用于买卖、战斗结算、物品移除等路径，防止已卖/已毁物品的旧加成残留。
+export function normalizeCultivationState(state: CharacterState): CharacterState {
+  const normalizedState: CharacterState = {
+    ...state,
+    inventory: (state.inventory || []).map(normalizeCultivationBearingItem),
+    equipped: (state.equipped || []).map(normalizeCultivationBearingItem),
+  };
+  const rate = computeEffectiveCultivationRate(normalizedState);
+  return {
+    ...normalizedState,
+    cultivationMultiplier: rate.multiplier,
+    cultivationFactors: computeCultivationFactors(normalizedState),
+  };
+}
+
 // 默认 equipNote（玩家点装备时若物品无 equipNote 则按类型生成）
 const DEFAULT_EQUIP_NOTE: Record<string, string> = {
   weapon: '手持', armor: '身穿', accessory: '佩戴', artifact: '悬身', scripture: '修习',
 };
+
+
+type ItemRarity = ItemEntry['rarity'];
+
+function safeRarityIndex(rarity?: string): number {
+  const idx = rarityIndex(String(rarity || 'common'));
+  return idx >= 0 ? idx : 0;
+}
+
+function clampRarityIndex(idx: number): ItemRarity {
+  return RARITY_ORDER[Math.max(0, Math.min(RARITY_ORDER.length - 1, idx))] as ItemRarity;
+}
+
+function makeLootId(prefix = 'loot'): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function buildLearnedCombatArts(state: CharacterState): { itemId: string; name: string; description: string; mpCost: number; power: number; rarity?: string; sourceType?: string }[] {
+  return (state.equipped || [])
+    .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
+    .map(it => ({
+      itemId: it.id,
+      name: it.name,
+      description: it.description,
+      mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
+      power: 1 + (safeRarityIndex(it.rarity) * 0.5),
+      rarity: it.rarity,
+      sourceType: it.item_type,
+    }))
+    .slice(0, 8);
+}
+
+function enemyLootTier(enemy: CombatEnemy, state: CharacterState): number {
+  const text = `${enemy.name || ''} ${enemy.description || ''} ${enemy.realm || ''}`;
+  const realmIdx = enemy.realm ? REALMS.findIndex(r => r.id === enemy.realm || r.name === enemy.realm) : -1;
+  if (/大乘|渡劫|仙|魔尊|老祖|天君/.test(text) || realmIdx >= 6) return 5;
+  if (/化神|元婴|魔君|长老/.test(text) || realmIdx >= 4) return 4;
+  if (/金丹|结丹|真人|筑基后期/.test(text) || realmIdx >= 3) return 3;
+  if (/筑基|执事|精英/.test(text) || realmIdx >= 2) return 2;
+  if (/炼气|修士|邪修|魔修|劫修|散修/.test(text) || realmIdx >= 1) return 1;
+  const playerRealmIdx = REALMS.findIndex(r => r.id === state.realm);
+  return Math.max(0, Math.min(2, playerRealmIdx));
+}
+
+function buildEnemyCarriedLoot(enemy: CombatEnemy, state: CharacterState, enemyIndex: number): { items: ItemEntry[]; spiritStones: number } {
+  const text = `${enemy.name || ''} ${enemy.description || ''}`;
+  const tier = enemyLootTier(enemy, state);
+  const baseRarity = clampRarityIndex(Math.max(0, tier - 1));
+  const betterRarity = clampRarityIndex(tier);
+  const source = `${enemy.name || '敌修'}遗物`;
+  const items: ItemEntry[] = [];
+  const addItem = (name: string, description: string, item_type: ItemEntry['item_type'], rarity: ItemRarity, effects: any[], suffix: string) => {
+    items.push({ id: makeLootId(`loot_${enemyIndex}_${suffix}`), name, description, item_type, rarity, effects, source });
+  };
+
+  const title = enemy.name || '敌修';
+  const isCultivator = /修|道人|魔|邪|劫|散人|真人|老祖|剑|宗|门/.test(text) || tier >= 1;
+  const isBeast = /妖|兽|狼|虎|蛟|蛇|蛛|狐|猿|禽|鸟/.test(text);
+
+  if (isCultivator) {
+    addItem(
+      `${title.replace(/^(蒙面|黑衣)/, '')}的储物袋`,
+      `从${title}身侧搜得的小型储物法器，袋口禁制已散，可并入自身储物之用。`,
+      'tool',
+      baseRarity,
+      [{ target_attribute: 'storageCapacity', operation: 'add', value: Math.max(8, 8 + tier * 10), description: `储物上限+${Math.max(8, 8 + tier * 10)}` }],
+      'bag'
+    );
+    addItem(
+      /剑|剑修/.test(text) ? '染血飞剑' : /魔|邪|血/.test(text) ? '血纹短刃' : '夺来的护身法器',
+      /魔|邪|血/.test(text) ? '刃上血纹未灭，仍残存几分凶煞灵机。' : '虽经斗法震荡，核心禁制尚未崩坏，可重新祭炼。',
+      /剑|刃|刀/.test(text) ? 'weapon' : 'artifact',
+      betterRarity,
+      [{ target_attribute: /剑|刃|刀/.test(text) ? 'attack' : 'defense', operation: 'add', value: Math.max(6, 8 + tier * 8), description: /剑|刃|刀/.test(text) ? `攻伐+${Math.max(6, 8 + tier * 8)}` : `护身+${Math.max(6, 8 + tier * 8)}` }],
+      'gear'
+    );
+    addItem(
+      tier >= 2 ? '回元丹' : '疗伤散',
+      `藏在${title}储物袋中的应急丹药，瓶身尚未碎裂。`,
+      'consumable',
+      baseRarity,
+      [{ target_attribute: tier >= 2 ? 'mp' : 'hp', operation: 'add', value: Math.max(30, 40 + tier * 35), description: tier >= 2 ? `回灵+${Math.max(30, 40 + tier * 35)}` : `疗伤+${Math.max(30, 40 + tier * 35)}` }],
+      'pill'
+    );
+    if (tier >= 2 || /功法|秘术|邪|魔|血/.test(text)) {
+      addItem(
+        /邪|魔|血/.test(text) ? '残缺血煞诀' : '斗法心得玉简',
+        /邪|魔|血/.test(text) ? '邪修随身携带的残缺法诀，凶险却也有可借鉴之处。' : '记有此人多年斗法心得的玉简。',
+        'scripture',
+        baseRarity,
+        [{ target_attribute: 'cultivationExp', operation: 'multiply', value: Number((1.15 + tier * 0.15).toFixed(2)), description: `参悟修行×${Number((1.15 + tier * 0.15).toFixed(2))}` }],
+        'scripture'
+      );
+    }
+  } else if (isBeast) {
+    addItem('妖兽内丹', `从${title}体内剖出的内丹，灵气未散。`, 'material', betterRarity, [{ target_attribute: 'cultivationExp', operation: 'add', value: Math.max(20, 35 + tier * 25), description: `炼化可增修为+${Math.max(20, 35 + tier * 25)}` }], 'core');
+    addItem('妖兽利爪', `${title}遗下的坚硬利爪，可作炼器材料。`, 'material', baseRarity, [{ target_attribute: 'attack', operation: 'add', value: Math.max(3, 4 + tier * 4), description: `炼器攻材+${Math.max(3, 4 + tier * 4)}` }], 'claw');
+  } else {
+    addItem('残破护符', `战后从${title}身旁拾得，虽有裂纹，灵光尚存。`, 'accessory', baseRarity, [{ target_attribute: 'luck', operation: 'add', value: 1, description: '护身气运+1' }], 'charm');
+  }
+
+  const explicitDrops = Array.isArray(enemy.drops) ? enemy.drops : [];
+  for (const d of explicitDrops.slice(0, 3)) {
+    const rarity = clampRarityIndex(safeRarityIndex(d.rarity));
+    addItem(String(d.name || '遗落材料'), `从${title}身上搜得，未在斗法中毁去。`, 'material', rarity, [], `drop_${items.length}`);
+  }
+
+  const explicitLoot = Array.isArray(enemy.lootItems) ? enemy.lootItems : [];
+  const safeExplicitLoot = explicitLoot.slice(0, 6).map((it, idx) => ({
+    ...it,
+    id: it.id || makeLootId(`enemy_${enemyIndex}_${idx}`),
+    source: it.source || source,
+  }));
+
+  const stonesBase = tier <= 0 ? 2 : 12 * Math.pow(2, tier - 1);
+  const spiritStones = Math.max(0, Math.floor(Number(enemy.lootSpiritStones ?? 0) || 0))
+    + (isCultivator ? Math.max(5, Math.floor(stonesBase + Math.random() * stonesBase)) : 0);
+
+  return { items: [...safeExplicitLoot, ...items], spiritStones };
+}
+
+export function buildCombatVictorySpoils(state: CharacterState, session: CombatSession): { items: ItemEntry[]; spiritStones: number } {
+  if (!session || session.status !== 'victory') return { items: [], spiritStones: 0 };
+  const enemies = session.enemies || [];
+  const allItems: ItemEntry[] = [];
+  let spiritStones = 0;
+  enemies.forEach((enemy, idx) => {
+    const loot = buildEnemyCarriedLoot(enemy, state, idx);
+    allItems.push(...loot.items);
+    spiritStones += loot.spiritStones;
+  });
+  const triggerDrops = Array.isArray(session.victoryDrops) ? session.victoryDrops : [];
+  allItems.push(...triggerDrops.map((it, idx) => ({ ...it, id: it.id || makeLootId(`drop_${idx}`), source: it.source || '战利所得' })));
+
+  const seen = new Set<string>();
+  const deduped = allItems.filter(item => {
+    const key = `${item.name}|${item.item_type}|${item.rarity}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, Math.max(4, 6 + enemies.length * 3));
+  return { items: deduped, spiritStones };
+}
 
 // 装备物品（从 inventory 移到 equipped 数组末尾，不限制同类型数量）
 // 不再替换同槽位物品——玩家可戴多个戒指、脖挂一串储物戒指等，由 AI 在 equipNote 中描述位置
@@ -754,38 +1331,106 @@ export function alchemy(
 
 // ==================== 突破处理 ====================
 
-export function tryBreakthrough(state: CharacterState): { state: CharacterState; success: boolean; newRealm?: Realm } {
+export function tryBreakthrough(
+  state: CharacterState,
+  intent?: { reason?: string; targetRealm?: Realm; targetLevel?: number }
+): { state: CharacterState; success: boolean; newRealm?: Realm; major?: boolean; steps?: number; reasonAccepted?: boolean } {
   if (state.cultivationExp < state.expToBreak) {
     return { state, success: false };
   }
-  const nextRealm = getNextRealm(state.realm);
-  if (!nextRealm) {
-    // 已达最高境界（渡劫→飞升由特殊事件处理）
-    return { state, success: false };
+
+  // 修仙世界允许「连破数境」，但不能无因果乱跳。
+  // 普通积累：最多升一小层；有明确奇遇/丹药/传承/顿悟等由头，且修为溢出足够时，可连续突破。
+  const reason = String(intent?.reason || '').trim();
+  const hasStrongReason = /奇遇|传承|顿悟|丹|灵药|天材地宝|灌顶|秘境|仙缘|雷劫|天劫|血脉|功法|灵脉|机缘/.test(reason);
+  const requestedTargetRealm = intent?.targetRealm;
+  const requestedTargetLevel = Number(intent?.targetLevel || 0);
+  const allowChain = hasStrongReason && (Boolean(requestedTargetRealm) || requestedTargetLevel > state.realmLevel + 1);
+  const maxSteps = allowChain ? 4 : 1;
+
+  let next: CharacterState = { ...state };
+  let steps = 0;
+  let major = false;
+  let lastRealm: Realm | undefined;
+
+  while (steps < maxSteps && next.cultivationExp >= next.expToBreak) {
+    const info = getRealmInfo(next.realm);
+
+    // 小境界优先；只有满层时才进入下一大境界。
+    if (info.levels > 0 && next.realmLevel < info.levels - 1) {
+      const minor = tryMinorBreakthrough(next);
+      if (!minor.advanced) break;
+      next = minor.state;
+      steps += 1;
+      lastRealm = next.realm;
+    } else {
+      const nextRealm = getNextRealm(next.realm);
+      if (!nextRealm) break;
+      const nextInfo = getRealmInfo(nextRealm);
+      const remainingExp = Math.max(0, next.cultivationExp - next.expToBreak);
+      const realmIdx = Math.max(1, REALMS.findIndex(r => r.id === nextRealm));
+      const boost = 1.15 + realmIdx * 0.12;
+      next = {
+        ...next,
+        realm: nextRealm,
+        realmLevel: 0,
+        cultivationExp: remainingExp,
+        expToBreak: Math.floor(nextInfo.expPerLevel * (getRealmProfile(next)?.expMultiplier || 1)),
+        lifespan: Math.max(next.lifespan, nextInfo.baseLifespan),
+        maxHp: Math.floor(next.maxHp * boost),
+        maxMp: Math.floor(next.maxMp * boost),
+        attack: Math.floor(next.attack * boost),
+        defense: Math.floor(next.defense * boost),
+        speed: Math.floor(next.speed * boost),
+      };
+      next.hp = next.maxHp;
+      next.mp = next.maxMp;
+      steps += 1;
+      major = true;
+      lastRealm = nextRealm;
+
+      // ===== Phase-α 批 1 α-1: 首次大境界突破触发天劫判定 =====
+      // 仅当跨越大境界（new realmLevel=0 且非 mortal→qi_refining 的凡人首踏仙路，
+      // 以及 qi_refining→foundation / foundation→golden_core / golden_core→nascent_soul …）时判定。
+      // mortal → qi_refining 视为"开仙路"，跳过天劫（修真小说的常见设定）。
+      // 已在该大境界历劫过（lastTribulationTargetRealm === nextRealm）→ skipped，不再触发。
+      const isFirstEnterMajorRealm = (
+        nextRealm !== 'qi_refining'
+        && state.realm !== nextRealm
+        && state.realmLevel <= 0
+      );
+      const alreadyTribulated = next.tribulationProfile?.lastTribulationTargetRealm === nextRealm;
+      if (isFirstEnterMajorRealm && !alreadyTribulated && next.alive) {
+        const originalRealm = state.realm;
+        const outcome = computeTribulationOutcome(next, nextRealm);
+        if (outcome.verdict === 'failed_fall_realm') {
+          // 提前回滚：保持 state.realm (原境界)，不进入 nextRealm
+          next = {
+            ...next,
+            realm: originalRealm,
+            realmLevel: Math.min(state.realmLevel, getRealmInfo(originalRealm).levels - 1),
+          };
+          outcome.revertedRealm = originalRealm;
+        }
+        next = applyTribulationResult(next, outcome);
+        // 若致命 → 立即停步，不再跳更大境界
+        if (!next.alive) break;
+      }
+    }
+
+    // 无强因果时，永远只允许一跳，防止「资质普通无奇遇，炼气一层直筑基」。
+    if (!allowChain) break;
+
+    // 若 AI 给了明确目标，到达目标后停止；目标是显示层数（1基），内部 realmLevel 为0基。
+    if (requestedTargetRealm && next.realm === requestedTargetRealm) {
+      if (!requestedTargetLevel || next.realmLevel + 1 >= requestedTargetLevel) break;
+    } else if (!requestedTargetRealm && requestedTargetLevel && next.realmLevel + 1 >= requestedTargetLevel) {
+      break;
+    }
   }
 
-  const nextInfo = getRealmInfo(nextRealm);
-  const newState: CharacterState = {
-    ...state,
-    realm: nextRealm,
-    realmLevel: 0,
-    cultivationExp: 0,
-    expToBreak: nextInfo.expPerLevel,
-    lifespan: Math.max(state.lifespan, nextInfo.baseLifespan),
-  };
-
-  // 突破提升基础属性
-  const realmIdx = REALMS.findIndex(r => r.id === nextRealm);
-  const boost = 1 + realmIdx * 0.5;
-  newState.maxHp = Math.floor(state.maxHp * boost);
-  newState.hp = newState.maxHp;
-  newState.maxMp = Math.floor(state.maxMp * boost);
-  newState.mp = newState.maxMp;
-  newState.attack = Math.floor(state.attack * boost);
-  newState.defense = Math.floor(state.defense * boost);
-  newState.speed = Math.floor(state.speed * boost);
-
-  return { state: newState, success: true, newRealm: nextRealm };
+  if (steps <= 0) return { state, success: false };
+  return { state: next, success: true, newRealm: lastRealm || next.realm, major, steps, reasonAccepted: allowChain };
 }
 
 // ==================== 小境界提升 ====================
@@ -808,6 +1453,271 @@ export function tryMinorBreakthrough(state: CharacterState): { state: CharacterS
     speed: Math.floor(state.speed * 1.05),
   };
   return { state: newState, advanced: true };
+}
+
+// ==================== Phase-α 批 1 α-1: 雷劫/天劫 判定与落地 ====================
+
+// 天劫判定档位（修真风味，不可外露为"算法/概率"机制词）
+export type TribulationVerdict =
+  | 'passed_with_refinement'  // 渡过并获得淬体加成（天降祥瑞、灵台稳固）
+  | 'passed_barely'           // 堪堪渡过，身心俱疲，轻伤
+  | 'failed_fall_realm'       // 失败跌回原境界，不掉大境界
+  | 'failed_fatal'            // 渡劫陨落
+  | 'skipped';                // 跳过——已在该大境界历劫过
+
+export interface TribulationOutcome {
+  verdict: TribulationVerdict;
+  targetRealm: Realm;
+  // 失败时的回滚境界（仅 failed_fall_realm 使用）
+  revertedRealm?: Realm;
+  // 渡劫后的淬体加成（仅 passed_with_refinement 使用）
+  refinementBonus?: TribulationHistoryEntry['refinementBonus'];
+  // 因果残响（karma 偏移）
+  karmaShift: number;
+  // 中文叙事因由（渡劫者视角的一句话）
+  reason: string;
+}
+
+// 计算渡劫下场（不落 state）
+// 修真风味的硬约束：
+// - 致命陨落 ≤ 30% 上限（owner 关注点）
+// - 首次大境界失败：fall-realm 概率占多数，fatal 仅在极低气血/极重业火时触发
+// - 高 karma（善）提升 passed_with_refinement 概率；低 karma（恶）提升 failed_fall_realm 概率
+// - sin 高叠加会提升致命概率
+export function computeTribulationOutcome(state: CharacterState, targetRealm: Realm): TribulationOutcome {
+  const karma = Number(state.karma || 0);
+  const sin = Number(state.sin || 0);
+  const merit = Number(state.merit || 0);
+  const hpRatio = state.maxHp > 0 ? state.hp / state.maxHp : 0;
+
+  // 基础判定值（0..1）：修真世界观"天时、地利、人和"用伪随机种子近似模拟
+  // 锚点：age + sin - merit + (realm 索引) → 给出稳定可重现的判定
+  const seedRaw = Math.abs(Math.floor(state.age)) + sin * 7 - merit * 3 + state.realmLevel * 5;
+  const seed = ((seedRaw % 100) + 100) % 100; // 0..99
+  const fateRoll = seed / 100; // 0..1
+
+  // karma 在 ±1 之间：正负偏移影响判定
+  const karmaDelta = Math.max(-0.15, Math.min(0.15, karma * 0.15));
+
+  // 致命区间宽度：sin 累加会扩展致命区间（每 10 点 +0.02），但上限 0.30
+  // 气血极低（< 30%）→ 致命区间再扩 +0.15
+  const fatalRange = Math.min(0.30, 0.05 + sin * 0.01) + (hpRatio < 0.3 ? 0.15 : 0);
+
+  // 失败跌境区间：sin + 恶 karma 拉高此区间；最大 0.25
+  const fallRange = Math.min(0.25, 0.10 + sin * 0.005 + (karma < 0 ? -karma * 0.05 : 0));
+
+  // 调整值：善者向成功偏移，恶者向失败偏移
+  const adjusted = fateRoll - karmaDelta;
+
+  let verdict: TribulationVerdict;
+  let refinementBonus: TribulationHistoryEntry['refinementBonus'] | undefined;
+  let karmaShift = 0;
+  let reason = '';
+
+  if (adjusted < fatalRange) {
+    verdict = 'failed_fatal';
+    karmaShift = -0.05 - sin * 0.001; // 致命时业火更盛
+    reason = sin > 20
+      ? '业火缠身，天雷灌顶，道基崩解'
+      : hpRatio < 0.3
+        ? '气血早已亏虚，天雷之下再无余力'
+        : '天雷凶猛，道基难承，魂飞魄散';
+  } else if (adjusted < fatalRange + fallRange) {
+    verdict = 'failed_fall_realm';
+    karmaShift = -0.02;
+    reason = karma < -0.3
+      ? '杀业深重，天雷反噬，跌回原境界'
+      : '雷云之下难以寸进，跌回原境界以图再破';
+  } else if (adjusted < 0.50) {
+    verdict = 'passed_barely';
+    karmaShift = 0;
+    reason = '勉强渡过天劫，神魂疲惫，根基尚稳';
+  } else {
+    verdict = 'passed_with_refinement';
+    // 淬体加成：maxHp +20%, maxMp +20%, attack +15%, defense +15%, speed +10%
+    refinementBonus = {
+      maxHp: 1.2,
+      maxMp: 1.2,
+      attack: 1.15,
+      defense: 1.15,
+      speed: 1.1,
+    };
+    karmaShift = merit > 10 ? 0.02 : 0.01;
+    reason = merit > 10
+      ? '功德护心，天降祥瑞，雷霆淬体'
+      : '天雷淬体，灵台稳固，根基更深一层';
+  }
+
+  return {
+    verdict,
+    targetRealm,
+    refinementBonus,
+    karmaShift,
+    reason,
+    revertedRealm: verdict === 'failed_fall_realm' ? state.realm : undefined,
+  };
+}
+
+// 应用渡劫结果到 state（落库）：
+// - passed_with_refinement：进入新境界 + 淬体加成 + 落档案
+// - passed_barely：进入新境界，无淬体，hp/mp 扣 30% 表示疲态
+// - failed_fall_realm：留在原境界（不进入新境界），hp 扣 40%，expToBreak 略降以备再破
+// - failed_fatal：alive=false，causeOfDeath 写入，sin +5（业火归身）
+export function applyTribulationResult(state: CharacterState, outcome: TribulationOutcome): CharacterState {
+  let next: CharacterState = { ...state };
+  // 更新 karma
+  next.karma = clampProfileNumber((next.karma || 0) + outcome.karmaShift, -1, 1, 0);
+
+  // 追加历史
+  const history = Array.isArray(next.tribulationProfile?.tribulationHistory)
+    ? next.tribulationProfile!.tribulationHistory.slice()
+    : [];
+  const entry: TribulationHistoryEntry = {
+    age: next.age,
+    targetRealm: outcome.targetRealm,
+    result: outcome.verdict,
+    refinementBonus: outcome.refinementBonus,
+    karmaShift: outcome.karmaShift,
+    reason: outcome.reason,
+  };
+  history.push(entry);
+  const newProfile: TribulationProfile = {
+    ...(next.tribulationProfile || {}),
+    lastTribulationAge: next.age,
+    lastTribulationTargetRealm: outcome.targetRealm,
+    lastTribulationResult: outcome.reason,
+    tribulationHistory: history.slice(-10),
+  };
+  next.tribulationProfile = newProfile;
+
+  if (outcome.verdict === 'failed_fatal') {
+    next.alive = false;
+    next.hp = 0;
+    next.causeOfDeath = outcome.reason || '陨落于天劫';
+    // 致命陨落：杀业归身
+    next.sin = Math.max(0, (next.sin || 0) + 5);
+    return next;
+  }
+
+  if (outcome.verdict === 'failed_fall_realm') {
+    // 留在原境界（revertedRealm 若提供则回滚；缺省保持当前）
+    if (outcome.revertedRealm && next.realm !== outcome.revertedRealm) {
+      next.realm = outcome.revertedRealm;
+      next.realmLevel = Math.min(next.realmLevel, getRealmInfo(outcome.revertedRealm).levels - 1);
+    }
+    // 跌境扣血
+    next.hp = Math.max(1, Math.floor(next.maxHp * 0.4));
+    next.mp = Math.max(0, Math.floor(next.maxMp * 0.4));
+    // expToBreak 略降以备再破
+    next.expToBreak = Math.floor(next.expToBreak * 0.7);
+    // 失败跌境 sin +2
+    next.sin = Math.max(0, (next.sin || 0) + 2);
+    return next;
+  }
+
+  if (outcome.verdict === 'passed_barely') {
+    // 进入新境界（state.realm 已被调用方切换），hp/mp 扣 30%
+    next.hp = Math.max(1, Math.floor(next.maxHp * 0.7));
+    next.mp = Math.max(0, Math.floor(next.maxMp * 0.7));
+    return next;
+  }
+
+  // passed_with_refinement
+  if (outcome.refinementBonus) {
+    const b = outcome.refinementBonus;
+    if (b.maxHp) next.maxHp = Math.floor(next.maxHp * b.maxHp);
+    if (b.maxMp) next.maxMp = Math.floor(next.maxMp * b.maxMp);
+    if (b.attack) next.attack = Math.floor(next.attack * b.attack);
+    if (b.defense) next.defense = Math.floor(next.defense * b.defense);
+    if (b.speed) next.speed = Math.floor(next.speed * b.speed);
+    next.hp = next.maxHp;
+    next.mp = next.maxMp;
+    // 渡劫成功且功德高 → merit +3
+    if ((next.merit || 0) > 10) {
+      next.merit = (next.merit || 0) + 3;
+    }
+  }
+  return next;
+}
+
+// ==================== Phase-α 批 1 α-2: 因果业力调整 ====================
+
+// 引擎权威的 karma/merit/sin 调整器
+// AI 在叙事中点出"杀无辜/救一命/渡亡魂/济世"等行为后，引擎按 aiOutput.changes 标签或显式调用累加
+// reason 仅作存档/审计，不入 narrative
+export interface KarmaAdjustment {
+  deltaMerit: number;
+  deltaSin: number;
+  // 引擎推断的标签：'rescue' | 'mercy' | 'meridian' | 'massacre' | 'kill_innocent' | 'butcher' | 'slay_demon' | 'general'
+  tag?: 'rescue' | 'mercy' | 'meridian' | 'massacre' | 'kill_innocent' | 'butcher' | 'slay_demon' | 'general';
+  reason?: string;
+}
+
+export function adjustKarma(state: CharacterState, adjustment: KarmaAdjustment): CharacterState {
+  const { deltaMerit = 0, deltaSin = 0, tag = 'general', reason } = adjustment;
+  if (!deltaMerit && !deltaSin) return state;
+  const next: CharacterState = { ...state };
+  // merit / sin 累计（最小 0）
+  next.merit = Math.max(0, (next.merit || 0) + Math.max(0, deltaMerit));
+  next.sin = Math.max(0, (next.sin || 0) + Math.max(0, deltaSin));
+
+  // karma 连续值：merit 高 → 向 + 偏移；sin 高 → 向 - 偏移
+  // 步进：每 5 单位的 merit/sin 偏移 karma 0.01，封顶 ±1
+  const net = (next.merit || 0) - (next.sin || 0);
+  const shift = clampProfileNumber(net / 500, -1, 1, 0); // 500 单位净业 → ±1 karma
+  // 若是显式 rescue/massacre 等强标签，再叠加一次性偏移
+  let tagShift = 0;
+  if (tag === 'rescue' || tag === 'mercy' || tag === 'meridian') tagShift = 0.02;
+  if (tag === 'massacre' || tag === 'butcher' || tag === 'kill_innocent') tagShift = -0.03;
+  // 平滑到现有 karma（不突变）
+  next.karma = clampProfileNumber(((next.karma || 0) + shift * 0.1) + tagShift, -1, 1, 0);
+
+  if (reason && next.longTermMemory && !next.longTermMemory.includes(reason)) {
+    next.longTermMemory = [...next.longTermMemory, reason].slice(-50);
+  }
+  return next;
+}
+
+// 根据 aiOutput.changes 的 attribute+reason 文本推断 karma 增量
+// attribute 只识别 reason 含特定中文标签的情况（不强制 AI 使用 attribute 字段；这里是软解析）
+export function inferKarmaFromChanges(aiOutput: AIEventOutput): KarmaAdjustment {
+  let deltaMerit = 0;
+  let deltaSin = 0;
+  let tag: KarmaAdjustment['tag'] = 'general';
+  let reasonAcc = '';
+
+  for (const ch of aiOutput.changes || []) {
+    const text = `${ch.reason || ''}`;
+    if (/救一命|救下|救出|济世|济困|渡化|渡亡魂|超度|慈悲|舍命相救|布施/.test(text)) {
+      deltaMerit += 5;
+      tag = 'rescue';
+      reasonAcc = `${ch.reason}（功德+5）`;
+    } else if (/杀无辜|滥杀|屠戮|屠杀|屠村|灭门|嗜杀|血洗/.test(text)) {
+      deltaSin += 5;
+      tag = 'butcher';
+      reasonAcc = `${ch.reason}（杀业+5）`;
+    } else if (/击杀|斩杀|诛杀|伏妖|除魔/.test(text)) {
+      // 杀妖魔/邪修：小幅 sin（修真世界的合理杀戮），但有时可加 merit（除魔卫道）
+      if (/魔|邪|妖|鬼/.test(text)) {
+        deltaSin += 1;
+        deltaMerit += 1;
+        tag = 'slay_demon';
+        reasonAcc = `${ch.reason}（除魔卫道，功德+1 杀业+1）`;
+      } else {
+        deltaSin += 2;
+        reasonAcc = `${ch.reason}（杀业+2）`;
+      }
+    }
+  }
+
+  // sinReason 显式标记强杀业
+  if (aiOutput.sinReason && /杀|屠|灭|戮/.test(aiOutput.sinReason)) {
+    deltaSin += 3;
+    if (tag === 'general') tag = 'massacre';
+    reasonAcc = reasonAcc || `${aiOutput.sinReason}（杀业+3）`;
+  }
+
+  return { deltaMerit, deltaSin, tag, reason: reasonAcc };
 }
 
 // ==================== 寿元检查 ====================
@@ -842,12 +1752,40 @@ export function checkFateNode(state: CharacterState): number | null {
   return null;
 }
 
-// ==================== 状态词条管理 ====================
+// ==================== 状态管理 ====================
+
+export function isMeaningfulStatus(status: Partial<StatusEntry> | null | undefined): boolean {
+  if (!status || !status.name) return false;
+  const effects = Array.isArray(status.effects) ? status.effects.filter((e: any) =>
+    e && e.target_attribute && e.operation && e.value !== undefined && e.value !== 0
+  ) : [];
+  if (effects.length > 0) return true;
+
+  // 少数标志性状态允许无数值效果：身份、命格、线索、重大奇缘等，供 AI 后续判断使用。
+  // 修复：扩展 special 含"心境/余韵/感悟"词条的状态——AI prompt (llm.ts:616) 明确要求玩家顶部展示这些，
+  // 但旧过滤会把没有数值效果的"旧铜同源之念/旧铜花纹在心"等状态过滤掉，导致 StatusPanel 不显示。
+  const category = status.category;
+  const text = `${status.name || ''} ${status.description || ''} ${status.source || ''}`;
+  if (category === 'identity' || category === 'quest') return true;
+  if (category === 'special' && /(身份|师承|宗门|命格|命途|奇缘|传承|血脉|体质|灵体|道体|剑体|骨|体|誓约|因果|线索|印记|称号|灵宠|契约|心境|感悟|余韵|心法|心痕|在心|之念|之悟|之感|之缘|入心|印心|铭心|心相|机|兆|痕|韵|缘|意|念|志|怀|道)/.test(text)) return true;
+  return false;
+}
+
+export function filterMeaningfulStatuses(statuses: StatusEntry[]): StatusEntry[] {
+  return (statuses || []).filter(isMeaningfulStatus).map(s => ({
+    ...s,
+    effects: Array.isArray(s.effects) ? s.effects.filter((e: any) =>
+      e && e.target_attribute && e.operation && e.value !== undefined && e.value !== 0
+    ) : [],
+  }));
+}
 
 export function addStatuses(state: CharacterState, statuses: StatusEntry[]): CharacterState {
-  if (!statuses.length) return state;
+  const meaningful = filterMeaningfulStatuses(statuses || []);
+  if (!meaningful.length) return state;
   const existingIds = new Set(state.activeStatuses.map(s => s.id));
-  const newStatuses = statuses.filter(s => !existingIds.has(s.id));
+  const existingNames = new Set(state.activeStatuses.map(s => s.name));
+  const newStatuses = meaningful.filter(s => !existingIds.has(s.id) && !existingNames.has(s.name));
   return { ...state, activeStatuses: [...state.activeStatuses, ...newStatuses] };
 }
 
@@ -858,10 +1796,99 @@ export function tickStatusDurations(state: CharacterState): CharacterState {
     duration: s.duration === -1 ? -1 : s.duration - 1,
   }));
   const alive = ticked.filter(s => s.duration === -1 || s.duration > 0);
-  return { ...state, activeStatuses: alive };
+  return { ...state, activeStatuses: filterMeaningfulStatuses(alive) };
+}
+
+// 每岁自然恢复：身体与灵息会自行回转，但只恢复少量。
+// 大型事件/战斗/伤势叙事仍由 AI 处理，AI 可额外生成调息、疗伤、求药等事件。
+export function tickNaturalRecovery(state: CharacterState): CharacterState {
+  if (!state.alive) return state;
+  const hpMissing = Math.max(0, state.maxHp - state.hp);
+  const mpMissing = Math.max(0, state.maxMp - state.mp);
+  const hpRegen = hpMissing > 0 ? Math.max(1, Math.floor(state.maxHp * 0.08)) : 0;
+  const mpRegen = mpMissing > 0 ? Math.max(1, Math.floor(state.maxMp * 0.12)) : 0;
+  return {
+    ...state,
+    hp: Math.min(state.maxHp, state.hp + hpRegen),
+    mp: Math.min(state.maxMp, state.mp + mpRegen),
+  };
 }
 
 // ==================== 物品管理 ====================
+
+
+const VALID_ITEM_TYPES_FOR_NORMALIZE = new Set(['weapon', 'armor', 'accessory', 'artifact', 'consumable', 'material', 'tool', 'scripture']);
+const SCRIPTURE_NAME_RE = /诀|决|经|典|录|篇|章|解|式|术|功法|心法|秘籍|玉简|心得|真经|真解|引气|凝气|吐纳/;
+const CULTIVATION_EFFECT_ALIASES = new Set(['cultivationExp', 'cultivation', 'cultivationRate', 'cultivationMultiplier', 'cultivation_speed', '修为', '修炼速度']);
+
+function defaultScriptureMultiplier(rarity?: string): number {
+  const multByRarity: Record<string, number> = {
+    common: 1.3, uncommon: 1.7, rare: 2.5, epic: 3.5, legendary: 4.5, mythic: 5.5,
+  };
+  return multByRarity[rarity || ''] || 1.5;
+}
+
+function normalizeCultivationBearingItem(it: ItemEntry): ItemEntry {
+  const hasStorageEffect = (it.effects || []).some(e => e.target_attribute === 'storageCapacity' && e.operation === 'add' && e.value > 0);
+  let itemType = it.item_type;
+  if (!VALID_ITEM_TYPES_FOR_NORMALIZE.has(itemType)) {
+    itemType = hasStorageEffect ? 'tool' : 'material';
+  } else if (hasStorageEffect && itemType !== 'tool') {
+    itemType = 'tool';
+  }
+
+  const isScriptureByName = SCRIPTURE_NAME_RE.test(`${it.name || ''}${it.description || ''}`);
+  if (isScriptureByName && itemType !== 'scripture') {
+    itemType = 'scripture';
+  }
+
+  let effects = Array.isArray(it.effects) ? it.effects.map(e => {
+    if (CULTIVATION_EFFECT_ALIASES.has(e.target_attribute) && e.target_attribute !== 'cultivationExp') {
+      return { ...e, target_attribute: 'cultivationExp' };
+    }
+    return e;
+  }) : [];
+
+  if (itemType === 'scripture' && !effects.some(e => e.target_attribute === 'cultivationExp' && e.operation === 'multiply')) {
+    const mult = defaultScriptureMultiplier(it.rarity as string);
+    effects = [...effects, {
+      target_attribute: 'cultivationExp',
+      operation: 'multiply',
+      value: mult,
+      description: `修习此功法，修为流转加速×${mult}`,
+    }];
+  }
+
+  // α-4 功法三段：scripture 类型缺省填初习 + 0 进度；旧数据无字段也视为初习
+  // 不在此处覆写 AI 已经给出的合法 stage/exp（保留跨 session 累计）
+  let scriptureStage: ItemEntry['scriptureStage'] | undefined = it.scriptureStage;
+  let scriptureExp: number | undefined = it.scriptureExp;
+  let scriptureAwakeningHook: string | undefined = it.scriptureAwakeningHook;
+  if (itemType === 'scripture') {
+    if (!scriptureStage || !['practiced', 'awakened', 'transcendent'].includes(scriptureStage)) {
+      scriptureStage = 'practiced';
+    }
+    if (typeof scriptureExp !== 'number' || !Number.isFinite(scriptureExp) || scriptureExp < 0) {
+      scriptureExp = 0;
+    } else if (scriptureExp > 100) {
+      scriptureExp = 100;
+    }
+  } else {
+    // 非 scripture 类型强制清掉三段字段——避免被旧数据 / 错误传递污染
+    scriptureStage = undefined;
+    scriptureExp = undefined;
+    scriptureAwakeningHook = undefined;
+  }
+
+  return {
+    ...it,
+    item_type: itemType as any,
+    effects,
+    scriptureStage,
+    scriptureExp,
+    scriptureAwakeningHook,
+  };
+}
 
 // 添加物品到 inventory。若物品是储物袋（含 storageCapacity 效果的 tool），自动增加 storageCapacity。
 // 兜底：若 AI 给了无效 item_type（如 'storage'），但物品含 storageCapacity 效果，则强转 item_type='tool'。
@@ -869,39 +1896,8 @@ export function tickStatusDurations(state: CharacterState): CharacterState {
 // Task 22: 容量限制——超过 storageCapacity 时丢弃多余物品（储物袋本身优先保留，因可扩容）
 export function addItems(state: CharacterState, items: ItemEntry[]): CharacterState {
   if (!items.length) return state;
-  // 规整化物品：确保 item_type 合法；储物袋 item_type 必为 'tool'；功法名必为 'scripture'
-  const VALID_TYPES = new Set(['weapon', 'armor', 'accessory', 'artifact', 'consumable', 'material', 'tool', 'scripture']);
-  const SCRIPTURE_NAME_RE = /诀|决|经|典|录|篇|章|解|式|术|功法|心法|秘籍|玉简|真经|真解|引气|凝气|吐纳/;
-  const normalized = items.map(it => {
-    const hasStorageEffect = (it.effects || []).some(e => e.target_attribute === 'storageCapacity' && e.operation === 'add' && e.value > 0);
-    let itemType = it.item_type;
-    if (!VALID_TYPES.has(itemType)) {
-      // 无效类型兜底：含 storageCapacity 效果 → tool；否则 material
-      itemType = hasStorageEffect ? 'tool' : 'material';
-    } else if (hasStorageEffect && itemType !== 'tool') {
-      itemType = 'tool';
-    }
-    // 功法名兜底：若名含功法关键词但 item_type 不是 scripture，强转 scripture
-    const isScriptureByName = SCRIPTURE_NAME_RE.test(it.name || '');
-    if (isScriptureByName && itemType !== 'scripture') {
-      itemType = 'scripture';
-    }
-    let effects = it.effects || [];
-    // 若是 scripture 但无 multiply cultivationExp 效果，补一条默认（按 rarity 分档）
-    if (itemType === 'scripture' && !effects.some(e => e.target_attribute === 'cultivationExp' && e.operation === 'multiply')) {
-      const multByRarity: Record<string, number> = {
-        common: 1.3, uncommon: 1.7, rare: 2.5, epic: 3.5, legendary: 4.5, mythic: 5.5,
-      };
-      const mult = multByRarity[it.rarity as string] || 1.5;
-      effects = [...effects, {
-        target_attribute: 'cultivationExp',
-        operation: 'multiply',
-        value: mult,
-        description: `修习此功法，修为流转加速×${mult}`,
-      }];
-    }
-    return { ...it, item_type: itemType as any, effects };
-  });
+  // 规整化物品：确保储物袋、功法、玉简/心得等可被后续修炼速度归算识别。
+  const normalized = items.map(normalizeCultivationBearingItem);
 
   // Task 22: 计算加入后的总容量（含本批储物袋扩容），按容量限制裁剪
   let bagBoost = 0;
@@ -934,6 +1930,146 @@ export function addItems(state: CharacterState, items: ItemEntry[]): CharacterSt
   return next;
 }
 
+// ==================== α-4 功法三段（经/诀/神通）====================
+
+// 阶段阈值表（闭区间右开；与 InventoryPanel chip 颜色映射保持一致）
+// 0..33 = practiced(初习) / 34..66 = awakened(觉意) / 67..100 = transcendent(神通 / 大成)
+export const SCRIPTURE_STAGE_THRESHOLDS: { stage: 'practiced' | 'awakened' | 'transcendent'; min: number; max: number; label: string; color: string }[] = [
+  { stage: 'practiced',     min: 0,  max: 33, label: '初习', color: '#9ca3af' }, // 灰
+  { stage: 'awakened',      min: 34, max: 66, label: '觉意', color: '#14b8a6' }, // 青
+  { stage: 'transcendent',  min: 67, max: 100, label: '大成', color: '#a855f7' }, // 紫
+];
+
+// 给定 exp（0..100）返回当前阶段。exp 越界会被夹紧。
+// 兼容旧数据：若 item 无 stage 字段，视作 exp=0 → 'practiced'。
+export function computeScriptureStage(expOrItem: number | ItemEntry | null | undefined): 'practiced' | 'awakened' | 'transcendent' {
+  let exp: number;
+  if (typeof expOrItem === 'number') {
+    exp = expOrItem;
+  } else if (expOrItem && typeof expOrItem === 'object') {
+    exp = typeof expOrItem.scriptureExp === 'number' ? expOrItem.scriptureExp : 0;
+  } else {
+    exp = 0;
+  }
+  if (!Number.isFinite(exp)) exp = 0;
+  const clamped = Math.max(0, Math.min(100, exp));
+  if (clamped <= 33) return 'practiced';
+  if (clamped <= 66) return 'awakened';
+  return 'transcendent';
+}
+
+// 给出 exp 计算阶段标签（中文：初习/觉意/大成）
+export function scriptureStageLabel(stage: 'practiced' | 'awakened' | 'transcendent' | null | undefined): string {
+  if (stage === 'awakened') return '觉意';
+  if (stage === 'transcendent') return '大成';
+  return '初习';
+}
+
+// 给出 exp 计算阶段色（chip 颜色用）
+export function scriptureStageColor(stage: 'practiced' | 'awakened' | 'transcendent' | null | undefined): string {
+  const found = SCRIPTURE_STAGE_THRESHOLDS.find(t => t.stage === (stage || 'practiced'));
+  return found?.color || '#9ca3af';
+}
+
+// 给单个 scripture 物品累计 exp，自动判定阶段并落 scriptureStage。
+// expDelta 由调用方钳制（建议 [0..30]/事件 防溢出）；reason 仅用于日志，不修改物品。
+// 返回 { state, item, crossedStage, oldStage }：
+//   - crossedStage=true 表示本次累计跨段（practiced→awakened 或 awakened→transcendent）
+//   - oldStage 用于日志 / 反馈
+//   - item 已是新值（写回 inventory / equipped 后视图一致）
+// 兼容：旧 scripture 无 stage 字段 → 视作初习 + 0 exp；item 不存在时返回 state 不变。
+export function addScriptureProgress(
+  state: CharacterState,
+  scriptureId: string,
+  expDelta: number,
+  reason?: string
+): { state: CharacterState; item: ItemEntry; crossedStage: boolean; oldStage: 'practiced' | 'awakened' | 'transcendent'; newStage: 'practiced' | 'awakened' | 'transcendent' } {
+  const safeDelta = Number.isFinite(expDelta) ? Math.max(0, Math.min(30, Math.floor(expDelta))) : 0;
+  // 找 inventory + equipped 两处
+  let item: ItemEntry | undefined = state.inventory.find(it => it.id === scriptureId);
+  let location: 'inventory' | 'equipped' | null = item ? 'inventory' : null;
+  if (!item) {
+    item = (state.equipped || []).find(it => it.id === scriptureId);
+    if (item) location = 'equipped';
+  }
+  if (!item || item.item_type !== 'scripture') {
+    // 找不到或非 scripture：原状返回 state，构造空 item 以便类型对齐
+    return {
+      state,
+      item: { id: scriptureId, name: '未知功法', description: '', item_type: 'scripture', rarity: 'common', effects: [], source: 'engine' },
+      crossedStage: false,
+      oldStage: 'practiced',
+      newStage: 'practiced',
+    };
+  }
+  const oldExp = typeof item.scriptureExp === 'number' && Number.isFinite(item.scriptureExp) ? item.scriptureExp : 0;
+  const oldStage = (item.scriptureStage && ['practiced', 'awakened', 'transcendent'].includes(item.scriptureStage))
+    ? item.scriptureStage
+    : computeScriptureStage(oldExp);
+  const newExp = Math.max(0, Math.min(100, oldExp + safeDelta));
+  const newStage = computeScriptureStage(newExp);
+  const crossedStage = newStage !== oldStage;
+  const awakeningHook = crossedStage
+    ? (typeof reason === 'string' && reason.trim() ? reason.trim().slice(0, 80) : `${scriptureStageLabel(oldStage)} → ${scriptureStageLabel(newStage)}`)
+    : item.scriptureAwakeningHook;
+  const updated: ItemEntry = {
+    ...item,
+    scriptureExp: newExp,
+    scriptureStage: newStage,
+    scriptureAwakeningHook: awakeningHook,
+  };
+  // 写回 inventory / equipped（不可变更新）
+  let next = state;
+  if (location === 'inventory') {
+    next = { ...state, inventory: state.inventory.map(it => it.id === scriptureId ? updated : it) };
+  } else if (location === 'equipped') {
+    next = { ...state, equipped: (state.equipped || []).map(it => it.id === scriptureId ? updated : it) };
+  }
+  return { state: next, item: updated, crossedStage, oldStage, newStage };
+}
+
+// 把 aiOutput.scriptureProgress 列表应用到 state 上（按 id 或 name 匹配）
+// 单条 delta 限幅 [0..30]，跨多事件总和单场上限 100（一次 AI 事件整体不会超过整段进度）。
+// 返回 { state, applied: [{ id, delta, crossedStage, oldStage, newStage, awakeningHook }], dropped }
+//   - applied 顺序与输入一致
+//   - dropped 是无效条目（无 itemId/itemName 或非 scripture 或不存在）
+export function applyScriptureProgressFromAI(
+  state: CharacterState,
+  progresses: { itemId?: string; itemName: string; expDelta: number; reason?: string }[] | undefined | null
+): { state: CharacterState; applied: { id: string; name: string; delta: number; crossedStage: boolean; oldStage: 'practiced' | 'awakened' | 'transcendent'; newStage: 'practiced' | 'awakened' | 'transcendent'; awakeningHook?: string }[]; dropped: number } {
+  if (!Array.isArray(progresses) || progresses.length === 0) {
+    return { state, applied: [], dropped: 0 };
+  }
+  let next = state;
+  let applied: { id: string; name: string; delta: number; crossedStage: boolean; oldStage: 'practiced' | 'awakened' | 'transcendent'; newStage: 'practiced' | 'awakened' | 'transcendent'; awakeningHook?: string }[] = [];
+  let dropped = 0;
+  for (const p of progresses) {
+    if (!p || typeof p !== 'object') { dropped++; continue; }
+    const targetId = (typeof p.itemId === 'string' && p.itemId) ? p.itemId : '';
+    let targetItem: ItemEntry | undefined;
+    if (targetId) {
+      targetItem = next.inventory.find(it => it.id === targetId) || (next.equipped || []).find(it => it.id === targetId);
+    }
+    if (!targetItem && p.itemName) {
+      targetItem = next.inventory.find(it => it.item_type === 'scripture' && it.name === p.itemName)
+        || (next.equipped || []).find(it => it.item_type === 'scripture' && it.name === p.itemName);
+    }
+    if (!targetItem || targetItem.item_type !== 'scripture') { dropped++; continue; }
+    const result = addScriptureProgress(next, targetItem.id, p.expDelta, p.reason);
+    next = result.state;
+    applied.push({
+      id: targetItem.id,
+      name: targetItem.name,
+      delta: Math.max(0, Math.min(30, Math.floor(Number(p.expDelta) || 0))),
+      crossedStage: result.crossedStage,
+      oldStage: result.oldStage,
+      newStage: result.newStage,
+      awakeningHook: result.item.scriptureAwakeningHook,
+    });
+  }
+  return { state: next, applied, dropped };
+}
+
 // ==================== 记忆管理 ====================
 
 export function addMemory(state: CharacterState, memory: string): CharacterState {
@@ -957,10 +2093,18 @@ export function markFateNodeDone(state: CharacterState, nodeIndex: number): Char
 
 export function buildStateContext(state: CharacterState, recentEvents: { age: number; title: string; narrative: string; eventType?: string }[]): EngineStateContext {
   const realmInfo = getRealmInfo(state.realm);
+  const completedFateNodes = Array.isArray(state.fateNodes) ? state.fateNodes : [];
+  const safePendingThreads = Array.isArray(state.pendingThreads) ? state.pendingThreads : [];
+  const safeRecentEvents = Array.isArray(recentEvents) ? recentEvents : [];
+  const safeActiveStatuses = Array.isArray(state.activeStatuses) ? state.activeStatuses : [];
+  const safeInventory = Array.isArray(state.inventory) ? state.inventory : [];
+  const safeEquipped = Array.isArray(state.equipped) ? state.equipped : [];
+  const safeCultivationFactors = Array.isArray(state.cultivationFactors) ? state.cultivationFactors : [];
+  const safeLongTermMemory = Array.isArray(state.longTermMemory) ? state.longTermMemory : [];
   // 找下一个未完成的命节点
-  const nextNode = FATE_NODES.find(n => !state.fateNodes.includes(n.index));
+  const nextNode = FATE_NODES.find(n => !completedFateNodes.includes(n.index));
   // Task 20: 推进 urgent 线索状态（deadlineAge - age <= 3 视为 urgent）
-  const threads = (state.pendingThreads || []).map(t => ({
+  const threads = safePendingThreads.map(t => ({
     ...t,
     status: (t.status === 'pending' && (t.deadlineAge - state.age) <= 3) ? 'urgent' as const : t.status,
   }));
@@ -983,27 +2127,35 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
       realmLevel: state.realmLevel,
       cultivationExp: state.cultivationExp,
       expToBreak: state.expToBreak,
-      elements: state.elements,
+      elements: state.elements || { metal: 0, wood: 0, water: 0, fire: 0, earth: 0 },
       hp: state.hp, maxHp: state.maxHp,
       mp: state.mp, maxMp: state.maxMp,
       attack: state.attack, defense: state.defense, speed: state.speed,
       luck: state.luck, comprehension: state.comprehension,
+      // 修真三宝——身神分化，引擎在 dbToState 末尾已按公式派生并 Object.assign 到 state
+      spiritualSense: (state as any).spiritualSense ?? 0,
+      soulStrength: (state as any).soulStrength ?? 0,
+      physicalFoundation: (state as any).physicalFoundation ?? 0,
+      soulRealmName: (state as any).soulRealmName ?? '未凝神',
+      soulRealmRank: (state as any).soulRealmRank ?? 0,
+      soulRealmGap: (state as any).soulRealmGap ?? '身神相称',
+      combatProjection: (state as any).combatProjection,
       spiritStones: state.spiritStones, reputation: state.reputation,
       faction: state.faction, master: state.master, location: state.location,
       alive: state.alive, ascended: state.ascended,
       // Task 22: 心魔值——AI 可看到，可用 changes 中 attribute='heartDemon' 调整
       heartDemon: state.heartDemon ?? 0,
     },
-    activeStatuses: state.activeStatuses,
-    inventory: state.inventory,
-    equipped: state.equipped,
+    activeStatuses: safeActiveStatuses,
+    inventory: safeInventory,
+    equipped: safeEquipped,
     storageCapacity: state.storageCapacity,
     cultivationMultiplier: state.cultivationMultiplier,
     cultivationInsight: state.cultivationInsight,
-    cultivationFactors: state.cultivationFactors,
-    recentEvents: recentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
-    longTermMemory: state.longTermMemory.slice(-10),
-    completedFateNodes: state.fateNodes,
+    cultivationFactors: safeCultivationFactors,
+    recentEvents: safeRecentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
+    longTermMemory: safeLongTermMemory.slice(-10),
+    completedFateNodes,
     availableAttributes: Object.keys(ATTRIBUTE_BOUNDS),
     nextFateNode: nextNode ? { index: nextNode.index, name: nextNode.name, realm: nextNode.realm } : undefined,
     // Task 20 新字段
@@ -1012,10 +2164,14 @@ export function buildStateContext(state: CharacterState, recentEvents: { age: nu
     recentEventTypes,
     recentBlueprintCategories,
     // Task 23 新字段
-    pets: state.pets || [],
+    pets: Array.isArray(state.pets) ? state.pets : [],
     // Task 24 新字段
-    exploredRealms: state.exploredRealms || [],
+    exploredRealms: Array.isArray(state.exploredRealms) ? state.exploredRealms : [],
     currentExploration: (state as any)._currentExploration,
+    discoveredRealms: getDiscoveredStoryRealms(state),
+    // ===== Phase-α 批 2 α-7：灵田 / 节气 =====
+    spiritGarden: state.spiritGarden || { zones: [] },
+    solarTerm: getSolarTermForAge(state.age),
   };
 }
 
@@ -1091,20 +2247,51 @@ export function pickEventBlueprint(state: CharacterState, recentBlueprintCategor
 
 // 引擎根据角色当前处境生成"主动意图"，AI 必须在事件中体现这些意图的执行
 // 解决"角色太蠢"问题：快比赛了会主动备战、有仇敌会主动防备、灵石富余会主动淘宝等
-export function generateCharacterIntents(state: CharacterState, threads: PendingThread[]): CharacterIntent[] {
+export function generateCharacterIntents(state: CharacterState, threads?: PendingThread[] | null): CharacterIntent[] {
   const intents: CharacterIntent[] = [];
   const now = state.age;
+  const safeThreads = Array.isArray(threads) ? threads : Array.isArray((state as any).pendingThreads) ? (state as any).pendingThreads : [];
   // 1. 检查 pendingThreads —— 临近 deadline 的线索生成对应意图
-  for (const t of threads) {
+  for (const t of safeThreads) {
     if (t.status !== 'pending' && t.status !== 'urgent') continue;
     const remaining = t.deadlineAge - now;
-    if (remaining <= 0) continue;
+    if (remaining < 0) continue;
+    if (remaining === 0) {
+      intents.push({
+        id: `intent_due_${t.id}`,
+        type: t.category === 'exploration' || t.category === 'mystery' || t.category === 'inheritance' ? 'explore_opportunity' : 'resolve_thread',
+        title: `应约·${t.title}`,
+        description: `「${t.title}」已到约期。此事压在心头，须去赴约、入境、应试或还愿；若一时不能成行，也该给自己一个交代。${t.followUpHint ? `关窍：${t.followUpHint}` : ''}`,
+        priority: 10,
+        relatedThreadId: t.id,
+      });
+      continue;
+    }
+    if ((t.category === 'exploration' || t.category === 'mystery' || t.category === 'inheritance') && remaining <= 3) {
+      intents.push({
+        id: `intent_realm_${t.id}`,
+        type: 'explore_opportunity',
+        title: `牵挂·${t.title}`,
+        description: `「${t.title}」仍在心头，约莫 ${remaining} 岁内便会再起波澜。信物、禁制与旧地皆有未尽之意，若暂不能入内，也需另寻缘法。${t.followUpHint ? `关窍：${t.followUpHint}` : ''}`,
+        priority: 9,
+        relatedThreadId: t.id,
+      });
+    } else if ((t.category === 'promise' || t.category === 'romance') && remaining <= 3) {
+      intents.push({
+        id: `intent_promise_${t.id}`,
+        type: 'socialize',
+        title: `守约·${t.title}`,
+        description: `「${t.title}」渐近，旧约旧人萦绕心间。或赴约，或传信，或亲自探望；若终究失约，也该有一番缘由。`,
+        priority: 8,
+        relatedThreadId: t.id,
+      });
+    }
     if (t.category === 'competition' && remaining <= 5) {
       intents.push({
         id: `intent_comp_${t.id}`,
         type: 'prepare_combat',
         title: `备战·${t.title}`,
-        description: `「${t.title}」将在 ${remaining} 岁后到来。角色应主动准备战斗装备、炼制或购买丹药、磨砺功法、请教前辈。若无武器应设法获取，若修为不足应闭关苦修。`,
+        description: `「${t.title}」将在 ${remaining} 岁后到来。兵器、丹药、功法与师长指点皆可早作筹谋；修为若浅，更该趁早磨砺。`,
         priority: 9,
         relatedThreadId: t.id,
       });
@@ -1113,7 +2300,7 @@ export function generateCharacterIntents(state: CharacterState, threads: Pending
         id: `intent_enemy_${t.id}`,
         type: 'avoid_danger',
         title: `防备·${t.title}`,
-        description: `「${t.title}」可能近期发作。角色应主动防备：随身携带防身法器、避免独行险地、寻求师长庇护或同门结伴。`,
+        description: `「${t.title}」近来隐有动静。独行险地需多留心，护身之物、师长照拂或同门同行，皆可保一线周全。`,
         priority: 8,
         relatedThreadId: t.id,
       });
@@ -1122,7 +2309,7 @@ export function generateCharacterIntents(state: CharacterState, threads: Pending
         id: `intent_quest_${t.id}`,
         type: 'resolve_thread',
         title: `推进·${t.title}`,
-        description: `「${t.title}」deadline 临近，角色应主动推进任务进度，采集材料、完成委托、寻觅目标等。`,
+        description: `「${t.title}」已近收束之时。材料、委托与目标仍需一一落实，不宜再久拖。`,
         priority: 8,
         relatedThreadId: t.id,
       });
@@ -1131,7 +2318,7 @@ export function generateCharacterIntents(state: CharacterState, threads: Pending
         id: `intent_debt_${t.id}`,
         type: 'gather_resources',
         title: `还债·${t.title}`,
-        description: `「${t.title}」即将到期，角色应主动筹措灵石或物品偿债，否则将有严重后果。`,
+        description: `「${t.title}」债期将近，灵石与抵偿之物都得早作筹措，否则恐生祸端。`,
         priority: 9,
         relatedThreadId: t.id,
       });
@@ -1170,7 +2357,35 @@ export function generateCharacterIntents(state: CharacterState, threads: Pending
       });
     }
   }
-  // 5. 限制最多保留 5 个意图（按优先级排序）
+  // 5. 软牵挂：父母、故乡、师承、旧友等不是硬任务，但会在合适年份自然回响。
+  const concernText = [
+    ...(state.longTermMemory || []),
+    ...(state.activeStatuses || []).map(st => `${st.name} ${st.description} ${st.source || ''}`),
+    ...(state.pendingThreads || []).map(t => `${t.title} ${t.description} ${t.followUpHint || ''}`),
+  ].join(' ');
+  const concernSeed = Math.abs((state.age * 17) + String(state.name || '').split('').reduce((n, ch) => n + ch.charCodeAt(0), 0));
+  if (/父母|爹娘|双亲|母亲|父亲|家中|故乡|旧宅|亲人/.test(concernText) && (concernSeed % 4 === 0 || intents.length === 0)) {
+    intents.push({
+      id: `intent_family_${now}`,
+      type: state.spiritStones >= 20 ? 'trade' : 'socialize',
+      title: state.spiritStones >= 20 ? '奉亲问安' : '牵挂家中',
+      description: state.spiritStones >= 20
+        ? '角色心中牵挂父母亲人，若路途与处境允许，可购买调养丹药、托人送信或回乡探望；若不能成行，也应在叙事中自然带过原因。'
+        : '角色心中牵挂父母亲人，可能回乡探望、托人问安，或因修行/险地所阻只能暂寄书信。此类牵挂应偶尔回响，不必每年硬写。',
+      priority: 3,
+    });
+  }
+  if (/师父|师尊|师门|同门|旧友|好友|恩人|道侣/.test(concernText) && (concernSeed % 5 === 0 || intents.length === 0)) {
+    intents.push({
+      id: `intent_social_${now}`,
+      type: 'socialize',
+      title: '旧缘回响',
+      description: '角色心中仍有师门、旧友或恩人牵挂；合适时可传信、探访、互赠丹药法器，或写明因闭关/险阻暂不能赴约。',
+      priority: 3,
+    });
+  }
+
+  // 6. 限制最多保留 5 个意图（按优先级排序）
   intents.sort((a, b) => b.priority - a.priority);
   return intents.slice(0, 5);
 }
@@ -1232,6 +2447,7 @@ export function checkThreadDeadlines(state: CharacterState): { state: CharacterS
 
 // 启动战斗：从 AI 触发的 triggerCombat 创建 CombatSession
 export function startCombat(state: CharacterState, trigger: NonNullable<AIEventOutput['triggerCombat']>): CharacterState {
+  const realmPower = realmPowerMultiplier(state);
   const session: CombatSession = {
     id: `combat_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     enemies: trigger.enemies.map(e => ({ ...e, maxHp: e.maxHp || e.hp, currentCooldown: 0 })),
@@ -1249,16 +2465,8 @@ export function startCombat(state: CharacterState, trigger: NonNullable<AIEventO
     playerAttack: state.attack,
     playerDefense: state.defense,
     playerSpeed: state.speed,
-    // 从已装备提取法术（scripture 类）
-    playerSkills: (state.equipped || [])
-      .filter(it => it.item_type === 'scripture' || it.item_type === 'artifact')
-      .map(it => ({
-        name: it.name,
-        description: it.description,
-        mpCost: Math.max(5, Math.floor((it.rarity === 'mythic' ? 30 : it.rarity === 'legendary' ? 25 : it.rarity === 'epic' ? 20 : it.rarity === 'rare' ? 15 : 10))),
-        power: 1 + (['common','uncommon','rare','epic','legendary','mythic'].indexOf(it.rarity) * 0.5),
-      }))
-      .slice(0, 4),
+    // 从已装备功法/法宝提取可施展术法（与「宝」页习得法术同源）
+    playerSkills: buildLearnedCombatArts(state).slice(0, 4),
     // 从背包提取丹药（consumable 类）
     playerItems: (state.inventory || [])
       .filter(it => it.item_type === 'consumable')
@@ -1419,26 +2627,33 @@ export function executeCombatRound(
       };
     }
     playerActionDesc = `激发${item.name}`;
-    // 根据 effects 中的 target_attribute 判定符箓类型
+    // 根据 effects 中的 target_attribute 判定符箓类型，兼容 AI 可能写出的 targetAttribute/attribute 别名
+    let talismanResolved = false;
     for (const eff of item.effects || []) {
-      if (eff.target_attribute === 'talisman_attack' && eff.operation === 'add') {
+      const target = (eff as any).target_attribute || (eff as any).targetAttribute || (eff as any).attribute || '';
+      const operation = (eff as any).operation || 'add';
+      if (target === 'talisman_attack' && operation === 'add') {
         // 攻击符：直接对敌人造成 value 伤害（无视防御一半）
         const dmg = Math.max(1, Math.floor(eff.value - enemy.defense * 0.3));
         playerDamageDealt = dmg;
         enemyHp -= dmg;
+        talismanResolved = true;
         narrative += `你激发${item.name}，符箓化为攻伐之力轰向${enemy.name}，造成 ${dmg} 点伤害。`;
-      } else if (eff.target_attribute === 'talisman_defense' && eff.operation === 'add') {
+      } else if (target === 'talisman_defense' && operation === 'add') {
         // 防御符：本回合减伤 value
         session.talismanDefenseActive = eff.value;
+        talismanResolved = true;
         narrative += `你激发${item.name}，符箓化为护体金光，本回合可减伤 ${eff.value} 点。`;
-      } else if (eff.target_attribute === 'talisman_heal' && eff.operation === 'add') {
+      } else if (target === 'talisman_heal' && operation === 'add') {
         // 治疗符：回复 HP
         const heal = eff.value;
         playerHp = Math.min(session.playerMaxHp, playerHp + heal);
         playerHeal = heal;
+        talismanResolved = true;
         narrative += `你激发${item.name}，符箓化为温润灵光，回复 ${heal} 点气血。`;
-      } else if (eff.target_attribute === 'talisman_escape' && eff.operation === 'add') {
+      } else if (target === 'talisman_escape' && operation === 'add') {
         // 遁逃符：高概率逃跑
+        talismanResolved = true;
         const escapeChance = Math.min(0.95, 0.5 + eff.value * 0.1);
         if (Math.random() < escapeChance) {
           narrative += `你激发${item.name}，符箓化为金光裹身，瞬间脱离战场！`;
@@ -1455,11 +2670,15 @@ export function executeCombatRound(
         } else {
           narrative += `你激发${item.name}，但灵力被压制，未能脱身。`;
         }
-      } else if (eff.target_attribute === 'talisman_stun' && eff.operation === 'add') {
+      } else if (target === 'talisman_stun' && operation === 'add') {
         // 镇压符：让敌人本回合无法行动
         session.enemyStunned = true;
+        talismanResolved = true;
         narrative += `你激发${item.name}，符箓化为镇压力量，${enemy.name}本回合无法行动！`;
       }
+    }
+    if (!talismanResolved) {
+      narrative += `你激发${item.name}，符纸微燃，灵光散入战局。`;
     }
     // 消耗符箓（除遁逃符已消耗外）
     state = { ...state, inventory: state.inventory.filter(it => it.id !== payload.itemId) };
@@ -1616,16 +2835,21 @@ export function executeCombatRound(
 }
 
 // 结束战斗（清理 combatSession，但保留 log 用于事件记录）
-export function endCombat(state: CharacterState, applyDrops: boolean = true): { state: CharacterState; drops: ItemEntry[]; result: 'victory' | 'defeat' | 'fled' | 'ongoing' | null } {
-  if (!state.combatSession) return { state, drops: [], result: null };
+export function endCombat(state: CharacterState, applyDrops: boolean = true): { state: CharacterState; drops: ItemEntry[]; result: 'victory' | 'defeat' | 'fled' | 'ongoing' | null; spiritStones?: number } {
+  if (!state.combatSession) return { state, drops: [], result: null, spiritStones: 0 };
   const session = state.combatSession;
   let next: CharacterState = { ...state, combatSession: null };
   let drops: ItemEntry[] = [];
-  if (applyDrops && session.status === 'victory' && session.victoryDrops?.length) {
-    drops = session.victoryDrops;
-    next = addItems(next, drops);
+  let spiritStones = 0;
+  if (applyDrops && session.status === 'victory') {
+    const spoils = buildCombatVictorySpoils(state, session);
+    drops = spoils.items;
+    spiritStones = spoils.spiritStones;
+    if (drops.length) next = addItems(next, drops);
+    if (spiritStones > 0) next = { ...next, spiritStones: next.spiritStones + spiritStones };
+    next = normalizeCultivationState(next);
   }
-  return { state: next, drops, result: session.status };
+  return { state: next, drops, result: session.status, spiritStones };
 }
 
 // ==================== 引擎执行 AI 输出（统一入口） ====================
@@ -1636,6 +2860,9 @@ export interface EngineExecutionResult {
   rejectedChanges: AttributeChange[];
   breakthroughHappened: boolean;
   newRealm?: Realm;
+  breakthroughMajor?: boolean;
+  breakthroughSteps?: number;
+  breakthroughReasonAccepted?: boolean;
   died: boolean;
   deathReason?: string;
 }
@@ -1716,17 +2943,30 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   // 不再合并 AI 输出的额外因素——AI 输出不稳定会导致条目忽隐忽现，且 AI 编造的数字
   // 与 cultivationMultiplier 脱节会让"顶部倍率"与"来源条目数字之积"不一致。
   // AI 若想体现环境/心境等动态因素，可在 cultivationInsight 文本中描述，但不得影响数值。
-  next.cultivationFactors = computeCultivationFactors(next);
+  next = normalizeCultivationState(next);
 
   // 5. 处理突破
   let breakthroughHappened = false;
   let newRealm: Realm | undefined;
+  let breakthroughMajor = false;
+  let breakthroughSteps = 0;
+  let breakthroughReasonAccepted = false;
   if (aiOutput.triggeredBreakthrough) {
-    const br = tryBreakthrough(next);
+    const br = tryBreakthrough(next, {
+      reason: aiOutput.breakthroughReason,
+      targetRealm: aiOutput.breakthroughTargetRealm,
+      targetLevel: aiOutput.breakthroughTargetLevel,
+    });
     if (br.success) {
       next = br.state;
       breakthroughHappened = true;
       newRealm = br.newRealm;
+      breakthroughMajor = Boolean(br.major);
+      breakthroughSteps = br.steps || 1;
+      breakthroughReasonAccepted = Boolean(br.reasonAccepted);
+      if (br.reasonAccepted && aiOutput.realmProfilePatch) {
+        next = applyRealmProfilePatch(next, aiOutput.realmProfilePatch);
+      }
     }
   }
 
@@ -1780,10 +3020,16 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
   // Task 22 修复：若同时有 hasChoice，延迟战斗——选择通常决定战斗策略（奋力搏杀/灵活周旋/抛物安抚）
   // 选项后才进入战斗，避免 ChoiceModal 与 CombatModal 同时弹出
   if (aiOutput.triggerCombat && aiOutput.triggerCombat.enemies?.length) {
+    const combatTrigger = {
+      ...aiOutput.triggerCombat,
+      // 战斗弹窗承接刚才的事件：标题和缘由必须与事件描述一致，避免玩家跳戏
+      contextTitle: aiOutput.title || aiOutput.triggerCombat.contextTitle,
+      contextNarrative: aiOutput.narrative || aiOutput.triggerCombat.contextNarrative,
+    };
     if (aiOutput.hasChoice) {
-      (next as any)._deferredCombat = aiOutput.triggerCombat;
+      (next as any)._deferredCombat = combatTrigger;
     } else {
-      next = startCombat(next, aiOutput.triggerCombat);
+      next = startCombat(next, combatTrigger);
     }
   }
 
@@ -1794,8 +3040,98 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     }
   }
 
+  // ===== Phase-α 批 1 α-4: 功法三段累计（经/诀/神通）=====
+  // 引擎权威累计 scriptureProgress，AI 提议的 delta 限幅 [0..30]/条 防溢出
+  // 跨段（practiced→awakened / awakened→transcendent）会自动落 scriptureStage 与 scriptureAwakeningHook
+  if (aiOutput.scriptureProgress && aiOutput.scriptureProgress.length) {
+    const r = applyScriptureProgressFromAI(next, aiOutput.scriptureProgress);
+    next = r.state;
+    // 跨段时静默写入一段记忆，便于玩家后续查证（不污染 narrative）
+    for (const a of r.applied) {
+      if (a.crossedStage) {
+        const hook = a.awakeningHook ? `（${a.awakeningHook}）` : '';
+        next = addMemory(next, `《${a.name}》功法参悟进入${scriptureStageLabel(a.newStage)}${hook}`);
+      }
+    }
+  }
+
+  // ===== Phase-α 批 2 α-5: 法宝养灵 / 器灵觉醒 =====
+  // AI 提议的 nurtureOutput（心血祭炼/神识交流/器灵苏醒）累加到对应 item；
+  // 单次事件 delta 由 addNurtureProgress 内部限幅到 [0..10]，防溢出；
+  // 跨 stage 时引擎自动落回 awakeningStage + sentientName，无需 AI 在 narrative 重述。
+  // itemId 优先；若缺则按 itemName 在 inventory/equipped 中精确匹配
+  if (aiOutput.nurtureOutput && aiOutput.nurtureOutput.length) {
+    for (const n of aiOutput.nurtureOutput) {
+      let targetId = n.itemId;
+      if (!targetId && n.itemName) {
+        const name = String(n.itemName).trim();
+        const inInventory = next.inventory?.find((it: ItemEntry) => it.name === name);
+        const inEquipped = next.equipped?.find((it: ItemEntry) => it.name === name);
+        targetId = (inInventory || inEquipped)?.id;
+      }
+      if (!targetId) continue;
+      next = addNurtureProgress(next, targetId, n.delta, n.reason, n.awakenedName).state;
+    }
+  }
+
   // 8. 角色主动意图重新生成（每岁重算）
   next.characterIntents = generateCharacterIntents(next, next.pendingThreads);
+
+  // ===== Phase-α 批 2 α-7: 灵田事件（AI 自然产出翻土/抽薹/采收/落霜） =====
+  // aiOutput.gardenOutput 由 AI 在 narrative 自然产出时按 schema 给出
+  // 引擎累计并按节气推进；不动 narrative，不暴露机制词
+  if (aiOutput.gardenOutput && aiOutput.gardenOutput.length && next.alive && !next.ascended) {
+    const gardenOps = aiOutput.gardenOutput;
+    const currentAge = next.age;
+    const currentSolarTerm = getSolarTermForAge(currentAge);
+    for (const op of gardenOps) {
+      if (!op || typeof op !== 'object') continue;
+      const action = op.action;
+      if (action === 'plant' || action === 'tend') {
+        // 翻土/播种/照料：注册新 zone（若指定 seed）；或对现有 zone 做质量微调
+        const seed = (op.seed || '').trim();
+        if (seed && action === 'plant') {
+          next = addGardenZone(next, {
+            seed,
+            quality: Math.max(0, Math.min(100, Number(op.quality ?? 50))),
+            atmosphere: (op.note || '').trim().slice(0, 80) || `${currentSolarTerm}翻土`,
+          }, currentAge);
+        } else if (action === 'tend' && op.zoneId) {
+          // 照料现有 zone —— 仅微调 atmosphere，不修改 quality/atmosphere（避免重复叠加）
+          const existing = (next.spiritGarden?.zones || []).find(z => z.id === op.zoneId);
+          if (existing) {
+            const note = (op.note || '').trim().slice(0, 60);
+            if (note) {
+              const updatedZones = next.spiritGarden!.zones.map(z => z.id === op.zoneId
+                ? { ...z, atmosphere: `${z.atmosphere}｜${currentSolarTerm}：${note}` }
+                : z
+              );
+              next = { ...next, spiritGarden: { zones: updatedZones } };
+            }
+          }
+        }
+      } else if (action === 'harvest') {
+        // 采收：若指定 zoneId 则采指定；否则采首个到期 zone
+        if (op.zoneId) {
+          next = harvestZone(next, op.zoneId, currentAge);
+        } else {
+          const next2 = next.spiritGarden?.zones || [];
+          const dueZone = next2.find(z => z.expectedHarvestAt.age <= currentAge);
+          if (dueZone) next = harvestZone(next, dueZone.id, currentAge);
+        }
+      }
+    }
+  }
+
+  // ===== Phase-α 批 1 α-2: 因果业力调整 =====
+  // 从 aiOutput.changes.reason 与 sinReason 推断本轮的功德/杀业增量，由引擎权威落库
+  // 只在角色还活着时累加（陨落后不再叠 sin / merit）
+  if (next.alive) {
+    const karmaAdj = inferKarmaFromChanges(aiOutput);
+    if (karmaAdj.deltaMerit || karmaAdj.deltaSin) {
+      next = adjustKarma(next, karmaAdj);
+    }
+  }
 
   const appliedChanges = (aiOutput.changes || []).filter(ch => ATTRIBUTE_BOUNDS[ch.attribute]);
 
@@ -1805,6 +3141,9 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     rejectedChanges: rejected,
     breakthroughHappened,
     newRealm,
+    breakthroughMajor,
+    breakthroughSteps,
+    breakthroughReasonAccepted,
     died,
     deathReason,
   };
@@ -1817,21 +3156,25 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
 // 这样前端 setCharacter({...character, ...data.state}) 时这些字段会被正确更新
 export function stateToResponse(s: CharacterState) {
   const realmInfo = getRealmInfo(s.realm);
+  const realmProfile = getRealmProfile(s);
   const rootInfo = SPIRITUAL_ROOTS[s.spiritualRoot];
   const rate = computeEffectiveCultivationRate(s);
+  const realmPower = realmPowerMultiplier(s);
   return {
     age: s.age,
     lifespan: s.lifespan,
     realm: s.realm,
-    realmName: realmInfo.name,
-    realmColor: realmInfo.color,
+    realmName: realmProfile?.name || realmInfo.name,
+    realmColor: realmProfile?.color || realmInfo.color,
     realmLevel: s.realmLevel,
-    realmMaxLevel: realmInfo.levels,
+    realmMaxLevel: realmProfile?.maxLevel ?? realmInfo.levels,
+    realmProfile,
+    realmPowerMultiplier: realmPower,
     cultivationExp: s.cultivationExp,
     expToBreak: s.expToBreak,
-    hp: s.hp, maxHp: s.maxHp,
-    mp: s.mp, maxMp: s.maxMp,
-    attack: s.attack, defense: s.defense, speed: s.speed,
+    hp: scaleByRealmPower(s.hp, realmPower), maxHp: scaleByRealmPower(s.maxHp, realmPower),
+    mp: scaleByRealmPower(s.mp, realmPower), maxMp: scaleByRealmPower(s.maxMp, realmPower),
+    attack: scaleByRealmPower(s.attack, realmPower), defense: scaleByRealmPower(s.defense, realmPower), speed: scaleByRealmPower(s.speed, Math.sqrt(realmPower)),
     luck: s.luck, comprehension: s.comprehension,
     spiritStones: s.spiritStones, reputation: s.reputation,
     alive: s.alive, ascended: s.ascended,
@@ -1846,7 +3189,7 @@ export function stateToResponse(s: CharacterState) {
     cultivationMultiplier: rate.multiplier,
     cultivationFlatBonus: rate.flatBonus,
     cultivationInsight: s.cultivationInsight,
-    cultivationFactors: s.cultivationFactors,
+    cultivationFactors: computeCultivationFactors(s),
     storageCapacity: s.storageCapacity,
     activeStatuses: s.activeStatuses,
     inventory: s.inventory,
@@ -1861,6 +3204,15 @@ export function stateToResponse(s: CharacterState) {
     pets: s.pets || [],
     // Task 24 新字段
     exploredRealms: s.exploredRealms || [],
+    discoveredRealms: getDiscoveredStoryRealms(s),
+    // ===== Phase-α 批 1 α-1/α-2 透传 =====
+    // 前端可选读（如轮回结算、人物志），不在常规面板展示数值调节器
+    tribulationProfile: s.tribulationProfile || { tribulationHistory: [] },
+    karma: typeof s.karma === 'number' ? s.karma : 0,
+    merit: typeof s.merit === 'number' ? s.merit : 0,
+    sin: typeof s.sin === 'number' ? s.sin : 0,
+    // ===== Phase-α 批 2 α-7：灵田透传 =====
+    spiritGarden: s.spiritGarden || { zones: [] },
   };
 }
 
@@ -2313,6 +3665,152 @@ export function getAvailableTalismans(state: CharacterState): ItemEntry[] {
   return (state.inventory || []).filter(it => getTalismanType(it) !== null);
 }
 
+
+function slugifyRealmName(name: string): string {
+  const raw = String(name || 'story_realm').trim() || 'story_realm';
+  const ascii = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  if (ascii) return ascii.slice(0, 48);
+  let hash = 0;
+  for (const ch of raw) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `story_${hash.toString(36)}`;
+}
+
+function cleanStoryRealmName(name: string): string {
+  return String(name || '')
+    .replace(/^(?:或可|可|可以|尚可|似可|若要|若想|前往|进入|探入|探明|探得|发现|得见|显出|现出|浮出|露出|通往|指向|开启)+/, '')
+    .replace(/^(?:的|之|其|一处|此处)+/, '')
+    .replace(/[，。；、：:！!？?].*$/, '')
+    .trim();
+}
+
+function inferStoryRealmName(text: string): string | null {
+  const source = String(text || '');
+  const suffix = '(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|钟楼|雾楼|楼|谷|府|墟|宫|殿)';
+  const composite = source.match(new RegExp(`([\\u4e00-\\u9fa5]{2,8}(?:江|溪|河|湾|湖|山|岭|渡|岸|洲|峰|林|泽|城))[\\u4e00-\\u9fa5]{0,4}(?:显出|现出|浮出|露出|探明|探得|发现|得见|可见|藏着|藏有|通往|开启|指向)([\\u4e00-\\u9fa5]{2,8}${suffix})`));
+  if (composite?.[1] && composite?.[2]) {
+    const loc = cleanStoryRealmName(composite[1]);
+    const site = cleanStoryRealmName(composite[2]);
+    if (loc && site && !site.startsWith(loc)) return `${loc}${site}`.slice(0, 14);
+    if (site) return site;
+  }
+  const quoted = source.match(/[「『“\"]([^」』”\"]{2,14}(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|钟楼|雾楼|楼|谷|府|墟|宫|殿))[^」』”\"]*[」』”\"]/);
+  if (quoted?.[1]) return cleanStoryRealmName(quoted[1]);
+  const named = source.match(/([\u4e00-\u9fa5]{2,14}(?:秘境|浮阁|洞府|遗迹|禁地|水府|古阁|钟楼|雾楼|楼|谷|府|墟|宫|殿))/);
+  if (named?.[1]) return cleanStoryRealmName(named[1]);
+  return null;
+}
+
+function inferRealmRequirement(text: string): string | undefined {
+  const source = String(text || '');
+  const specific = source.match(/([\u4e00-\u9fa5]{1,10}(?:玉片|钥匙|钥纹|残图|令牌|符令|禁制手法|破禁法))/);
+  if (specific?.[1]) return specific[1];
+  if (/钥|钥匙|钥纹|禁制|破禁|残图|令牌|符令|玉片|信物/.test(source)) return '入境信物';
+  return undefined;
+}
+
+function buildStoryRealmFromText(name: string, text: string, state: CharacterState, thread?: PendingThread): SecretRealm {
+  const water = /江|水|潮|雨|雾|渡|溪|河|禁/.test(`${name}${text}`);
+  const ancient = /古|旧|昔年|残图|壁刻|禁制|遗/.test(`${name}${text}`);
+  const tier: SecretRealm['tier'] = ancient ? 'uncommon' : 'common';
+  const realmIdx = Math.max(0, REALMS.findIndex(r => r.id === state.realm));
+  const req = inferRealmRequirement(text);
+  return {
+    id: thread?.realmId || `story_${slugifyRealmName(name)}`,
+    name,
+    description: String(text || `因缘牵引而显露的${name}。`).slice(0, 180),
+    tier,
+    minRealm: Math.max(0, Math.min(realmIdx, realmIdx || 1)),
+    minAge: Math.max(0, state.age - 1),
+    spiritStoneCost: 0,
+    discoveredByThreadId: thread?.id,
+    entryRequirement: req,
+    entryAlternatives: req ? ['参悟信物中的禁制手法', '循原先残图与地势另觅侧径', '等待潮汐/地脉再次开合'] : ['循旧迹探入', '等待地脉气机再显'],
+    isStoryRealm: true,
+    dangerLevel: /内禁|杀机|禁地|强闯|不敢/.test(text) ? 6 : 3,
+    rewardMultiplier: ancient ? 1.4 : 1.1,
+    cooldownYears: 3,
+    themeTags: [water ? 'water' : 'mystery', ancient ? 'inheritance' : 'treasure', 'story'],
+    elementAffinity: water ? 'water' : undefined,
+    encounterHints: req
+      ? [`凭${req}试探门户`, '沿旧日痕迹复探外围', '另寻破禁之法', '避开内禁杀机']
+      : ['循线索探路', '辨认地脉气机', '避开未知禁制'],
+    color: water ? '#0ea5e9' : '#a855f7',
+    icon: water ? '🌊' : '🏛',
+  };
+}
+
+export function getDiscoveredStoryRealms(state: CharacterState): SecretRealm[] {
+  const realms = new Map<string, SecretRealm>();
+  const threads = (state.pendingThreads || []).filter(t => t.status !== 'failed' && t.status !== 'resolved');
+  for (const t of threads) {
+    const text = `${t.title} ${t.description} ${t.reward || ''} ${t.followUpHint || ''}`;
+    const looksRealm = t.category === 'exploration' || /秘境|浮阁|洞府|遗迹|禁地|水府|古阁|江心|残图|禁制|破禁/.test(text);
+    if (!looksRealm) continue;
+    const name = inferStoryRealmName(text) || (t.title && /秘境|浮阁|洞府|遗迹|禁地|水府|古阁|楼|谷|府|墟|宫|殿/.test(t.title) ? t.title : null);
+    if (!name) continue;
+    const realm = buildStoryRealmFromText(name, text, state, t);
+    realms.set(realm.id, realm);
+  }
+  const inventoryText = [...(state.inventory || []), ...(state.equipped || [])]
+    .map(it => `${it.name} ${it.description || ''} ${it.source || ''}`).join('\n');
+  const invName = inferStoryRealmName(inventoryText);
+  if (invName) {
+    const realm = buildStoryRealmFromText(invName, inventoryText, state);
+    realms.set(realm.id, realm);
+  }
+  const list = [...realms.values()];
+  return list
+    .filter((realm, idx, arr) => !arr.some((other, j) => j !== idx && other.name.includes(realm.name) && other.name.length > realm.name.length))
+    .slice(0, 5);
+}
+
+export function getSameYearThreads(state: CharacterState): PendingThread[] {
+  const age = state.age;
+  return (state.pendingThreads || []).filter(t =>
+    (t.status === 'pending' || t.status === 'urgent') &&
+    (t.dueInSameYear || t.deadlineAge <= age) &&
+    t.progress < 100
+  ).slice(0, 2);
+}
+
+export function buildThreadContinuationEvent(state: CharacterState, thread: PendingThread): any {
+  const realmName = inferStoryRealmName(`${thread.title} ${thread.description} ${thread.followUpHint || ''}`);
+  const isRealm = thread.category === 'exploration' || !!realmName || /秘境|浮阁|洞府|遗迹|禁地|禁制|破禁/.test(`${thread.title}${thread.description}`);
+  const isCompetition = thread.category === 'competition' || /比试|考核|入门|仙门|擂台/.test(`${thread.title}${thread.description}`);
+  const title = isRealm ? `余波再起·${realmName || thread.title}` : isCompetition ? `约期已至·${thread.title}` : `因果续起·${thread.title}`;
+  const narrative = isRealm
+    ? `${thread.description}此事并未随上一段经历散去。${state.name}收拢所得线索，反复揣摩${thread.followUpHint || '其中关窍'}；若要真正深入，还需凭信物、地势或另一条破禁之法再寻入口。`
+    : isCompetition
+      ? `${thread.description}约期已近，${state.name}没有把此事抛在脑后。她整备衣装与随身法器，按约前去应试；这一场比试不只是胜负，更关系到能否接上前文所开的仙途。`
+      : `${thread.description}前事余波在这一日重新牵动。${state.name}循着旧约与旧迹继续追索，使这段因果没有半途断线。`;
+  return {
+    title,
+    narrative,
+    eventType: isCompetition ? 'normal' : isRealm ? 'exploration' : 'normal',
+    changes: isCompetition ? [{ attribute: 'reputation', delta: 1, reason: '守约赴试' }] : [],
+    newStatuses: isRealm ? [{
+      id: `status_thread_${thread.id}_${Date.now().toString(36)}`,
+      name: realmName ? `${realmName}线索` : '秘境线索',
+      description: thread.followUpHint || '这段线索仍可引向后续探索。',
+      category: 'quest',
+      rarity: 'uncommon',
+      duration: -1,
+      source: thread.title,
+      effects: [],
+    }] : [],
+    newItems: [], removedItemIds: [], newEquippedItems: [], equipItemIds: [], unequipItemIds: [],
+    memory: `${state.age}岁续写线索：${thread.title}`,
+    cultivationInsight: '',
+    hasChoice: false, choice: null, triggeredBreakthrough: false, causedDeath: false, causedAscension: false,
+    newThreads: [],
+    advanceThreads: [{ id: thread.id, progressDelta: isRealm ? 35 : 50, note: '同年后续已展开' }],
+    completeThreadIds: isCompetition ? [thread.id] : [],
+    failThreadIds: [],
+    triggerCombat: null,
+    newPets: [],
+  };
+}
+
 // ==================== Task 24: 秘境探索系统 ====================
 
 // 获取当前角色可探索的秘境列表（含冷却状态）
@@ -2324,7 +3822,9 @@ export function getAvailableRealms(state: CharacterState): Array<SecretRealm & {
 }> {
   const realmIdx = REALMS.findIndex(r => r.id === state.realm);
   const records = state.exploredRealms || [];
-  return SECRET_REALMS
+  const storyRealms = getDiscoveredStoryRealms(state);
+  const pool = storyRealms.length ? storyRealms : SECRET_REALMS;
+  return pool
     .filter(r => realmIdx >= r.minRealm && state.age >= r.minAge)
     .map(r => {
       const rec = records.find(rec => rec.realmId === r.id);
@@ -2343,7 +3843,7 @@ export function getAvailableRealms(state: CharacterState): Array<SecretRealm & {
 
 // 探索秘境前置校验：返回 { ok, error? }
 export function canExploreRealm(state: CharacterState, realmId: string): { ok: boolean; error?: string; realm?: SecretRealm } {
-  const realm = SECRET_REALMS.find(r => r.id === realmId);
+  const realm = [...getDiscoveredStoryRealms(state), ...SECRET_REALMS].find(r => r.id === realmId);
   if (!realm) return { ok: false, error: '秘境不存在' };
   if (!state.alive) return { ok: false, error: '角色已陨落' };
   if (state.combatSession && state.combatSession.status === 'ongoing') {
@@ -2353,8 +3853,15 @@ export function canExploreRealm(state: CharacterState, realmId: string): { ok: b
   const realmIdx = REALMS.findIndex(r => r.id === state.realm);
   if (realmIdx < realm.minRealm) return { ok: false, error: `境界不足，需${REALMS[realm.minRealm].name}以上` };
   if (state.age < realm.minAge) return { ok: false, error: `年龄不足，需${realm.minAge}岁以上` };
-  if (state.spiritStones < realm.spiritStoneCost) {
-    return { ok: false, error: `灵石不足，需${realm.spiritStoneCost}灵石（路费+护身符）` };
+  const cost = realm.isStoryRealm ? 0 : realm.spiritStoneCost;
+  if (realm.entryRequirement) {
+    const hasRequirement = hasRealmEntryRequirement(state, realm.entryRequirement);
+    if (!hasRequirement) {
+      return { ok: false, error: `尚未掌握入境关窍：需${realm.entryRequirement}，或另寻${(realm.entryAlternatives || ['破禁之法']).join('、')}` };
+    }
+  }
+  if (state.spiritStones < cost) {
+    return { ok: false, error: `灵石不足，需${cost}灵石` };
   }
   // 冷却检查
   const rec = (state.exploredRealms || []).find(rec => rec.realmId === realmId);
@@ -2371,7 +3878,7 @@ export function canExploreRealm(state: CharacterState, realmId: string): { ok: b
 export function startExploration(state: CharacterState, realm: SecretRealm): CharacterState {
   const newState: CharacterState = {
     ...state,
-    spiritStones: Math.max(0, state.spiritStones - realm.spiritStoneCost),
+    spiritStones: Math.max(0, state.spiritStones - (realm.isStoryRealm ? 0 : realm.spiritStoneCost)),
   };
   // 标记当前探索的秘境（让 buildStateContext 透传给 AI）
   (newState as any)._currentExploration = realm;
@@ -2414,5 +3921,158 @@ export function recordExploration(
   };
   delete (newState as any)._currentExploration;
   return newState;
+}
+
+// ==================== Phase-α 批 2 α-7：灵田 / 灵植 / 物候 ====================
+
+// 节气辅助：根据 age 推算当前节气名（age % 24 映射到 1..24）
+// age 为负或非数时返回 '立春'（不会发生，兜底）
+export function getSolarTermForAge(age: number): string {
+  const a = Math.max(0, Math.floor(Number(age) || 0));
+  return TWENTY_FOUR_SOLAR_TERMS[a % 24];
+}
+
+// 节气辅助：根据 age 推算当前节气序号 1..24
+export function getSolarTermIndexForAge(age: number): number {
+  const a = Math.max(0, Math.floor(Number(age) || 0));
+  return (a % 24) + 1;
+}
+
+// 节气辅助：构造 GameTime（带节气锚定）
+export function makeGameTime(age: number, eraName?: string, calendarYear?: number): GameTime {
+  return {
+    age: Math.max(0, Math.floor(Number(age) || 0)),
+    solarTerm: getSolarTermForAge(age),
+    eraName: eraName || undefined,
+    calendarYear: typeof calendarYear === 'number' ? calendarYear : undefined,
+  };
+}
+
+// 节气辅助：两个 age 之间的节气跨度（环 24 模；返回 >= 0 整数）
+// 用于 UI 显示"距收获节气数"
+export function solarTermsBetween(fromAge: number, toAge: number): number {
+  const fromIdx = getSolarTermIndexForAge(fromAge);
+  const toIdx = getSolarTermIndexForAge(toAge);
+  const rawDelta = toAge - fromAge;
+  // 总节气跨度 = 年数差 * 24 + 节气差
+  const total = rawDelta * 24 + (toIdx - fromIdx);
+  return Math.max(0, total);
+}
+
+// 灵田辅助：clamp [0..100]
+function clamp01to100(n: number): number {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 50;
+  return Math.max(0, Math.min(100, Math.round(v)));
+}
+
+// 灵田核心：注册一块新 zone
+// seed: 中文种子名（AI 在 narrative 自然给出）
+// quality: 灵土品质 0..100（AI 在 narrative 自然给出；默认 50）
+// atmosphere: 灵田气机描述（AI 在 narrative 自然给出；默认 "${节气}翻土"）
+// currentAge: 当前角色年龄，用于锚定 seededAt 与推算 expectedHarvestAt
+// 默认成熟周期：4 节气（≈ 4 年）—— 修真叙事中"灵药从播种到可采收"短周期
+const SPIRIT_GARDEN_DEFAULT_HARVEST_AGE_GAP = 4;
+
+export function addGardenZone(
+  state: CharacterState,
+  args: { seed: string; quality?: number; atmosphere?: string },
+  currentAge: number
+): CharacterState {
+  const seed = (args.seed || '').trim();
+  if (!seed) return state;
+  const age = Math.max(0, Math.floor(Number(currentAge) || state.age || 0));
+  const id = `zone_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  const seededAt = makeGameTime(age, undefined, undefined);
+  const expectedHarvestAt = makeGameTime(age + SPIRIT_GARDEN_DEFAULT_HARVEST_AGE_GAP, undefined, undefined);
+  const zone: SpiritGardenZone = {
+    id,
+    seed,
+    seededAt,
+    expectedHarvestAt,
+    quality: clamp01to100(args.quality ?? 50),
+    atmosphere: (args.atmosphere || `${seededAt.solarTerm || getSolarTermForAge(age)}翻土`).slice(0, 120),
+  };
+  const existing = state.spiritGarden?.zones || [];
+  // 同名 seed 已存在且未到期 → 不重复注册（修真生态里"翻土"不会叠 buff）
+  const dup = existing.find(z => z.seed === seed && z.expectedHarvestAt.age > age);
+  if (dup) return state;
+  return { ...state, spiritGarden: { zones: [...existing, zone] } };
+}
+
+// 灵田核心：主动采收某 zone（AI narrative 给出"采收"事件时调用；或引擎到期自动调）
+// 产出物按 quality + 节气匹配度 → rarity 与数量
+// quality >= 80 → legendary；>= 60 → epic；>= 40 → rare；>= 20 → uncommon；其余 common
+// 节气与种子"季节属性"匹配 → 同季 +1 级；冬季播种 + 落霜风险可能 -1 级
+function pickZoneOutput(zone: SpiritGardenZone): ItemEntry {
+  // 基础 rarity 来自 quality
+  let rarity: ItemEntry['rarity'] = 'common';
+  if (zone.quality >= 80) rarity = 'legendary';
+  else if (zone.quality >= 60) rarity = 'epic';
+  else if (zone.quality >= 40) rarity = 'rare';
+  else if (zone.quality >= 20) rarity = 'uncommon';
+
+  // 节气匹配：solarTerm 与 seed 季节属性
+  const harvestTerm = getSolarTermForAge(zone.expectedHarvestAt.age);
+  const harvestSeason = SOLAR_TERM_SEASON[harvestTerm];
+  // 种子季节（粗略推断：含"夏/阳/烈/火"→夏；含"冬/寒/冰"→冬；含"秋/金/霜"→秋；含"春/生/木"→春；默认春）
+  let seedSeason: 'spring' | 'summer' | 'autumn' | 'winter' = 'spring';
+  if (/夏|阳|烈|火/.test(zone.seed)) seedSeason = 'summer';
+  else if (/冬|寒|冰|雪|霜/.test(zone.seed)) seedSeason = 'winter';
+  else if (/秋|金|萧/.test(zone.seed)) seedSeason = 'autumn';
+  else if (/春|生|木|灵/.test(zone.seed)) seedSeason = 'spring';
+
+  if (harvestSeason !== seedSeason) {
+    // 不匹配：降一级
+    const ladder: ItemEntry['rarity'][] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+    const i = ladder.indexOf(rarity);
+    rarity = ladder[Math.max(0, i - 1)];
+  }
+
+  // 数量：quality 越高越多（1~3 个）
+  const quantity = zone.quality >= 70 ? 3 : zone.quality >= 40 ? 2 : 1;
+
+  // 描述：自然叙出节气与灵田气机
+  const desc = `采自灵田（${zone.atmosphere}），时值${harvestTerm}，品质 ${zone.quality}。`;
+  return {
+    id: `harvest_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+    name: `${zone.seed}×${quantity}`,
+    description: desc,
+    item_type: 'material',
+    rarity,
+    effects: [],
+    source: `${harvestTerm}灵田采收`,
+  };
+}
+
+// 灵田核心：采收某 zone → 产出物入 addItems；zone 移除
+export function harvestZone(state: CharacterState, zoneId: string, currentAge?: number): CharacterState {
+  const zones = state.spiritGarden?.zones || [];
+  const zone = zones.find(z => z.id === zoneId);
+  if (!zone) return state;
+  const harvested = pickZoneOutput(zone);
+  const next = addItems(state, [harvested]);
+  // 同时从灵田移除该 zone
+  const remaining = zones.filter(z => z.id !== zoneId);
+  return { ...next, spiritGarden: { zones: remaining } };
+}
+
+// 灵田核心：每岁推进
+// - 检查所有 zone.expectedHarvestAt.age <= newAge → 自动 harvestZone
+// - 不修改 quality/atmosphere（避免每岁悄悄涨分；只有 AI narrative 显式提议才改）
+// - 此函数由 advance 流程在主事件 executeAIEvent 之后调用（保证 AI 显式 harvest 优先；此处兜底到期）
+export function advanceGarden(state: CharacterState, newAge: number): CharacterState {
+  if (!state.spiritGarden || state.spiritGarden.zones.length === 0) return state;
+  if (!state.alive || state.ascended) return state;
+  let next: CharacterState = state;
+  // 反复调用 harvestZone 直到无到期 zone
+  let safety = 16;
+  while (safety-- > 0) {
+    const zones = next.spiritGarden?.zones || [];
+    const due = zones.find(z => z.expectedHarvestAt.age <= newAge);
+    if (!due) break;
+    next = harvestZone(next, due.id, newAge);
+  }
+  return next;
 }
 
