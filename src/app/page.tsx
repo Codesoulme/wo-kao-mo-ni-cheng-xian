@@ -10,7 +10,6 @@ import { EventTimeline } from '@/components/xianxia/EventTimeline';
 import { StatusList } from '@/components/xianxia/StatusList';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
 import { SaveSlotPanel } from '@/components/xianxia/SaveSlotPanel';
-import { EndingPanel } from '@/components/xianxia/EndingPanel';
 import { InheritancePoolPanel } from '@/components/xianxia/InheritancePoolPanel';
 import { DeathGuidancePanel } from '@/components/xianxia/DeathGuidancePanel';
 import { useAutoSave } from '@/lib/xianxia/useAutoSave';
@@ -30,16 +29,12 @@ import { TribulationModal } from '@/components/xianxia/TribulationModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, ScrollText, Compass, GitBranch, Users, Sword, Globe } from 'lucide-react';
 import { ResetWorldButton } from '@/components/xianxia/ResetWorldButton';
-import { YinyuanTimelinePanel } from '@/components/xianxia/YinyuanTimelinePanel';
-import { TechniqueCreatorPanel } from '@/components/xianxia/TechniqueCreatorPanel';
 import { NpcGrowthPanel } from '@/components/xianxia/NpcGrowthPanel';
 import { CrossCycleInheritancePanel } from '@/components/xianxia/CrossCycleInheritancePanel';
 import { SectStorylinePanel } from '@/components/xianxia/SectStorylinePanel';
 import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
 import { HeartIntentPanel } from '@/components/xianxia/HeartIntentPanel';
-import { PetPanel } from '@/components/xianxia/PetPanel';
 import { AlchemyFurnace } from '@/components/xianxia/AlchemyFurnace';
-import { FormationPanel } from '@/components/xianxia/FormationPanel';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
 import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
 import { FateNodes } from '@/components/xianxia/FateNodes';
@@ -420,19 +415,8 @@ export default function Home() {
                         defaultCollapsed={true}
                       />
                     </div>
-                    <div data-testid="ending-section">
-                      <EndingPanel
-                        character={character}
-                        worldState={useGameStore.getState().worldCalendar}
-                        defaultCollapsed={true}
-                      />
-                    </div>
-                    <div data-testid="yinyuan-timeline-section">
-                      <YinyuanTimelinePanel
-                        character={character}
-                        defaultCollapsed={true}
-                      />
-                    </div>
+                    {/* EndingPanel 结局谱：剧透性过强，玩家没玩完就知道所有结局，破坏沉浸 → 不展示 */}
+                    {/* YinyuanTimelinePanel 命途时间线：暴露伏笔/预兆，让玩家主动制造触发条件，破坏 AI 涌现叙事 → 不展示 */}
                   </div>
                 </TabsContent>
 
@@ -481,19 +465,11 @@ export default function Home() {
                   </div>
                 </TabsContent>
 
-                {/* 修行：自创功法 + 灵宠 + 阵法 + 秘境 + 宝物（原 inventory） */}
+                {/* 修行：修炼速度 + 秘境 + 宝物（灵宠/阵法在宝页底部） */}
                 <TabsContent value="xiuxing" className="h-full m-0 data-[state=inactive]:hidden">
                   <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
-                    <div data-testid="technique-creator-section">
-                      <TechniqueCreatorPanel
-                        defaultCollapsed={true}
-                      />
-                    </div>
-                    <div data-testid="pet-section">
-                      <PetPanel />
-                    </div>
-                    <div data-testid="formation-section">
-                      <FormationPanel />
+                    <div data-testid="cultivation-speed-section">
+                      <CultivationSpeedCard />
                     </div>
                     <div data-testid="secret-realm-section">
                       <SecretRealmPanel />

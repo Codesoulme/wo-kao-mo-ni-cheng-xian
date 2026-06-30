@@ -440,25 +440,35 @@ export function ActionButtons() {
       if (data.breakthrough) setLastBreakthrough(data.breakthrough);
 
       const returnedEvents = Array.isArray(data.events) && data.events.length ? data.events : [];
-      // 批量推进：每段都触发气泡级流式显示
+      // 批量推进：逐条流式浮现（每条间隔 STREAM_INTERVAL_MS），让 scroll-reveal + narrative 渐入逐次触发
+      // 修复：原本一次性 addEvent 全部 → 看起来"全部生成完才一起显示"
       const batchStart = events.length;
-      setNewEventRange({ start: batchStart, end: batchStart + returnedEvents.length });
-      setTimeout(() => setNewEventRange(null), 10000);
-      returnedEvents.forEach((evt: any, idx: number) => addEvent({
-        id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
-        age: evt.age,
-        title: evt.title,
-        narrative: evt.narrative,
-        eventType: evt.eventType,
-        effects: evt.effects || (idx === returnedEvents.length - 1 ? (data.changes || []) : []),
-        isFateNode: evt.isFateNode,
-        fateNodeName: evt.fateNodeName,
-        blueprint: evt.blueprint,
-        timeAdvance: evt.timeAdvance,
-        worldTime: evt.worldTime,
-        actionProjections: evt.actionProjections || [],
-        createdAt: evt.createdAt || new Date().toISOString(),
-      }));
+      const STREAM_INTERVAL_MS = 450;
+      returnedEvents.forEach((evt: any, idx: number) => {
+        setTimeout(() => {
+          // 用户中途点击"停"时，不再继续排后续事件（节省算力 + 避免误更新 store）
+          if (autoCancelRef.current) return;
+          addEvent({
+            id: evt.id || `event-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+            age: evt.age,
+            title: evt.title,
+            narrative: evt.narrative,
+            eventType: evt.eventType,
+            effects: evt.effects || (idx === returnedEvents.length - 1 ? (data.changes || []) : []),
+            isFateNode: evt.isFateNode,
+            fateNodeName: evt.fateNodeName,
+            blueprint: evt.blueprint,
+            timeAdvance: evt.timeAdvance,
+            worldTime: evt.worldTime,
+            actionProjections: evt.actionProjections || [],
+            createdAt: evt.createdAt || new Date().toISOString(),
+          });
+          // 让最新一条卡片标记 isNewEvent，触发 scroll-reveal + narrative 渐入动画
+          setNewEventRange({ start: batchStart, end: batchStart + idx + 1 });
+        }, idx * STREAM_INTERVAL_MS);
+      });
+      // 所有流式渲染完毕后清除高亮
+      setTimeout(() => setNewEventRange(null), returnedEvents.length * STREAM_INTERVAL_MS + 8000);
 
       const finalEvent = data.event || returnedEvents[returnedEvents.length - 1];
       if (data.hasChoice && data.choice && finalEvent) {
