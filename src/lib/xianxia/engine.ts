@@ -172,6 +172,10 @@ import { applyAgeBasedBodyGrowth } from './body-growth';
 import { validateAIBoundary, BoundaryValidationTrace } from './ai-boundary-validator';
 import { buildStateChangeLog, StateChangeLogEntry } from './state-change-log';
 import { buildEventSchedulerPlan } from './event-scheduler';
+// Phase-α 批 1 α-1: 修真沉浸 PoC——雷劫判定引擎 + Event Sourcing
+import { attemptTribulation } from './tribulation/engine';
+import { realmToMajor } from './tribulation/types';
+import { appendEvent } from './events/store';
 import {
   registerItem,
   registerMany,
@@ -5021,6 +5025,59 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
       if (br.reasonAccepted && aiOutput.realmProfilePatch) {
         next = applyRealmProfilePatch(next, aiOutput.realmProfilePatch);
       }
+    }
+  }
+
+  // ===== Phase-α 批 1 α-1: 修真沉浸 PoC —— 大境界突破触发雷劫判定 =====
+  // 约束：仅当大境界突破（breakthroughMajor === true）时尝试渡劫；
+  //       fire-and-forget 调 appendEvent（不阻断同步主流程；appendEvent 失败仅 console.error）。
+  //       attemptTribulation 是同步纯函数；appendEvent 是 async，用 .catch 吞 promise。
+  if (breakthroughHappened && breakthroughMajor && newRealm && next.id) {
+    try {
+      const targetMajor = realmToMajor(newRealm);
+      if (targetMajor) {
+        const tribulationInput = {
+          character: {
+            id: next.id,
+            name: next.name,
+            age: next.age,
+            realm: realmToMajor(next.realm) || 'mortal',
+          },
+          targetRealm: targetMajor,
+          hpRatio: next.maxHp > 0 ? Math.max(0, Math.min(1, next.hp / next.maxHp)) : 0.5,
+          soulStrength: (next as any).soulStrength ?? 50,
+          heartDemon: (next as any).heartDemon ?? 30,
+          hasBondedArtifact: Array.isArray((next as any).equipment) && (next as any).equipment.length > 0,
+          hasTribulationPill: false,
+        };
+        const tribulationResult = attemptTribulation(tribulationInput);
+        const fromRealm = next.realm;
+        const toRealm = newRealm;
+        // fire-and-forget：appendEvent 失败不阻断主流程
+        appendEvent({
+          characterId: next.id,
+          type: 'character.tribulation.attempted',
+          data: {
+            type: 'character.tribulation.attempted',
+            fromRealm,
+            toRealm,
+            outcome: tribulationResult.outcome,
+            kind: tribulationResult.kind,
+            difficulty: tribulationResult.difficulty,
+            hpDelta: tribulationResult.hpDelta,
+            cause: tribulationResult.cause,
+          },
+          source: 'system-tick',
+          triggerActor: 'system',
+          createdAtAge: next.age,
+        }).catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(`[tribulation PoC] appendEvent failed (non-fatal): ${msg}`);
+        });
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[tribulation PoC] breakthrough tribulation attempt failed (non-fatal): ${msg}`);
     }
   }
 
