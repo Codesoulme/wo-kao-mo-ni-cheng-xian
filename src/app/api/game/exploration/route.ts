@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import {
   dbToState,
   buildStateContext,
@@ -22,9 +23,63 @@ import {
   recordExploration,
 } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
+import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
+import type { SecretRealm } from '@/lib/xianxia/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
+
+function buildFallbackExplorationEvent(state: any, realm: SecretRealm, ctx: any, error?: any) {
+  const hints = realm.encounterHints || [];
+  const hint = hints[(state.age + realm.id.length) % Math.max(1, hints.length)] || '秘境气机变化';
+  const danger = realm.dangerLevel >= 7;
+  // 修真 8 维影响秘境收益：悟性 + 运气 都加成
+  const comprehensionBonus = (state.comprehension || 0) * 0.12;
+  const luckBonus = (state.luck || 0) * 0.08; // 运气越高，灵机越多
+  const gain = Math.max(6, Math.round(10 * realm.rewardMultiplier + comprehensionBonus + luckBonus));
+  const mpCost = Math.min(state.mp || 0, danger ? 10 : 5);
+  const luckGain = realm.themeTags?.some((t: string) => ['treasure', 'inheritance', 'spiritual_energy'].includes(t)) ? 1 : 0;
+  const title = danger ? `秘境险归·${realm.name}` : `秘境探幽·${realm.name}`;
+  const warning = error?.message ? '天机紊乱，秘境中诸象难以尽录；' : '';
+  return {
+    title,
+    narrative: `${state.name}备好符箓与干粮，循着地脉裂隙入了「${realm.name}」。${realm.description}\n\n${warning}行至深处，${hint}忽然应在眼前。${state.name}不敢贪功，借地势遮掩气息，或采灵机，或避杀阵，终在天色将明时折返。此行虽未惊动大势，却也让经脉多了一分磨砺，对此地的虚实记下几处关窍。`,
+    eventType: danger ? 'danger' : 'exploration',
+    changes: [
+      { attribute: 'cultivationExp', delta: gain, reason: `${realm.name}探幽所得` },
+      ...(mpCost ? [{ attribute: 'mp', delta: -mpCost, reason: '入境探路消耗灵力' }] : []),
+      ...(luckGain ? [{ attribute: 'luck', delta: luckGain, reason: '窥得秘境灵机' }] : []),
+    ],
+    newStatuses: danger ? [{
+      id: `realm-wary-${realm.id}-${Date.now()}`,
+      name: '秘境余悸',
+      type: 'debuff',
+      description: `刚从${realm.name}险地归来，心神尚未完全平复。`,
+      duration: 1,
+      effects: [{ attribute: 'heartDemon', operation: 'add', value: 1 }],
+      source: realm.name,
+    }] : [],
+    newItems: [],
+    removedItemIds: [],
+    newEquippedItems: [],
+    equipItemIds: [],
+    unequipItemIds: [],
+    memory: `${state.age}岁探索${realm.name}，记下${hint}`,
+    cultivationInsight: ctx.cultivationInsight || `${realm.name}地脉复杂，行走其间亦是一场修行。`,
+    hasChoice: false,
+    choice: null,
+    triggeredBreakthrough: false,
+    causedDeath: false,
+    causedAscension: false,
+    newThreads: [],
+    advanceThreads: [],
+    completeThreadIds: [],
+    failThreadIds: [],
+    triggerCombat: null,
+    newPets: [],
+  };
+}
+
 
 export async function POST(req: NextRequest) {
   try {
@@ -44,6 +99,7 @@ export async function POST(req: NextRequest) {
     }
 
     const char = await db.character.findUnique({ where: { id: characterId } });
+    await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: '角色不存在' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
     if (char.ascended) return NextResponse.json({ success: false, error: '角色已飞升' }, { status: 400 });
@@ -90,9 +146,9 @@ export async function POST(req: NextRequest) {
     ctx.blueprint = {
       category: 'exploration',
       name: `秘境探索·${realm.name}`,
-      description: `玩家主动探索秘境「${realm.name}」，按秘境主题标签生成事件`,
+      description: `玩家主动探索剧情秘境「${realm.name}」。必须承接该秘境的 description、entryRequirement、entryAlternatives 与前文线索，不得改成其他秘境或收费副本。`,
       weight: 0, minRealm: 0, maxRealm: 99, minAge: 0, maxAge: 99999,
-      examples: realm.encounterHints,
+      examples: [realm.description, ...(realm.entryRequirement ? [`入境关窍：${realm.entryRequirement}`] : []), ...(realm.entryAlternatives || []), ...realm.encounterHints],
     };
 
     // 调用 LLM 生成探索事件（不推进年龄）
@@ -101,34 +157,11 @@ export async function POST(req: NextRequest) {
       aiOutput = await generateAgeEvent(ctx, false);
     } catch (llmErr: any) {
       console.error('LLM exploration failed, using fallback:', llmErr?.message || llmErr);
-      aiOutput = {
-        title: `秘境探索·${realm.name}`,
-        narrative: `${state.name}前往${realm.name}探索。${realm.description}一番波折后，${state.name}带着些许收获归来。`,
-        eventType: 'normal',
-        changes: [],
-        newStatuses: [],
-        newItems: [],
-        removedItemIds: [],
-        newEquippedItems: [],
-        equipItemIds: [],
-        unequipItemIds: [],
-        memory: `${state.age}岁探索${realm.name}`,
-        cultivationInsight: ctx.cultivationInsight || '',
-        hasChoice: false,
-        choice: null,
-        triggeredBreakthrough: false,
-        causedDeath: false,
-        causedAscension: false,
-        newThreads: [],
-        advanceThreads: [],
-        completeThreadIds: [],
-        failThreadIds: [],
-        triggerCombat: null,
-        newPets: [],
-      };
+      aiOutput = buildFallbackExplorationEvent(state, realm, ctx, llmErr);
     }
 
     // 引擎执行 AI 输出
+    const stateBeforeExploration = { ...state };
     const result = executeAIEvent(state, aiOutput);
     let finalState = result.state;
 
@@ -187,6 +220,17 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    const displayEffects = buildEventDisplayEffects({
+      before: stateBeforeExploration,
+      after: finalState,
+      changes: result.appliedChanges,
+      newStatuses: aiOutput.newStatuses,
+      newItems: aiOutput.newItems,
+      newEquippedItems: aiOutput.newEquippedItems,
+      newPets: aiOutput.newPets,
+      removedItemIds: aiOutput.removedItemIds,
+    });
+
     // 写入事件日志（eventType='exploration' 便于史册识别）
     const event = await db.eventLog.create({
       data: {
@@ -195,7 +239,7 @@ export async function POST(req: NextRequest) {
         title: aiOutput.title,
         narrative: aiOutput.narrative,
         eventType: 'exploration',
-        effects: JSON.stringify(aiOutput.changes),
+        effects: JSON.stringify(displayEffects),
       },
     });
 
@@ -211,6 +255,7 @@ export async function POST(req: NextRequest) {
         realmName: realm.name,
         realmTier: realm.tier,
         realmIcon: realm.icon,
+        effects: displayEffects,
       },
       changes: result.appliedChanges,
       rejectedChanges: result.rejectedChanges,

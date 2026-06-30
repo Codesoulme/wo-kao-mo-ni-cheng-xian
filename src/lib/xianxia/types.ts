@@ -589,6 +589,15 @@ export interface CombatSession {
   playerHp: number; playerMaxHp: number;
   playerMp: number; playerMaxMp: number;
   playerAttack: number; playerDefense: number; playerSpeed: number;
+  // 修真三宝·身神 8 维快照（开打时定下，战斗内不变）—— 让 8 维真正进战斗公式
+  playerForce?: number;        // 破势 = attack + spiritualSense*0.12 + comprehension*0.08
+  playerGuard?: number;        // 护持 = defense + physicalFoundation*0.16 + soulStrength*0.06
+  playerAgility?: number;      // 机变 = speed + spiritualSense*0.10 + luck*0.04
+  playerSpiritualSense?: number;
+  playerSoulStrength?: number;
+  playerPhysicalFoundation?: number;
+  playerLuck?: number;
+  playerComprehension?: number;
   // 玩家可用的法术/法宝（从 equipped 提取）
   playerSkills?: { name: string; description: string; mpCost: number; power: number }[];
   // 玩家可用的丹药（从 inventory 的 consumable 提取）

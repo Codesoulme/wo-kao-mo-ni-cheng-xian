@@ -6,7 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { dbToState, stateToResponse, addItems, removeItemsByIds } from '@/lib/xianxia/engine';
+import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
+import { dbToState, stateToResponse, addItems, removeItemsByIds, normalizeCultivationState } from '@/lib/xianxia/engine';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -102,6 +103,7 @@ export async function POST(req: NextRequest) {
     }
 
     const char = await db.character.findUnique({ where: { id: characterId } });
+    await clearAdvancePreload(characterId);
     if (!char) return NextResponse.json({ success: false, error: 'Character not found' }, { status: 404 });
     if (!char.alive) return NextResponse.json({ success: false, error: '角色已陨落' }, { status: 400 });
     // 坊市交易期间不允许有未抉择的命节点（避免状态错乱）
@@ -122,16 +124,36 @@ export async function POST(req: NextRequest) {
 
     if (action === 'list') {
       // 返回当前坊市物品（每次访问重新生成）
-      const items = generateMarketItems(state.realm);
+      // 运气影响：luck ≥ 60 → 8% 触发「珍品优惠」再 -10% 价；luck ≥ 80 → 15% 概率再 -15%
+      // 失运（luck ≤ 20）→ 5% 触发「涨价」+10%
+      const luck = state.luck ?? 50;
+      let luckPriceMultiplier = 1;
+      let luckEventNote = '';
+      if (luck >= 80 && Math.random() < 0.15) {
+        luckPriceMultiplier = 0.85;
+        luckEventNote = '气运相合，坊市主人客气相让，享 85 折。';
+      } else if (luck >= 60 && Math.random() < 0.08) {
+        luckPriceMultiplier = 0.9;
+        luckEventNote = '小有眼缘，摊主抹了个零头，享 9 折。';
+      } else if (luck <= 20 && Math.random() < 0.05) {
+        luckPriceMultiplier = 1.1;
+        luckEventNote = '今日气运不济，摊主眉头一挑，价格涨了些。';
+      }
+      const items = generateMarketItems(state.realm).map(it => ({
+        ...it,
+        price: Math.round(it.price * luckPriceMultiplier),
+      }));
       // 同时返回玩家背包中可出售物品（估价 = estimateValue * 0.6）
+      // 运气高的玩家卖货也加点价（+luck*0.5%）
       const sellable = state.inventory.map(it => ({
         ...it,
-        sellPrice: Math.max(1, Math.floor(estimateValue(it) * 0.6)),
+        sellPrice: Math.max(1, Math.floor(estimateValue(it) * (0.6 + luck * 0.005))),
       }));
       return NextResponse.json({
         success: true,
         marketItems: items,
         sellableItems: sellable,
+        luckEventNote: luckEventNote || undefined,
         playerSpiritStones: state.spiritStones,
         storageCapacity: state.storageCapacity,
         inventoryCount: state.inventory.length,
@@ -170,6 +192,7 @@ export async function POST(req: NextRequest) {
         source: '坊市所购',
       };
       state = addItems(state, [newItem]);
+      state = normalizeCultivationState(state);
       // 持久化
       await db.character.update({
         where: { id: characterId },
@@ -178,6 +201,8 @@ export async function POST(req: NextRequest) {
           inventoryJson: JSON.stringify(state.inventory),
           storageCapacity: state.storageCapacity,
           equippedJson: JSON.stringify(state.equipped || []),
+          cultivationMultiplier: state.cultivationMultiplier ?? 0,
+          cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
         },
       });
       // 写入事件日志（便于史册追溯）
@@ -213,6 +238,7 @@ export async function POST(req: NextRequest) {
       state = removed.state;
       // 加灵石
       state.spiritStones += sellPrice;
+      state = normalizeCultivationState(state);
       await db.character.update({
         where: { id: characterId },
         data: {
@@ -220,6 +246,8 @@ export async function POST(req: NextRequest) {
           inventoryJson: JSON.stringify(state.inventory),
           storageCapacity: state.storageCapacity,
           equippedJson: JSON.stringify(state.equipped || []),
+          cultivationMultiplier: state.cultivationMultiplier ?? 0,
+          cultivationFactorsJson: JSON.stringify(state.cultivationFactors || []),
         },
       });
       // 写入事件日志
