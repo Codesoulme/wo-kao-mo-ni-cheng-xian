@@ -25,6 +25,10 @@ import { registerItem, registerMany, registerNpc, registerThread } from '@/lib/x
 // 批 16: auction 路由接 Event Sourcing PoC — bid 拍得触发 spirit-stones.changed + item.added
 // appendEvent 失败不影响主流程；保留 NPC 互竞/aftermath/线索/鉴权等所有原逻辑。
 import { appendEvent } from '@/lib/xianxia/events/store';
+// Phase 5 #3: 把 ECS tick-helper 推广到 auction 路由。
+// 拍卖成交（bid）后 ECS tick（修为沉淀 + 寿元推进），与 choose/interfere/advance 风格对齐——tick 放在 appendEvent 之前（不进事务），失败 try/catch 不阻断主流程。
+// deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖竞拍失利等显式原因。
+import { tickEcsForCharacter, applyEcsTickToState } from '@/lib/xianxia/ecs/tick-helper';
 import type { AttributeChange, AuctionAIOutcome, CausalEdge, CausalNode, CharacterState, ItemEntry, PendingThread, WorldNpc } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 import { z } from 'zod';
@@ -586,6 +590,28 @@ export async function POST(req: NextRequest) {
       state = recordAuctionCausality(state, session, 'enter', undefined, [], newNpcs);
       state = normalizeCultivationState(refreshWorldFacts({ ...state, isAtChoice: false }, 'auction-enter'));
       narrative = [`${state.name}入了${session.title}。`, '帘后灵灯压低，主持人含笑举槌，诸修各按心思落座。', ...session.lots.map((l, i) => `第${i + 1}件，${l.item.name}，起价 ${l.startingPrice} 灵石。`)].join('\n');
+
+      // Phase 5 #3: auction.enter 接 ECS tick（入楼后修为沉淀）。tick 不进事务，failure 仅 console.error 不阻断主流程。
+      // deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖现有状态。
+      try {
+        const ecsBaseSnapshot = {
+          characterId,
+          name: state.name || '',
+          age: state.age,
+          realm: state.realm,
+          cultivationExp: state.cultivationExp,
+          hp: state.hp,
+          maxHp: state.maxHp,
+          spiritStones: state.spiritStones,
+          alive: state.alive,
+          lifespan: state.lifespan || 100,
+          inventory: [],
+        };
+        const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'auction-enter' });
+        applyEcsTickToState(state, ecsResult);
+      } catch (e) {
+        console.error('[auction] enter ECS tick failed (non-fatal):', e);
+      }
     } else if (action === 'bid') {
       const lot = session.lots.find(l => l.id === lotId);
       if (!lot) return NextResponse.json({ success: false, error: '此件拍品已不在槌下' }, { status: 400 });
@@ -700,6 +726,28 @@ export async function POST(req: NextRequest) {
         state = recordAuctionCausality(state, session, 'bid', lot, newThreads, newNpcs);
       }
       state = normalizeCultivationState(refreshWorldFacts(state, 'auction-bid'));
+
+      // Phase 5 #3: auction.bid 接 ECS tick（出价/拍得后修为沉淀）。tick 放在 normalizeCultivationState 之后（不进事务），failure 仅 console.error 不阻断。
+      // deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖竞拍失利/陨落等显式原因。
+      try {
+        const ecsBaseSnapshot = {
+          characterId,
+          name: state.name || '',
+          age: state.age,
+          realm: state.realm,
+          cultivationExp: state.cultivationExp,
+          hp: state.hp,
+          maxHp: state.maxHp,
+          spiritStones: state.spiritStones,
+          alive: state.alive,
+          lifespan: state.lifespan || 100,
+          inventory: [],
+        };
+        const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'auction-bid' });
+        applyEcsTickToState(state, ecsResult);
+      } catch (e) {
+        console.error('[auction] bid ECS tick failed (non-fatal):', e);
+      }
     }
 
     const stateChangeLog = buildStateChangeLog({

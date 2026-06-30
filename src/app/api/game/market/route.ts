@@ -23,6 +23,10 @@ import { registerItem } from '@/lib/xianxia/content-registry';
 // 批 16: market 路由接 Event Sourcing PoC — buy/sell 触发 spirit-stones.changed + item.added/removed
 // appendEvent 失败不影响主流程；保留 ContentRegistry 校验 + 鉴权 + db.character.update 全部原逻辑。
 import { appendEvent } from '@/lib/xianxia/events/store';
+// Phase 5 #3: 把 ECS tick-helper 推广到 market 路由。
+// 坊市交易后 ECS tick（市场活动算修为沉淀），与 choose/interfere/advance 风格对齐——tick 放在 appendEvent 之前（不进事务），失败 try/catch 不阻断主流程。
+// deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖用户上下文。
+import { tickEcsForCharacter, applyEcsTickToState } from '@/lib/xianxia/ecs/tick-helper';
 import type { AttributeChange } from '@/lib/xianxia/types';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 
@@ -299,6 +303,28 @@ export async function POST(req: NextRequest) {
       const displayEffects = buildEventDisplayEffects({ before, after: state, changes: appliedChanges, newItems });
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
 
+      // Phase 5 #3: market.buy 接 ECS tick（坊市购得后修为沉淀）。tick 放在 appendEvent 之前（不进事务），failure 仅 console.error 不阻断主流程。
+      // deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖现有状态。
+      try {
+        const ecsBaseSnapshot = {
+          characterId,
+          name: state.name || '',
+          age: state.age,
+          realm: state.realm,
+          cultivationExp: state.cultivationExp,
+          hp: state.hp,
+          maxHp: state.maxHp,
+          spiritStones: state.spiritStones,
+          alive: state.alive,
+          lifespan: state.lifespan || 100,
+          inventory: [],
+        };
+        const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'market-buy' });
+        applyEcsTickToState(state, ecsResult);
+      } catch (e) {
+        console.error('[market] buy ECS tick failed (non-fatal):', e);
+      }
+
       // Event Sourcing PoC: buy 触发 spirit-stones.changed + item.added。
       // 失败不阻断主流程——appendEvent 在 db.character.update 之前写入事件流。
       try {
@@ -367,6 +393,28 @@ export async function POST(req: NextRequest) {
       const stateChangeLog = buildStateChangeLog({ before, after: state, appliedChanges, rejectedChanges: removed.rejectedChanges || [], contentRegistryTrace, effectResolveTrace, aiBoundaryTrace: [] });
       const displayEffects = buildEventDisplayEffects({ before, after: state, changes: appliedChanges, removedItemIds });
       const effectsWithAudit = appendStateChangeAuditEffect(displayEffects, stateChangeLog);
+
+      // Phase 5 #3: market.sell 接 ECS tick（坊市售出后修为沉淀）。tick 放在 appendEvent 之前（不进事务），failure 仅 console.error 不阻断主流程。
+      // deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖现有状态。
+      try {
+        const ecsBaseSnapshot = {
+          characterId,
+          name: state.name || '',
+          age: state.age,
+          realm: state.realm,
+          cultivationExp: state.cultivationExp,
+          hp: state.hp,
+          maxHp: state.maxHp,
+          spiritStones: state.spiritStones,
+          alive: state.alive,
+          lifespan: state.lifespan || 100,
+          inventory: [],
+        };
+        const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'market-sell' });
+        applyEcsTickToState(state, ecsResult);
+      } catch (e) {
+        console.error('[market] sell ECS tick failed (non-fatal):', e);
+      }
 
       // Event Sourcing PoC: sell 触发 item.removed + spirit-stones.changed (delta > 0)。
       // 失败不阻断主流程。

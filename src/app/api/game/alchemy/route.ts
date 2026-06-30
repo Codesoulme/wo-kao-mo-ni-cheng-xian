@@ -17,6 +17,10 @@ import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 // 批 16: alchemy 路由接 Event Sourcing PoC — 炼丹触发 spirit-stones.changed（花费）+ item.added（产出）
 // appendEvent 失败不影响主流程；保留 AI/公式双路径 + 鉴权 + 全部原逻辑。
 import { appendEvent } from '@/lib/xianxia/events/store';
+// Phase 5 #3: 把 ECS tick-helper 推广到 alchemy 路由。
+// 炼丹后 ECS tick（修为推进 + 丹道沉淀），与 choose/interfere/advance 风格对齐——tick 放在 appendEvent 之前（不进事务），失败 try/catch 不阻断主流程。
+// deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖炼丹焦炉/陨落等事件。
+import { tickEcsForCharacter, applyEcsTickToState } from '@/lib/xianxia/ecs/tick-helper';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -99,6 +103,29 @@ export async function POST(req: NextRequest) {
       effectResolveTrace: [],
       aiBoundaryTrace: [],
     });
+
+    // Phase 5 #3: alchemy 接 ECS tick（炼丹成功后修为沉淀 / 寿元推进）。
+    // 放在 appendEvent 之前——tick 不进 ES 事务；failure 仅 console.error，不阻断 alchemy 主流程。
+    // deathReason 兜底：ECS 判死时若 causeOfDeath 为空补 'ecs-aging-natural'，不覆盖炼丹焦炉/陨落等显式原因。
+    try {
+      const ecsBaseSnapshot = {
+        characterId,
+        name: finalState.name || '',
+        age: finalState.age,
+        realm: finalState.realm,
+        cultivationExp: finalState.cultivationExp,
+        hp: finalState.hp,
+        maxHp: finalState.maxHp,
+        spiritStones: finalState.spiritStones,
+        alive: finalState.alive,
+        lifespan: finalState.lifespan || 100,
+        inventory: [],
+      };
+      const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'alchemy' });
+      applyEcsTickToState(finalState, ecsResult);
+    } catch (e) {
+      console.error('[alchemy] ECS tick failed (non-fatal):', e);
+    }
 
     // Event Sourcing PoC: alchemy 触发 spirit-stones.changed（炼丹耗用，delta < 0）。
     // 成功时（result.success === true 且 result.product 存在）再追加 item.added。

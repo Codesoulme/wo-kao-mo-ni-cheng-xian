@@ -2442,6 +2442,7 @@ function smokeP003EmptyPoolEmptyState(): void {
 }
 
 function smokeP004PageHasInheritanceSection(): void {
+  // phase-α：ending-section 已删除，page.tsx 只剩 inheritance-section-wrapper
   const page = readFileSync('src/app/page.tsx', 'utf-8');
   assert(page.includes("import { InheritancePoolPanel } from '@/components/xianxia/InheritancePoolPanel';"),
     'page.tsx should import InheritancePoolPanel');
@@ -2449,10 +2450,11 @@ function smokeP004PageHasInheritanceSection(): void {
     'page.tsx should render <InheritancePoolPanel>');
   assert(page.includes('inheritance-section-wrapper') || page.includes('inheritance-section'),
     'page.tsx should have inheritance-section testid wrapper');
+  // 反向验证：ending-section 已删
   const idxEnd = page.indexOf('ending-section');
   const idxInh = page.indexOf('inheritance-section-wrapper');
-  assert(idxEnd > 0 && idxInh > 0, 'page.tsx should contain both ending-section and inheritance-section-wrapper');
-  assert(idxInh > idxEnd, 'inheritance-section-wrapper should be placed after ending-section');
+  assert(idxInh > 0, 'page.tsx should contain inheritance-section-wrapper');
+  assert(idxEnd < 0, 'page.tsx should NOT contain ending-section (phase-α 5 面板减法)');
   log('smoke-p-004-page-has-inheritance-section', { passed: true });
 }
 
@@ -2827,6 +2829,9 @@ function pgRunPhaseUYinyuanTimelineSmokes(): void {
 // Phase-V #6: Custom Technique Creator (3 smokes)
 
 function smokeV001CustomTechniqueLibExports(): void {
+  // phase-p1-technique-rebuild: 自创功法面板已重建，custom-technique.ts 模块应存在且导出 API
+  const fs = require('fs') as typeof import('fs');
+  assert(fs.existsSync('src/lib/xianxia/custom-technique.ts'), 'src/lib/xianxia/custom-technique.ts should exist (phase-p1 重建)');
   const mod = require('../src/lib/xianxia/custom-technique.ts');
   assert(typeof mod.createCustomTechnique === 'function', 'should export createCustomTechnique');
   assert(typeof mod.validateTechniqueInput === 'function', 'should export validateTechniqueInput');
@@ -3696,6 +3701,7 @@ function smokeAi103RumorReliability(): void {
   pgRunPhaseKCWorkerCSmokes();
   pgRunPhaseKAWorkerASmokes();
   pgRunPhaseLSmokes();
+  pgRunPhaseAlphaTribulationSmokes();
 }
 
 function smokeCombatLabelsDisplay(): void {
@@ -5323,6 +5329,9 @@ function smokeBlueprintDocsCoverage(): void {
     assert(/\|.+\|.+\|/.test(src), `${f} 应有 markdown 表格`);
   }
   log('blueprint-docs-coverage', { passed: true });
+    // Phase-α 批 1 α-1: 修真沉浸 PoC —— 雷劫判定 (3 个纯函数 smoke)
+    // 顶层调用 + main() 双保险：避免 projection-persist smoke 抛错终止 main 时漏掉 phase-alpha。
+    pgRunPhaseAlphaTribulationSmokes();
     pgRunPhaseLSmokes();
     pgRunPhaseMSmokes();
     pgRunPhaseNFollowupSmokes();
@@ -5376,7 +5385,7 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseEcsSmokes();
       // Phase 5 #2: ECS tick helper + choose/interfere/advance 接入 — 3 个静态 smoke
       pgRunPhaseP5EcsTickHelperSmokes();
-      // 批 20b: ES 真实链路集成测试（轻量——import + 返回值结构；完整跑需 --db）— 2 个静态 smoke
+      // 批 20b: ES 真实链路集成测试（轻量——import + 返回值结构；完整跑需 --db）— 6 个静态 smoke
       pgRunPhaseEsIntegrationSmokes();
       // 批 22: page.tsx 主 tab 重构（5 个新 tab：道途/命途/传承/人情/修行）— 5 个静态 smoke
       pgRunPhaseTabRestructureSmokes();
@@ -5463,14 +5472,11 @@ function pgRunPhaseWCrossCycleInheritanceSmokes(): void {
 
 function smokeX001PageIntegratesAllPanels(): void {
   const src = readFileSync('src/app/page.tsx', 'utf-8');
-  // Required testids in page.tsx
+  // phase-α：5 面板减法（ending / yinyuan-timeline / technique-creator / pet / formation 已删），保留主流程面板
   const required = [
     'world-legacy-section',
     'cycle-projection-section',
     'save-slot-section',
-    'ending-section',
-    'yinyuan-timeline-section',
-    'technique-creator-section',
     'npc-growth-section',
     'sect-storyline-section',
     'cross-cycle-section',
@@ -5483,14 +5489,16 @@ function smokeX001PageIntegratesAllPanels(): void {
   const missing = required.filter((id) => !src.includes('data-testid="' + id + '"'));
   assert(missing.length === 0, 'missing testids in page.tsx: ' + missing.join(', '));
 
-  // Required imports
+  // 反向验证：5 面板减法的 testid 不应再出现
+  const removedTestids = ['ending-section', 'yinyuan-timeline-section', 'technique-creator-section', 'pet-section', 'formation-section'];
+  const shouldNotExist = removedTestids.filter((id) => src.includes('data-testid="' + id + '"'));
+  assert(shouldNotExist.length === 0, 'page.tsx should NOT contain removed testids: ' + shouldNotExist.join(', '));
+
+  // Required imports（phase-α 已移除 EndingPanel/YinyuanTimelinePanel/TechniqueCreatorPanel/PetPanel/FormationPanel）
   const requiredImports = [
-    'YinyuanTimelinePanel',
-    'TechniqueCreatorPanel',
     'NpcGrowthPanel',
     'SectStorylinePanel',
     'CrossCycleInheritancePanel',
-    'EndingPanel',
     'DeathGuidancePanel',
     'InheritancePoolPanel',
     'SaveSlotPanel',
@@ -5498,11 +5506,24 @@ function smokeX001PageIntegratesAllPanels(): void {
   const missingImports = requiredImports.filter((name) => !src.includes(name));
   assert(missingImports.length === 0, 'missing imports in page.tsx: ' + missingImports.join(', '));
 
+  const removedImports = ['EndingPanel', 'YinyuanTimelinePanel', 'TechniqueCreatorPanel', 'PetPanel', 'FormationPanel'];
+  // 匹配真实 import / require 语句，过滤注释
+  const importLineRe = /^\s*(?:import|const|let|var)\s+[\s\S]*?from\s+['"][^'"]+['"]/gm;
+  const importBlock: string[] = [];
+  const componentUseRe = /<\s*([A-Z][A-Za-z0-9]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = importLineRe.exec(src))) importBlock.push(m[0]);
+  while ((m = componentUseRe.exec(src))) importBlock.push(m[1]);
+  const shouldNotImport = removedImports.filter((name) =>
+    importBlock.some((line) => new RegExp('\\b' + name + '\\b').test(line))
+  );
+  assert(shouldNotImport.length === 0, 'page.tsx should NOT import removed panels: ' + shouldNotImport.join(', '));
+
   // Top of file should be clean 'use client';
   const firstLine = src.split(/\r?\n/)[0];
   assert(firstLine === "'use client';", 'page.tsx L1 should be use client, got: ' + JSON.stringify(firstLine));
 
-  log('smoke-x-001-page-integrates-all-panels', { passed: true, testidCount: required.length, importCount: requiredImports.length });
+  log('smoke-x-001-page-integrates-all-panels', { passed: true, testidCount: required.length, importCount: requiredImports.length, removedCount: removedTestids.length });
 }
 
 function pgRunPhaseXPageIntegrationSmokes(): void {
@@ -5588,17 +5609,15 @@ function smokeTabRestructure003DeathGuidanceBanner(): void {
 
 function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
   const src = readFileSync('src/app/page.tsx', 'utf-8');
-  // 各 panel 应分布到对应 tab：
-  // 命途 tab：cycle-projection / ending / yinyuan-timeline
+  // phase-α：5 面板减法后（ending/yinyuan-timeline/technique-creator/pet/formation 已删），保留 panel 分布
+  // 命途 tab：cycle-projection
   // 传承 tab：cross-cycle / inheritance / save-slot
   // 人情 tab：npc-growth / sect-storyline / heart-intent
-  // 修行 tab：technique-creator / pet / formation / secret-realm / inventory
+  // 修行 tab：cultivation-speed / secret-realm / inventory
   // 世界：world-legacy / reset-world
   const requiredTestids = [
     // 命途
     'cycle-projection-section',
-    'ending-section',
-    'yinyuan-timeline-section',
     // 传承
     'cross-cycle-section',
     'inheritance-section-wrapper',
@@ -5608,31 +5627,31 @@ function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
     'sect-storyline-section',
     'heart-intent-section',
     // 修行
-    'technique-creator-section',
-    'pet-section',
-    'formation-section',
+    'cultivation-speed-section',
+    'secret-realm-section',
     'inventory-section',
     // 世界
     'world-legacy-section',
     'reset-world-section',
   ];
   const missing = requiredTestids.filter((id) => !src.includes('data-testid="' + id + '"'));
-  assert(missing.length === 0, 'page.tsx 应包含所有 panel testid，缺少: ' + missing.join(', '));
+  assert(missing.length === 0, 'page.tsx 应包含保留 panel testid，缺少: ' + missing.join(', '));
 
-  // 关键 panel 必须 import
+  // 反向验证：5 面板减法的 testid 不应出现
+  const removedTestids = ['ending-section', 'yinyuan-timeline-section', 'technique-creator-section', 'pet-section', 'formation-section'];
+  const shouldNotExist = removedTestids.filter((id) => src.includes('data-testid="' + id + '"'));
+  assert(shouldNotExist.length === 0, 'page.tsx 不应包含已删除 panel testid: ' + shouldNotExist.join(', '));
+
+  // 关键 panel 必须 import（phase-α 已移除 EndingPanel/YinyuanTimelinePanel/TechniqueCreatorPanel/PetPanel/FormationPanel）
   const requiredImports = [
     'CycleProjectionPanel',
-    'EndingPanel',
-    'YinyuanTimelinePanel',
     'CrossCycleInheritancePanel',
     'InheritancePoolPanel',
     'SaveSlotPanel',
     'NpcGrowthPanel',
     'SectStorylinePanel',
     'HeartIntentPanel',
-    'TechniqueCreatorPanel',
-    'PetPanel',
-    'FormationPanel',
+    'CultivationSpeedCard',
     'InventoryPanel',
     'WorldLegacyPanel',
     'ResetWorldButton',
@@ -5640,9 +5659,22 @@ function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
     'StatusPanel',
   ];
   const missingImports = requiredImports.filter((name) => !src.includes(name));
-  assert(missingImports.length === 0, 'page.tsx 应 import 所有 panel，缺少: ' + missingImports.join(', '));
+  assert(missingImports.length === 0, 'page.tsx 应 import 保留 panel，缺少: ' + missingImports.join(', '));
 
-  log('smoke-tab-restructure-004-panel-distribution-across-tabs', { passed: true, panelCount: requiredTestids.length });
+  const removedImports = ['EndingPanel', 'YinyuanTimelinePanel', 'TechniqueCreatorPanel', 'PetPanel', 'FormationPanel'];
+  // 匹配真实 import / require 语句，过滤注释
+  const importLineRe = /^\s*(?:import|const|let|var)\s+[\s\S]*?from\s+['"][^'"]+['"]/gm;
+  const componentUseRe = /<\s*([A-Z][A-Za-z0-9]+)/g;
+  const importBlock: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = importLineRe.exec(src))) importBlock.push(m[0]);
+  while ((m = componentUseRe.exec(src))) importBlock.push(m[1]);
+  const shouldNotImport = removedImports.filter((name) =>
+    importBlock.some((line) => new RegExp('\\b' + name + '\\b').test(line))
+  );
+  assert(shouldNotImport.length === 0, 'page.tsx 不应 import 已删除 panel: ' + shouldNotImport.join(', '));
+
+  log('smoke-tab-restructure-004-panel-distribution-across-tabs', { passed: true, panelCount: requiredTestids.length, removedCount: removedTestids.length });
 }
 
 function smokeTabRestructure005BackcompatFourTabs(): void {
@@ -9452,6 +9484,7 @@ function smokeN002EndingPreviewHandlesNull(): void {
 }
 
 function smokeN003EndingPanelRenders(): void {
+  // phase-α：ending-section 已从 page.tsx 移除（5 面板减法），EndingPanel 组件保留作审计用
   const src = readFileSync('src/components/xianxia/EndingPanel.tsx', 'utf-8');
   assert(src.includes('ending-panel'), 'EndingPanel should have ending-panel testid');
   // React JSX uses `ending-${e.archetype}` template literal
@@ -9459,8 +9492,9 @@ function smokeN003EndingPanelRenders(): void {
   assert(src.includes('entries.map'), 'EndingPanel should map over entries');
   assert(src.includes('defaultCollapsed'), 'EndingPanel should accept defaultCollapsed prop');
   const page = readFileSync('src/app/page.tsx', 'utf-8');
-  assert(page.includes('import { EndingPanel }'), 'page.tsx should import EndingPanel');
-  assert(page.includes('data-testid="ending-section"'), 'page.tsx should have ending-section testid');
+  // 反向验证：page.tsx 不再 import EndingPanel / 不再有 ending-section
+  assert(!page.includes('import { EndingPanel }'), 'page.tsx should NOT import EndingPanel (phase-α 5 面板减法)');
+  assert(!page.includes('data-testid="ending-section"'), 'page.tsx should NOT contain ending-section (phase-α 5 面板减法)');
   log('smoke-n-003-ending-panel-renders', { passed: true });
 }
 
@@ -13346,6 +13380,102 @@ function smokeP5EcsTickHelper002TickAdvancesAgeAndExp(): void {
   log('smoke-p5-ecs-tick-helper-002-tick-advances-age-and-exp', { passed: true });
 }
 
+// Phase 5 #3: 把 ECS tick-helper 推广到 settle / market / alchemy / auction 4 router。
+// 验证每个 router 都接入了 helper，且与 choose/interfere 风格一致：import + tickEcsForCharacter + applyEcsTickToState + 非致命 try/catch + baseSnapshot 含 inventory=[]。
+
+function smokeP5EcsTickSettle001RouteCallsHelper(): void {
+  const src = readFileSync('src/app/api/game/settlement/route.ts', 'utf-8');
+
+  // 1. import helper
+  assert(src.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'settlement route should import tick-helper');
+
+  // 2. 调用 tickEcsForCharacter + applyEcsTickToState（参考 helper 003 的风格）
+  assert(/tickEcsForCharacter\(/.test(src), 'settlement route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(src), 'settlement route should call applyEcsTickToState');
+
+  // 3. 非致命 try/catch + ECS 失败日志
+  assert(/\[settlement\]\s+ECS tick failed \(non-fatal\)/.test(src), 'settlement route should have non-fatal ECS catch log');
+
+  // 4. baseSnapshot 含 name + inventory=[]
+  assert(/name:\s*state\.name/.test(src), 'settlement ECS baseSnapshot should include name from state');
+  assert(/inventory:\s*\[\]/.test(src), 'settlement ECS baseSnapshot should default inventory=[]');
+
+  // 5. source 参数标记为 'settlement'（路由定位用）
+  assert(/source:\s*'settlement'/.test(src), 'settlement tick should pass source="settlement" for log prefix');
+
+  log('smoke-p5-ecs-tick-settle-001-route-calls-helper', { passed: true });
+}
+
+function smokeP5EcsTickMarket001RouteCallsHelper(): void {
+  const src = readFileSync('src/app/api/game/market/route.ts', 'utf-8');
+
+  assert(src.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'market route should import tick-helper');
+
+  // market 有 buy + sell 两个分支，需各调一次 helper
+  const helperImportCount = (src.match(/from '@\/lib\/xianxia\/ecs\/tick-helper'/g) || []).length;
+  assert(helperImportCount === 1, `market route should import tick-helper once, got ${helperImportCount}`);
+
+  const tickCallCount = (src.match(/tickEcsForCharacter\(/g) || []).length;
+  const applyCallCount = (src.match(/applyEcsTickToState\(/g) || []).length;
+  assert(tickCallCount >= 2, `market route should call tickEcsForCharacter for buy+sell (>=2), got ${tickCallCount}`);
+  assert(applyCallCount >= 2, `market route should call applyEcsTickToState for buy+sell (>=2), got ${applyCallCount}`);
+
+  // 两条非致命 catch 日志
+  assert(/\[market\]\s+buy ECS tick failed \(non-fatal\)/.test(src), 'market.buy should have non-fatal ECS catch log');
+  assert(/\[market\]\s+sell ECS tick failed \(non-fatal\)/.test(src), 'market.sell should have non-fatal ECS catch log');
+
+  // source 标签区分 buy/sell
+  assert(/source:\s*'market-buy'/.test(src), 'market-buy tick should pass source="market-buy"');
+  assert(/source:\s*'market-sell'/.test(src), 'market-sell tick should pass source="market-sell"');
+
+  // baseSnapshot 含 inventory=[]
+  assert(/inventory:\s*\[\]/.test(src), 'market ECS baseSnapshot should default inventory=[]');
+
+  log('smoke-p5-ecs-tick-market-001-route-calls-helper', { passed: true });
+}
+
+function smokeP5EcsTickAlchemy001RouteCallsHelper(): void {
+  const src = readFileSync('src/app/api/game/alchemy/route.ts', 'utf-8');
+
+  assert(src.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'alchemy route should import tick-helper');
+
+  assert(/tickEcsForCharacter\(/.test(src), 'alchemy route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(src), 'alchemy route should call applyEcsTickToState');
+
+  assert(/\[alchemy\]\s+ECS tick failed \(non-fatal\)/.test(src), 'alchemy route should have non-fatal ECS catch log');
+
+  // alchemy 用的是 finalState（不是 state 也不是 char）
+  assert(/name:\s*finalState\.name/.test(src), 'alchemy ECS baseSnapshot should include name from finalState');
+
+  assert(/inventory:\s*\[\]/.test(src), 'alchemy ECS baseSnapshot should default inventory=[]');
+
+  assert(/source:\s*'alchemy'/.test(src), 'alchemy tick should pass source="alchemy" for log prefix');
+
+  log('smoke-p5-ecs-tick-alchemy-001-route-calls-helper', { passed: true });
+}
+
+function smokeP5EcsTickAuction001RouteCallsHelper(): void {
+  const src = readFileSync('src/app/api/game/auction/route.ts', 'utf-8');
+
+  assert(src.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'auction route should import tick-helper');
+
+  // auction 有 enter + bid 两个分支
+  const tickCallCount = (src.match(/tickEcsForCharacter\(/g) || []).length;
+  const applyCallCount = (src.match(/applyEcsTickToState\(/g) || []).length;
+  assert(tickCallCount >= 2, `auction route should call tickEcsForCharacter for enter+bid (>=2), got ${tickCallCount}`);
+  assert(applyCallCount >= 2, `auction route should call applyEcsTickToState for enter+bid (>=2), got ${applyCallCount}`);
+
+  assert(/\[auction\]\s+enter ECS tick failed \(non-fatal\)/.test(src), 'auction.enter should have non-fatal ECS catch log');
+  assert(/\[auction\]\s+bid ECS tick failed \(non-fatal\)/.test(src), 'auction.bid should have non-fatal ECS catch log');
+
+  assert(/source:\s*'auction-enter'/.test(src), 'auction-enter tick should pass source="auction-enter"');
+  assert(/source:\s*'auction-bid'/.test(src), 'auction-bid tick should pass source="auction-bid"');
+
+  assert(/inventory:\s*\[\]/.test(src), 'auction ECS baseSnapshot should default inventory=[]');
+
+  log('smoke-p5-ecs-tick-auction-001-route-calls-helper', { passed: true });
+}
+
 function smokeP5EcsTickHelper003ChooseAndInterfereRouteCallHelper(): void {
   // 验证 choose / interfere / advance 三个路由都调用了 helper
   const chooseSrc = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
@@ -13383,6 +13513,11 @@ function pgRunPhaseP5EcsTickHelperSmokes(): void {
     { name: 'smoke-p5-ecs-tick-helper-001-exists', fn: smokeP5EcsTickHelper001Exists },
     { name: 'smoke-p5-ecs-tick-helper-002-tick-advances-age-and-exp', fn: smokeP5EcsTickHelper002TickAdvancesAgeAndExp },
     { name: 'smoke-p5-ecs-tick-helper-003-choose-and-interfere-route-call-helper', fn: smokeP5EcsTickHelper003ChooseAndInterfereRouteCallHelper },
+    // Phase 5 #3: helper 推广到 settle / market / alchemy / auction 4 router
+    { name: 'smoke-p5-ecs-tick-settle-001-route-calls-helper', fn: smokeP5EcsTickSettle001RouteCallsHelper },
+    { name: 'smoke-p5-ecs-tick-market-001-route-calls-helper', fn: smokeP5EcsTickMarket001RouteCallsHelper },
+    { name: 'smoke-p5-ecs-tick-alchemy-001-route-calls-helper', fn: smokeP5EcsTickAlchemy001RouteCallsHelper },
+    { name: 'smoke-p5-ecs-tick-auction-001-route-calls-helper', fn: smokeP5EcsTickAuction001RouteCallsHelper },
   ];
   for (const c of cases) {
     try {
@@ -13458,6 +13593,15 @@ function smokeP5EsMiddleware002Exports(): void {
       mod._esmRegisteredTags().includes('interfere'),
     'middleware should register choose + interfere tags',
   );
+  // Phase 5 #3：新增 API 存在性
+  assert(typeof mod.runWithRetry === 'function', 'middleware should export runWithRetry');
+  assert(typeof mod.computeBackoffMs === 'function', 'middleware should export computeBackoffMs');
+  assert(typeof mod._esmNewTestCircuit === 'function', 'middleware should export _esmNewTestCircuit');
+  assert(typeof mod.esmGetCircuitState === 'function', 'middleware should export esmGetCircuitState');
+  assert(typeof mod.wrapEsInTransaction === 'function', 'middleware should export wrapEsInTransaction');
+  assert(typeof mod.esmRouteMarker === 'function', 'middleware should export esmRouteMarker');
+  assert(typeof mod.esmDumpRegisteredTags === 'function', 'middleware should export esmDumpRegisteredTags');
+  assert(typeof mod.OpenCircuitError === 'function', 'middleware should export OpenCircuitError class');
   log('smoke-p5-es-middleware-002-exports', { passed: true });
 }
 
@@ -13513,7 +13657,226 @@ function smokeP5EsMustRouteInterfere(): void {
   log('smoke-p5-es-must-route-interfere', { passed: true });
 }
 
+// ===== Phase 5 #3: ES middleware 真包装器 + 重试 + 熔断 + tx + marker — 7 smoke =====
+//   smoke-p5-esm-001: withEventSourcing 包装器真的捕获 handler 错误（required 模式抛错）
+//   smoke-p5-esm-002: optional 模式不抛错（fall through to handler）
+//   smoke-p5-esm-003: 重试生效（mock 失败 N-1 次后成功 → totalAttempts = N）
+//   smoke-p5-esm-004: circuit breaker 三状态转换（closed → open → half-open → closed）
+//   smoke-p5-esm-005: wrapEsInTransaction 事务内/外模式选型正确
+//   smoke-p5-esm-006: esmRouteMarker 收集到的 tag 列表正确（清空 + 注册 2 个 → 含 2 个）
+//   smoke-p5-esm-007: computeBackoffMs 公式正确（base * factor^(n-1) ≈ 期望；jitter=0 → 精确）
+
+async function smokeP5Esm001WrapperRequiredThrows(): Promise<void> {
+  const { withEventSourcing } = require('../src/lib/xianxia/events/middleware');
+  // required 模式：handler 抛错 → wrapper 抛错
+  const handler = async () => {
+    throw new Error('boom-required');
+  };
+  const wrapped = withEventSourcing(handler, { tag: 'test-required', esRouting: 'required' });
+  let thrown: Error | null = null;
+  try {
+    await wrapped({} as any);
+  } catch (e: any) {
+    thrown = e;
+  }
+  assert(thrown !== null, 'required-mode wrapper should re-throw handler error');
+  assert(/boom-required/.test(thrown!.message), `error message preserved, got: ${thrown!.message}`);
+  log('smoke-p5-esm-001-wrapper-required-throws', { passed: true });
+}
+
+async function smokeP5Esm002WrapperOptionalFallthrough(): Promise<void> {
+  const { withEventSourcing } = require('../src/lib/xianxia/events/middleware');
+  // optional 模式：handler 抛错 → wrapper 不抛，跑一次 best-effort 后仍返回
+  let calls = 0;
+  const handler = async () => {
+    calls += 1;
+    if (calls <= 1) {
+      throw new Error('boom-optional');
+    }
+    return 'recovered';
+  };
+  const wrapped = withEventSourcing(handler, {
+    tag: 'test-optional',
+    esRouting: 'optional',
+    retries: 0, // 关闭 retry 加速
+    baseMs: 10,
+  });
+  // 第一次：handler 失败（call #1 抛错）→ optional 模式 fallback 重试一次（call #2 成功）
+  const res = await wrapped({} as any);
+  assert(res === 'recovered', `optional-mode wrapper should fall through to recovered result, got: ${res}`);
+  assert(calls >= 2, `optional-mode should retry at least once, got calls=${calls}`);
+  log('smoke-p5-esm-002-wrapper-optional-fallthrough', { passed: true, calls });
+}
+
+async function smokeP5Esm003RetryThenSuccess(): Promise<void> {
+  const { runWithRetry, computeBackoffMs } = require('../src/lib/xianxia/events/middleware');
+  // 验证：mock 失败 2 次后成功 → totalAttempts = 3
+  let calls = 0;
+  const fn = async () => {
+    calls += 1;
+    if (calls < 3) {
+      throw new Error(`fail-${calls}`);
+    }
+    return 'ok';
+  };
+  let onRetryCalls = 0;
+  const res = await runWithRetry(fn, {
+    maxRetries: 3,
+    baseMs: 5,    // 短等待加速 smoke
+    jitter: 0,    // 零抖动 → 时间稳定
+    onRetry: () => { onRetryCalls += 1; },
+  });
+  assert(res === 'ok', `runWithRetry should succeed after retries, got: ${res}`);
+  assert(calls === 3, `runWithRetry should call fn 3 times total, got: ${calls}`);
+  assert(onRetryCalls === 2, `onRetry should fire 2 times (before retries 2 and 3), got: ${onRetryCalls}`);
+  // 同时验证完全失败：maxRetries=2，fn 总抛错 → 抛错
+  let failCalls = 0;
+  const failFn = async () => { failCalls += 1; throw new Error('always-fail'); };
+  let failed = false;
+  try {
+    await runWithRetry(failFn, { maxRetries: 2, baseMs: 5, jitter: 0 });
+  } catch (e: any) {
+    failed = true;
+    assert(/always-fail/.test(e.message), 'error should propagate');
+  }
+  assert(failed, 'runWithRetry should throw after exhausting retries');
+  assert(failCalls === 3, `runWithRetry should call fn maxRetries+1=3 times before giving up, got: ${failCalls}`);
+  log('smoke-p5-esm-003-retry-then-success', { passed: true, recovered: calls, exhausted: failCalls });
+}
+
+async function smokeP5Esm004CircuitBreakerStates(): Promise<void> {
+  const { _esmNewTestCircuit, OpenCircuitError } = require('../src/lib/xianxia/events/middleware');
+  // 隔离实例（threshold=3, cooldownMs=500 加速 smoke）
+  const cb = _esmNewTestCircuit({ threshold: 3, cooldownMs: 500 });
+  // 初始 closed
+  assert(cb.state() === 'closed', `initial state should be closed, got: ${cb.state()}`);
+  // 连续失败 3 次 → open
+  for (let i = 0; i < 3; i += 1) {
+    let caught: any = null;
+    try {
+      await cb.run(async () => { throw new Error(`fail-${i}`); });
+    } catch (e) { caught = e; }
+    assert(caught !== null, `failure ${i} should propagate`);
+  }
+  assert(cb.state() === 'open', `state after 3 failures should be open, got: ${cb.state()}`);
+  // open 期间调用 → 抛 OpenCircuitError
+  let openErr: any = null;
+  try {
+    await cb.run(async () => 'should-not-run');
+  } catch (e) { openErr = e; }
+  assert(openErr instanceof OpenCircuitError, `open-circuit call should throw OpenCircuitError, got: ${openErr?.constructor?.name}`);
+  assert(typeof openErr.remainingMs === 'number' && openErr.remainingMs > 0, 'remainingMs should be > 0');
+  // 等 cooldown → state() 显示 half-open
+  await new Promise((r) => setTimeout(r, 550));
+  assert(cb.state() === 'half-open', `state after cooldown should be half-open, got: ${cb.state()}`);
+  // half-open 探测调用成功 → closed
+  const okRes = await cb.run(async () => 'probe-ok');
+  assert(okRes === 'probe-ok', `half-open success should return value, got: ${okRes}`);
+  assert(cb.state() === 'closed', `state after half-open success should be closed, got: ${cb.state()}`);
+  log('smoke-p5-esm-004-circuit-breaker-states', { passed: true });
+}
+
+async function smokeP5Esm005WrapTxInOrOut(): Promise<void> {
+  const { wrapEsInTransaction } = require('../src/lib/xianxia/events/middleware');
+  // 事务外模式：tx=null/undefined → 走 mustRouteEsAppendEvent（返回 committed=false 因为没有真实 DB 事件 + characterId 缺失）
+  // 用假 characterId 验证 callable
+  const outRes = await wrapEsInTransaction(null, {
+    characterId: 'ghost-out-' + Date.now(),
+    type: 'world.tick',
+    data: { x: 1 } as any,
+  });
+  // 注意：mustRouteEsAppendEvent 在 appendEvent 失败时返回 committed=false（不抛），所以 result 一定存在
+  assert(outRes && typeof outRes === 'object', 'transaction-less result should be object');
+  assert(typeof outRes.committed === 'boolean', 'committed should be boolean');
+  // 事务内模式：tx 有 event.create 方法 → 走 tx.event.create
+  // mock tx：记录是否调用
+  let txCalled = false;
+  const fakeTx = {
+    event: {
+      create: async (args: any) => {
+        txCalled = true;
+        return { id: 'fake-evt-1', data: args.data };
+      },
+    },
+  };
+  const inRes = await wrapEsInTransaction(fakeTx, {
+    characterId: 'fake-char-1',
+    type: 'world.tick',
+    data: { y: 2 } as any,
+  });
+  assert(txCalled, 'tx.event.create should be invoked in tx mode');
+  assert(inRes.committed === true, `tx-mode result should be committed=true, got: ${JSON.stringify(inRes)}`);
+  assert(inRes.eventId === 'fake-evt-1', `tx-mode eventId should match, got: ${inRes.eventId}`);
+  // 混型：tx 是非对象（字符串）→ 走事务外
+  const nonObjRes = await wrapEsInTransaction('not-a-tx', {
+    characterId: 'ghost-nonobj-' + Date.now(),
+    type: 'world.tick',
+    data: { z: 3 } as any,
+  });
+  assert(typeof nonObjRes.committed === 'boolean', 'non-object tx should fall through to out-mode');
+  log('smoke-p5-esm-005-wrap-tx-in-or-out', { passed: true });
+}
+
+async function smokeP5Esm006RouteMarkerTags(): Promise<void> {
+  const mod = require('../src/lib/xianxia/events/middleware');
+  const { esmRouteMarker, esmDumpRegisteredTags, _esmClearRegisteredTagsForTest } = mod;
+  _esmClearRegisteredTagsForTest();
+  // 清空后空
+  const before = esmDumpRegisteredTags();
+  assert(Array.isArray(before) && before.length === 0, `cleared tag list should be empty, got: ${JSON.stringify(before)}`);
+  // 注册 2 个 tag
+  esmRouteMarker('choose');
+  esmRouteMarker('interfere');
+  const after = esmDumpRegisteredTags();
+  assert(after.includes('choose'), `marker list should contain 'choose', got: ${JSON.stringify(after)}`);
+  assert(after.includes('interfere'), `marker list should contain 'interfere', got: ${JSON.stringify(after)}`);
+  // 重复注册幂等
+  esmRouteMarker('choose');
+  const dedup = esmDumpRegisteredTags();
+  assert(dedup.filter((t: string) => t === 'choose').length === 1, 'duplicate marker should be idempotent');
+  // 字母排序
+  const sorted = [...after].sort();
+  assert(JSON.stringify(dedup) === JSON.stringify(sorted), `marker list should be sorted, got: ${JSON.stringify(dedup)}`);
+  // withEventSourcing 调用时也注册 tag
+  _esmClearRegisteredTagsForTest();
+  const { withEventSourcing } = mod;
+  const wrapped = withEventSourcing(async () => 'ok', { tag: 'choose' });
+  // wrapped 是 fn，需要调一次才触发 marker；但 wrapper 进入会调 marker 的——直接 await 一下
+  await wrapped({} as any);
+  const afterWrap = esmDumpRegisteredTags();
+  assert(afterWrap.includes('choose'), `withEventSourcing('choose') should auto-register tag 'choose', got: ${JSON.stringify(afterWrap)}`);
+  log('smoke-p5-esm-006-route-marker-tags', { passed: true });
+}
+
+async function smokeP5Esm007BackoffFormula(): Promise<void> {
+  const { computeBackoffMs } = require('../src/lib/xianxia/events/middleware');
+  // jitter=0 → 退避严格 = base * factor^(n-1)，最低 10ms
+  const base = 100;
+  const factor = 2;
+  for (let n = 1; n <= 5; n += 1) {
+    const expected = Math.round(base * Math.pow(factor, n - 1));
+    const got = computeBackoffMs(n, { baseMs: base, factor, jitter: 0 });
+    assert(got === expected, `attempt ${n}: expected ${expected}ms (jitter=0), got ${got}ms`);
+  }
+  // jitter=0.5 时值落在 [base-delta, base+delta]
+  for (let n = 1; n <= 3; n += 1) {
+    const baseV = base * Math.pow(factor, n - 1);
+    const delta = baseV * 0.5;
+    const got = computeBackoffMs(n, { baseMs: base, factor, jitter: 0.5 });
+    assert(got >= Math.round(baseV - delta) && got <= Math.round(baseV + delta),
+      `attempt ${n} with jitter 0.5 should be in [${Math.round(baseV - delta)}, ${Math.round(baseV + delta)}], got ${got}`);
+  }
+  // attempt ≤0 → 不抛错，至少返回 base（公式自然延伸：factor^0=1 → base * 1 = base）
+  const floor = computeBackoffMs(0, { baseMs: base, factor, jitter: 0 });
+  assert(floor === 100, `attempt 0 (jitter=0) should equal base=100, got ${floor}`);
+  // attempt=-5（负数）→ Math.max(0, -6) = 0，也等于 base
+  const neg = computeBackoffMs(-5, { baseMs: base, factor, jitter: 0 });
+  assert(neg === 100, `negative attempt should equal base, got ${neg}`);
+  log('smoke-p5-esm-007-backoff-formula', { passed: true });
+}
+
 function pgRunPhaseEsIntegrationSmokes(): void {
+  // sync 部分立即跑
   const syncCases = [
     { name: 'smoke-es-integration-001-importable', fn: smokeEsIntegration001Importable },
     { name: 'smoke-es-integration-002-return-shape', fn: smokeEsIntegration002ReturnShape },
@@ -13529,6 +13892,22 @@ function pgRunPhaseEsIntegrationSmokes(): void {
     } catch (e) {
       log(c.name, { passed: false, error: (e && e.message) || String(e) });
     }
+  }
+  // async 部分 fire-and-forget：smoke 内部已 log，最终 commit 前把状态补救上
+  // 编排函数立即返回——main 同步流不被阻塞。async smoke 通过 Promise.catch 自行兜底。
+  const asyncCases = [
+    { name: 'smoke-p5-esm-001-wrapper-required-throws', fn: smokeP5Esm001WrapperRequiredThrows },
+    { name: 'smoke-p5-esm-002-wrapper-optional-fallthrough', fn: smokeP5Esm002WrapperOptionalFallthrough },
+    { name: 'smoke-p5-esm-003-retry-then-success', fn: smokeP5Esm003RetryThenSuccess },
+    { name: 'smoke-p5-esm-004-circuit-breaker-states', fn: smokeP5Esm004CircuitBreakerStates },
+    { name: 'smoke-p5-esm-005-wrap-tx-in-or-out', fn: smokeP5Esm005WrapTxInOrOut },
+    { name: 'smoke-p5-esm-006-route-marker-tags', fn: smokeP5Esm006RouteMarkerTags },
+    { name: 'smoke-p5-esm-007-backoff-formula', fn: smokeP5Esm007BackoffFormula },
+  ];
+  for (const c of asyncCases) {
+    c.fn()
+      .then(() => log(c.name, { passed: true }))
+      .catch((e) => log(c.name, { passed: false, error: (e && e.message) || String(e) }));
   }
 }
 
@@ -13888,6 +14267,134 @@ function pgRunPhaseEsProjectorPersistSmokes(): void {
     { name: 'smoke-projection-persist-002-dual-layer-write', fn: smokeProjectionPersist002DualLayerWrite },
     { name: 'smoke-projection-persist-003-invalidate-clears-db', fn: smokeProjectionPersist003InvalidateClearsDb },
     { name: 'smoke-projection-persist-004-clear-projection-clears-db', fn: smokeProjectionPersist004ClearProjectionClearsDb },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ====================================================================
+// Phase-α 批 1 α-1: 修真沉浸 PoC —— 雷劫判定 (tribulation)
+// 共 3 个 smoke：types schema + attemptTribulation success + fatal + fall_realm
+// 注意：纯函数 smoke，不依赖 DB（appendEvent 调用由 engine.ts 内部 fire-and-forget，不在 smoke 内测）
+// ====================================================================
+
+function smokeAlpha001TribulationSuccess(): void {
+  // 凡人 → 炼气：基础概率 success=85%，无致命/降境。强制 hpRatio=0.95 soul=80 heartDemon=10（有法宝+丹药）。
+  const mod = require('../src/lib/xianxia/tribulation/engine.ts');
+  const typesMod = require('../src/lib/xianxia/tribulation/types.ts');
+  const result = mod.attemptTribulation({
+    character: { id: 'test-char-1', name: '测试凡人', age: 16, realm: 'mortal' },
+    targetRealm: 'qi_refining',
+    hpRatio: 0.95,
+    soulStrength: 80,
+    heartDemon: 10,
+    hasBondedArtifact: true,
+    hasTribulationPill: true,
+  });
+  assert(result && typeof result === 'object', 'should return object');
+  assert(typeof result.outcome === 'string', 'outcome should be string, got=' + typeof result.outcome);
+  assert(['success', 'fall_realm', 'severe', 'fatal'].includes(result.outcome), 'outcome should be one of 4 enum values, got=' + result.outcome);
+  // 凡人 → 炼气 难度 2：success 概率极高（85% + 法宝丹药 +10%/-10%）；陨落概率 0%。应当不会陨落。
+  assert(result.outcome !== 'fatal', '凡人→炼气 不应陨落（基础致命概率 0），got=' + result.outcome);
+  // 凡人 → 炼气 基础 possibleOutcomes = ['success', 'severe']，无 fall_realm
+  // 注：targetRealm='qi_refining'（炼气期），对应 profile 是心火劫
+  assert(result.kind === 'heart_fire', '凡人→炼气 劫型应为心火劫（炼气 profile），got=' + result.kind);
+  assert(result.difficulty === 4, '炼气期 艰难度应为 4，got=' + result.difficulty);
+  assert(Array.isArray(result.narrativeHooks), 'narrativeHooks 应该是数组');
+  assert(result.narrativeHooks.length >= 3, '至少应有 3 条 narrative hooks，got=' + result.narrativeHooks.length);
+  // hooks 应有 setting + emotion/action/aftermath 至少 3 类
+  const categories = new Set(result.narrativeHooks.map((h: any) => h.category));
+  assert(categories.has('setting'), '应有 setting 类钩子');
+  assert(categories.size >= 2, '钩子至少 2 个不同 category，got=' + Array.from(categories).join(','));
+  // TRIBULATION_PROFILES 表存在
+  assert(typesMod.TRIBULATION_PROFILES, '应导出 TRIBULATION_PROFILES');
+  assert(typesMod.TRIBULATION_PROFILES.mortal, '应包含 mortal 配置');
+  assert(typesMod.TRIBULATION_PROFILES.qi_refining, '应包含 qi_refining 配置');
+  assert(typesMod.TRIBULATION_PROFILES.golden_core, '应包含 golden_core 配置');
+  assert(typesMod.TRIBULATION_PROFILES.nascent_soul, '应包含 nascent_soul 配置');
+  assert(typesMod.TRIBULATION_PROFILES.soul_formation, '应包含 soul_formation 配置');
+  // 金丹 → 元婴 概率：30 fatal / 10 fall / 20 severe / 40 success
+  const nascentSoulProfile = typesMod.TRIBULATION_PROFILES.nascent_soul;
+  assert(nascentSoulProfile.difficulty === 9, '元婴 艰难度 9');
+  assert(nascentSoulProfile.kind === 'heart_demon', '元婴 劫型心魔');
+  log('smoke-α-001-tribulation-success', { passed: true, outcome: result.outcome, hooks: result.narrativeHooks.length });
+}
+
+function smokeAlpha002TribulationFatal(): void {
+  // 金丹 → 元婴：基础概率 fatal=30%。强制低 hpRatio=0.1 + 心魔 90 → fatal +20% +15% = 65%。
+  // 应当出现 fatal。但因为是概率函数（hash seed），无法 100% 保证；只校验接口正确性。
+  const mod = require('../src/lib/xianxia/tribulation/engine.ts');
+  const result = mod.attemptTribulation({
+    character: { id: 'test-char-2', name: '测试金丹', age: 200, realm: 'golden_core' },
+    targetRealm: 'nascent_soul',
+    hpRatio: 0.1,
+    soulStrength: 30,
+    heartDemon: 90,
+    hasBondedArtifact: false,
+    hasTribulationPill: false,
+  });
+  assert(result && typeof result === 'object', 'should return object');
+  assert(['success', 'fall_realm', 'severe', 'fatal'].includes(result.outcome), 'outcome 应在 4 选 1，got=' + result.outcome);
+  assert(typeof result.hpDelta === 'number', 'hpDelta 应为 number，got=' + typeof result.hpDelta);
+  assert(typeof result.cause === 'string' && result.cause.length > 0, 'cause 应为非空字符串');
+  // 致命结局时 hpDelta 应为 -100
+  if (result.outcome === 'fatal') {
+    assert(result.hpDelta === -100, 'fatal hpDelta 应为 -100，got=' + result.hpDelta);
+    assert(result.cause.includes('陨落'), 'fatal cause 应含「陨落」，got=' + result.cause);
+    // fatal 应有 3 条 narrative hooks
+    assert(result.narrativeHooks.length === 3, 'fatal 应有 3 条 narrative hooks，got=' + result.narrativeHooks.length);
+  }
+  log('smoke-α-002-tribulation-fatal', { passed: true, outcome: result.outcome, cause: result.cause.slice(0, 50) });
+}
+
+function smokeAlpha003TribulationFallRealm(): void {
+  // 筑基 → 金丹：基础概率 fall_realm=20%。强制中 hpRatio=0.4 + 心魔 60 → 概率提升但仍非 100%。
+  // 校验：接口正确 + fallback 路径有效 + pickNarrativeHooks 工作。
+  const mod = require('../src/lib/xianxia/tribulation/engine.ts');
+  const result = mod.attemptTribulation({
+    character: { id: 'test-char-3', name: '测试筑基', age: 80, realm: 'foundation' },
+    targetRealm: 'golden_core',
+    hpRatio: 0.4,
+    soulStrength: 50,
+    heartDemon: 60,
+    hasBondedArtifact: false,
+    hasTribulationPill: false,
+  });
+  assert(result && typeof result === 'object', 'should return object');
+  assert(['success', 'fall_realm', 'severe', 'fatal'].includes(result.outcome), 'outcome 应在 4 选 1，got=' + result.outcome);
+  // 筑基→金丹：fall_realm 概率 20%
+  if (result.outcome === 'fall_realm') {
+    assert(result.hpDelta === -40, 'fall_realm hpDelta 应为 -40，got=' + result.hpDelta);
+    assert(result.cause.includes('跌落'), 'fall_realm cause 应含「跌落」，got=' + result.cause);
+  }
+  // pickNarrativeHooks 工作：返回字符串、长度 <= charLimit
+  const prompt = mod.pickNarrativeHooks(result, 300);
+  assert(typeof prompt === 'string', 'pickNarrativeHooks 应返回字符串');
+  assert(prompt.length <= 300, 'prompt 长度应 <= 300，got=' + prompt.length);
+  // fallback 路径：targetRealm='deity_transformation'（不在表内）→ 降级
+  const fallback = mod.attemptTribulation({
+    character: { id: 'test-char-3', name: 'test', age: 100, realm: 'golden_core' },
+    targetRealm: 'deity_transformation' as any, // 不在 TRIBULATION_PROFILES 内
+    hpRatio: 0.5,
+    soulStrength: 50,
+    heartDemon: 30,
+  });
+  assert(fallback.outcome === 'success', 'fallback 应降级为 success，got=' + fallback.outcome);
+  assert(fallback.narrativeHooks.length === 0, 'fallback 应无 narrative hooks');
+  log('smoke-α-003-tribulation-fall-realm', { passed: true, outcome: result.outcome, promptLen: prompt.length });
+}
+
+function pgRunPhaseAlphaTribulationSmokes(): void {
+  const cases = [
+    { name: 'smoke-α-001-tribulation-success', fn: smokeAlpha001TribulationSuccess },
+    { name: 'smoke-α-002-tribulation-fatal', fn: smokeAlpha002TribulationFatal },
+    { name: 'smoke-α-003-tribulation-fall-realm', fn: smokeAlpha003TribulationFallRealm },
   ];
   for (const c of cases) {
     try {
