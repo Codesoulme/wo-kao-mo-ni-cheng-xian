@@ -1,4 +1,4 @@
-// 修真沉浸 PoC：雷劫判定系统的类型定义。
+// 沉浸版 PoC：雷劫判定系统的类型定义。
 // Phase-α 批 1 α-1：仅 PoC 范围——纯函数 + 4 种劫型 + 大境界映射表。
 // 不依赖 db / store / 路由，纯契约层。
 
@@ -138,7 +138,7 @@ export interface TribulationInput {
 
 /**
  * NarrativeHook：给 LLM prompt 用的雷劫叙事钩子（单条）。
- * 修真沉浸感的关键：每条钩子是"具体场景 + 情绪 + 主角反应"三要素，
+ * 沉浸版之要：每条钩子是"具体场景 + 情绪 + 主角反应"三要素，
  * 让 LLM 生成叙事时直接据此润色，而不是凭空编。
  */
 export interface NarrativeHook {

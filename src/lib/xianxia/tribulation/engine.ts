@@ -1,4 +1,4 @@
-// 修真沉浸 PoC：雷劫判定引擎（纯函数 + 修真常识概率 + LLM narrative hooks）。
+// 沉浸版 PoC：雷劫判定引擎（纯函数 + 修真常识概率 + LLM narrative hooks）。
 // Phase-α 批 1 α-1：仅 PoC 范围——不写 DB，由调用方负责持久化。
 //
 // 设计原则：

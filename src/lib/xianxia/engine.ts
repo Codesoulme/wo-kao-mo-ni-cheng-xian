@@ -172,7 +172,7 @@ import { applyAgeBasedBodyGrowth } from './body-growth';
 import { validateAIBoundary, BoundaryValidationTrace } from './ai-boundary-validator';
 import { buildStateChangeLog, StateChangeLogEntry } from './state-change-log';
 import { buildEventSchedulerPlan } from './event-scheduler';
-// Phase-α 批 1 α-1: 修真沉浸 PoC——雷劫判定引擎 + Event Sourcing
+// Phase-α 批 1 α-1: 沉浸版 PoC——雷劫判定引擎 + Event Sourcing
 import { attemptTribulation } from './tribulation/engine';
 import { realmToMajor } from './tribulation/types';
 import { appendEvent } from './events/store';
@@ -5300,7 +5300,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     }
   }
 
-  // ===== Phase-α 批 1 α-1: 修真沉浸 PoC —— 大境界突破触发雷劫判定 =====
+  // ===== Phase-α 批 1 α-1: 沉浸版 PoC —— 大境突破引雷劫判定 =====
   // 约束：仅当大境界突破（breakthroughMajor === true）时尝试渡劫；
   //       fire-and-forget 调 appendEvent（不阻断同步主流程；appendEvent 失败仅 console.error）。
   //       attemptTribulation 是同步纯函数；appendEvent 是 async，用 .catch 吞 promise。

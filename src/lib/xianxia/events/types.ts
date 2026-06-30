@@ -22,7 +22,7 @@ export type EventType =
   | 'character.end-result.set'
   | 'character.settlement-result.set'
   | 'character.streaming-narrative.started'
-  // Phase-α 批 1 α-1: 修真沉浸 PoC——雷劫判定事件
+  // Phase-α 批 1 α-1: 沉浸版 PoC——雷劫判定事件
   | 'character.tribulation.attempted';
 
 // EventData 是 discriminated union——`type` 字段做判别式。
@@ -46,7 +46,7 @@ export type EventData =
   | { type: 'character.end-result.set'; status: string; narrative: string }
   | { type: 'character.settlement-result.set'; settlement: any }
   | { type: 'character.streaming-narrative.started'; eventIndex: number; placeholderId: string }
-  // Phase-α 批 1 α-1: 修真沉浸 PoC——雷劫判定事件 payload
+  // Phase-α 批 1 α-1: 沉浸版 PoC——雷劫判定事件 payload
   | { type: 'character.tribulation.attempted'; fromRealm: string; toRealm: string; outcome: 'success' | 'fall_realm' | 'severe' | 'fatal'; kind: string; difficulty: number; hpDelta: number; cause: string };
 
 // 来源标签（决定 audit + reducer 信任级别）
