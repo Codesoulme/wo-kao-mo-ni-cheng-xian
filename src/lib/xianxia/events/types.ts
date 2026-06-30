@@ -21,7 +21,9 @@ export type EventType =
   | 'character.inheritance-ending-summary.set'
   | 'character.end-result.set'
   | 'character.settlement-result.set'
-  | 'character.streaming-narrative.started';
+  | 'character.streaming-narrative.started'
+  // Phase-α 批 1 α-1: 修真沉浸 PoC——雷劫判定事件
+  | 'character.tribulation.attempted';
 
 // EventData 是 discriminated union——`type` 字段做判别式。
 // 命名规则：所有 event data 字段都用 `newValue`/`to` 表示"终态"，`delta`/`from` 表示"变化量"。
@@ -43,7 +45,9 @@ export type EventData =
   | { type: 'character.inheritance-ending-summary.set'; summary: string | null }
   | { type: 'character.end-result.set'; status: string; narrative: string }
   | { type: 'character.settlement-result.set'; settlement: any }
-  | { type: 'character.streaming-narrative.started'; eventIndex: number; placeholderId: string };
+  | { type: 'character.streaming-narrative.started'; eventIndex: number; placeholderId: string }
+  // Phase-α 批 1 α-1: 修真沉浸 PoC——雷劫判定事件 payload
+  | { type: 'character.tribulation.attempted'; fromRealm: string; toRealm: string; outcome: 'success' | 'fall_realm' | 'severe' | 'fatal'; kind: string; difficulty: number; hpDelta: number; cause: string };
 
 // 来源标签（决定 audit + reducer 信任级别）
 export type EventSource = 'user-action' | 'ai-output' | 'system-tick' | 'migration';
