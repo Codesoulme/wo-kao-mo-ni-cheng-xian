@@ -47,7 +47,10 @@ function buildFallbackExplorationEvent(state: any, realm: SecretRealm, ctx: any,
   const hints = realm.encounterHints || [];
   const hint = hints[(state.age + realm.id.length) % Math.max(1, hints.length)] || '秘境气机变化';
   const danger = realm.dangerLevel >= 7;
-  const gain = Math.max(6, Math.round(10 * realm.rewardMultiplier + state.comprehension * 0.12));
+  // 修真 8 维影响秘境收益：悟性 + 运气 都加成（运气越高灵机越多）
+  const comprehensionBonus = (state.comprehension || 0) * 0.12;
+  const luckBonus = (state.luck || 0) * 0.08;
+  const gain = Math.max(6, Math.round(10 * realm.rewardMultiplier + comprehensionBonus + luckBonus));
   const mpCost = Math.min(state.mp || 0, danger ? 10 : 5);
   const luckGain = realm.themeTags?.some((t: string) => ['treasure', 'inheritance', 'spiritual_energy'].includes(t)) ? 1 : 0;
   const title = danger ? `秘境险归·${realm.name}` : `秘境探幽·${realm.name}`;

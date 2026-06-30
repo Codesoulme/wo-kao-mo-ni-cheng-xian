@@ -218,14 +218,35 @@ export async function POST(req: NextRequest) {
       } catch (err: any) {
         console.error('market AI offerings failed, fallback to pool:', err?.message || err);
       }
+      // 修真 8 维·运气 影响：luck ≥ 60 / 80 概率触发珍品优惠；luck ≤ 20 概率涨价
+      const luck = state.luck ?? 50;
+      let luckPriceMultiplier = 1;
+      let luckEventNote = '';
+      if (luck >= 80 && Math.random() < 0.15) {
+        luckPriceMultiplier = 0.85;
+        luckEventNote = '气运相合，坊市主人客气相让，享 85 折。';
+      } else if (luck >= 60 && Math.random() < 0.08) {
+        luckPriceMultiplier = 0.9;
+        luckEventNote = '小有眼缘，摊主抹了个零头，享 9 折。';
+      } else if (luck <= 20 && Math.random() < 0.05) {
+        luckPriceMultiplier = 1.1;
+        luckEventNote = '今日气运不济，摊主眉头一挑，价格涨了些。';
+      }
+      // 涨价只在玩家买价生效，AI offerings 提供的基础 items 上叠加 luck multiplier
+      const marketItemsWithLuck = items.map(it => ({
+        ...it,
+        price: Math.round((it.price || 0) * luckPriceMultiplier),
+      }));
+      // 同时返回玩家背包中可出售物品（估价 = estimateValue * 0.6）；运气高的玩家卖货也加点价（+luck*0.5%）
       const sellable = state.inventory.map(it => ({
         ...it,
-        sellPrice: Math.max(1, Math.floor(estimateValue(it) * 0.6)),
+        sellPrice: Math.max(1, Math.floor(estimateValue(it) * (0.6 + luck * 0.005))),
       }));
       return NextResponse.json({
         success: true,
-        marketItems: items,
+        marketItems: marketItemsWithLuck,
         sellableItems: sellable,
+        luckEventNote: luckEventNote || undefined,
         playerSpiritStones: state.spiritStones,
         storageCapacity: state.storageCapacity,
         inventoryCount: state.inventory.length,

@@ -2036,8 +2036,10 @@ export function tryBreakthrough(
   const hasStrongReason = /奇遇|传承|顿悟|丹|灵药|天材地宝|灌顶|秘境|仙缘|雷劫|天劫|血脉|功法|灵脉|机缘/.test(reason);
   const requestedTargetRealm = intent?.targetRealm;
   const requestedTargetLevel = Number(intent?.targetLevel || 0);
+  // 悟性影响连破：comprehension ≥ 70 时允许 1 步额外连破（无强因果时），≥ 85 时允许 2 步
+  const comprehensionChainBonus = (state.comprehension || 0) >= 85 ? 2 : (state.comprehension || 0) >= 70 ? 1 : 0;
   const allowChain = hasStrongReason && (Boolean(requestedTargetRealm) || requestedTargetLevel > state.realmLevel + 1);
-  const maxSteps = allowChain ? 4 : 1;
+  const maxSteps = allowChain ? 4 : (comprehensionChainBonus > 0 ? 1 + comprehensionChainBonus : 1);
 
   let next: CharacterState = { ...state };
   let steps = 0;
@@ -2164,6 +2166,89 @@ export function applySpiritualRootChange(state: CharacterState, change?: Spiritu
       source: change.reason || 'ai-event',
     },
   };
+}
+
+// 天劫判定档位（修真风味，不可外露为"算法/概率"机制词）
+export type TribulationVerdict =
+  | 'passed_with_refinement'  // 渡过并获得淬体加成（天降祥瑞、灵台稳固）
+  | 'passed_barely'           // 堪堪渡过，身心俱疲，轻伤
+  | 'failed_fall_realm'       // 失败跌回原境界，不掉大境界
+  | 'failed_fatal'            // 渡劫陨落
+  | 'skipped';                // 跳过——已在该大境界历劫过
+
+export interface TribulationOutcome {
+  verdict: TribulationVerdict;
+  targetRealm: Realm;
+  // 失败时的回滚境界（仅 failed_fall_realm 使用）
+  revertedRealm?: Realm;
+  // 渡劫后的淬体加成（仅 passed_with_refinement 使用）
+  refinementBonus?: { maxHp?: number; maxMp?: number; attack?: number; defense?: number; speed?: number };
+  // 因果残响（karma 偏移）
+  karmaShift: number;
+  // 中文叙事因由（渡劫者视角的一句话）
+  reason: string;
+}
+
+// 计算渡劫下场（不落 state）
+// 修真风味的硬约束：
+// - 致命陨落 ≤ 30% 上限（owner 关注点）
+// - 首次大境界失败：fall-realm 概率占多数，fatal 仅在极低气血/极重业火时触发
+// - 高 karma（善）提升 passed_with_refinement 概率；低 karma（恶）提升 failed_fall_realm 概率
+// - sin 高叠加会提升致命概率
+export function computeTribulationOutcome(state: CharacterState, targetRealm: Realm): TribulationOutcome {
+  const stateAny = state as any;
+  const karma = Number(stateAny.karma || 0);
+  const sin = Number(stateAny.sin || 0);
+  const merit = Number(stateAny.merit || 0);
+  const hpRatio = state.maxHp > 0 ? state.hp / state.maxHp : 0;
+  // 修真三宝·身神 — 渡劫加成：体魄/魂魄/悟 各按值缩窄致命/跌落区间
+  const bodyTenacity = stateAny.physicalFoundation ?? 0;
+  const soulStability = stateAny.soulStrength ?? 0;
+  const enlightenment = state.comprehension ?? 0;
+  const tribulationDefenseBonus = Math.min(0.20, bodyTenacity * 0.0008);
+  const tribulationSoulBonus = Math.min(0.12, soulStability * 0.0006);
+  const tribulationEnlightenBonus = Math.min(0.10, enlightenment * 0.0005);
+
+  // 基础判定值（0..1）：修真世界观'天时、地利、人和'用伪随机种子近似模拟
+  const seedRaw = Math.abs(Math.floor(state.age)) + sin * 7 - merit * 3 + state.realmLevel * 5;
+  const seed = ((seedRaw % 100) + 100) % 100;
+  const fateRoll = seed / 100;
+
+  const karmaDelta = Math.max(-0.15, Math.min(0.15, karma * 0.15));
+
+  const fatalRange = Math.max(0.0, Math.min(0.30, 0.05 + sin * 0.01) + (hpRatio < 0.3 ? 0.15 : 0) - tribulationDefenseBonus);
+  const fallRange = Math.max(0.0, Math.min(0.25, 0.10 + sin * 0.005 + (karma < 0 ? -karma * 0.05 : 0)) - tribulationSoulBonus);
+  const adjusted = fateRoll - karmaDelta - tribulationEnlightenBonus;
+
+  let verdict: TribulationVerdict = 'passed_barely';
+  let refinementBonus: TribulationOutcome['refinementBonus'] | undefined;
+  let karmaShift = 0;
+  let reason = '';
+
+  if (adjusted < fatalRange) {
+    verdict = 'failed_fatal';
+    karmaShift = -0.05 - sin * 0.001;
+    reason = sin > 20
+      ? '业火缠身，天雷灌顶，道基崩解'
+      : hpRatio < 0.3
+        ? '气血早已亏虚，天雷之下再无余力'
+        : '天雷凶猛，道基难承，魂飞魄散';
+  } else if (adjusted < fatalRange + fallRange) {
+    verdict = 'failed_fall_realm';
+    karmaShift = -0.02;
+    reason = karma < -0.3
+      ? '杀业深重，天雷反噬，跌回原境界'
+      : '雷云之下难以寸进，跌回原境界以图再破';
+  } else if (adjusted < 0.50) {
+    verdict = 'passed_barely';
+    karmaShift = 0;
+    reason = '勉强渡过天劫，神魂疲惫，根基尚稳';
+  } else {
+    verdict = 'passed_with_refinement';
+    refinementBonus = { maxHp: 1.2, maxMp: 1.2, attack: 1.15, defense: 1.15, speed: 1.1 };
+    reason = '天雷淬体，根基稳固，灵台愈发清明';
+  }
+  return { verdict, targetRealm, refinementBonus, karmaShift, reason };
 }
 
 // ==================== 寿元检查 ====================
@@ -2464,6 +2549,148 @@ export function addItems(state: CharacterState, items: ItemEntry[]): CharacterSt
   // 储物袋获得即扩容
   if (bagBoost > 0) next.storageCapacity = projectedCapacity;
   return next;
+}
+
+// ==================== α-4 功法三段（经/诀/神通）====================
+
+// 阶段阈值表（闭区间右开；与 InventoryPanel chip 颜色映射保持一致）
+// 0..33 = practiced(初习) / 34..66 = awakened(觉意) / 67..100 = transcendent(神通 / 大成)
+export const SCRIPTURE_STAGE_THRESHOLDS: { stage: 'practiced' | 'awakened' | 'transcendent'; min: number; max: number; label: string; color: string }[] = [
+  { stage: 'practiced',     min: 0,  max: 33, label: '初习', color: '#9ca3af' }, // 灰
+  { stage: 'awakened',      min: 34, max: 66, label: '觉意', color: '#14b8a6' }, // 青
+  { stage: 'transcendent',  min: 67, max: 100, label: '大成', color: '#a855f7' }, // 紫
+];
+
+// 给定 exp（0..100）返回当前阶段。exp 越界会被夹紧。
+// 兼容旧数据：若 item 无 stage 字段，视作 exp=0 → 'practiced'。
+export function computeScriptureStage(expOrItem: number | ItemEntry | null | undefined): 'practiced' | 'awakened' | 'transcendent' {
+  let exp: number;
+  if (typeof expOrItem === 'number') {
+    exp = expOrItem;
+  } else if (expOrItem && typeof expOrItem === 'object') {
+    exp = typeof expOrItem.scriptureExp === 'number' ? expOrItem.scriptureExp : 0;
+  } else {
+    exp = 0;
+  }
+  if (!Number.isFinite(exp)) exp = 0;
+  const clamped = Math.max(0, Math.min(100, exp));
+  if (clamped <= 33) return 'practiced';
+  if (clamped <= 66) return 'awakened';
+  return 'transcendent';
+}
+
+// 给出 exp 计算阶段标签（中文：初习/觉意/大成）
+export function scriptureStageLabel(stage: 'practiced' | 'awakened' | 'transcendent' | null | undefined): string {
+  if (stage === 'awakened') return '觉意';
+  if (stage === 'transcendent') return '大成';
+  return '初习';
+}
+
+// 给出 exp 计算阶段色（chip 颜色用）
+export function scriptureStageColor(stage: 'practiced' | 'awakened' | 'transcendent' | null | undefined): string {
+  const found = SCRIPTURE_STAGE_THRESHOLDS.find(t => t.stage === (stage || 'practiced'));
+  return found?.color || '#9ca3af';
+}
+
+// 给单个 scripture 物品累计 exp，自动判定阶段并落 scriptureStage。
+// expDelta 由调用方钳制（建议 [0..30]/事件 防溢出）；reason 仅用于日志，不修改物品。
+// 返回 { state, item, crossedStage, oldStage }：
+//   - crossedStage=true 表示本次累计跨段（practiced→awakened 或 awakened→transcendent）
+//   - oldStage 用于日志 / 反馈
+//   - item 已是新值（写回 inventory / equipped 后视图一致）
+// 兼容：旧 scripture 无 stage 字段 → 视作初习 + 0 exp；item 不存在时返回 state 不变。
+export function addScriptureProgress(
+  state: CharacterState,
+  scriptureId: string,
+  expDelta: number,
+  reason?: string
+): { state: CharacterState; item: ItemEntry; crossedStage: boolean; oldStage: 'practiced' | 'awakened' | 'transcendent'; newStage: 'practiced' | 'awakened' | 'transcendent' } {
+  // 悟性影响功法修炼：comprehension 每点 +0.5% exp 增益（上限 +50%）
+  const comprehensionBoost = Math.min(1.5, 1 + (state.comprehension || 0) * 0.005);
+  const safeDelta = Number.isFinite(expDelta) ? Math.max(0, Math.min(30, Math.floor(expDelta * comprehensionBoost))) : 0;
+  // 找 inventory + equipped 两处
+  let item: ItemEntry | undefined = state.inventory.find(it => it.id === scriptureId);
+  let location: 'inventory' | 'equipped' | null = item ? 'inventory' : null;
+  if (!item) {
+    item = (state.equipped || []).find(it => it.id === scriptureId);
+    if (item) location = 'equipped';
+  }
+  if (!item || item.item_type !== 'scripture') {
+    // 找不到或非 scripture：原状返回 state，构造空 item 以便类型对齐
+    return {
+      state,
+      item: { id: scriptureId, name: '未知功法', description: '', item_type: 'scripture', rarity: 'common', effects: [], source: 'engine' },
+      crossedStage: false,
+      oldStage: 'practiced',
+      newStage: 'practiced',
+    };
+  }
+  const oldExp = typeof item.scriptureExp === 'number' && Number.isFinite(item.scriptureExp) ? item.scriptureExp : 0;
+  const oldStage = (item.scriptureStage && ['practiced', 'awakened', 'transcendent'].includes(item.scriptureStage))
+    ? item.scriptureStage
+    : computeScriptureStage(oldExp);
+  const newExp = Math.max(0, Math.min(100, oldExp + safeDelta));
+  const newStage = computeScriptureStage(newExp);
+  const crossedStage = newStage !== oldStage;
+  const awakeningHook = crossedStage
+    ? (typeof reason === 'string' && reason.trim() ? reason.trim().slice(0, 80) : `${scriptureStageLabel(oldStage)} → ${scriptureStageLabel(newStage)}`)
+    : item.scriptureAwakeningHook;
+  const updated: ItemEntry = {
+    ...item,
+    scriptureExp: newExp,
+    scriptureStage: newStage,
+    scriptureAwakeningHook: awakeningHook,
+  };
+  // 写回 inventory / equipped（不可变更新）
+  let next = state;
+  if (location === 'inventory') {
+    next = { ...state, inventory: state.inventory.map(it => it.id === scriptureId ? updated : it) };
+  } else if (location === 'equipped') {
+    next = { ...state, equipped: (state.equipped || []).map(it => it.id === scriptureId ? updated : it) };
+  }
+  return { state: next, item: updated, crossedStage, oldStage, newStage };
+}
+
+// 把 aiOutput.scriptureProgress 列表应用到 state 上（按 id 或 name 匹配）
+// 单条 delta 限幅 [0..30]，跨多事件总和单场上限 100（一次 AI 事件整体不会超过整段进度）。
+// 返回 { state, applied: [{ id, delta, crossedStage, oldStage, newStage, awakeningHook }], dropped }
+//   - applied 顺序与输入一致
+//   - dropped 是无效条目（无 itemId/itemName 或非 scripture 或不存在）
+export function applyScriptureProgressFromAI(
+  state: CharacterState,
+  progresses: { itemId?: string; itemName: string; expDelta: number; reason?: string }[] | undefined | null
+): { state: CharacterState; applied: { id: string; name: string; delta: number; crossedStage: boolean; oldStage: 'practiced' | 'awakened' | 'transcendent'; newStage: 'practiced' | 'awakened' | 'transcendent'; awakeningHook?: string }[]; dropped: number } {
+  if (!Array.isArray(progresses) || progresses.length === 0) {
+    return { state, applied: [], dropped: 0 };
+  }
+  let next = state;
+  let applied: { id: string; name: string; delta: number; crossedStage: boolean; oldStage: 'practiced' | 'awakened' | 'transcendent'; newStage: 'practiced' | 'awakened' | 'transcendent'; awakeningHook?: string }[] = [];
+  let dropped = 0;
+  for (const p of progresses) {
+    if (!p || typeof p !== 'object') { dropped++; continue; }
+    const targetId = (typeof p.itemId === 'string' && p.itemId) ? p.itemId : '';
+    let targetItem: ItemEntry | undefined;
+    if (targetId) {
+      targetItem = next.inventory.find(it => it.id === targetId) || (next.equipped || []).find(it => it.id === targetId);
+    }
+    if (!targetItem && p.itemName) {
+      targetItem = next.inventory.find(it => it.item_type === 'scripture' && it.name === p.itemName)
+        || (next.equipped || []).find(it => it.item_type === 'scripture' && it.name === p.itemName);
+    }
+    if (!targetItem || targetItem.item_type !== 'scripture') { dropped++; continue; }
+    const result = addScriptureProgress(next, targetItem.id, p.expDelta, p.reason);
+    next = result.state;
+    applied.push({
+      id: targetItem.id,
+      name: targetItem.name,
+      delta: Math.max(0, Math.min(30, Math.floor(Number(p.expDelta) || 0))),
+      crossedStage: result.crossedStage,
+      oldStage: result.oldStage,
+      newStage: result.newStage,
+      awakeningHook: result.item.scriptureAwakeningHook,
+    });
+  }
+  return { state: next, applied, dropped };
 }
 
 // ==================== 记忆管理 ====================
@@ -3569,6 +3796,15 @@ export function startCombat(state: CharacterState, trigger: NonNullable<AIEventO
     playerAttack: state.attack,
     playerDefense: state.defense,
     playerSpeed: state.speed,
+    // 修真三宝·身神——影响实际战斗：破势/护持/机变在 damage 公式里替换基础攻防速
+    playerForce: (state as any).combatProjection?.force ?? state.attack,
+    playerGuard: (state as any).combatProjection?.guard ?? state.defense,
+    playerAgility: (state as any).combatProjection?.agility ?? state.speed,
+    playerSpiritualSense: (state as any).spiritualSense ?? 0,
+    playerSoulStrength: (state as any).soulStrength ?? 0,
+    playerPhysicalFoundation: (state as any).physicalFoundation ?? 0,
+    playerLuck: state.luck ?? 0,
+    playerComprehension: state.comprehension ?? 0,
     // 从已装备功法/法宝提取可施展术法（与「宝」页习得法术同源）
     playerSkills: buildLearnedCombatArts(state).slice(0, 4),
     // 从背包提取丹药（consumable 类）
@@ -4157,19 +4393,38 @@ export function executeCombatRound(
   let playerActionDesc = '';
   let playerActionType: CombatRound['playerActionType'] = 'attack';
 
+  // 修真三宝 8 维——本场战斗内一次性结算（破势/护持/机变 替换基础攻防速）
+  // 让「神识/魂魄/体魄/悟/运」真的进战斗公式，而不只是显示
+  const myForce    = (session.playerForce    ?? session.playerAttack);
+  const myGuard    = (session.playerGuard    ?? session.playerDefense);
+  const myAgility  = (session.playerAgility  ?? session.playerSpeed);
+  const myLuck     = session.playerLuck     ?? state.luck     ?? 0;
+  const myCompr    = session.playerComprehension ?? state.comprehension ?? 0;
+  // 暴击（运）：luck 每点 +0.4% 暴击率；闪避（机变）：agility 每点 +0.3% 闪避
+  const critChance = Math.min(0.5, Math.max(0, myLuck * 0.004));
+  const dodgeChance = Math.min(0.4, Math.max(0, myAgility * 0.003));
+
   // 玩家行动
   if (action === 'attack') {
     playerActionType = 'attack';
     playerActionDesc = '挥出攻招';
-    playerDamageDealt = computeDamage(session.playerAttack, enemy.defense);
+    playerDamageDealt = computeDamage(myForce, enemy.defense);
     const weakness = consumeCombatWeaknessInsight(session, session.currentEnemyIdx);
     if (weakness) {
       const bonus = Math.max(1, Math.floor(playerDamageDealt * weakness.bonusPct));
       playerDamageDealt += bonus;
       narrative += '先前窥见的破绽在此刻应验，';
     }
+    const isCrit = Math.random() < critChance;
+    let dmg = computeDamage(myForce, enemy.defense, isCrit ? 1.5 : 1, 0.2);
+    if (isCrit) {
+      dmg = Math.floor(dmg * 1.5);
+      narrative += `气运牵引，${enemy.name}露出破绽，你出招攻向它，造成 ${dmg} 点伤害（暴击）！`;
+    } else {
+      narrative += `你出招攻向${enemy.name}，造成 ${dmg} 点伤害。`;
+    }
+    playerDamageDealt = dmg;
     enemyHp -= playerDamageDealt;
-    narrative += `你出招攻向${enemy.name}，造成 ${playerDamageDealt} 点伤害。`;
   } else if (action === 'skill' && payload?.skillIdx != null) {
     playerActionType = 'skill';
     const skillIdx = selectedOption?.skillIdx ?? payload.skillIdx;
@@ -4190,7 +4445,9 @@ export function executeCombatRound(
     }
     playerMp -= skill.mpCost;
     playerActionDesc = `施展${skill.name}`;
-    playerDamageDealt = computeDamage(session.playerAttack, enemy.defense, skill.power, 0.3);
+    // 悟性影响法术：comprehension 每点 +0.5% 威力，上限 +50%
+    const spellBoost = Math.min(1.5, 1 + myCompr * 0.005);
+    playerDamageDealt = computeDamage(myForce, enemy.defense, skill.power * spellBoost, 0.3);
     const weakness = consumeCombatWeaknessInsight(session, session.currentEnemyIdx);
     if (weakness) {
       const bonus = Math.max(1, Math.floor(playerDamageDealt * weakness.bonusPct));
@@ -4318,8 +4575,8 @@ export function executeCombatRound(
   } else if (action === 'flee') {
     playerActionType = 'flee';
     playerActionDesc = '转身遁走';
-    // 逃跑成功率：速度差 + 随机
-    const fleeChance = 0.3 + (session.playerSpeed - enemy.speed) * 0.02;
+    // 逃跑成功率：机变差 + 随机（机变包含速度与神识加成）
+    const fleeChance = 0.3 + (myAgility - enemy.speed) * 0.02;
     if (Math.random() < fleeChance) {
       narrative += '你身形一闪，成功脱离战场。';
       const endSession: CombatSession = { ...session, status: 'fled' };
@@ -4401,9 +4658,24 @@ export function executeCombatRound(
 
     // 敌人反击（除非被镇符眩晕）
     if (!session.enemyStunned) {
+      // 机变闪避：玩家 agility 每点 +0.3% 闪避率（上限 40%）
+      const didDodge = Math.random() < dodgeChance;
+      if (didDodge) {
+        enemyDamageDealt = 0;
+        narrative += `${enemy.name}反扑，你身形机敏，堪堪避过！`;
+        playerHp -= 0;
+        // 仍需把这次回合的结果返回
+        const updatedEnemiesRound = session.enemies.map((e, i) => i === session.currentEnemyIdx ? { ...e, hp: enemyHp } : e);
+        return {
+          state: { ...state, combatSession: { ...session, enemies: updatedEnemiesRound, round: session.round + 1, playerHp, playerMp }, hp: playerHp, mp: playerMp },
+          round: { round: session.round, playerAction: playerActionDesc, playerActionType, playerDamage: playerDamageDealt, playerHeal, narrative, playerHpAfter: playerHp, enemyHpAfter: enemyHp, playerMpAfter: playerMp },
+          ended: false,
+        };
+      }
+      // 护持（替换 defense）：减伤
       let enemyDmg = action === 'defend'
-        ? Math.floor(computeDamage(enemy.attack, session.playerDefense, 1, 0.2) * 0.5)
-        : computeDamage(enemy.attack, session.playerDefense, 1, 0.2);
+        ? Math.floor(computeDamage(enemy.attack, myGuard, 1, 0.2) * 0.5)
+        : computeDamage(enemy.attack, myGuard, 1, 0.2);
       // Task 23: 防御符减伤
       if (session.talismanDefenseActive && session.talismanDefenseActive > 0) {
         const blocked = Math.min(enemyDmg, session.talismanDefenseActive);
