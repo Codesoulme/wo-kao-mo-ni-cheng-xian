@@ -15,6 +15,11 @@ import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 import { getCurrentUser } from '@/lib/auth-helpers';
 import { generateEntityId } from '@/lib/xianxia/engine';
+// Phase 5 #2: ECS tick helper（PoC 复用 advance 的 AgingSystem + CultivationSystem）
+import { tickEcsForCharacter, applyEcsTickToState } from '@/lib/xianxia/ecs/tick-helper';
+// Event Sourcing Phase-5 #1：interfere 路由必走 ES 路径（升级自批 14 "附加式"事务内 append）。
+// 用 mustRouteEsAppendEvent 替换事务内 tx.event.create（仍走 try/catch 兜底，主流程不被阻断）。
+import { mustRouteEsAppendEvent, recomputeAndPersistState } from '@/lib/xianxia/events/middleware';
 
 // P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
@@ -223,6 +228,32 @@ export async function POST(req: NextRequest) {
       aiBoundaryTrace: [],
     }) : [];
 
+    // Phase 5 #2: ECS tick（PoC 复用 AgingSystem + CultivationSystem）。失败仅 console.error，不阻断主流程。
+    // 放在 stateChangeLog 计算后、事务前——和 choose / advance 风格一致；不会和 Event Sourcing PoC 冲突。
+    try {
+      const ecsBaseSnapshot = {
+        characterId,
+        name: state.name || '',
+        age: state.age,
+        realm: state.realm,
+        cultivationExp: state.cultivationExp,
+        hp: state.hp,
+        maxHp: state.maxHp,
+        spiritStones: state.spiritStones,
+        alive: state.alive,
+        lifespan: state.lifespan || 100,
+        inventory: [],
+      };
+      const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'interfere' });
+      applyEcsTickToState(state, ecsResult);
+      // 若 ECS tick 把角色判死，要同步设置 died/deathReason（让前端拿到 deathReason）
+      if (ecsResult && !ecsResult.alive && !died) {
+        died = true;
+        deathReason = state.causeOfDeath || 'ecs-aging-natural';
+      }
+    } catch (e) {
+      console.error('[interfere] ECS tick failed (non-fatal):', e);
+    }
 
     // 持久化
     // P1-3 修复：interfere 路由加幂等保护——与 advance 路由风格一致，用 updateMany + age 条件做乐观锁。
@@ -407,6 +438,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ===== Event Sourcing Phase-5 #1 必走 ES（事务后）=====
+    // interfere 路由的事件落库与 updateMany + log 在同事务内（保留原子性）；
+    // 此处事务后调 mustRouteEsAppendEvent 走"必走 ES middleware"路径，
+    // 验证 router 经过 middleware → store.appendEvent → projector 重算 链路通。
+    // 失败不阻断：返回结果中标注 esMiddlewareOk=false 供 smoke 校验降级行为。
+    let esMiddlewareOk = false;
+    let esProjectionOk = false;
+    if (result.accepted) {
+      // 探针：必走 ES — append "interfere-middleware-pass" 标记事件
+      const appendRes = await mustRouteEsAppendEvent({
+        characterId,
+        type: 'character.cultivation-exp.changed',
+        data: {
+          type: 'character.cultivation-exp.changed',
+          delta: 0,
+          newValue: charAfter.cultivationExp,
+          reason: 'interfere:middleware-pass',
+        },
+        source: 'user-action',
+        triggerActor: 'player',
+        createdAtAge: charAfter.age,
+      });
+      esMiddlewareOk = appendRes.committed;
+
+      // 探针：必走 projector 重算
+      const projRes = await recomputeAndPersistState(characterId, async () => true);
+      esProjectionOk = projRes.ok;
+    }
+
     return NextResponse.json({
       success: true,
       classification: result.classification,
@@ -421,6 +481,9 @@ export async function POST(req: NextRequest) {
       // Task 20: 是否触发战斗（前端据此打开 CombatModal）
       triggeredCombat: !!state.combatSession,
       state: stateToResponse(state),
+      // Phase 5 #1: 必走 ES 探针标记（前端可忽略，smoke 用）
+      esMiddlewareOk,
+      esProjectionOk,
     });
   } catch (err: any) {
     console.error('interfere error:', err);

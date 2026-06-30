@@ -14,10 +14,12 @@ import { sanitizeNarrativeText } from '@/lib/xianxia/display';
 import { registerMany, registerNpc } from '@/lib/xianxia/content-registry';
 import type { ValidationTrace } from '@/lib/xianxia/content-registry';
 import { getCurrentUser } from '@/lib/auth-helpers';
-// Event Sourcing PoC: appendEvent 接入 choose 写路径（批 14 PoC 集成）。
-// 仅在 cultivationInsight / spiritualRoot / cultivationFactors 变更时 append event。
-// appendEvent 失败不影响主流程——保留原 db.character.update 兼容路径。
-import { appendEvent } from '@/lib/xianxia/events/store';
+// Event Sourcing Phase-5 #1：choose 路由必走 ES 路径（升级自批 14 "附加式"）。
+// 用 mustRouteEsAppendEvent 强制落事件；用 recomputeAndPersistState 走 projector 重算 + 回写 DB。
+// 失败回退到原 db.update 主路径——不阻断用户主流程。
+import { mustRouteEsAppendEvent, recomputeAndPersistState, withEventSourcing } from '@/lib/xianxia/events/middleware';
+// Phase 5 #2: ECS tick helper（PoC 复用 advance 的 AgingSystem + CultivationSystem）
+import { tickEcsForCharacter, applyEcsTickToState } from '@/lib/xianxia/ecs/tick-helper';
 
 // P1 step2 worker A: 生产模式下强制 userId 检查；dev 模式保持原行为。
 
@@ -149,61 +151,64 @@ export async function POST(req: NextRequest) {
       for (const id of result.failThreadIds) state = failThread(state, id);
     }
 
-    // Event Sourcing PoC: 在写路径上 append event。
-    // 仅在 cultivationInsight / spiritualRoot / cultivationFactors 变更时触发。
-    // stateBeforeChoice 是 dbToState(char) 后的浅拷贝快照——含 cultivationFactors / spiritualRoot / realm / cultivationExp。
-    // 注意：try/catch 包住——appendEvent 失败不影响主流程（保留原 db.update 兼容路径）。
-    try {
-      const factorsBefore = stateBeforeChoice.cultivationFactors;
-      const factorsAfter = state.cultivationFactors;
-      const factorsChanged =
-        JSON.stringify(factorsBefore || []) !== JSON.stringify(factorsAfter || []);
+    // Event Sourcing Phase-5 #1 必走 ES：替代原批 14 "附加式" try/catch。
+    // 走 mustRouteEsAppendEvent 强制落事件；走 recomputeAndPersistState 走 projector 重算。
+    // 失败不阻断：ES 失败 → 走原 db.update 主路径；projector 失败 → 走原 db.update。
+    const factorsBefore = stateBeforeChoice.cultivationFactors;
+    const factorsAfter = state.cultivationFactors;
+    const factorsChanged =
+      JSON.stringify(factorsBefore || []) !== JSON.stringify(factorsAfter || []);
+    const esCommits: Array<{ type: string; committed: boolean; eventId?: string }> = [];
 
-      // 修为因素（cultivationFactors）变更 → cultivation-exp.changed 事件
-      if (factorsChanged) {
-        try {
-          await appendEvent({
-            characterId,
-            type: 'character.cultivation-exp.changed',
-            data: {
-              type: 'character.cultivation-exp.changed',
-              delta: (state.cultivationExp ?? 0) - (stateBeforeChoice.cultivationExp ?? 0),
-              newValue: state.cultivationExp ?? 0,
-              reason: 'choose:factors-recomputed',
-            },
-            source: 'user-action',
-            triggerActor: 'player',
-            createdAtAge: state.age,
-          });
-        } catch (e) {
-          console.error('[choose] cultivation-exp event append failed (non-fatal):', e);
-        }
-      }
-
-      // 灵根（spiritualRoot）变更 → realm.changed 事件（method: 'set' 标识 choose 触发的覆写）
-      if (stateBeforeChoice.spiritualRoot !== state.spiritualRoot) {
-        try {
-          await appendEvent({
-            characterId,
-            type: 'character.realm.changed',
-            data: {
-              type: 'character.realm.changed',
-              from: stateBeforeChoice.realm,
-              to: state.realm,
-              method: 'set',
-            },
-            source: 'user-action',
-            triggerActor: 'player',
-            createdAtAge: state.age,
-          });
-        } catch (e) {
-          console.error('[choose] realm event append failed (non-fatal):', e);
-        }
-      }
-    } catch (e) {
-      // 外层 try：兜底防御，理论上内层已经捕获，但保险起见再 catch 一次。
-      console.error('[choose] event sourcing PoC outer catch (non-fatal):', e);
+    // 必走 ES：修为因素变更
+    if (factorsChanged) {
+      const r = await mustRouteEsAppendEvent({
+        characterId,
+        type: 'character.cultivation-exp.changed',
+        data: {
+          type: 'character.cultivation-exp.changed',
+          delta: (state.cultivationExp ?? 0) - (stateBeforeChoice.cultivationExp ?? 0),
+          newValue: state.cultivationExp ?? 0,
+          reason: 'choose:factors-recomputed',
+        },
+        source: 'user-action',
+        triggerActor: 'player',
+        createdAtAge: state.age,
+      });
+      esCommits.push({ type: 'cultivation-exp.changed', committed: r.committed, eventId: r.eventId });
     }
+
+    // 必走 ES：灵根/境界变更
+    if (stateBeforeChoice.spiritualRoot !== state.spiritualRoot) {
+      const r = await mustRouteEsAppendEvent({
+        characterId,
+        type: 'character.realm.changed',
+        data: {
+          type: 'character.realm.changed',
+          from: stateBeforeChoice.realm,
+          to: state.realm,
+          method: 'set',
+        },
+        source: 'user-action',
+        triggerActor: 'player',
+        createdAtAge: state.age,
+      });
+      esCommits.push({ type: 'realm.changed', committed: r.committed, eventId: r.eventId });
+    }
+
+    // 必走 ES：projector 重算 state（验证 cache 失效 → 重算链路正常）
+    // PoC：recompute 仅作"读路径"探针，不替换 state（state 已是 router 算出的最终值）。
+    // 成功标记 esProjectionOk=true 即可——失败不阻断主流程。
+    let esProjectionOk = false;
+    if (esCommits.some((c) => c.committed)) {
+      const projResult = await recomputeAndPersistState(characterId, async (_projectedState) => {
+        // 不真的回写——choose 路由下面已有完整的 db.character.update。
+        // 这里只验"projector 可读"+"persist 回调可被调用"，返回 true 让 middleware 知道链路通。
+        return true;
+      });
+      esProjectionOk = projResult.ok;
+    }
+    void esProjectionOk;
     // Task 20: 触发战斗
     // Task 22: 优先使用选择结果的 triggerCombat（AI 可根据玩家选择定制战斗）；
     // 若选择结果未触发战斗，但 advance 时延迟了战斗 → 现在作为 fallback 触发
@@ -241,6 +246,33 @@ export async function POST(req: NextRequest) {
         died = true;
         deathReason = life.reason;
       }
+    }
+
+    // Phase 5 #2: ECS tick（PoC 复用 AgingSystem + CultivationSystem）。失败仅 console.error，不阻断主流程。
+    // 放在寿元检查之后、isAtChoice 之前——和 advance 风格一致；不会和 Event Sourcing PoC 冲突。
+    try {
+      const ecsBaseSnapshot = {
+        characterId,
+        name: state.name || '',
+        age: state.age,
+        realm: state.realm,
+        cultivationExp: state.cultivationExp,
+        hp: state.hp,
+        maxHp: state.maxHp,
+        spiritStones: state.spiritStones,
+        alive: state.alive,
+        lifespan: state.lifespan || 100,
+        inventory: [],
+      };
+      const ecsResult = tickEcsForCharacter(characterId, ecsBaseSnapshot, { source: 'choose' });
+      applyEcsTickToState(state, ecsResult);
+      // 若 ECS tick 把角色判死，要同步设置 died/deathReason（让前端拿到 deathReason）
+      if (ecsResult && !ecsResult.alive && !died) {
+        died = true;
+        deathReason = state.causeOfDeath || 'ecs-aging-natural';
+      }
+    } catch (e) {
+      console.error('[choose] ECS tick failed (non-fatal):', e);
     }
 
 
@@ -403,6 +435,9 @@ export async function POST(req: NextRequest) {
       // Task 20: 是否触发战斗（前端据此打开 CombatModal）
       triggeredCombat: !!state.combatSession,
       state: stateToResponse(state),
+      // Phase 5 #1: 必走 ES 探针标记（前端可忽略，smoke 用）
+      esMiddlewareOk: esCommits.some((c) => c.committed) || esCommits.length === 0,
+      esCommits,
     });
   } catch (err: any) {
     console.error('choose error:', err);

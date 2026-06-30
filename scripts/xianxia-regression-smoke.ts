@@ -5374,6 +5374,8 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseReplayAdvancedSmokes();
       // 批 18.6.3: ECS 数据模型 PoC 基础设施 + Character 演示 — 8 个静态 smoke
       pgRunPhaseEcsSmokes();
+      // Phase 5 #2: ECS tick helper + choose/interfere/advance 接入 — 3 个静态 smoke
+      pgRunPhaseP5EcsTickHelperSmokes();
       // 批 20b: ES 真实链路集成测试（轻量——import + 返回值结构；完整跑需 --db）— 2 个静态 smoke
       pgRunPhaseEsIntegrationSmokes();
       // 批 22: page.tsx 主 tab 重构（5 个新 tab：道途/命途/传承/人情/修行）— 5 个静态 smoke
@@ -10412,8 +10414,13 @@ function pgRunPhaseEventsSmokes(): void {
 
 function smokeChooseEvent001AppendEventImported(): void {
   const src = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
-  assert(src.includes("from '@/lib/xianxia/events/store'"), 'choose route should import from events/store');
-  assert(src.includes('appendEvent('), 'choose route should call appendEvent');
+  // Phase 5 #1 升级：choose 路由从"附加式 appendEvent"改为"必走 ES middleware"。
+  // 校验从 events/store import 改为 events/middleware import；appendEvent 调用改为 middleware helper。
+  assert(
+    src.includes("from '@/lib/xianxia/events/middleware'"),
+    'choose route should import from events/middleware (Phase 5 #1 must-route ES)',
+  );
+  assert(src.includes('mustRouteEsAppendEvent('), 'choose route should call mustRouteEsAppendEvent');
   log('smoke-choose-event-001-append-event-imported', { passed: true });
 }
 
@@ -10456,21 +10463,27 @@ function smokeChooseEvent003RealmTriggerOnRootChange(): void {
 
 function smokeChooseEvent004FailureNonFatal(): void {
   const src = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
-  // appendEvent 必须被 try/catch 包住——失败不能影响主流程
-  // 至少出现两次 "catch"（cultivation-exp + realm）+ 一次外层 catch
-  const catchCount = (src.match(/catch \(e\)/g) || []).length;
-  assert(catchCount >= 2, `choose route should wrap appendEvent with try/catch (>=2 inner catches), found ${catchCount}`);
-  // 关键非致命提示
+  // Phase 5 #1 升级：try/catch 已下沉到 middleware 内部（mustRouteEsAppendEvent 返回 committed=false）。
+  // 校验：middleware 必须从内部 try/catch 返回，不抛异常（router 不直接调用 appendEvent）。
   assert(
-    src.includes('non-fatal') || src.includes('console.error'),
-    'choose route appendEvent failure should be logged (non-fatal)'
+    src.includes('mustRouteEsAppendEvent('),
+    'choose route should use mustRouteEsAppendEvent (middleware absorbs failures)',
   );
-  // 主流程 db.character.update 仍然存在
+  assert(
+    src.includes('recomputeAndPersistState('),
+    'choose route should use recomputeAndPersistState (projector path absorbs failures)',
+  );
+  // 主流程 db.character.update 仍然存在（兼容路径，不被 ES 失败阻断）
   assert(
     src.includes('db.character.update'),
-    'choose route should still call db.character.update (compat path)'
+    'choose route should still call db.character.update (compat path)',
   );
-  log('smoke-choose-event-004-failure-non-fatal', { passed: true, catchCount });
+  // 中间件响应：esCommits + esMiddlewareOk 标记
+  assert(
+    src.includes('esCommits') && src.includes('esMiddlewareOk'),
+    'choose response should expose esCommits + esMiddlewareOk for downstream observability',
+  );
+  log('smoke-choose-event-004-failure-non-fatal', { passed: true });
 }
 
 async function smokeChooseEvent005RealChain(): Promise<void> {
@@ -10632,9 +10645,10 @@ function smokeInterfereEvent003RealmTrigger(): void {
 function smokeInterfereEvent004IdempotentLockNoEvent(): void {
   const src = readFileSync('src/app/api/game/interfere/route.ts', 'utf-8');
   // 乐观锁拦截：updateMany count===0 → throw IDEMPOTENT_DUPLICATE
-  // throw 必须在 tx.event.create 之前（否则乐观锁挡不住第二次时还会写 event）
+  // throw 必须在事务内第一个 await tx.event.create 之前（否则乐观锁挡不住第二次时还会写 event）。
+  // Phase 5 #1：注释里也可能提到 tx.event.create——所以找真实 "await tx.event.create("（前缀 await）。
   const idxLock = src.indexOf("throw new Error('IDEMPOTENT_DUPLICATE')");
-  const idxFirstCreate = src.indexOf('tx.event.create');
+  const idxFirstCreate = src.indexOf('await tx.event.create');
   assert(idxLock > -1, 'interfere route should throw IDEMPOTENT_DUPLICATE on optimistic lock fail');
   assert(idxFirstCreate > -1, 'interfere route should call tx.event.create somewhere');
   assert(
@@ -10643,6 +10657,11 @@ function smokeInterfereEvent004IdempotentLockNoEvent(): void {
   );
   // 乐观锁必须基于 age（与 advance 风格一致）
   assert(/age:\s*char\.age/.test(src), 'interfere route optimistic lock should use age: char.age');
+  // Phase 5 #1 必走 ES：事务后调 mustRouteEsAppendEvent 探针
+  assert(
+    src.includes('mustRouteEsAppendEvent('),
+    'interfere route should call mustRouteEsAppendEvent (Phase 5 #1 must-route ES after tx)',
+  );
   log('smoke-interfere-event-004-idempotent-lock-no-event', { passed: true });
 }
 
@@ -13263,6 +13282,118 @@ function pgRunPhaseEcsSmokes(): void {
   }
 }
 
+// ===== Phase 5 #2: ECS tick helper + choose / interfere / advance 接入 =====
+
+function smokeP5EcsTickHelper001Exists(): void {
+  // tick-helper.ts 必须存在 + 导出 tickEcsForCharacter / applyEcsTickToState
+  assert(existsSync('src/lib/xianxia/ecs/tick-helper.ts'), 'tick-helper.ts should exist');
+  const mod = require('../src/lib/xianxia/ecs/tick-helper.ts');
+  assert(typeof mod.tickEcsForCharacter === 'function', 'should export tickEcsForCharacter');
+  assert(typeof mod.applyEcsTickToState === 'function', 'should export applyEcsTickToState');
+
+  // index.ts barrel 也得导出（保持 ECS 模块对外 API 一致）
+  const indexMod = require('../src/lib/xianxia/ecs/index.ts');
+  assert(typeof indexMod.tickEcsForCharacter === 'function', 'ecs/index should re-export tickEcsForCharacter');
+  assert(typeof indexMod.applyEcsTickToState === 'function', 'ecs/index should re-export applyEcsTickToState');
+
+  log('smoke-p5-ecs-tick-helper-001-exists', { passed: true });
+}
+
+function smokeP5EcsTickHelper002TickAdvancesAgeAndExp(): void {
+  // 实际跑一次 tickEcsForCharacter，验证 AgingSystem + CultivationSystem 生效
+  const { tickEcsForCharacter } = require('../src/lib/xianxia/ecs/tick-helper.ts');
+
+  const characterId = `p5-test-${Date.now()}`;
+  const baseSnapshot = {
+    characterId,
+    name: 'p5-test',
+    age: 20,
+    realm: 'qi-refining',
+    cultivationExp: 50,
+    hp: 100,
+    maxHp: 100,
+    spiritStones: 0,
+    alive: true,
+    lifespan: 200, // 远大于 age → 不会因寿元判死
+    inventory: [],
+  };
+
+  const result = tickEcsForCharacter(characterId, baseSnapshot);
+  assert(result !== null, 'tickEcsForCharacter should return non-null result');
+  // AgingSystem: age + 1
+  assert(result.age === 21, `age should advance to 21, got ${result.age}`);
+  // CultivationSystem: cultivationSpeed(1.0) * comprehension(0) * 0.1 = 0 → cultivationExp 不变（默认 comprehension=0）
+  assert(result.cultivationExp === 50, `cultivationExp should stay 50 (comprehension=0), got ${result.cultivationExp}`);
+  assert(result.alive === true, 'should remain alive (age < lifespan)');
+  // 耗时记录
+  assert(typeof result.durationMs === 'number' && result.durationMs >= 0, 'durationMs should be a non-negative number');
+  assert(result.entityCount === 1, `entityCount should be 1 (one character), got ${result.entityCount}`);
+
+  // 寿元边界：age >= lifespan → alive=false
+  // 注意：tickEcsForCharacter 第一个参数（characterId）必须和 snapshot.characterId 一致，
+  // helper 内部 getEntity(`character-${characterId}`) 用的是第一个参数。
+  const dyingCharId = `p5-dying-${Date.now()}`;
+  const dyingResult = tickEcsForCharacter(dyingCharId, {
+    ...baseSnapshot,
+    characterId: dyingCharId,
+    age: 199,
+    lifespan: 200,
+  });
+  assert(dyingResult !== null, 'dying tick should return result');
+  assert(dyingResult.age === 200, `dying age should be 200, got ${dyingResult.age}`);
+  assert(dyingResult.alive === false, 'should be dead when age >= lifespan');
+
+  log('smoke-p5-ecs-tick-helper-002-tick-advances-age-and-exp', { passed: true });
+}
+
+function smokeP5EcsTickHelper003ChooseAndInterfereRouteCallHelper(): void {
+  // 验证 choose / interfere / advance 三个路由都调用了 helper
+  const chooseSrc = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
+  const interfereSrc = readFileSync('src/app/api/game/interfere/route.ts', 'utf-8');
+  const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+
+  // 1. 三个路由都 import helper
+  assert(chooseSrc.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'choose route should import tick-helper');
+  assert(interfereSrc.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'interfere route should import tick-helper');
+  assert(advanceSrc.includes("from '@/lib/xianxia/ecs/tick-helper'"), 'advance route should import tick-helper');
+
+  // 2. 三个路由都调 tickEcsForCharacter + applyEcsTickToState
+  assert(/tickEcsForCharacter\(/.test(chooseSrc), 'choose route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(chooseSrc), 'choose route should call applyEcsTickToState');
+  assert(/tickEcsForCharacter\(/.test(interfereSrc), 'interfere route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(interfereSrc), 'interfere route should call applyEcsTickToState');
+  assert(/tickEcsForCharacter\(/.test(advanceSrc), 'advance route should call tickEcsForCharacter');
+  assert(/applyEcsTickToState\(/.test(advanceSrc), 'advance route should call applyEcsTickToState');
+
+  // 3. 三个路由都有非致命 try/catch + ECS 失败日志
+  assert(/\[choose\]\s+ECS tick failed \(non-fatal\)/.test(chooseSrc), 'choose route should have non-fatal ECS catch log');
+  assert(/\[interfere\]\s+ECS tick failed \(non-fatal\)/.test(interfereSrc), 'interfere route should have non-fatal ECS catch log');
+  assert(/\[advance\]\s+ECS tick failed \(non-fatal\)/.test(advanceSrc), 'advance route should have non-fatal ECS catch log');
+
+  // 4. 三个路由都构造 baseSnapshot（含 characterId + name + inventory=[]）
+  assert(/name:\s*state\.name/.test(chooseSrc) || /name:\s*char\.name/.test(chooseSrc), 'choose ECS baseSnapshot should include name');
+  assert(/inventory:\s*\[\]/.test(chooseSrc), 'choose ECS baseSnapshot should default inventory=[]');
+  assert(/inventory:\s*\[\]/.test(interfereSrc), 'interfere ECS baseSnapshot should default inventory=[]');
+
+  log('smoke-p5-ecs-tick-helper-003-choose-and-interfere-route-call-helper', { passed: true });
+}
+
+function pgRunPhaseP5EcsTickHelperSmokes(): void {
+  const cases = [
+    { name: 'smoke-p5-ecs-tick-helper-001-exists', fn: smokeP5EcsTickHelper001Exists },
+    { name: 'smoke-p5-ecs-tick-helper-002-tick-advances-age-and-exp', fn: smokeP5EcsTickHelper002TickAdvancesAgeAndExp },
+    { name: 'smoke-p5-ecs-tick-helper-003-choose-and-interfere-route-call-helper', fn: smokeP5EcsTickHelper003ChooseAndInterfereRouteCallHelper },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+      log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
 // 批 20b: Event Sourcing 真实链路集成测试（轻量验证——只验 import + 函数签名；完整跑需要 --db）
 function smokeEsIntegration001Importable(): void {
   // 不连 db，只验证模块能 require + 函数签名
@@ -13290,10 +13421,106 @@ function smokeEsIntegration002ReturnShape(): void {
   log('smoke-es-integration-002-return-shape', { passed: true });
 }
 
+// ===== Phase 5 #1: Event Sourcing middleware（必走 ES）静态 smoke =====
+// 4 个静态校验（不连 db，只验证 import / 函数签名 / 路由源文件包含必走 ES 标记）。
+//   smoke-p5-es-middleware-001: middleware 模块可 require
+//   smoke-p5-es-middleware-002: 关键函数存在（mustRouteEsAppendEvent / recomputeAndPersistState / withEventSourcing）
+//   smoke-p5-es-must-route-choose: choose 路由源文件含 mustRouteEsAppendEvent + recomputeAndPersistState
+//   smoke-p5-es-must-route-interfere: interfere 路由源文件含 mustRouteEsAppendEvent
+
+function smokeP5EsMiddleware001Importable(): void {
+  const mod = require('../src/lib/xianxia/events/middleware');
+  assert(mod !== null && typeof mod === 'object', 'middleware module should be a non-null object');
+  log('smoke-p5-es-middleware-001-importable', { passed: true });
+}
+
+function smokeP5EsMiddleware002Exports(): void {
+  const mod = require('../src/lib/xianxia/events/middleware');
+  assert(
+    typeof mod.mustRouteEsAppendEvent === 'function',
+    'middleware must export mustRouteEsAppendEvent function',
+  );
+  assert(
+    typeof mod.recomputeAndPersistState === 'function',
+    'middleware must export recomputeAndPersistState function',
+  );
+  assert(
+    typeof mod.withEventSourcing === 'function',
+    'middleware must export withEventSourcing function',
+  );
+  assert(
+    typeof mod._esmVersion === 'function' && mod._esmVersion().startsWith('esm-'),
+    'middleware should expose _esmVersion probe',
+  );
+  assert(
+    Array.isArray(mod._esmRegisteredTags()) &&
+      mod._esmRegisteredTags().includes('choose') &&
+      mod._esmRegisteredTags().includes('interfere'),
+    'middleware should register choose + interfere tags',
+  );
+  log('smoke-p5-es-middleware-002-exports', { passed: true });
+}
+
+function smokeP5EsMustRouteChoose(): void {
+  const src = readFileSync('src/app/api/game/choose/route.ts', 'utf-8');
+  // 必走 ES 标记 1：import mustRouteEsAppendEvent
+  assert(
+    src.includes("mustRouteEsAppendEvent") && src.includes("from '@/lib/xianxia/events/middleware'"),
+    'choose route should import mustRouteEsAppendEvent from middleware',
+  );
+  // 必走 ES 标记 2：调用 mustRouteEsAppendEvent（不再用 appendEvent 包 try/catch）
+  assert(
+    src.includes('await mustRouteEsAppendEvent('),
+    'choose route should call mustRouteEsAppendEvent (must-route ES)',
+  );
+  // 必走 ES 标记 3：调用 recomputeAndPersistState（走 projector 链路）
+  assert(
+    src.includes('recomputeAndPersistState('),
+    'choose route should call recomputeAndPersistState (projector path)',
+  );
+  // 不再保留"附加式"：旧 appendEvent import 应被替换
+  assert(
+    !src.includes("from '@/lib/xianxia/events/store'"),
+    'choose route should no longer import appendEvent directly (use middleware instead)',
+  );
+  // 响应必带 esMiddlewareOk 标记
+  assert(
+    src.includes('esMiddlewareOk') && src.includes('esCommits'),
+    'choose response should include esMiddlewareOk + esCommits markers',
+  );
+  log('smoke-p5-es-must-route-choose', { passed: true });
+}
+
+function smokeP5EsMustRouteInterfere(): void {
+  const src = readFileSync('src/app/api/game/interfere/route.ts', 'utf-8');
+  assert(
+    src.includes("mustRouteEsAppendEvent") && src.includes("from '@/lib/xianxia/events/middleware'"),
+    'interfere route should import mustRouteEsAppendEvent from middleware',
+  );
+  assert(
+    src.includes('await mustRouteEsAppendEvent('),
+    'interfere route should call mustRouteEsAppendEvent (must-route ES)',
+  );
+  assert(
+    src.includes('recomputeAndPersistState('),
+    'interfere route should call recomputeAndPersistState (projector path)',
+  );
+  // 响应必带 esMiddlewareOk 标记
+  assert(
+    src.includes('esMiddlewareOk') && src.includes('esProjectionOk'),
+    'interfere response should include esMiddlewareOk + esProjectionOk markers',
+  );
+  log('smoke-p5-es-must-route-interfere', { passed: true });
+}
+
 function pgRunPhaseEsIntegrationSmokes(): void {
   const syncCases = [
     { name: 'smoke-es-integration-001-importable', fn: smokeEsIntegration001Importable },
     { name: 'smoke-es-integration-002-return-shape', fn: smokeEsIntegration002ReturnShape },
+    { name: 'smoke-p5-es-middleware-001-importable', fn: smokeP5EsMiddleware001Importable },
+    { name: 'smoke-p5-es-middleware-002-exports', fn: smokeP5EsMiddleware002Exports },
+    { name: 'smoke-p5-es-must-route-choose', fn: smokeP5EsMustRouteChoose },
+    { name: 'smoke-p5-es-must-route-interfere', fn: smokeP5EsMustRouteInterfere },
   ];
   for (const c of syncCases) {
     try {
@@ -13314,26 +13541,21 @@ function pgRunPhaseEsIntegrationSmokes(): void {
 
 function smokeEcsAdvance001Imports(): void {
   const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
-  // advance 路由必须 import World / createCharacterEntity / entityToSnapshot / AgingSystem / CultivationSystem
+  // Phase 5 #2: advance 改用 helper（tickEcsForCharacter / applyEcsTickToState）。
+  // 之前直接 import World / createCharacterEntity / entityToSnapshot / AgingSystem / CultivationSystem，
+  // 现在统一通过 helper 间接引用——验证 helper import 即可。
   assert(
-    advanceSrc.includes("from '@/lib/xianxia/ecs/core'"),
-    'advance route should import World from ecs/core'
+    advanceSrc.includes("from '@/lib/xianxia/ecs/tick-helper'"),
+    'advance route should import tick-helper'
   );
   assert(
-    advanceSrc.includes("from '@/lib/xianxia/ecs/character-entity'"),
-    'advance route should import createCharacterEntity / entityToSnapshot from ecs/character-entity'
+    /tickEcsForCharacter\(/.test(advanceSrc),
+    'advance route should call tickEcsForCharacter'
   );
   assert(
-    advanceSrc.includes("from '@/lib/xianxia/ecs/systems/aging-system'"),
-    'advance route should import AgingSystem'
+    /applyEcsTickToState\(/.test(advanceSrc),
+    'advance route should call applyEcsTickToState'
   );
-  assert(
-    advanceSrc.includes("from '@/lib/xianxia/ecs/systems/cultivation-system'"),
-    'advance route should import CultivationSystem'
-  );
-  assert(/World/.test(advanceSrc), 'advance route should reference World');
-  assert(/AgingSystem/.test(advanceSrc), 'advance route should reference AgingSystem');
-  assert(/CultivationSystem/.test(advanceSrc), 'advance route should reference CultivationSystem');
 
   const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
   assert(
@@ -13358,12 +13580,18 @@ function smokeEcsAdvance001Imports(): void {
 
 function smokeEcsAdvance002CreatesEntity(): void {
   const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
-  // 必须调 createCharacterEntity(world, snapshot)
+  // Phase 5 #2: advance 不再直接调 createCharacterEntity——由 helper 内部封装。
+  // 验证 helper 文件存在 + helper 内部确实 createCharacterEntity。
   assert(
-    /createCharacterEntity\(\s*\w+\s*,\s*\w+\s*\)/.test(advanceSrc),
-    'advance route should call createCharacterEntity(world, snapshot)'
+    existsSync('src/lib/xianxia/ecs/tick-helper.ts'),
+    'tick-helper.ts should exist'
   );
-  // 必须构造 baseSnapshot（包含 characterId / age / realm / cultivationExp / hp / maxHp / alive / lifespan / inventory）
+  const helperSrc = readFileSync('src/lib/xianxia/ecs/tick-helper.ts', 'utf-8');
+  assert(
+    /createCharacterEntity\(\s*\w+\s*,\s*\w+\s*\)/.test(helperSrc),
+    'tick-helper should call createCharacterEntity(world, snapshot)'
+  );
+  // advance 必须构造 baseSnapshot（包含 characterId / age / realm / cultivationExp / hp / maxHp / alive / lifespan / inventory）
   const hasCharacterId = /characterId,/.test(advanceSrc) || /characterId\s*:/.test(advanceSrc);
   assert(hasCharacterId, 'advance ECS baseSnapshot should include characterId');
   assert(/age:\s*finalState\.age/.test(advanceSrc), 'advance ECS baseSnapshot should set age from finalState.age');
@@ -13383,18 +13611,21 @@ function smokeEcsAdvance002CreatesEntity(): void {
 
 function smokeEcsAdvance003WorldTick(): void {
   const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
-  // 必须 addSystem + tick
-  assert(/addSystem\(AgingSystem\)/.test(advanceSrc), 'advance route should addSystem(AgingSystem)');
-  assert(/addSystem\(CultivationSystem\)/.test(advanceSrc), 'advance route should addSystem(CultivationSystem)');
-  assert(/\.tick\(\)/.test(advanceSrc), 'advance route should call world.tick()');
-  // 必须 getEntity + entityToSnapshot 把结果合并回 finalState
-  assert(/getEntity\(`character-\$\{characterId\}`\)/.test(advanceSrc) || /getEntity\(['"]character-['"]\s*\+\s*characterId/.test(advanceSrc), 'advance route should getEntity(`character-${characterId}`)');
-  assert(/entityToSnapshot\(/.test(advanceSrc), 'advance route should call entityToSnapshot');
-  assert(/finalState\.age\s*=\s*tickedSnapshot\.age/.test(advanceSrc), 'advance route should override finalState.age from tickedSnapshot.age');
-  assert(/finalState\.cultivationExp\s*=\s*tickedSnapshot\.cultivationExp/.test(advanceSrc), 'advance route should override finalState.cultivationExp from tickedSnapshot.cultivationExp');
+  // Phase 5 #2: advance 不再直接 addSystem / tick / entityToSnapshot——由 helper 内部封装。
+  // 验证 helper 内部有 tick + entityToSnapshot + addSystem + 死亡兜底。
+  const helperSrc = readFileSync('src/lib/xianxia/ecs/tick-helper.ts', 'utf-8');
+  assert(/addSystem\(AgingSystem\)/.test(helperSrc), 'tick-helper should addSystem(AgingSystem)');
+  assert(/addSystem\(CultivationSystem\)/.test(helperSrc), 'tick-helper should addSystem(CultivationSystem)');
+  assert(/\.tick\(\)/.test(helperSrc), 'tick-helper should call world.tick()');
+  assert(/getEntity\(`character-\$\{characterId\}`\)/.test(helperSrc), 'tick-helper should getEntity(`character-${characterId}`)');
+  assert(/entityToSnapshot\(/.test(helperSrc), 'tick-helper should call entityToSnapshot');
+  // applyEcsTickToState 必须把 ECS 结果合并回 state（等价 advance 旧的"覆盖 finalState.age/cultivationExp"逻辑）
+  assert(/state\.age\s*=\s*result\.age/.test(helperSrc) || /\(state\s+as\s+T\)\.age\s*=\s*result\.age/.test(helperSrc), 'applyEcsTickToState should set state.age = result.age');
+  assert(/state\.cultivationExp\s*=\s*result\.cultivationExp/.test(helperSrc) || /\(state\s+as\s+T\)\.cultivationExp\s*=\s*result\.cultivationExp/.test(helperSrc), 'applyEcsTickToState should set state.cultivationExp = result.cultivationExp');
   // ECS 死亡兜底
-  assert(/!tickedSnapshot\.alive\s*&&\s*finalState\.alive/.test(advanceSrc), 'advance route should set finalState.alive=false when ECS reports death');
-  assert(/'ecs-aging-natural'/.test(advanceSrc), 'advance route should default causeOfDeath=ecs-aging-natural on ECS death');
+  assert(/'ecs-aging-natural'/.test(helperSrc), 'applyEcsTickToState should default causeOfDeath=ecs-aging-natural on ECS death');
+  // advance 路由必须把 helper 结果合并回 finalState
+  assert(/applyEcsTickToState\(finalState/.test(advanceSrc), 'advance route should call applyEcsTickToState(finalState, ...)');
 
   const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
   assert(/addSystem\(AgingSystem\)/.test(sseSrc), 'advance-sse route should addSystem(AgingSystem)');
@@ -13407,11 +13638,11 @@ function smokeEcsAdvance003WorldTick(): void {
 
 function smokeEcsAdvance004FailureNonFatal(): void {
   const advanceSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
-  // ECS tick 必须 try/catch 包住 + 主流程 db.update 保留
-  // 用更稳健的"找 ECS 注释后第一个 try { 与下一个 } catch 配对"逻辑
-  const ecsTickIdx = advanceSrc.indexOf('// 批 20: ECS 集成 advance');
+  // Phase 5 #2: advance 用 helper 后，原 `// 批 20:` 注释已替换为 `// Phase 5 #2: ECS tick`。
+  // try/catch + 非致命语义不变——验证 catch log + 主流程保留 + 4 类事件未被破坏。
+  const ecsTickIdx = advanceSrc.indexOf('// Phase 5 #2: ECS tick');
   const ecsCatchIdx = advanceSrc.indexOf('ECS tick failed (non-fatal)');
-  assert(ecsTickIdx > 0, 'advance route should have ECS tick block comment');
+  assert(ecsTickIdx > 0, 'advance route should have Phase 5 #2 ECS tick block comment');
   assert(ecsCatchIdx > 0, 'advance route should have non-fatal catch log for ECS tick');
   assert(ecsCatchIdx > ecsTickIdx, 'ECS catch must come after ECS tick block');
   // 在 ECS 注释和 ECS catch log 之间必须存在 try { ... } catch (...) 配对

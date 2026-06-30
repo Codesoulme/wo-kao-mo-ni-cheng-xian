@@ -5,3 +5,5 @@ export * from './components';
 export * from './character-entity';
 export { AgingSystem } from './systems/aging-system';
 export { CultivationSystem } from './systems/cultivation-system';
+export { tickEcsForCharacter, applyEcsTickToState } from './tick-helper';
+export type { TickEcsOptions, TickEcsResult } from './tick-helper';
