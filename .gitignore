@@ -16,6 +16,7 @@ next-env.d.ts
 *.log
 server.log
 dev.log
+logs/*.last
 
 # local runtime / non-game artifacts
 db

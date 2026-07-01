@@ -421,20 +421,27 @@ export function deriveCoreCultivationAttributes(state: CharacterState) {
   const realmIdx = Math.max(0, REALMS.findIndex(r => r.id === state.realm));
   const levelRatio = Math.max(0, Number(state.realmLevel || 0)) / Math.max(1, Number(getRealmInfo(state.realm).levels || 1));
   const profilePower = realmPowerMultiplier(state);
+  // \u5c81\u6708\u7d2f\u79ef\uff1a\u8eab\u795e\u4e09\u5b9d\u968f\u5e74\u9f84\u7f13\u6162\u589e\u957f\uff08\u51e1\u4eba\u671f\u6700\u660e\u663e\uff0c\u5883\u754c\u7a81\u7834\u540e\u88ab realm \u9879\u4e3b\u5bfc\uff09
+  // age \u7cfb\u6570\uff1a\u795e\u8bc6 0.04/\u5c81\u3001\u9b42\u9b44 0.035/\u5c81\u3001\u4f53\u9b44 0.045/\u5c81
+  // \u51e1\u4eba 50 \u5c81 \u2248 \u795e\u8bc6 +1.8 / \u9b42\u9b44 +1.6 / \u4f53\u9b44 +2.0\uff1b\u70bc\u6c14 200 \u5c81 \u2248 +7.8 / +6.8 / +8.8
+  const age = Math.max(0, Number(state.age || 0));
+  const ageDriftSS = age * 0.04;
+  const ageDriftSoul = age * 0.035;
+  const ageDriftPhys = age * 0.045;
   const spiritualSense = Math.round(firstNumber(
     (state as any).spiritualSense,
     attributeNumber(state, ['spiritualSense', '\u795e\u8bc6']),
-    5 + realmIdx * 24 + levelRatio * 18 + (state.comprehension || 0) * 0.45 + (state.maxMp || 0) * 0.04,
+    5 + realmIdx * 24 + levelRatio * 18 + (state.comprehension || 0) * 0.45 + (state.maxMp || 0) * 0.04 + ageDriftSS,
   )! * profilePower);
   const soulStrength = Math.round(firstNumber(
     (state as any).soulStrength,
     attributeNumber(state, ['soulStrength', '\u9b42\u9b44', '\u795e\u9b42', '\u5143\u795e']),
-    8 + realmIdx * 22 + levelRatio * 16 + (state.comprehension || 0) * 0.35 - (state.heartDemon || 0) * 0.15,
+    8 + realmIdx * 22 + levelRatio * 16 + (state.comprehension || 0) * 0.35 - (state.heartDemon || 0) * 0.15 + ageDriftSoul,
   )! * profilePower);
   const physicalFoundation = Math.round(firstNumber(
     (state as any).physicalFoundation,
     attributeNumber(state, ['physicalFoundation', '\u4f53\u9b44', '\u8089\u8eab', '\u6839\u9aa8']),
-    20 + realmIdx * 18 + levelRatio * 12 + (state.maxHp || 0) * 0.08 + (state.defense || 0) * 0.2,
+    20 + realmIdx * 18 + levelRatio * 12 + (state.maxHp || 0) * 0.08 + (state.defense || 0) * 0.2 + ageDriftPhys,
   )! * profilePower);
   return {
     spiritualSense: Math.max(0, Math.min(9999, spiritualSense)),

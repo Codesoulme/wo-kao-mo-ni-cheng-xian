@@ -4,7 +4,7 @@ import { GameEvent, streamingRef } from '@/lib/xianxia/store';
 import { cn } from '@/lib/utils';
 import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } from '@/lib/xianxia/display';
 import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass, Loader2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, Fragment } from 'react';
 
 interface EventTimelineProps {
   events: GameEvent[];
@@ -215,7 +215,7 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
           <p
             key={idx}
             className={cn(
-              "first-letter:pl-0 transition-opacity duration-200 indent-4",
+              "transition-opacity duration-200 indent-4",
               idx === paragraphs.length - 1 && isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
             )}
           >
@@ -230,13 +230,13 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
   const streamingParagraphs = splitNarrativeParagraphs(streamingText);
   return (
     <div ref={contentRef} className={cn(
-      "first-letter:pl-0 space-y-2",
+      "space-y-2 indent-4",
       isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
     )}>
       {streamingParagraphs.map((paragraph, idx) => (
         <p
           key={idx}
-          className="first-letter:pl-0 indent-4 transition-opacity duration-200"
+          className="indent-4 transition-opacity duration-200"
         >
           {paragraph}
         </p>
@@ -479,7 +479,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
           const timeText = eventTimeLabel(event, ageMeta, prevEvent);
           const typeText = eventTypeLabel(event, prevEvent);
           return (
-            <>
+            <Fragment key={event.id || idx}>
             {isSectionStart && (
               <div className="relative my-3 flex items-center gap-2 px-2 pointer-events-none">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
@@ -488,7 +488,6 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
               </div>
             )}
             <div
-              key={event.id || idx}
               className={cn(
                 "relative pl-10 scroll-reveal",
                 ageMeta.isContinuation && "-mt-1 pl-14",
@@ -650,7 +649,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 )}
               </div>
             </div>
-            </>
+            </Fragment>
           );
         })}
         <div ref={endRef} />
