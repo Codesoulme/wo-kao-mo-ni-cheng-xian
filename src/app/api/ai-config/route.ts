@@ -33,6 +33,8 @@ const CONFIG_PATH = path.join(process.cwd(), '.xianxia-ai-config');
 
 function maskKey(key: string) {
   if (!key) return '';
+  // env:VAR_NAME form does not expose the variable name
+  if (key.startsWith('env:')) return 'env:****';
   if (key.length <= 8) return `${key.slice(0, 2)}****`;
   return `${key.slice(0, 4)}****${key.slice(-4)}`;
 }
