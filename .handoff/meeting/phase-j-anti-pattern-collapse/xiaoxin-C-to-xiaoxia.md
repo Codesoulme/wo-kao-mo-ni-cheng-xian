@@ -9,7 +9,7 @@
 
 ## 1. 任务目标
 
-为 xianxia 引擎加 4 个 export function + 4 个 smoke，校验修真特异化 / 传承 /
+为 xianxia 引擎加 4 个 export function + 4 个 smoke，校验修仙特异化 / 传承 /
 命运回响 / 宗门 之间的 cross-reference：找出引用断裂、给出衔接建议、并产出
 AI prompt 可用的"因果链健康摘要"。
 

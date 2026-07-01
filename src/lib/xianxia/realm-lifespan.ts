@@ -1,4 +1,4 @@
-// 修真界感改进 - 任务 D：寿元压力
+// 修仙界感改进 - 任务 D：寿元压力
 // 文件目的：提供"按境界 + 境界层数"算寿元的函数，供 prompt/advance 边界检查复用。
 // 设计：以 types.ts 的 REALMS 表为单一权威（baseLifespan + expPerLevel/levels）。
 //        同时提供一份详细 per-level 配置（REALM_LIFESPAN_TABLE）以兼容任务模板里的"perLevel"概念；

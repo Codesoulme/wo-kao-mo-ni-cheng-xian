@@ -2,7 +2,7 @@
  * 引擎行为：年龄驱动的身体成长
  *
  * 凡人/低境界角色从幼年到壮年，attack/defense/speed/maxHp 应随年龄自然增长
- * 修真后由功法/境界倍率再放大
+ * 修仙后由功法/境界倍率再放大
  *
  * 这是纯引擎行为：不依赖 AI 输出、不依赖 narrative 关键词
  * 在 executeAIEvent 流程最早期调用，确保属性随年龄长
@@ -11,7 +11,7 @@
  * - 叙事写"久病/缠绵病榻" → body 压到 baseline 30%
  * - 叙事写"病弱/旧疾" → body 压到 baseline 50%
  * - 叙事写"病愈/初愈" → body 恢复 baseline
- * - 修真后属性保留：current > 修正后 baseline 时保留 current
+ * - 修仙后属性保留：current > 修正后 baseline 时保留 current
  */
 import type { CharacterState } from './types';
 import { detectBodyModifier } from './narrative-body-modifier';
@@ -91,9 +91,9 @@ export interface BodyGrowthResult {
  * 2. realmMultiplier（境界）
  * 3. narrativeBodyMultiplier（叙事修正：1.0 / 0.5 / 0.3）
  * 4. baseline = MORTAL_PEAK * ageFactor * realmMultiplier * narrativeBodyMultiplier
- * 5. current > baseline → 保留 current（修真成果不被抹除）
+ * 5. current > baseline → 保留 current（修仙成果不被抹除）
  * 6. current < baseline → 拉到 baseline（身体在成长 / 病愈）
- * 7. current >> baseline（如修真者）→ 修真巅峰保留
+ * 7. current >> baseline（如修仙者）→ 修仙巅峰保留
  */
 export function applyAgeBasedBodyGrowth(state: CharacterState, newAge: number, narrative?: string): BodyGrowthResult {
   const factor = ageGrowthFactor(newAge);
@@ -105,7 +105,7 @@ export function applyAgeBasedBodyGrowth(state: CharacterState, newAge: number, n
   const baselineSpeed = Math.round(MORTAL_PEAK.speed * factor * effectiveMult);
   const baselineMaxHp = Math.round(MORTAL_PEAK.maxHp * factor * effectiveMult);
 
-  // 修真者属性保留：若 current > baseline，取 current（修真巅峰不被病弱压低）
+  // 修仙者属性保留：若 current > baseline，取 current（修仙巅峰不被病弱压低）
   const newAttack = Math.max(state.attack, baselineAttack);
   const newDefense = Math.max(state.defense, baselineDefense);
   const newSpeed = Math.max(state.speed, baselineSpeed);

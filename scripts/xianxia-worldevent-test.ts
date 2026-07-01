@@ -1,4 +1,4 @@
-// 修真界感改进 - 任务 E v2 单元测试
+// 修仙界感改进 - 任务 E v2 单元测试
 // 验证 world-event-scheduler 模块：
 //   - 30+ 模板完整性、type 覆盖、hints/effects/triggers 字段齐备
 //   - getAvailableEvents 按 age/realm/族裔/lineage/cooldown/prerequisites/excludedIf 过滤
@@ -6,7 +6,7 @@
 //   - buildAvailableWorldEventsPrompt 文案完整性
 //   - fallbackRollWorldEvent 旧 random roll 仍能触发（兼容 7 种历史事件）
 //   - 多事件叠加 cultivationMultiplier / decayWorldEvents 推进时间
-//   - 修真界感修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真
+//   - 修仙界感修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙
 // 独立脚本，不污染现有 smoke baseline。
 
 import {
@@ -449,15 +449,15 @@ assert(isUnderWorldEvent(state4, 'demon_invasion'), 'isUnder demon_invasion = tr
 assert(!isUnderWorldEvent(state4, 'beast_invasion'), 'isUnder beast_invasion = false');
 
 // ============================================================
-// 13. 修真感 E v2：lineage 联动 + 上轮事件反查
+// 13. 修仙感 E v2：lineage 联动 + 上轮事件反查
 // ============================================================
-console.log('=== 修真感修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真修真 ===');
+console.log('=== 修仙感修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙 ===');
 
 const lineageDemo = WORLD_EVENT_TEMPLATES.find(t => t.type === 'rare_treasure_surfaces')!;
 assert(isTemplateEligible(lineageDemo, { age: 25, realm: '炼气期', ethnicity: 'human', lineage: '凡人' }, undefined, []),
   'rare_treasure_surfaces age 25 炼气 凡人/均可触发（applicableEthnicity 默认为空 即 *）');
 
-// 综合 getAvailableEvents 修真感：age 200 金丹修士在末法时代前夕，应能触发末法
+// 综合 getAvailableEvents 修仙感：age 200 金丹修士在末法时代前夕，应能触发末法
 const oldCultivator: any = {
   age: 200, realm: '金丹期', ethnicity: 'human', lineage: '修仙世家',
   worldEvent: { activeEvents: [], history: [] },
@@ -482,7 +482,7 @@ const complexTypes = complexAvailable.map(t => t.type);
 // 因为灵潮枯竭在 180 年触发，cooldown=10，200-180=20 ≥ 10 → 再次可触发（且无 spirit_tide_high 互斥）
 assert(complexTypes.includes('spirit_tide_low'), 'cooldown 已过：灵潮枯竭再次可触发');
 
-// 修真感修真事件修真修真修真修真修真修真修真修真修真修真修真修真：spirit_tide_low 与 spirit_tide_high 互斥
+// 修仙感修仙事件修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙修仙：spirit_tide_low 与 spirit_tide_high 互斥
 const conflictHistory: WorldEvent[] = [
   {
     id: 'past-high', type: 'spirit_tide_high',

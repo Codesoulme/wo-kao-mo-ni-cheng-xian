@@ -1,4 +1,4 @@
-// 修真界感改进 - 任务 B + D 单元测试
+// 修仙界感改进 - 任务 B + D 单元测试
 // 验证 realm-power / realm-lifespan 模块输出 + engine.executeCombatRound 集成 + advance-sse 寿元检查
 // 独立脚本，不污染现有 smoke baseline
 

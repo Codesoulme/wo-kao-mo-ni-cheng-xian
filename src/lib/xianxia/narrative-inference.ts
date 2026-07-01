@@ -1,7 +1,7 @@
 /**
  * 引擎兜底：当 AI 漏写 changes 字段时，从 narrative 关键词 + 当前境界推断合理属性变化
  *
- * 修真叙事风 AI 常把 narrative 写得生动但忘记给 changes
+ * 修仙叙事风 AI 常把 narrative 写得生动但忘记给 changes
  * 这个模块让 engine 在 inputChanges 为空时，自动从叙事里"读"出合理 delta
  */
 import type { AttributeChange, CharacterState } from './types';

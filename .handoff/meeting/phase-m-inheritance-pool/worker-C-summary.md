@@ -20,7 +20,7 @@
   - 评级：`>=0.7 上佳` / `>=0.5 适配` / `>=0.3 中平` / `<0.3 微薄`
   - 灵根色：tianling → amber，dual → emerald，triple → stone，mixed → muted
   - 按钮 "承此衣钵" / "详述" / "收起"，右侧详述 + 底部概括面板
-- 空态分支：`inheritance-empty` testid + 文案"尚无可继承者候选 · 修真轮转暂止"
+- 空态分支：`inheritance-empty` testid + 文案"尚无可继承者候选 · 修仙轮转暂止"
 - Testids：`inheritance-section` / `inheritance-candidate-list` / `inheritance-candidate-{id}` / `inheritance-toggle-{id}` / `inheritance-claim-{id}` / `inheritance-empty`
 - 中文文案无 `????` 乱码；零"引擎/缓存/失效/节点/AI"机制词暴露给玩家
 
@@ -160,7 +160,7 @@ const isDead = character && (character.dead === true || character.alive === fals
 
 ### 玩家可见文案 vs 内部机制词
 
-- 玩家可见文案全用世界内词：`衣钵待承`、`承继者`、`承此衣钵`、`修真轮转`、`道韵`、`传承`、`血脉`、`灵根`、`因缘`
+- 玩家可见文案全用世界内词：`衣钵待承`、`承继者`、`承此衣钵`、`修仙轮转`、`道韵`、`传承`、`血脉`、`灵根`、`因缘`
 - 零暴露：`AI` / `引擎` / `缓存` / `失效` / `调试` / `预加载` / `id` / `节点`
 
 ---

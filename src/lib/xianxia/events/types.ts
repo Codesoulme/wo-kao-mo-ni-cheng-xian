@@ -47,7 +47,16 @@ export type EventData =
   | { type: 'character.settlement-result.set'; settlement: any }
   | { type: 'character.streaming-narrative.started'; eventIndex: number; placeholderId: string }
   // Phase-α 批 1 α-1: 沉浸版 PoC——雷劫判定事件 payload
-  | { type: 'character.tribulation.attempted'; fromRealm: string; toRealm: string; outcome: 'success' | 'fall_realm' | 'severe' | 'fatal'; kind: string; difficulty: number; hpDelta: number; cause: string };
+  | { type: 'character.tribulation.attempted'; fromRealm: string; toRealm: string; outcome: 'success' | 'fall_realm' | 'severe' | 'fatal'; kind: string; difficulty: number; hpDelta: number; cause: string; karmaShift?: KarmaShiftPayload };
+
+// ==================== Phase-α 批 1 α-2: 因果业力事件 payload ====================
+
+export type KarmaShiftPayload = {
+  meritDelta: number;
+  sinDelta: number;
+  karmaDelta: number;
+  reason: string;
+};
 
 // 来源标签（决定 audit + reducer 信任级别）
 export type EventSource = 'user-action' | 'ai-output' | 'system-tick' | 'migration';

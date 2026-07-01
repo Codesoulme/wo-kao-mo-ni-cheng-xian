@@ -1,4 +1,4 @@
-﻿'use client';
+﻿﻿'use client';
 
 /**
  * Phase-M #3: 继承池选择面板
@@ -206,7 +206,7 @@ export function InheritancePoolPanel({ className, defaultCollapsed = true }: Inh
               data-testid="inheritance-empty"
               className="text-[11px] text-stone-500 italic font-serif-cn py-3 text-center border border-dashed border-stone-300 rounded"
             >
-              尚无可继承者候选 · 修真轮转暂止
+              尚无可继承者候选 · 修仙轮转暂止
             </div>
           )}
 

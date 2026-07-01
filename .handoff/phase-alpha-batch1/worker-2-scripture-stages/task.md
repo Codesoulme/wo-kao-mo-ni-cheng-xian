@@ -34,7 +34,7 @@
   - 不写新组件
 
 ## owner 关注点
-- **修真沉浸**：stage 三段用修仙词（初习/觉意/大成），不暴露"enum/字段"机制词
+- **修仙沉浸**：stage 三段用修仙词（初习/觉意/大成），不暴露"enum/字段"机制词
 - **可读 priority**：UI chip 上的熟练度按 stage 灰阶/青色/紫色区分，数字用 `xx%` 格式（不暴露内部 exp 字段名）
 - **AI 自然产出**：AI 在 narrative 自然叙出"功法精进/觉醒/推演"事件，引擎累计 stage；**禁止**在 narrative 中出现"stage=practiced"等机制词
 - **兼容旧档**：旧 scripture 物品无 stage 字段默认 `practiced`，加载不报错

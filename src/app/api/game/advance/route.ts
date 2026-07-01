@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 引擎兜底：若修为已达突破阈值且 AI 未显式触发，则自动突破
-    // 这保证修真进度不会无限卡住，且境界会正确更新到顶部信息
+    // 这保证修仙进度不会无限卡住，且境界会正确更新到顶部信息
     if (
       !result.breakthroughHappened &&
       !result.died &&

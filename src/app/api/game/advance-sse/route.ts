@@ -22,9 +22,9 @@ import {
   cleanNarrativeAge,
 } from '@/lib/xianxia/llm';
 import { getCurrentUser } from '@/lib/auth-helpers';
-// 修真界感改进 - 任务 D：寿元压力
+// 修仙界感改进 - 任务 D：寿元压力
 import { lifespanPressure, lifespanPressureStatus, nearLifespan } from '@/lib/xianxia/realm-lifespan';
-// 修真界感改进 - 任务 E：世界级事件调度器
+// 修仙界感改进 - 任务 E：世界级事件调度器
 import { rollWorldEvent, applyWorldEvent, decayWorldEvents, parseWorldEventMarkers, buildAvailableWorldEventsPrompt, type WorldEvent } from '@/lib/xianxia/world-event-scheduler';
 // 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 SSE 路径上也跑一次 world.tick()
 // 优化：缓存 World + Systems + Entity 跨多次 advance 复用，避免每次 new World() + addSystem() + createCharacterEntity()（节省 200-500ms/advance）
@@ -527,7 +527,7 @@ export async function POST(req: NextRequest) {
               ecsCache = null;
             }
 
-            // 修真界感改进 - 任务 E v2：世界级事件调度器（LLM 决策 + fallback）
+            // 修仙界感改进 - 任务 E v2：世界级事件调度器（LLM 决策 + fallback）
             // 优先级：
             //   1) decay 已有 active 事件
             //   2) 从 aiOutput.narrative 解析 [WORLD_EVENT:type]...[/WORLD_EVENT] 标记（LLM 自主决定触发）
@@ -593,7 +593,7 @@ export async function POST(req: NextRequest) {
             });
           }
 
-        // 修真界感改进 - 任务 D：寿元边界检查。
+        // 修仙界感改进 - 任务 D：寿元边界检查。
         // 仅在 age 接近 lifespan 时将强信号叠入 finalState.statusJson 与 statusList，
         // 避免另起 status type schema 让客户端多分支处理。
         try {

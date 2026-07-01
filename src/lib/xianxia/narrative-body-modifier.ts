@@ -8,7 +8,7 @@
  * - 久病/重病/垂危/缠绵病榻/气息奄奄/卧床 → 0.30x（baseline 30%）
  * - 病弱/体弱/瘦弱/病根/旧疾/体虚 → 0.50x（baseline 50%）
  * - 病愈/痊愈/康复/久病初愈/初愈/复元 → 1.00x（恢复）
- * - 修真后属性保留：current > baseline*multiplier 时保留 current
+ * - 修仙后属性保留：current > baseline*multiplier 时保留 current
  *
  * 这是纯引擎行为：从 narrative 文本读取，AI 漏写 changes 也能应用
  */

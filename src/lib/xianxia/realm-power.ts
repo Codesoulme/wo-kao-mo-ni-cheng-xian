@@ -1,4 +1,4 @@
-// 修真界感改进 - 任务 B：境界碾压
+// 修仙界感改进 - 任务 B：境界碾压
 // 文件目的：计算 attacker vs defender 境界差的胜率/碾压系数
 // 注意：与 engine.ts 现有的 realmPowerMultiplier(state) 重载同名——后者取的是"自身 realmProfile.powerMultiplier"，
 //       本函数是双角色（attacker / defender）境界差距判定。为避免冲突，导出独立的命名空间 API。
