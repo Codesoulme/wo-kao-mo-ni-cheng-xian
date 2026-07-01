@@ -619,7 +619,24 @@ ${buildNarrativeContractFeedbackList(ctx)}
 
 export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean, qualityMode: 'full' | 'light' = 'full'): string {
   const isLightMode = qualityMode === 'light' && !isFateNode;
-  // [P0 fix 2026-07-02] Hoist sc/realmTraits/realmTraitText/engineFactors declarations to function head; previous code referenced them before declaration (TDZ).
+  // [P0 fix 2026-07-02] Hoist sc/realmTraits/realmTraitText/engineFactors to function head.
+  const sc = ctx.character;
+  const realmTraits = ctx.realmTraits;
+  const realmTraitText = realmTraits ? [
+    `\u4fee\u884c\u65b9\u5f0f\uff1a${realmTraits.cultivationMode}`,
+    `\u5f53\u524d\u74f6\u9888\uff1a${realmTraits.bottleneck}`,
+    `\u7a81\u7834\u8003\u9a8c\uff1a${realmTraits.breakthroughTrial}`,
+    `\u80fd\u529b\u8fb9\u754c\uff1a${realmTraits.capabilities.join('\u3001')}`,
+    `\u4e0d\u53ef\u8f7b\u5199\uff1a${realmTraits.limitations.join('\u3001')}`,
+    `\u53ef\u89e6\u8fbe\u4e16\u754c\uff1a${realmTraits.worldAccess.join('\u3001')}`,
+    `\u4e16\u754c\u5f85\u9047\uff1a${realmTraits.socialWeight}`,
+    `\u6218\u6597\u503e\u5411\uff1a${realmTraits.combatStyle.join('\u3001')}`,
+    `\u8d44\u6e90\u9700\u6c42\uff1a${realmTraits.resourceNeeds.join('\u3001')}`,
+    `\u98ce\u9669\u6807\u7b7e\uff1a${realmTraits.riskTags.join('\u3001')}`,
+  ].join('\n') : '\u6682\u65e0\u5883\u754c\u7279\u6027\u753b\u50cf';
+  const engineFactors = (ctx.cultivationFactors && ctx.cultivationFactors.length)
+    ? ctx.cultivationFactors.map(f => `${f.name}(${f.operation === 'multiply' ? '×' : '+'}${f.value}${f.note ? '，' + f.note : ''})`).join('，')
+    : '（暂无来源——可能无灵根或未装备功法）';
 
   // v11: 修为认知告警——不强制 AI 突破，但让 AI 必须清楚当前修为状态、决定破不破、并且让玩家能看出「AI 是故意不破」
   // 修真游戏核心：AI 据剧情/状态/场景/因果生成；面板只承载投影。AI 应该比面板更懂当前的修炼瓶颈。
@@ -657,7 +674,6 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
   // 风格锚定 + 实体库：让 AI 续写时维持同一笔触、复用已有 NPC/地点/物件
   const styleAnchorsBlock = (ctx as any).styleAnchorsPrompt ? `\n${(ctx as any).styleAnchorsPrompt}\n` : '';
   const entityBlock = (ctx as any).entityEntriesPrompt ? `\n${(ctx as any).entityEntriesPrompt}\n` : '';
-  const sc = ctx.character;
   const elements = `金${sc.elements.metal}/木${sc.elements.wood}/水${sc.elements.water}/火${sc.elements.fire}/土${sc.elements.earth}`;
   const statusList = ctx.activeStatuses.length
     ? ctx.activeStatuses.map(s => `- ${s.name}（${s.category}，${s.rarity}）：${s.description}${s.constitution ? `；体质阶段：${s.constitution.currentStage || 1}/${s.constitution.maxStage || 1}；风险：${s.constitution.riskHint || '暂无显著反噬'}` : ''}`).join('\n')
@@ -697,24 +713,8 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
   const mult = ctx.cultivationMultiplier || 0;
   const multDesc = mult > 0 ? `${mult.toFixed(2)}倍（已含灵根与功法加成）` : '0（无灵根，无法修炼）';
   const curInsight = ctx.cultivationInsight || '';
-  const realmTraits = ctx.realmTraits;
-  const realmTraitText = realmTraits ? [
-    `\u4fee\u884c\u65b9\u5f0f\uff1a${realmTraits.cultivationMode}`,
-    `\u5f53\u524d\u74f6\u9888\uff1a${realmTraits.bottleneck}`,
-    `\u7a81\u7834\u8003\u9a8c\uff1a${realmTraits.breakthroughTrial}`,
-    `\u80fd\u529b\u8fb9\u754c\uff1a${realmTraits.capabilities.join('\u3001')}`,
-    `\u4e0d\u53ef\u8f7b\u5199\uff1a${realmTraits.limitations.join('\u3001')}`,
-    `\u53ef\u89e6\u8fbe\u4e16\u754c\uff1a${realmTraits.worldAccess.join('\u3001')}`,
-    `\u4e16\u754c\u5f85\u9047\uff1a${realmTraits.socialWeight}`,
-    `\u6218\u6597\u503e\u5411\uff1a${realmTraits.combatStyle.join('\u3001')}`,
-    `\u8d44\u6e90\u9700\u6c42\uff1a${realmTraits.resourceNeeds.join('\u3001')}`,
-    `\u98ce\u9669\u6807\u7b7e\uff1a${realmTraits.riskTags.join('\u3001')}`,
-  ].join('\n') : '\u6682\u65e0\u5883\u754c\u7279\u6027\u753b\u50cf';
   // 引擎权威计算的来源条目（灵根 + 已装备功法 + 状态中的 cultivationExp 效果）
   // 这些数字是准确的，与顶部倍率一致；AI 必须在 cultivationInsight 文本中引用这些准确数字
-  const engineFactors = (ctx.cultivationFactors && ctx.cultivationFactors.length)
-    ? ctx.cultivationFactors.map(f => `${f.name}(${f.operation === 'multiply' ? '×' : '+'}${f.value}${f.note ? '，' + f.note : ''})`).join('，')
-    : '（暂无来源——可能无灵根或未装备功法）';
   // 储物袋容量信息
   const storageCap = ctx.storageCapacity ?? 5;
   const invCount = ctx.inventory.length;

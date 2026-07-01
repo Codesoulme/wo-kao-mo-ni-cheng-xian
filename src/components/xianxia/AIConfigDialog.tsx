@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Settings, KeyRound, CheckCircle2, AlertTriangle, Loader2, Plus, Trash2, Zap, Edit3, Radio } from 'lucide-react';
+import { Settings, KeyRound, CheckCircle2, AlertTriangle, Loader2, Plus, Trash2, Zap, Edit3, Radio, Eye, EyeOff, KeySquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +62,9 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   const [editModel, setEditModel] = useState('ark-code-latest');
   const [editChatId, setEditChatId] = useState('');
   const [editUserId, setEditUserId] = useState('');
+  // Key 模式：plain=明文, env=环境变量名引用
+  const [keyMode, setKeyMode] = useState<'plain' | 'env'>('plain');
+  const [showApiKey, setShowApiKey] = useState(false);
 
   const loadStatus = async () => {
     setChecking(true);
@@ -88,6 +91,9 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     setEditModel(profile.model);
     setEditChatId('');
     setEditUserId('');
+    // 如果后端返回的 masked 形如 env:****，说明当前是环境变量引用模式
+    setKeyMode(profile.apiKeyMasked?.startsWith('env:') ? 'env' : 'plain');
+    setShowApiKey(false);
   };
 
   // 开始新建接口
@@ -99,6 +105,8 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     setEditModel('ark-code-latest');
     setEditChatId('');
     setEditUserId('');
+    setKeyMode('plain');
+    setShowApiKey(false);
   };
 
   // 保存当前编辑的接口
@@ -106,6 +114,11 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     if (saving) return;
     setSaving(true);
     try {
+      // env 模式下，提交形如 env:VAR_NAME；明文模式提交用户输入原值
+      let apiKeyPayload = editApiKey.trim();
+      if (keyMode === 'env') {
+        apiKeyPayload = apiKeyPayload.startsWith('env:') ? apiKeyPayload : `env:${apiKeyPayload}`;
+      }
       const res = await fetch('/api/ai-config', {
         method: 'POST',
         headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
@@ -114,7 +127,7 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
           profileId: editingProfileId || undefined,
           name: editName,
           baseUrl: editBaseUrl,
-          apiKey: editApiKey,
+          apiKey: apiKeyPayload,
           model: editModel,
           chatId: editChatId,
           userId: editUserId,
@@ -176,10 +189,14 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
     if (testing) return;
     setTesting(true);
     try {
+      let apiKeyPayload = editApiKey.trim();
+      if (keyMode === 'env') {
+        apiKeyPayload = apiKeyPayload.startsWith('env:') ? apiKeyPayload : `env:${apiKeyPayload}`;
+      }
       const res = await fetch('/api/ai-config/test', {
         method: 'POST',
         headers: buildAuthHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ baseUrl: editBaseUrl, apiKey: editApiKey, model: editModel }),
+        body: JSON.stringify({ baseUrl: editBaseUrl, apiKey: apiKeyPayload, model: editModel }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '测试连接失败');
@@ -275,7 +292,10 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
                       {profile.id === activeId && <span className="text-primary text-[9px]">使用中</span>}
                     </div>
                     <div className="truncate text-muted-foreground">{profile.baseUrl}</div>
-                    <div className="text-muted-foreground">{profile.model} · Key: {profile.apiKeyMasked}</div>
+                    <div className="text-muted-foreground flex items-center gap-1">
+                      {profile.apiKeyMasked?.startsWith('env:') && <KeySquare className="w-3 h-3 text-emerald-500" />}
+                      <span>{profile.model} · Key: {profile.apiKeyMasked}</span>
+                    </div>
                   </div>
 
                   {/* 操作按钮 */}
@@ -376,14 +396,62 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium">API Key</label>
-                <Input
-                  value={editApiKey}
-                  onChange={(e) => setEditApiKey(e.target.value)}
-                  placeholder={editingProfileId ? '留空保留原 Key；如需更新请重新填写' : '请输入 API Key'}
-                  type="password"
-                  autoComplete="new-password"
-                />
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium">API Key</label>
+                  <div className="inline-flex rounded-md border border-border/60 overflow-hidden text-[10px]">
+                    <button
+                      type="button"
+                      className={cn(
+                        'px-2 py-0.5 transition-colors',
+                        keyMode === 'plain' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                      )}
+                      onClick={() => setKeyMode('plain')}
+                      title="直接填写 API Key（仅保存在本地 .xianxia-ai-config）"
+                    >
+                      明文 Key
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        'px-2 py-0.5 transition-colors',
+                        keyMode === 'env' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                      )}
+                      onClick={() => setKeyMode('env')}
+                      title="引用环境变量名；Key 本身只放在 .env.local，不进配置文件"
+                    >
+                      环境变量名
+                    </button>
+                  </div>
+                </div>
+                <div className="relative">
+                  <Input
+                    value={editApiKey}
+                    onChange={(e) => setEditApiKey(e.target.value)}
+                    placeholder={
+                      keyMode === 'env'
+                        ? (editingProfileId ? '留空保留原变量名；如需更新请填写新变量名' : '请输入环境变量名，如 MINIMAX_M3_KEY')
+                        : (editingProfileId ? '留空保留原 Key；如需更新请重新填写' : '请输入 API Key')
+                    }
+                    type={keyMode === 'env' ? 'text' : (showApiKey ? 'text' : 'password')}
+                    autoComplete="new-password"
+                    className={cn(keyMode === 'env' && 'font-mono')}
+                  />
+                  {keyMode === 'plain' && editApiKey && (
+                    <button
+                      type="button"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowApiKey((v) => !v)}
+                      title={showApiKey ? '隐藏' : '显示'}
+                    >
+                      {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  {keyMode === 'env'
+                    ? '推荐：Key 本身放在 .env.local，配置文件只存变量名（不会泄露到截图或日志）。'
+                    : '仅保存在本地 .xianxia-ai-config（已在 .gitignore）。'}
+                </p>
               </div>
 
               <div className="space-y-2">
