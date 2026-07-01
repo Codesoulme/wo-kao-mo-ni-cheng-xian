@@ -472,11 +472,21 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
           const isExploration = event.eventType === 'exploration';
           const visibleEffects = (event.effects || []).filter(isVisibleEffect);
           const ageMeta = sameAgeMeta[idx] || { count: 1, index: 1, isContinuation: false };
-
           const prevEvent = idx > 0 ? events[idx - 1] : undefined;
+          // 节起始：fate_node / breakthrough / death / ascension / 同年首条 加弱化细线
+          const isSectionStart = isFate || isBreakthrough || isDeath || isAscension ||
+            (idx === 0) || (prevEvent && prevEvent.age !== event.age);
           const timeText = eventTimeLabel(event, ageMeta, prevEvent);
           const typeText = eventTypeLabel(event, prevEvent);
           return (
+            <>
+            {isSectionStart && (
+              <div className="relative my-3 flex items-center gap-2 px-2 pointer-events-none">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
+                <span className="text-[9px] tracking-[0.3em] text-muted-foreground/50 font-serif-cn">·</span>
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
+              </div>
+            )}
             <div
               key={event.id || idx}
               className={cn(
@@ -640,6 +650,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 )}
               </div>
             </div>
+            </>
           );
         })}
         <div ref={endRef} />

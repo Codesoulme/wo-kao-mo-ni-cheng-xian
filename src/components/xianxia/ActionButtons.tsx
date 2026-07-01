@@ -209,82 +209,110 @@ export function ActionButtons() {
 
       while (true) {
         const { done, value } = await reader.read();
+        // ★ 修复 SSE 响应未完成 bug：先处理 value 再判 done
+        // 服务端发完 done 后立即 controller.close()，浏览器 fetch ReadableStream 最后一次 read()
+        // 可能同时返回 {done: true, value: <含 done 事件的剩余字节>}。原代码 if(done) break 在前，
+        // 导致最后那块含 event: done 的 chunk 被丢弃，前端永远收不到 done。
+        if (value) {
+          const chunkText = decoder.decode(value, { stream: true });
+          buffer += chunkText;
+          // SSE 格式: "event: xxx\ndata: {json}\n\n"
+          const lines = buffer.split('\n\n');
+          buffer = lines.pop() || '';
+
+          for (const part of lines) {
+            if (!part.trim()) continue;
+            const eventLine = part.split('\n').find(l => l.startsWith('event:'));
+            const dataLine = part.split('\n').find(l => l.startsWith('data:'));
+            if (!dataLine) continue;
+            const dataStr = dataLine.slice(5).trim();
+            if (!dataStr) continue;
+            try {
+              const obj = JSON.parse(dataStr);
+              if (obj.type === 'start') {
+                console.log('[SSE advance] Received start, age:', obj.age);
+                // ★ 立即清掉旧推进遗留的"收获结算中"提示
+                setSettlingHint(null);
+                // ★ 立即添加一个空 narrative 的占位事件，StreamingNarrative 会显示实时增量文本
+                const placeholderId = `streaming-${Date.now()}`;
+                const newAge = obj.age + (obj.timeAdvance?.ageDeltaYears || 0);
+                const placeholderEvent: any = {
+                  id: placeholderId,
+                  age: newAge,  // 用新年龄（当前年龄 + 岁数增量），避免 isContinuation 误判
+                  title: LOADING_LABELS.advanceTitle,
+                  narrative: '',
+                  eventType: 'normal',
+                  effects: [],
+                  isFateNode: false,
+                  fateNodeName: undefined,
+                  blueprint: undefined,
+                  timeAdvance: obj.timeAdvance || undefined,
+                  worldTime: obj.worldTime || undefined,
+                  actionProjections: [],
+                  createdAt: new Date().toISOString(),
+                  };
+                // 用 setEvents 替换（不是 addEvent），避免出现两个事件
+                setEvents([...events, placeholderEvent]);
+                // 记录占位 ID，后面 done 时替换
+                setPlaceholder(placeholderId);
+              } else if (obj.type === 'heartbeat') {
+                // 忽略心跳
+              } else if (obj.type === 'narrative_delta') {
+                fullNarrative += obj.delta;
+                useGameStore.getState().setStreamingNarrative(eventIndex, fullNarrative);
+                // ★ 同步更新占位事件的 narrative 字段，这样 done 到达前气泡也不会空
+                const phId = placeholderIdRef.current;
+                if (phId) {
+                  const curEvents = useGameStore.getState().events;
+                  setEvents(curEvents.map((e: any) =>
+                    e.id === phId ? { ...e, narrative: fullNarrative } : e
+                  ));
+                }
+              } else if (obj.type === 'narrative_complete') {
+                // ★ narrative 字段闭合：LLM 已写完正文，正在生成剩余 JSON 字段
+                // → 显示"收获结算中..."提示，但按钮仍锁定（同步结算）
+                if (!narrativeCompleted) {
+                  narrativeCompleted = true;
+                  console.log('[SSE advance] narrative_complete, showing settling hint');
+                  setSettlingHint('calculating');
+                }
+              } else if (obj.type === 'done') {
+                console.log('[SSE advance] Received done, narrative length:', obj.narrative?.length, 'perf:', obj._debug_perf);
+                doneData = obj;
+              } else if (obj.type === 'error') {
+                throw new Error(obj.error || 'SSE error');
+              }
+            } catch (e: any) {
+              if (e?.message?.includes('SSE error')) throw e;
+              console.error('[SSE advance] Parse error:', e);
+            }
+          }
+        }
         if (done) {
           console.log('[SSE advance] Stream done');
           break;
         }
+      }
 
-        const chunkText = decoder.decode(value, { stream: true });
-        buffer += chunkText;
-        // SSE 格式: "event: xxx\ndata: {json}\n\n"
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
-
-        for (const part of lines) {
-          if (!part.trim()) continue;
-          const eventLine = part.split('\n').find(l => l.startsWith('event:'));
-          const dataLine = part.split('\n').find(l => l.startsWith('data:'));
-          if (!dataLine) continue;
+      // ★ 兜底：循环结束后冲刷 buffer 残留（最后一段可能缺 \n\n 终止符或 split 把 done 留在了 buffer）
+      if (!doneData && buffer.trim()) {
+        console.log('[SSE advance] Flushing trailing buffer, len:', buffer.length);
+        const dataLine = buffer.split('\n').find(l => l.startsWith('data:'));
+        if (dataLine) {
           const dataStr = dataLine.slice(5).trim();
-          if (!dataStr) continue;
-          try {
-            const obj = JSON.parse(dataStr);
-            if (obj.type === 'start') {
-              console.log('[SSE advance] Received start, age:', obj.age);
-              // ★ 立即清掉旧推进遗留的"收获结算中"提示
-              setSettlingHint(null);
-              // ★ 立即添加一个空 narrative 的占位事件，StreamingNarrative 会显示实时增量文本
-              const placeholderId = `streaming-${Date.now()}`;
-              const newAge = obj.age + (obj.timeAdvance?.ageDeltaYears || 0);
-              const placeholderEvent: any = {
-                id: placeholderId,
-                age: newAge,  // 用新年龄（当前年龄 + 岁数增量），避免 isContinuation 误判
-                title: LOADING_LABELS.advanceTitle,
-                narrative: '',
-                eventType: 'normal',
-                effects: [],
-                isFateNode: false,
-                fateNodeName: undefined,
-                blueprint: undefined,
-                timeAdvance: obj.timeAdvance || undefined,
-                worldTime: obj.worldTime || undefined,
-                actionProjections: [],
-                createdAt: new Date().toISOString(),
-                };
-              // 用 setEvents 替换（不是 addEvent），避免出现两个事件
-              setEvents([...events, placeholderEvent]);
-              // 记录占位 ID，后面 done 时替换
-              setPlaceholder(placeholderId);
-            } else if (obj.type === 'heartbeat') {
-              // 忽略心跳
-            } else if (obj.type === 'narrative_delta') {
-              fullNarrative += obj.delta;
-              useGameStore.getState().setStreamingNarrative(eventIndex, fullNarrative);
-              // ★ 同步更新占位事件的 narrative 字段，这样 done 到达前气泡也不会空
-              const phId = placeholderIdRef.current;
-              if (phId) {
-                const curEvents = useGameStore.getState().events;
-                setEvents(curEvents.map((e: any) =>
-                  e.id === phId ? { ...e, narrative: fullNarrative } : e
-                ));
+          if (dataStr) {
+            try {
+              const obj = JSON.parse(dataStr);
+              if (obj.type === 'done') {
+                console.log('[SSE advance] Recovered done from trailing buffer');
+                doneData = obj;
+              } else if (obj.type === 'error') {
+                throw new Error(obj.error || 'SSE error');
               }
-            } else if (obj.type === 'narrative_complete') {
-              // ★ narrative 字段闭合：LLM 已写完正文，正在生成剩余 JSON 字段
-              // → 显示"收获结算中..."提示，但按钮仍锁定（同步结算）
-              if (!narrativeCompleted) {
-                narrativeCompleted = true;
-                console.log('[SSE advance] narrative_complete, showing settling hint');
-                setSettlingHint('calculating');
-              }
-            } else if (obj.type === 'done') {
-              console.log('[SSE advance] Received done, narrative length:', obj.narrative?.length, 'perf:', obj._debug_perf);
-              doneData = obj;
-            } else if (obj.type === 'error') {
-              throw new Error(obj.error || 'SSE error');
+            } catch (e: any) {
+              if (e?.message?.includes('SSE error')) throw e;
+              console.error('[SSE advance] Trailing buffer parse error:', e);
             }
-          } catch (e: any) {
-            if (e?.message?.includes('SSE error')) throw e;
-            console.error('[SSE advance] Parse error:', e);
           }
         }
       }
