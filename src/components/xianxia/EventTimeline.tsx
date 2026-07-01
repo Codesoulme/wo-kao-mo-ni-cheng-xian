@@ -93,35 +93,6 @@ function cleanVisibleTimeLabel(label?: string) {
 }
 
 
-function splitNarrativeParagraphs(text?: string): string[] {
-  const raw = cleanVisibleNarrativeText(text);
-  if (!raw) return [];
-  const explicit = raw
-    .split(/\n+/)
-    .map(part => part.trim())
-    .filter(Boolean);
-  const source = explicit.length > 1 ? explicit : [raw];
-  const paragraphs: string[] = [];
-  for (const part of source) {
-    if (part.length <= 90) {
-      paragraphs.push(part);
-      continue;
-    }
-    const sentences = part.match(/[^。！？!?；;]+[。！？!?；;]?/g) || [part];
-    let current = '';
-    for (const sentence of sentences.map(s => s.trim()).filter(Boolean)) {
-      if (current && (current + sentence).length > 86) {
-        paragraphs.push(current);
-        current = sentence;
-      } else {
-        current += sentence;
-      }
-    }
-    if (current) paragraphs.push(current);
-  }
-  return paragraphs;
-}
-
 function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: string; name: string }; eventType?: string }) {
   if (!blueprint) return null;
   if (hasInternalVisibleText(blueprint.name)) return null;
@@ -208,40 +179,12 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
   // 非流式模式：普通渲染
   if (streamingText === undefined) {
     if (!text) return null;
-    const paragraphs = splitNarrativeParagraphs(text);
-    return (
-      <>
-        {paragraphs.map((paragraph, idx) => (
-          <p
-            key={idx}
-            className={cn(
-              "transition-opacity duration-200 indent-4",
-              idx === paragraphs.length - 1 && isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
-            )}
-          >
-            {paragraph}
-          </p>
-        ))}
-      </>
-    );
+    return <p>{text}</p>;
   }
 
   // 流式模式：保持段落结构，避免 done 后重排
-  const streamingParagraphs = splitNarrativeParagraphs(streamingText);
   return (
-    <div ref={contentRef} className={cn(
-      "space-y-2 indent-4",
-      isNew ? "animate-in fade-in slide-in-from-bottom-1" : ""
-    )}>
-      {streamingParagraphs.map((paragraph, idx) => (
-        <p
-          key={idx}
-          className="indent-4 transition-opacity duration-200"
-        >
-          {paragraph}
-        </p>
-      ))}
-    </div>
+    <div ref={contentRef} className="xianxia-prose" />
   );
 }
 
@@ -257,7 +200,12 @@ function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }, 
   // 如果 worldTime/displayLabel 已包含岁数，避免重复拼接
   const displayLabelHasAge = displayLabel && displayLabel.includes(`${event.age}\u5c81`);
 
-  // 如果有 worldTime，始终显示完整时间（不受 isContinuation 影响）
+  // 同年叙事的额外/续写事件：必须显示自己的 timeAdvance.label，不能复用上一条的 displayLabel
+  if (ageMeta.isContinuation && segmentLabel) {
+    const combined = displayLabel && displayLabel !== segmentLabel ? `${displayLabel} · ${segmentLabel}` : segmentLabel;
+    return ageText ? `${ageText} · ${combined}` : combined;
+  }
+  // 普通事件：有 displayLabel 则用
   if (displayLabel) return ageText && !displayLabelHasAge ? `${ageText} · ${displayLabel}` : displayLabel;
   // 兜底：用 worldLabel + segmentLabel 组装
   if (worldLabel && segmentLabel) return `${ageText} · ${segmentLabel}${open}${worldLabel}${close}`;
@@ -577,7 +525,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 正文 - 可折叠 */}
                 {isExpanded && (
                   <div className="px-3 pb-2">
-                    <div className="space-y-2 text-xs leading-relaxed text-foreground/90 xianxia-prose">
+                    <div className="text-xs leading-relaxed text-foreground/90 xianxia-prose">
                       <StreamingNarrative text={event.narrative} isNew={isNewEvent} streamingText={streamingEvent && isNewEvent ? streamingEvent.text : undefined} eventIndex={idx} />
                     </div>
                     {/* 效果 */}

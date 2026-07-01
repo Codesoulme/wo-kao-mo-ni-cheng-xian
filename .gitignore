@@ -40,3 +40,9 @@ prisma/*.db
 prisma/*.db-*
 
 prisma/backups/
+android/
+.codebase-memory/
+dev-server.log.err
+*.bak
+*.bak2
+logs/bench/

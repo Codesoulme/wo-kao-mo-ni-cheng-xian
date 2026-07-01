@@ -299,7 +299,8 @@
     overflow-wrap: anywhere;
     word-break: break-word;
     line-break: anywhere;
-    white-space: pre-wrap;
+    white-space: pre-line;
+    /* 首行缩进完全交给 AI prompt 约束——不要 CSS 兜底 */
   }
 
   .xianxia-chip {

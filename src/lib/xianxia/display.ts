@@ -431,17 +431,9 @@ const MECHANISM_PATTERNS: Array<[RegExp, string | ((m: string) => string)]> = [
  * - 末尾是单引号 `"` 或 `'` → 自动补反引号 + 简短后续
  */
 export function completeNarrative(text: string): string {
-  if (!text) return text;
-  const trimmed = text.trimEnd();
-  // 末尾是中文冒号：补一句让叙事有"开头"
-  if (/[：:]$/.test(trimmed)) {
-    return `${trimmed}\n他张了张嘴，又咽了回去，只剩水波轻轻荡开。`;
-  }
-  // 末尾是单个引号（开了对话没关）
-  if (/["""]$/.test(trimmed)) {
-    return `${trimmed}"`;
-  }
-  return text;
+  // 修真沉浸版 PoC v8: 修真沉浸 PoC撤销掉——AI 写什么就显示什么，不填充
+  // 原因：AI 输出 `:` `,` 末尾时贸然填充会让玩家看到莫名尾注
+  return (text || '').trim();
 }
 
 /**

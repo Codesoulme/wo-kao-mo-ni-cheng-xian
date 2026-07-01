@@ -98,6 +98,8 @@ model Character {
   lastEventAge    Int      @default(-1)       // 上次事件发生的年龄
 
   // JSON string of current active status entries
+  npcRelationships  NpcRelationship[]
+  narrativeMemories NarrativeMemory[]
   statusJson      String   @default("[]")
   // JSON string of inventory items
   inventoryJson   String   @default("[]")
@@ -303,4 +305,50 @@ model ProjectionSnapshot {
   updatedAt        DateTime @updatedAt
 
   @@index([characterId])
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// Memory layer (Plan-A) — NPC relationships + narrative memory
+// 派生自 Event 主事件流；不抢 source-of-truth
+// ─────────────────────────────────────────────────────────────
+
+// NPC 关系表：每对 (character, npcKey) 一行，affinity 数值化
+model NpcRelationship {
+  id          String   @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  npcKey      String   // NPC 标识（如 "master_qingxu" / "shi_zun_lingxiao"）
+  npcName     String   // 玩家可见 NPC 名（中文名，叙事用）
+  affinity    Int      @default(0)   // 好感 [-100, 100]
+  trust       Int      @default(0)   // 信任 [-100, 100]
+  hostility   Int      @default(0)   // 敌意 [0, 100]
+  lastAge     Int      @default(0)   // 上次互动年龄（用于「同岁反复提到」自然刷新）
+  lastEvent   String   @default("")  // 上次事件 type（combat / trade / dialog / ...）
+  tag         String   @default("")  // 自由标签 JSON，如 '["师尊","救命恩人"]'
+  updatedAt   DateTime @updatedAt
+
+  @@unique([characterId, npcKey])
+  @@index([characterId])
+  @@index([npcKey])
+}
+
+// 心境/牵挂：每条记忆一行（"上次拒绝拜师 / 欠师尊三枚灵石 / 落霞山未了因缘"）
+model NarrativeMemory {
+  id          String   @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  category    String   // "unresolved_fate" / "debt" / "loss" / "growth" / "promise"
+  intensity   Int      @default(50)   // 牵挂强度 [0, 100]；衰减时 AI 据此排优先级
+  title       String                  // 一句话标题（如 "欠师尊三枚灵石"）
+  body        String                  // 完整记忆（不展示给玩家时用）
+  sourceEventId String?               // 触发该记忆的事件 id（Event.aggregateVersion）
+  age         Int                     // 发生时的角色年龄
+  resolved    Boolean  @default(false) // 是否已了结（玩家确认 / 自然消解）
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([characterId, resolved])
+  @@index([characterId, intensity])
+  @@index([sourceEventId])
 }
