@@ -2109,7 +2109,7 @@ function smokeNarrativeTruncation(): void {
 }
 
 function smokeNarrativeCompletion(): void {
-  // 修真沉浸版 PoC v8: completeNarrative 只 trim，不填充——测试「不改变内容」
+  // v8: completeNarrative 只 trim，不填充——测试「不改变内容」
   const t1 = '宣大江低头看儿子。';
   const r1 = completeNarrative(t1);
   assert(r1 === t1.trim(), `正常 narrative 应原样返回: ${r1.slice(-30)}`);
@@ -2117,7 +2117,7 @@ function smokeNarrativeCompletion(): void {
   const t2 = '  \n  她说「好」。  \n  ';
   const r2 = completeNarrative(t2);
   assert(r2 === t2.trim(), `前后空白应被 trim: ${r2.slice(-30)}`);
-  // 末尾是中文冒号  →  原样保留（v8 修真沉浸 PoC撤销了自动填充）
+  // 末尾是中文冒号  →  原样保留（v8 沉浸版 PoC撤销了自动填充）
   const t3 = '他说「我今天看见一个人——';
   const r3 = completeNarrative(t3);
   assert(r3 === t3.trim(), `末尾冒号原样保留，不填充: ${r3.slice(-30)}`);

@@ -224,7 +224,7 @@ async function loadAIConfig(): Promise<RuntimeAIConfig> {
     }
     cachedAIConfig = {
       baseUrl: String(active.baseUrl).trim().replace(/\/+$/, ''),
-      apiKey: String(active.apiKey).trim(),
+      apiKey: resolveApiKey(active.apiKey),
       model: String(active.model || 'ark-code-latest').trim() || 'ark-code-latest',
       liteModel: active.liteModel ? String(active.liteModel).trim() : undefined,
       chatId: active.chatId ? String(active.chatId) : undefined,
@@ -235,7 +235,7 @@ async function loadAIConfig(): Promise<RuntimeAIConfig> {
 
   // 旧格式兼容：直接 baseUrl/apiKey
   const baseUrl = String(cfg?.baseUrl || '').trim().replace(/\/+$/, '');
-  const apiKey = String(cfg?.apiKey || '').trim();
+  const apiKey = resolveApiKey(cfg?.apiKey);
   const model = String(cfg?.model || cfg?.modelName || 'ark-code-latest').trim() || 'ark-code-latest';
   if (!baseUrl || !apiKey) {
     throw new Error('游戏 AI 配置不完整，请在设置中填写 Base URL 和 API Key');
@@ -250,6 +250,30 @@ async function loadAIConfig(): Promise<RuntimeAIConfig> {
   };
   return cachedAIConfig;
 }
+
+/**
+ * Resolve an apiKey value from config.
+ * - "env:VAR_NAME"  -> process.env.VAR_NAME
+ * - any other value -> returned as-is (legacy plaintext)
+ * Throws when env var is referenced but missing.
+ */
+function resolveApiKey(raw: string | undefined | null): string {
+  const s = String(raw ?? '').trim();
+  if (s.startsWith('env:')) {
+    const varName = s.slice(4).trim();
+    if (!varName) {
+      throw new Error('AI 配置 apiKey 形式为 "env:VAR_NAME"，但变量名为空');
+    }
+    const v = process.env[varName];
+    if (!v) {
+      throw new Error(`AI 配置引用了环境变量 ${varName}，但 process.env.${varName} 未设置`);
+    }
+    return v;
+  }
+  return s;
+}
+
+
 
 function aiErrorMessage(body: any, status: number) {
   const message = body?.error?.message || body?.message || body?.error || `HTTP ${status}`;
@@ -595,8 +619,9 @@ ${buildNarrativeContractFeedbackList(ctx)}
 
 export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean, qualityMode: 'full' | 'light' = 'full'): string {
   const isLightMode = qualityMode === 'light' && !isFateNode;
+  // [P0 fix 2026-07-02] Hoist sc/realmTraits/realmTraitText/engineFactors declarations to function head; previous code referenced them before declaration (TDZ).
 
-  // 修真沉浸版 PoC v11: 修为认知告警——不强制 AI 突破，但让 AI 必须清楚当前修为状态、决定破不破、并且让玩家能看出「AI 是故意不破」
+  // v11: 修为认知告警——不强制 AI 突破，但让 AI 必须清楚当前修为状态、决定破不破、并且让玩家能看出「AI 是故意不破」
   // 修真游戏核心：AI 据剧情/状态/场景/因果生成；面板只承载投影。AI 应该比面板更懂当前的修炼瓶颈。
   const cultivationRatio = (sc.expToBreak > 0) ? sc.cultivationExp / sc.expToBreak : 0;
   const isCappedAtBreak = sc.cultivationExp >= sc.expToBreak && sc.expToBreak > 0;
@@ -604,8 +629,9 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
     const r = sc.cultivationInsight || '';
     return r ? `\n（修为状态机已记录的洞察：「${r}」）\n` : '';
   })();
-  // 修真沉浸版 PoC: 修真沉浸版 PoC 修真沉浸版 PoC: 修真沉浸版 PoC 给功法/资源/心境上下文
+  // 修真沉浸版 PoC context hint
   const realmBlock = realmTraitText || '';
+
   const factorsBlock = engineFactors || '';
   const cultivationStatusContext = `\n【修为现状（你必须清楚）】\n` +
     `当前修为：${sc.cultivationExp}/${sc.expToBreak}（${Math.round(cultivationRatio * 100)}%）\n` +
