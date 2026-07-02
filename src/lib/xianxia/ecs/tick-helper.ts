@@ -95,7 +95,7 @@ export function applyEcsTickToState<T extends { age: number; cultivationExp: num
   state.cultivationExp = result.cultivationExp;
   if (!result.alive && state.alive) {
     state.alive = false;
-    state.causeOfDeath = state.causeOfDeath || 'ecs-aging-natural';
+    state.causeOfDeath = state.causeOfDeath || '寿元已尽，身隳道消';
   }
   return state;
 }

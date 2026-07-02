@@ -300,10 +300,11 @@ ${breakthroughText}`;
         }
 
         if (char.alive !== finalState.alive && finalState.alive === false) {
+          const cause = finalState.causeOfDeath || '寿元已尽，身隳道消';
           await appendEvent({
             characterId,
             type: 'character.alive.changed',
-            data: { type: 'character.alive.changed', alive: false, cause: finalState.causeOfDeath || 'unknown' },
+            data: { type: 'character.alive.changed', alive: false, cause, narrative: `他的一生走到了尽头。${cause}。星辰夜凉，再无来者。` },
             source: 'system-tick',
             triggerActor: 'system',
             createdAtAge: finalState.age,
@@ -465,6 +466,21 @@ ${narrative || ''}`);
         worldTime: continuationWorldTime,
         effects: [...continuation.effects, hiddenEventMeta({ timeAdvance: continuation.timeAdvance, worldTime: continuationWorldTime, actionProjections: continuation.actionProjections })],
       }, finalState.age));
+    }
+
+    // 修真沉浸·生命终结叙事：若这一轮角色因 ECS aging / 战斗 / 寿元等任何原因跨过了 alive=false，
+    // 单独追加一条"身殒道消"独立事件，避免玩家看到主事件叙事却在角色死亡时毫无征兆。
+    if (char.alive !== finalState.alive && finalState.alive === false) {
+      const deathCause = finalState.causeOfDeath || '寿元已尽，身隳道消';
+      const deathTitles = ['身殒道消', '身隳道消', '道途已尽', '尘世收局'];
+      const seedStr = `${characterId}|${finalState.age}`;
+      let seed = 0; for (let si = 0; si < seedStr.length; si++) seed = (seed * 31 + seedStr.charCodeAt(si)) >>> 0;
+      eventDrafts.push({
+        title: deathTitles[seed % deathTitles.length],
+        narrative: `${aiOutput.title ? `${aiOutput.title}之后，` : ''}他的一生走到了尽头。${deathCause}。星辰夜凉，再无来者。`,
+        eventType: 'death',
+        effects: [],
+      });
     }
 
     // 若引擎最终确认已经突破，单独追加一条破境成功记载。

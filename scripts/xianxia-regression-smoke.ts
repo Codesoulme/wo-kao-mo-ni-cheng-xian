@@ -289,6 +289,50 @@ function smokeSameYearThreadTimeInference(): void {
   log('same-year-thread-time-inference', { passed: true, title: threads[0].title, ageDeltaYears: continuation.timeAdvance?.ageDeltaYears });
 }
 
+function smokeDeathEventDraftGeneration(): void {
+  // 修真沉浸·生命终结叙事：模拟 advance 路由里 finalState.alive 跨 false 时，
+  // eventDrafts 必须追加一条"身殒道消"独立事件；事件类型 + 标题 + 叙事三件套均不可缺。
+  const finalState: any = { alive: false, age: 100, causeOfDeath: '\u5bff\u5143\u5df2\u76f8\u3001\u8eab\u969d\u9053\u6d88' };
+  const char: any = { alive: true };
+  const characterId = 'char_test_death_001';
+  const eventDrafts: any[] = [{ title: '\u4e3b\u4e8b\u4ef6', narrative: '\u539f\u4e3b\u4e8b\u4ef6\u53d9\u4e8b', eventType: 'normal', effects: [] }];
+  if (char.alive !== finalState.alive && finalState.alive === false) {
+    const deathCause = finalState.causeOfDeath || '\u5bff\u5143\u5df2\u76f8\u3001\u8eab\u969d\u9053\u6d88';
+    const deathTitles = ['\u8eab\u6baf\u9053\u6d88', '\u8eab\u969d\u9053\u6d88', '\u9053\u9014\u5df2\u5c3d', '\u5c18\u4e16\u6536\u5c40'];
+    const seedStr = `${characterId}|${finalState.age}`;
+    let seed = 0; for (let si = 0; si < seedStr.length; si++) seed = (seed * 31 + seedStr.charCodeAt(si)) >>> 0;
+    eventDrafts.push({
+      title: deathTitles[seed % deathTitles.length],
+      narrative: `\u4ed6\u7684\u4e00\u751f\u8d70\u5230\u4e86\u5c3e\u58f0\u3002${deathCause}\u3002\u661f\u8fb0\u591c\u51c9\uff0c\u518d\u65e0\u6765\u8005\u3002`,
+      eventType: 'death',
+      effects: [],
+    });
+  }
+  assert(eventDrafts.length === 2, 'death event should be appended when alive flips false');
+  const deathEvent = eventDrafts[eventDrafts.length - 1];
+  assert(deathEvent.eventType === 'death', 'death event type should be "death"');
+  assert(deathEvent.title && deathEvent.title.length > 0, 'death event title must be non-empty');
+  assert(deathEvent.narrative.includes(finalState.causeOfDeath), 'death narrative should embed cause');
+  assert(deathEvent.narrative.includes('\u4ed6\u7684\u4e00\u751f'), 'death narrative should include "\u4ed6\u7684\u4e00\u751f" anchor');
+  log('death-event-draft-generation', { passed: true, title: deathEvent.title });
+}
+
+function smokeDeathDraftStableTitle(): void {
+  // 修真沉浸：同一 characterId + age 多次推进必须返回相同死亡标题（不可每次换字）
+  const titles = ['\u8eab\u6baf\u9053\u6d88', '\u8eab\u969d\u9053\u6d88', '\u9053\u9014\u5df2\u5c3d', '\u5c18\u4e16\u6536\u5c40'];
+  const charId = 'char_stable';
+  const age = 87;
+  function pick(): string {
+    const seedStr = `${charId}|${age}`;
+    let seed = 0; for (let i = 0; i < seedStr.length; i++) seed = (seed * 31 + seedStr.charCodeAt(i)) >>> 0;
+    return titles[seed % titles.length];
+  }
+  const a = pick();
+  const b = pick();
+  assert(a === b, 'death title must be stable for same characterId+age');
+  log('death-draft-stable-title', { passed: true, title: a });
+}
+
 function smokeAdvancePostNarrativeTimeReinfer(): void {
   // 修真沉浸推进：AI 叙事里写小时间单位时（翌日/数日后/入夜），不能机械跳一岁。
   // 修真质感打磨期 PoC：advance 路由在拿到 AI 标题+正文后用 inferInlineTimeAdvance 重推断；
@@ -3223,6 +3267,8 @@ async function main(): Promise<void> {
   smokeSameYearThreadNormalizedProgress100();
   smokeAdvancePostNarrativeTimeReinfer();
   smokeAdvancePostNarrativeAgeDelta();
+  smokeDeathEventDraftGeneration();
+  smokeDeathDraftStableTitle();
   smokeNarrativeFormatCompliant();
   smokeNarrativeFormatShortSingle();
   smokeNarrativeFormatLongFlat();
