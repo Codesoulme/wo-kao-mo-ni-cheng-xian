@@ -294,6 +294,9 @@ export function dbToState(c: DBCharacter): CharacterState {
     combatSession,
     // Task 22 新字段
     heartDemon: (c as any).heartDemon ?? 0,
+    karma: (c as any).karma ?? 0,
+    merit: (c as any).merit ?? 0,
+    sin: (c as any).sin ?? 0,
     // Task 23 新字段
     pets: safeParse<Pet[]>((c as any).petsJson || '[]', []),
     // Task 24 新字段

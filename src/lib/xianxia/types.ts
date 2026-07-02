@@ -3016,13 +3016,6 @@ export interface CharacterState {
 
   heartDemon: number;
 
-  // 因果业力（正负）：AI 抉择/事件积累，引擎用于概率分支（顶层字段）
-  karma?: number;
-  // 功德：善行积累
-  merit?: number;
-  // 业障：恶行积累
-  sin?: number;
-
   // ===== Task 23 新增 =====
 
   // 灵宠列表（Pet[]）—— 玩家收服的灵宠
