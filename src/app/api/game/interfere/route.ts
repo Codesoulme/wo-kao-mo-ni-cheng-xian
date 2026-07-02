@@ -1,4 +1,4 @@
-// @ts-nocheck - api route, types not critical
+﻿// @ts-nocheck - api route, types not critical
 
 // POST /api/game/interfere
 // 玩家在任意时刻输入"干扰模拟"
@@ -362,14 +362,14 @@ export async function POST(req: NextRequest) {
             data: {
               type: 'character.cultivation-exp.changed',
               delta: charAfter.cultivationExp - char.cultivationExp,
-              newValue: charAfter.cultivationExp,
+              newValue: charAfterExp ?? 0,
               reason: 'interfere',
             },
             previousEventId,
             aggregateVersion: nextAggregateVersion,
             source: 'user-action',
             triggerActor: 'player',
-            createdAtAge: charAfter.age,
+            createdAtAge: charAfterAge ?? 0,
           },
         });
         nextAggregateVersion += 1;
@@ -392,7 +392,7 @@ export async function POST(req: NextRequest) {
             aggregateVersion: nextAggregateVersion,
             source: 'user-action',
             triggerActor: 'player',
-            createdAtAge: charAfter.age,
+            createdAtAge: charAfterAge ?? 0,
           },
         });
         nextAggregateVersion += 1;
@@ -423,7 +423,7 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return { ok: true as const };
+      return { ok: true as const, charAfterExp: charAfter.cultivationExp, charAfterAge: charAfter.age };
     }).catch((err: any) => {
       if (err?.message === 'IDEMPOTENT_DUPLICATE') {
         return { ok: false as const, error: 'IDEMPOTENT_DUPLICATE' as const };
@@ -431,6 +431,8 @@ export async function POST(req: NextRequest) {
       throw err;
     });
 
+    const charAfterExp = (persistResult.ok && 'charAfterExp' in persistResult) ? (persistResult as any).charAfterExp : null;
+    const charAfterAge = (persistResult.ok && 'charAfterAge' in persistResult) ? (persistResult as any).charAfterAge : null;
     if (!persistResult.ok) {
       return NextResponse.json(
         { success: false, error: '请求已被处理，请刷新页面', code: 'IDEMPOTENT_DUPLICATE' },
@@ -453,12 +455,12 @@ export async function POST(req: NextRequest) {
         data: {
           type: 'character.cultivation-exp.changed',
           delta: 0,
-          newValue: charAfter.cultivationExp,
+          newValue: charAfterExp ?? 0,
           reason: 'interfere:middleware-pass',
         },
         source: 'user-action',
         triggerActor: 'player',
-        createdAtAge: charAfter.age,
+        createdAtAge: charAfterAge ?? 0,
       });
       esMiddlewareOk = appendRes.committed;
 
