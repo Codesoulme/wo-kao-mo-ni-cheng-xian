@@ -56,7 +56,7 @@ function renderSlots(slots: PlayerUISlotEntry[], expanded: boolean, max: number)
   if (visible.length === 0) {
     return (
       <div className="text-[10px] text-muted-foreground italic font-serif-cn text-center py-3">
-        尚无可投影内容
+        尚无前世遗留
       </div>
     );
   }
@@ -64,7 +64,7 @@ function renderSlots(slots: PlayerUISlotEntry[], expanded: boolean, max: number)
     <div className="space-y-1.5">
       {visible.map((slot, i) => (
         <div
-          key={`${'$'}{slot.slot}-${'$'}{slot.sourceId}-${'$'}{i}`}
+          key={`${{slot.slot}-${'$'}{slot.sourceId}-${'$'}{i}`}
           className={cn(
             'rounded-md border px-2 py-1.5 text-[11px] font-serif-cn',
             TONE_CLASS[slot.tone] || TONE_CLASS.neutral,
@@ -179,12 +179,12 @@ export function CycleProjectionPanel({
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="font-serif-cn">轮回投影</span>
+            <span className="font-serif-cn">前世因缘</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="text-[10px] text-muted-foreground italic font-serif-cn text-center py-4">
-            尚未踏足修仙之路，轮回投影无从展开。
+            尚未踏足仙路，前世因缘无从窥探。
           </div>
         </CardContent>
       </Card>
@@ -197,7 +197,7 @@ export function CycleProjectionPanel({
         <CardTitle className="text-sm flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="font-serif-cn">轮回投影</span>
+            <span className="font-serif-cn">前世因缘</span>
           </span>
           <div className="flex items-center gap-1">
             <Badge variant="secondary" className="text-[10px]" data-testid="cycle-total-slots">

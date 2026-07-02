@@ -78,7 +78,7 @@ export function ResetWorldButton() {
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || '清理失败');
-      toast.success('测试残留已清理', { description: `已清空 ${data.cleared?.events || 0} 条事件 / ${data.cleared?.preload || 0} 条预读 / ${data.cleared?.interferences || 0} 条干扰。` });
+      toast.success('历练痕迹已清', { description: `已清空 ${data.cleared?.events || 0} 条事件 / ${data.cleared?.preload || 0} 条天机待启 / ${data.cleared?.interferences || 0} 条私念余响。` });
       setCleanOpen(false);
     } catch (err: any) {
       toast.error('清理失败', { description: err?.message || '请稍后重试' });
@@ -98,15 +98,15 @@ export function ResetWorldButton() {
             disabled={cleanBusy}
           >
             <Eraser className="w-4 h-4" />
-            清理测试残留
+            清理历练痕迹
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent className="border-amber-500/30 bg-background/95">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-serif-cn text-amber-700">清理测试残留？</AlertDialogTitle>
+            <AlertDialogTitle className="font-serif-cn text-amber-700">清理历练痕迹？</AlertDialogTitle>
             <AlertDialogDescription className="leading-6">
-              仅清空事件史册、推进预读、玩家干扰记录。不会删除角色存档。
-              适合发现叙事/数据错乱时快速回到干净状态。
+              仅清空事件史册、推进预读、私念干预记录。不会删除角色存档。
+              适合发现叙事错乱或时光错位时，重返清净之初。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

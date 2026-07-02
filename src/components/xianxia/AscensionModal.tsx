@@ -52,12 +52,12 @@ export function AscensionModal({
       <div className="text-sm mb-3">{session.narrative}</div>
 
       <div data-testid="ascension-requirements" className="text-xs space-y-1 mb-3">
-        <div>境界要求：{req.minRealm}</div>
-        <div>雷劫：{req.tribulationPassed ? '已渡' : '未过'}</div>
-        <div>寿元：{req.lifespanMin}</div>
-        <div>声望：{req.reputationMin}</div>
-        <div>修为：{req.cultivationExpMin}</div>
-        <div>道心：{req.daoHeartMin}</div>
+        <div>境界已至此境：{req.minRealm}</div>
+        <div>雷劫：{req.tribulationPassed ? '已历' : '未历'}</div>
+        <div>寿元已逾 {req.lifespanMin}</div>
+        <div>声名已至 {req.reputationMin}</div>
+        <div>修为已达 {req.cultivationExpMin}</div>
+        <div>道心已显 {req.daoHeartMin}</div>
       </div>
 
       <div className="flex gap-2">
