@@ -4,8 +4,9 @@ import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Mountain, Sparkles, BookOpen, ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { formatNarrativeForDisplay } from '@/lib/xianxia/narrative-format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
@@ -25,6 +26,14 @@ export function ChoiceModal() {
   if (!character || !pendingChoice) return null;
 
   const hasContext = !!(pendingChoice.contextNarrative || pendingChoice.contextTitle);
+  const formattedContext = useMemo(
+    () => pendingChoice.contextNarrative ? formatNarrativeForDisplay(pendingChoice.contextNarrative) : '',
+    [pendingChoice.contextNarrative],
+  );
+  const formattedPrompt = useMemo(
+    () => pendingChoice.prompt ? formatNarrativeForDisplay(pendingChoice.prompt) : '',
+    [pendingChoice.prompt],
+  );
 
   const choose = async (idx: number) => {
     if (busy) return;
@@ -134,7 +143,7 @@ export function ChoiceModal() {
                   )}
                   {pendingChoice.contextNarrative && (
                     <p className="text-xs leading-relaxed text-foreground/85 font-serif-cn xianxia-prose">
-                      {pendingChoice.contextNarrative}
+                      {formattedContext}
                     </p>
                   )}
                 </div>
@@ -145,7 +154,7 @@ export function ChoiceModal() {
           {/* 抉择情境 */}
           <div className="rounded-lg border border-border/60 bg-card/60 p-3">
             <p className="text-sm leading-relaxed text-foreground/90 font-serif-cn xianxia-prose">
-              {pendingChoice.prompt}
+              {formattedPrompt}
             </p>
           </div>
 

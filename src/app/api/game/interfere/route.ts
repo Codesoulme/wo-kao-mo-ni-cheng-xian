@@ -362,14 +362,14 @@ export async function POST(req: NextRequest) {
             data: {
               type: 'character.cultivation-exp.changed',
               delta: charAfter.cultivationExp - char.cultivationExp,
-              newValue: charAfterExp ?? 0,
+              newValue: charAfter.cultivationExp,
               reason: 'interfere',
             },
             previousEventId,
             aggregateVersion: nextAggregateVersion,
             source: 'user-action',
             triggerActor: 'player',
-            createdAtAge: charAfterAge ?? 0,
+            createdAtAge: charAfter.age,
           },
         });
         nextAggregateVersion += 1;
@@ -392,7 +392,7 @@ export async function POST(req: NextRequest) {
             aggregateVersion: nextAggregateVersion,
             source: 'user-action',
             triggerActor: 'player',
-            createdAtAge: charAfterAge ?? 0,
+            createdAtAge: charAfter.age,
           },
         });
         nextAggregateVersion += 1;

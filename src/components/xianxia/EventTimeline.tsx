@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } from '@/lib/xianxia/display';
 import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, useCallback, Fragment } from 'react';
+import { formatNarrativeForDisplay } from '@/lib/xianxia/narrative-format';
 
 interface EventTimelineProps {
   events: GameEvent[];
@@ -176,10 +177,10 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
     return () => stopAnimation();
   }, [streamingText, eventIndex, startAnimation, stopAnimation]);
   
-  // 非流式模式：普通渲染
+  // 非流式模式：普通渲染（修真沉浸叙事段缩进兜底）
   if (streamingText === undefined) {
     if (!text) return null;
-    return <p>{text}</p>;
+    return <p>{formatNarrativeForDisplay(text)}</p>;
   }
 
   // 流式模式：保持段落结构，避免 done 后重排

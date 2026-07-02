@@ -132,6 +132,7 @@ import type { CombatStance, CombatResourceType, CombatResourceUsage, Breakthroug
 import { FateEchoKind } from '../src/lib/xianxia/types';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
+import { formatNarrativeForDisplay } from '../src/lib/xianxia/narrative-format';
 import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
 import { characterDisplayEntries, entriesForSlot } from '../src/lib/xianxia/display-registry';
 import { sanitizeNarrativeText, sanitizeEventDraft, truncateNarrativeAtSentence, completeNarrative } from '../src/lib/xianxia/display';
@@ -1889,6 +1890,69 @@ function smokeSameYearThreadNormalizedProgress100(): void {
   log('same-year-thread-normalized-progress100', { passed: true });
 }
 
+function smokeNarrativeFormatCompliant(): void {
+  // AI 已合规（多段 + 缩进）：保持原样
+  const compliant = '\u3000\u3000他站在山门之前。\n\n\u3000\u3000云雾未散，他深吸一口气。';
+  const r1 = formatNarrativeForDisplay(compliant);
+  assert(r1 === compliant, 'compliant narrative should be unchanged');
+  log('narrative-format-compliant', { passed: true, len: r1.length });
+}
+
+function smokeNarrativeFormatShortSingle(): void {
+  // 极短（≤60字）：单段加缩进
+  const short = '他环顾四周，此地灵气稀薄。';
+  const r = formatNarrativeForDisplay(short);
+  assert(r.startsWith('\u3000\u3000'), 'short narrative should have indent');
+  assert(!r.includes('\n\n'), 'short narrative should not force paragraph break');
+  assert(r.includes(short), 'short narrative should preserve content');
+  log('narrative-format-short-single', { passed: true, len: r.length });
+}
+
+function smokeNarrativeFormatLongFlat(): void {
+  // 长单段（AI 未分段）：按句号切分重排；总长 150 字以上应分多段
+  const flat = '\u4ed6\u73af\u987e\u56db\u5468\uff0c\u6b64\u5730\u7075\u6c14\u7a00\u8584\uff0c\u786e\u975e\u51e1\u4eba\u957f\u4e45\u4e4b\u5730\u3002\u4ed6\u8f6c\u8eab\u6b32\u8d70\uff0c\u5374\u88ab\u4e00\u4f4d\u767d\u53d1\u8001\u8005\u53eb\u4f4f\u3002\u8001\u8005\u81ea\u79f0\u662f\u5c71\u4e2d\u4fee\u58eb\uff0c\u5df2\u5728\u6b64\u7b49\u5019\u591a\u65f6\uff0c\u4f46\u8bb0\u5f97\u4ed6\u9762\u5b54\u3002\u4ed6\u5fc3\u4e2d\u7591\u60d1\uff0c\u5374\u4e5f\u4e0d\u6562\u8f6c\u5934\u5c31\u8d70\uff0c\u53ea\u5f97\u7aef\u7740\u5fc3\u67b6\u8be2\u95ee\u8001\u8005\u6765\u610f\u3002\u8001\u8005\u5f00\u53e3\uff0c\u53d9\u8ff0\u4e00\u6bb5\u4e0a\u53e4\u4fee\u58eb\u7684\u4f20\u627f\uff0c\u8bf4\u5c71\u4e2d\u4e00\u65e6\u51fa\u73b0\u80fd\u591f\u63a5\u53d7\u4f20\u627f\u7684\u540e\u8f88\uff0c\u5fc5\u987b\u5148\u8d70\u5165\u5c71\u95e8\u3002';
+  const r = formatNarrativeForDisplay(flat);
+  assert(r.includes('\n\n'), 'flat long narrative should be split into paragraphs');
+  const paras = r.split('\n\n');
+  assert(paras.length >= 2, `should produce ≥2 paragraphs, got ${paras.length}`);
+  for (const p of paras) {
+    assert(p.startsWith('\u3000\u3000'), `every paragraph should have indent: ${p.slice(0, 20)}`);
+  }
+  // 字符数守恒（去掉缩进与 \n\n）
+  const sumLen = paras.reduce((s, p) => s + p.replace(/^\u3000\u3000/, '').length, 0);
+  assert(Math.abs(sumLen - flat.length) <= 2, `char count should be preserved: ${sumLen} vs ${flat.length}`);
+  log('narrative-format-long-flat', { passed: true, paragraphs: paras.length, sumLen });
+}
+
+function smokeNarrativeFormatMidFlat(): void {
+  // 中等长度（70-100字）：即使分不出 ≥2 段，也必须加首行缩进
+  const mid = '\u4ed6\u73af\u987e\u56db\u5468\uff0c\u6b64\u5730\u7075\u6c14\u7a00\u8584\u3002\u4ed6\u8f6c\u8eab\u6b32\u8d70\uff0c\u5374\u88ab\u8001\u8005\u53eb\u4f4f\uff0c\u8bf4\u5df2\u7b49\u5019\u591a\u65f6\u3002';
+  const r = formatNarrativeForDisplay(mid);
+  assert(r.startsWith('\u3000\u3000'), 'mid-length narrative should at least have indent');
+  log('narrative-format-mid-flat', { passed: true, len: r.length });
+}
+
+
+function smokeNarrativeFormatMixedPunct(): void {
+  // 混合问号/感叹号分句
+  const mixed = '他惊呼：谁！他环顾四周。远处传来一声叹息。是幻觉吗？他揉了揉眼睛。远山之下老者点头微笑。随说：你我有缘。明日再来此地罢。那一夜月明如洗，众生皆有缘法。他唰地跳下老树，拍了拍身上的露水，竟听得耳后一个苍老的声音。';
+  const r = formatNarrativeForDisplay(mixed);
+  assert(r.includes('\n\n'), 'mixed-punct narrative should split');
+  const paras = r.split('\n\n');
+  assert(paras.length >= 2, `should produce at least 2 paragraphs, got ${paras.length}`);
+  log('narrative-format-mixed-punct', { passed: true, paragraphs: paras.length });
+}
+
+function smokeNarrativeFormatEmptyAndTrivial(): void {
+  // 边界：空、纯空白、单字符
+  assert(formatNarrativeForDisplay('') === '', 'empty stays empty');
+  assert(formatNarrativeForDisplay('   ') === '', 'whitespace becomes empty');
+  const oneChar = '好';
+  const r1 = formatNarrativeForDisplay(oneChar);
+  assert(r1.includes('好'), 'single char preserved');
+  log('narrative-format-trivial', { passed: true });
+}
+
 function smokeNoMechanismWordsInNarrative(): void {
   // 文案过滤层验证：sanitizeNarrativeText 应移除内部机制词
   // 验证策略：检查结果中不包含字段名、调试元词等机制词；不检查数值残留（来自原始文本，预期会部分残留）
@@ -3159,6 +3223,12 @@ async function main(): Promise<void> {
   smokeSameYearThreadNormalizedProgress100();
   smokeAdvancePostNarrativeTimeReinfer();
   smokeAdvancePostNarrativeAgeDelta();
+  smokeNarrativeFormatCompliant();
+  smokeNarrativeFormatShortSingle();
+  smokeNarrativeFormatLongFlat();
+  smokeNarrativeFormatMidFlat();
+  smokeNarrativeFormatMixedPunct();
+  smokeNarrativeFormatEmptyAndTrivial();
   smokeNoMechanismWordsInNarrative();
   smokeYoungCharacterNoAdultAction();
   smokeFallbackInfantHardGate();
