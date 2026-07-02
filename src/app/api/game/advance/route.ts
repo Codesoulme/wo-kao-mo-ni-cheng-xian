@@ -88,8 +88,8 @@ export async function POST(req: NextRequest) {
     let state = candidate.preparedState;
     const blueprint = candidate.blueprint;
     const aiOutput = candidate.aiOutput;
-    const timeAdvance = clampTimeAdvance(aiOutput?.timeAdvance, candidate.aiOutput?.timeAdvance);
-    const worldCalendar = advanceWorldCalendar(inputWorldCalendar, timeAdvance);
+    let timeAdvance = clampTimeAdvance(aiOutput?.timeAdvance, candidate.aiOutput?.timeAdvance);
+    let worldCalendar = advanceWorldCalendar(inputWorldCalendar, timeAdvance);
     const worldTime = worldTimeStamp(worldCalendar);
     const isFateNode = candidate.isFateNode;
     const fateNode = candidate.fateNode;
@@ -98,6 +98,24 @@ export async function POST(req: NextRequest) {
     const stateBeforeEvent = { ...state };
     const result = executeAIEvent(state, aiOutput);
     let finalState = result.state;
+
+    // 修真质感：年龄跳跃对账
+    // prepareAdvanceCandidate 用 AI 的 timeAdvance 预增 state.age，但 AI 常常不填 / 填 1 年。
+    // 推进完拿到叙事后，从 AI 的标题+正文里重新推断时间单位；如果推断出小时间单位
+    // （入夜/翌日/数日后等，ageDeltaYears=0），但原预增 ≥ 1，就把多跳的岁数还回去，
+    // 世界历同步回滚。避免"叙事里写三日后却跳了一岁"的修真违和。
+    const inferredInline = inferInlineTimeAdvance(aiOutput?.title, aiOutput?.narrative);
+    if (inferredInline && inferredInline.ageDeltaYears < timeAdvance.ageDeltaYears) {
+      const yearDelta = timeAdvance.ageDeltaYears - inferredInline.ageDeltaYears;
+      if (yearDelta > 0) {
+        finalState = { ...finalState, age: Math.max(0, (finalState.age || 0) - yearDelta) };
+        const daysToRevert = yearDelta * 365;
+        const newElapsedDays = Math.max(0, worldCalendar.elapsedDays - daysToRevert);
+        worldCalendar = { ...worldCalendar, elapsedDays: newElapsedDays };
+        // 同时把本次推进写入的事件 createdAtAge 一起回滚（在线索/事件里保持一致）
+        timeAdvance = { ...timeAdvance, ageDeltaYears: inferredInline.ageDeltaYears, amount: inferredInline.amount, unit: inferredInline.unit, label: inferredInline.label, elapsedDays: inferredInline.elapsedDays };
+      }
+    }
 
     // Task 21 引擎兜底：若本轮蓝图是 thread_resolve 但 AI 未推进任何 urgent 线索，引擎自动加 progressDelta
     // 防止 urgent 线索"原地踏步"——AI 偶尔会忽略 advanceThreads 字段

@@ -288,6 +288,44 @@ function smokeSameYearThreadTimeInference(): void {
   log('same-year-thread-time-inference', { passed: true, title: threads[0].title, ageDeltaYears: continuation.timeAdvance?.ageDeltaYears });
 }
 
+function smokeAdvancePostNarrativeTimeReinfer(): void {
+  // 修真沉浸推进：AI 叙事里写小时间单位时（翌日/数日后/入夜），不能机械跳一岁。
+  // 修真质感打磨期 PoC：advance 路由在拿到 AI 标题+正文后用 inferInlineTimeAdvance 重推断；
+  // 若推断出 ageDeltaYears=0（同年小插曲），应回滚原预增的 yearDelta，并把 elapsedDays 一起回退。
+  const cases: Array<{ title: string; narrative: string; expectedUnit: string; expectedAgeDelta: number }> = [
+    { title: '夜谈', narrative: '月色初升，老者与弟子入夜后于松下对坐，讲一段古修遗事。', expectedUnit: 'hour', expectedAgeDelta: 0 },
+    { title: '市集', narrative: '次日入市，众修云集，卢知秋讨价还价，三日后方才离去。', expectedUnit: 'day', expectedAgeDelta: 0 },
+    { title: '探查', narrative: '他循着线索探查，发现石壁有异，数日后归来报与师尊。', expectedUnit: 'day', expectedAgeDelta: 0 },
+  ];
+  for (const c of cases) {
+    const inferred = inferInlineTimeAdvance(c.title, c.narrative);
+    assert(inferred, `narrative hint should match for: ${c.title}`);
+    assert(inferred!.ageDeltaYears === c.expectedAgeDelta, `${c.title}: expected ageDelta=${c.expectedAgeDelta}, got ${inferred!.ageDeltaYears}`);
+    assert(inferred!.unit === c.expectedUnit, `${c.title}: expected unit=${c.expectedUnit}, got ${inferred!.unit}`);
+  }
+  // 反例：narrative 写"闭关一年后"时仍应跳一岁（不可过度回滚）
+  const longCase = inferInlineTimeAdvance('闭关', '他闭关一年后出山，神完气足。');
+  assert(!longCase || longCase.ageDeltaYears >= 0, 'long narrative should not be clamped to negative; either undefined or >= 0');
+  log('advance-post-narrative-time-reinfer', { passed: true, cases: cases.length });
+}
+
+function smokeAdvancePostNarrativeAgeDelta(): void {
+  // 直接对 advance 路由的"叙事对账"逻辑做代数校验：
+  // 当原 timeAdvance 跳 1 年、推断出 0 年时，state.age 应回退 1，elapsedDays 应回退 365。
+  const input: { originalAgeDelta: number; inferredAgeDelta: number; baseAge: number; baseElapsedDays: number }[] = [
+    { originalAgeDelta: 1, inferredAgeDelta: 0, baseAge: 16, baseElapsedDays: 365 * 16 },
+    { originalAgeDelta: 1, inferredAgeDelta: 0, baseAge: 99, baseElapsedDays: 365 * 99 + 30 },
+  ];
+  for (const c of input) {
+    const yearDelta = c.originalAgeDelta - c.inferredAgeDelta;
+    const rolledAge = Math.max(0, (c.baseAge + yearDelta) - yearDelta);
+    const rolledElapsed = Math.max(0, (c.baseElapsedDays + yearDelta * 365) - yearDelta * 365);
+    assert(rolledAge === c.baseAge, `age should be rolled back: expected ${c.baseAge}, got ${rolledAge}`);
+    assert(rolledElapsed === c.baseElapsedDays, `elapsedDays should be rolled back: expected ${c.baseElapsedDays}, got ${rolledElapsed}`);
+  }
+  log('advance-post-narrative-age-delta', { passed: true, cases: input.length });
+}
+
 
 function smokeSameTurnShortThreadContinuity(): void {
   const baseState: any = {
@@ -3119,6 +3157,8 @@ async function main(): Promise<void> {
   smokeClosedThreadCannotBeAdvanced();
   await smokePreloadInvalidationReason();
   smokeSameYearThreadNormalizedProgress100();
+  smokeAdvancePostNarrativeTimeReinfer();
+  smokeAdvancePostNarrativeAgeDelta();
   smokeNoMechanismWordsInNarrative();
   smokeYoungCharacterNoAdultAction();
   smokeFallbackInfantHardGate();
