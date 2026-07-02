@@ -64,12 +64,12 @@ function renderSlots(slots: PlayerUISlotEntry[], expanded: boolean, max: number)
     <div className="space-y-1.5">
       {visible.map((slot, i) => (
         <div
-          key={`${{slot.slot}-${'$'}{slot.sourceId}-${'$'}{i}`}
+          key={`${slot.slot}-${slot.sourceId}-${i}`}
           className={cn(
             'rounded-md border px-2 py-1.5 text-[11px] font-serif-cn',
             TONE_CLASS[slot.tone] || TONE_CLASS.neutral,
           )}
-          data-testid={`cycle-slot-${'$'}{slot.slot}`}
+          data-testid={`cycle-slot-${slot.slot}`}
         >
           <div className="flex items-start gap-1.5">
             <span className="shrink-0 text-[10px] opacity-70 mt-0.5">
