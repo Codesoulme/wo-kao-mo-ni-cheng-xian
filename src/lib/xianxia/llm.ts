@@ -1420,6 +1420,13 @@ async function callLLMText(systemPrompt: string, userPrompt: string, options: { 
         headers,
         body: JSON.stringify({
           model,
+          max_tokens: 8192,
+          temperature: 0.7,
+          top_p: 0.9,
+          repetition_penalty: 1.15,
+          frequency_penalty: 0.8,
+          presence_penalty: 0.6,
+          stop: ["\u4fee\u771f\u4fee\u771f", "\u6c89\u6d78\u6c89\u6d78"],
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
@@ -1496,7 +1503,13 @@ export async function callLLMStream(
     : JSON.stringify({
           model,
           stream: true,
-          max_tokens: 16384,
+          max_tokens: 8192,
+          temperature: 0.7,
+          top_p: 0.9,
+          repetition_penalty: 1.15,
+          frequency_penalty: 0.8,
+          presence_penalty: 0.6,
+          stop: ["\u4fee\u771f\u4fee\u771f", "\u6c89\u6d78\u6c89\u6d78"],
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },

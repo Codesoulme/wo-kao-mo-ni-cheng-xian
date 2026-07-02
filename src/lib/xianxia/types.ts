@@ -2704,6 +2704,12 @@ export interface EngineStateContext {
 
     heartDemon: number;
 
+    // ===== EngineStateContext.character 投影：因果业力 + 修炼心得（llm.ts 调用处用）=====
+    karma?: number;
+    merit?: number;
+    sin?: number;
+    cultivationInsight?: string;
+
   };
 
   // 修炼心得（当前已存的修炼速度说明文本，AI 可读取参考并决定是否更新）
@@ -3009,6 +3015,13 @@ export interface CharacterState {
   // 30+ 修炼速度 -10%；60+ 偶发心魔试炼战斗；90+ 走火入魔风险（突死/重伤）
 
   heartDemon: number;
+
+  // 因果业力（正负）：AI 抉择/事件积累，引擎用于概率分支（顶层字段）
+  karma?: number;
+  // 功德：善行积累
+  merit?: number;
+  // 业障：恶行积累
+  sin?: number;
 
   // ===== Task 23 新增 =====
 
