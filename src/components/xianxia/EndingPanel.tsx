@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { previewEndingsForCharacter, ENDING_ARCHETYPE_LABELS, type EndingPreviewEntry } from '@/lib/xianxia/ending-preview';
+import PaperCard from '@/components/xianxia/PaperCard';
 
 interface Props {
   character: any;
@@ -26,15 +27,9 @@ export function EndingPanel({ character, worldState, defaultCollapsed = true }: 
   const hasCharacter = !!character && typeof character === 'object';
 
   return (
-    <section
+    <PaperCard
       data-testid="ending-panel"
-      style={{
-        border: '1px solid #d4b478',
-        borderRadius: '8px',
-        background: 'rgba(255,253,247,0.94)',
-        margin: '12px 0',
-        padding: '12px 14px',
-      }}
+      style={{ margin: '12px 0', padding: '12px 14px' }}
     >
       <div
         onClick={() => setCollapsed((c) => !c)}
@@ -139,7 +134,7 @@ export function EndingPanel({ character, worldState, defaultCollapsed = true }: 
           )}
         </div>
       )}
-    </section>
+    </PaperCard>
   );
 }
 

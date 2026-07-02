@@ -604,3 +604,64 @@ export function formatItemEffectLabel(eff: any): string {
   if (op === 'floor') return `${zh}下限${value}`;
   return `${zh}${value !== '' ? String(value) : ''}`;
 }
+
+// ─── 选择叙事/AI 字段清洗（Worker-A 红点修复 #2） ──────────────────────────
+// 剥离玩家可见叙事中的机制词，避免泄露内部概念
+// 用法：渲染 {choice.prompt} / {choice.result} / {event.title} / {event.narrative} 前过一遍 sanitizeNarrative
+// 与 sanitizeNarrativeText 的区别：本函数只剥离 UI/机制词（按词列表精确匹配），不做 age 校准、不做叙事续写
+const SANITIZE_PHRASE_REPLACEMENTS: Array<[RegExp, string]> = [
+  [/角色应主动/g, '心中已有念头，欲'],
+  [/天道干预/g, '因缘牵动'],
+  [/deadline/gi, '期限'],
+];
+
+const SANITIZE_STRIP_TERMS: string[] = [
+  '同年续篇',
+  '流年因',
+  '命节点',
+  'hydration',
+  'fallback',
+  'payload',
+  'schema',
+  'SSR',
+  'HTTP',
+  'JSON',
+  'render',
+  'prompt',
+  'engine',
+  'cache',
+  'token',
+  'hook',
+  'API',
+  'AI',
+  '配置',
+  '缓存',
+  '后端',
+  '服务端',
+  '预演',
+  '续篇',
+  '内部',
+];
+
+export function sanitizeNarrative(text: string): string {
+  if (text == null) return '';
+  if (typeof text !== 'string') return String(text ?? '');
+  let result = text;
+  for (const [pattern, replacement] of SANITIZE_PHRASE_REPLACEMENTS) {
+    result = result.replace(pattern, replacement);
+  }
+  // 对剥离词做"全词匹配"，英文按 [A-Za-z0-9]+，中文按原样
+  for (const term of SANITIZE_STRIP_TERMS) {
+    if (/^[A-Za-z]+$/.test(term)) {
+      const re = new RegExp(`\\b${term}\\b`, 'g');
+      result = result.replace(re, '');
+    } else {
+      // 中文/混合：直接 replace（无词边界概念）
+      result = result.split(term).join('');
+    }
+  }
+  // 折叠重复空白
+  result = result.replace(/[ \u3000]{2,}/g, ' ');
+  result = result.replace(/[，。！？；：、]{2,}/g, (m) => m[0]);
+  return result.trim();
+}

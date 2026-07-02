@@ -35,7 +35,7 @@ export function GameMenu() {
       window.sessionStorage.setItem('xianxia-show-home', '1');
       window.dispatchEvent(new Event('xianxia:return-home'));
     }
-    toast('已回到首页', { description: '当前此世仍已保存，可从首页继续。' });
+    toast('返回仙路殿堂', { description: '当前此世仍已保存，可从首页继续。' });
   };
 
   const handleReset = async () => {

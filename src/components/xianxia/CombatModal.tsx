@@ -874,7 +874,8 @@ function PaletteButton({ paletteKey, openPalette, setOpenPalette, group, icon, t
                 {option.name}
                 {option.mpCost > 0 && <span className="text-[9px] px-1 rounded bg-amber-500/15 text-amber-700">-{option.mpCost}灵</span>}
                 {option.targetScope === 'aoe' && <span className="text-[9px] px-1 rounded bg-purple-500/15 text-purple-600">群攻</span>}
-                {(option.tags || []).includes('ai-context') && <span className="text-[9px] px-1 rounded bg-purple-500/15 text-purple-600">临机</span>}
+                {/* P1 修复（2026-07-02 21:11）：「临机」标签对玩家泄露后台 AI 介入；这里选项本身已通过 AI 正常生成与玩家，无须额外提示玩家这是 AI 触发。整段注释保留以便回退。 */}
+                {/* {(option.tags || []).includes('ai-context') && <span className="text-[9px] px-1 rounded bg-purple-500/15 text-purple-600">临机</span>} */}
               </div>
               <div className="text-[10px] text-muted-foreground line-clamp-2">{option.enabled ? option.description : (option.disabledReason || option.description)}</div>
               {option.risk && <div className="text-[10px] text-red-500/80 truncate">险：{option.risk}</div>}

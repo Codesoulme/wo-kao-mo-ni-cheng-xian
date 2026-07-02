@@ -41,8 +41,8 @@ const EVENT_LABELS: Record<string, string> = {
   breakthrough: '突破',
   death: '陨落',
   ascension: '飞升',
-  interference: '干扰',
-  exploration: '秘境',
+  interference: '天机一动',
+  exploration: '探幽',
 };
 
 // Task 20: 事件蓝图 category → 配色（避免 indigo/blue 主色调）
@@ -123,49 +123,88 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
   const contentRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<string>('');
   const rafRef = useRef<number | null>(null);
+  const intervalRef = useRef<number | null>(null);
   const streamingEventIdx = useRef<number | null>(null);
-  
+  // 熔断：记录 ref 最近一次更新的时间戳；超时后用 props 静态 text 兜底渲染
+  const lastRefUpdateAt = useRef<number>(Date.now());
+  // 是否已触发过熔断，避免重复清场
+  const fellbackRef = useRef<boolean>(false);
+
   // 停止动画循环
   const stopAnimation = useCallback(() => {
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
+    if (intervalRef.current !== null) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
   }, []);
-  
+
+  // 熔断 fallback：清 RAF + interval，用静态 text 兜底，通知上层清掉 streamingRef
+  const fallbackToStaticText = useCallback(() => {
+    if (fellbackRef.current) return;
+    fellbackRef.current = true;
+    stopAnimation();
+    if (contentRef.current && text != null) {
+      contentRef.current.innerText = text;
+    }
+    textRef.current = text || '';
+    // 通知上层 isStreaming = false（直接清掉共享 streamingRef）
+    streamingRef.current = null;
+  }, [stopAnimation, text]);
+
   // 启动动画循环：持续检查 ref 并更新 DOM
   const startAnimation = useCallback(() => {
     stopAnimation();
-    
+    fellbackRef.current = false;
+    lastRefUpdateAt.current = Date.now();
+
     const tick = () => {
       const state = streamingRef.current;
       const el = contentRef.current;
-      
+
       if (!el) {
         rafRef.current = requestAnimationFrame(tick);
         return;
       }
-      
+
       if (state && state.eventIndex === streamingEventIdx.current) {
         const newText = state.text;
         if (newText !== textRef.current) {
           el.innerText = newText;
           textRef.current = newText;
+          lastRefUpdateAt.current = Date.now();
           el.scrollIntoView({ behavior: 'smooth', block: 'end' });
         }
       }
-      
+
       rafRef.current = requestAnimationFrame(tick);
     };
-    
+
     rafRef.current = requestAnimationFrame(tick);
-  }, [stopAnimation]);
-  
+
+    // 1s 轮询：若 ref 长时间（>3s）未更新且仍在流式态，触发熔断
+    intervalRef.current = window.setInterval(() => {
+      if (fellbackRef.current) return;
+      // 仍在流式态：streamingEventIdx 已设置且共享 ref 还指向同一 eventIndex
+      const stillStreaming = streamingEventIdx.current !== null
+        && streamingRef.current !== null
+        && streamingRef.current.eventIndex === streamingEventIdx.current;
+      if (stillStreaming && Date.now() - lastRefUpdateAt.current > 3000) {
+        fallbackToStaticText();
+      }
+    }, 1000);
+  }, [stopAnimation, fallbackToStaticText]);
+
   // 处理流式状态开始
   useEffect(() => {
     if (streamingText !== undefined) {
       textRef.current = '';
       streamingEventIdx.current = eventIndex;
+      lastRefUpdateAt.current = Date.now();
+      fellbackRef.current = false;
       if (contentRef.current) {
         contentRef.current.innerText = streamingText;
       }
@@ -173,10 +212,10 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
     } else {
       stopAnimation();
     }
-    
+
     return () => stopAnimation();
   }, [streamingText, eventIndex, startAnimation, stopAnimation]);
-  
+
   // 非流式模式：普通渲染（修真沉浸叙事段缩进兜底）
   if (streamingText === undefined) {
     if (!text) return null;

@@ -6,6 +6,7 @@ import {
   summarizeInheritanceForDisplay,
   type CrossCycleInheritanceEntry,
 } from '@/lib/xianxia/cross-cycle-inheritance';
+import PaperCard from '@/components/xianxia/PaperCard';
 
 interface Props {
   character: any;
@@ -39,15 +40,9 @@ export function CrossCycleInheritancePanel({ character, heritageVault, claimedPo
   const summary = summarizeInheritanceForDisplay(entries);
 
   return (
-    <section
+    <PaperCard
       data-testid="cross-cycle-inheritance-panel"
-      style={{
-        border: '1px solid #d4b478',
-        borderRadius: '8px',
-        background: 'rgba(255,253,247,0.94)',
-        margin: '12px 0',
-        padding: '12px 14px',
-      }}
+      style={{ margin: '12px 0', padding: '12px 14px' }}
     >
       <div
         onClick={() => setCollapsed((c) => !c)}
@@ -115,6 +110,6 @@ export function CrossCycleInheritancePanel({ character, heritageVault, claimedPo
           )}
         </div>
       )}
-    </section>
+    </PaperCard>
   );
 }

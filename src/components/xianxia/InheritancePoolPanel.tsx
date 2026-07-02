@@ -13,6 +13,9 @@
  *    alive=true、causeOfDeath 清空、heritageVault 落地） → 关闭面板 → 由后续剧情承接
  *  - 文案全部使用世界内表达，不出现 "AI/引擎/缓存/失效/节点" 等机制词
  *  - 池子为空时显示空态（不强行渲染空卡）
+ *
+ * L8 整改：主卡只显姓名 + 境界 + 一句评价短语；适配度%作为右上角小角标；
+ *         更多信息（岁数/灵根/血脉/因缘/详述/承继）转移到 Modal 中显示。
  */
 
 import { useMemo, useState } from 'react';
@@ -20,6 +23,13 @@ import { useGameStore } from '@/lib/xianxia/store';
 import { selectNextProtagonist } from '@/lib/xianxia/engine';
 import { Sparkles, Users, Crown, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface CandidateDisplay {
   id: string;
@@ -134,8 +144,9 @@ export function InheritancePoolPanel({ className, defaultCollapsed = true }: Inh
   const worldCalendar = useGameStore((s) => s.worldCalendar);
 
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // L8 整改：详情按钮 → shadcn Dialog
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   // 触发条件：角色已陨落（兼容 character.dead 或 !character.alive）
   const isDead =
@@ -149,6 +160,12 @@ export function InheritancePoolPanel({ className, defaultCollapsed = true }: Inh
   );
 
   const poolInfo = useMemo(() => describePool(inheritancePool || []), [inheritancePool]);
+
+  // L8：Modal 当前选中对象，便于详情展示
+  const detailCandidate = useMemo(
+    () => candidates.find((c) => c.id === detailId) || null,
+    [candidates, detailId],
+  );
 
   // 不可见时返回 null，让 page.tsx 用条件渲染而非 panel 自身隐藏
   if (!isDead) return null;
@@ -210,11 +227,10 @@ export function InheritancePoolPanel({ className, defaultCollapsed = true }: Inh
             </div>
           )}
 
-          {/* 候选卡片 */}
+          {/* L8 整改：主卡只显姓名 + 境界 + 一句评价短语；适配度%右上角小角标；详情按钮打开 Modal */}
           {candidates.length > 0 && (
             <ul className="space-y-2" data-testid="inheritance-candidate-list">
               {candidates.map((cand) => {
-                const isExpanded = expandedId === cand.id;
                 const isSelected = selectedId === cand.id;
                 const toneClass =
                   cand.tone === 'good'
@@ -227,111 +243,55 @@ export function InheritancePoolPanel({ className, defaultCollapsed = true }: Inh
                     key={cand.id}
                     data-testid={`inheritance-candidate-${cand.id}`}
                     className={cn(
-                      'rounded-md border p-2 transition-colors',
+                      'relative rounded-md border p-2 transition-colors',
                       toneClass,
                       isSelected && 'ring-2 ring-amber-400',
                     )}
                   >
-                    <div className="flex items-start gap-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-serif-cn font-bold text-sm text-stone-800">
-                            {cand.name}
-                          </span>
-                          <span className="text-[10px] text-stone-500">
-                            {cand.age} 岁 · {cand.realm}
-                          </span>
-                          <span
-                            className={cn(
-                              'text-[10px] px-1.5 py-0.5 rounded border',
-                              rootToneClass(cand.spiritualRoot),
-                            )}
-                          >
-                            {rootLabel(cand.spiritualRoot)}
-                          </span>
-                          {cand.bloodline && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded border border-rose-300 bg-rose-50 text-rose-900">
-                              血脉 · {cand.bloodline}
-                            </span>
-                          )}
-                        </div>
+                    {/* L8 整改：适配度%右上角小角标（绝对定位） */}
+                    <div
+                      data-testid={`inheritance-eligibility-${cand.id}`}
+                      className={cn(
+                        'absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded border',
+                        cand.tone === 'good'
+                          ? 'border-emerald-300 text-emerald-800 bg-white/80'
+                          : cand.tone === 'mystery'
+                            ? 'border-violet-300 text-violet-800 bg-white/80'
+                            : 'border-stone-300 text-stone-700 bg-white/80',
+                      )}
+                    >
+                      {(cand.eligibility * 100).toFixed(0)}%
+                    </div>
 
-                        {cand.karmaTags.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {cand.karmaTags.slice(0, 4).map((tag, i) => (
-                              <span
-                                key={`${cand.id}-tag-${i}`}
-                                className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-white/70 text-stone-600"
-                              >
-                                因缘 · {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                    <div className="flex items-center gap-2 pr-12">
+                      <span className="font-serif-cn font-bold text-sm text-stone-800">
+                        {cand.name}
+                      </span>
+                      <span className="text-[10px] text-stone-500">
+                        · {cand.realm}
+                      </span>
+                    </div>
 
-                        {cand.traitNarrative && (
-                          <div
-                            className={cn(
-                              'mt-1 text-[11px] font-serif-cn text-stone-700 leading-relaxed',
-                              !isExpanded && 'line-clamp-2',
-                            )}
-                          >
-                            {cand.traitNarrative}
-                          </div>
-                        )}
-
-                        <div className="mt-1 flex items-center gap-2 text-[10px] text-stone-500">
-                          <span>
-                            适配 ·{' '}
-                            <span className="font-bold text-stone-700">
-                              {(cand.eligibility * 100).toFixed(0)}%
-                            </span>
-                          </span>
-                          <span
-                            className={cn(
-                              'px-1.5 py-0.5 rounded border',
-                              cand.tone === 'good'
-                                ? 'border-emerald-300 text-emerald-800'
-                                : cand.tone === 'mystery'
-                                  ? 'border-violet-300 text-violet-800'
-                                  : 'border-stone-300 text-stone-700',
-                            )}
-                          >
-                            {cand.evaluationLabel}
-                          </span>
-                          <button
-                            type="button"
-                            data-testid={`inheritance-toggle-${cand.id}`}
-                            onClick={() => setExpandedId(isExpanded ? null : cand.id)}
-                            className="ml-auto text-[10px] text-stone-500 underline-offset-2 hover:underline"
-                          >
-                            <Eye className="w-3 h-3 inline" />{' '}
-                            {isExpanded ? '收起' : '详述'}
-                          </button>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        data-testid={`inheritance-claim-${cand.id}`}
-                        onClick={() => handleClaim(cand.id)}
-                        disabled={!!selectedId}
+                    <div className="mt-1 flex items-center gap-2 text-[10px] text-stone-500">
+                      <span
                         className={cn(
-                          'shrink-0 px-2.5 py-1.5 rounded-md text-[11px] font-serif-cn font-bold border transition-colors',
-                          selectedId
-                            ? 'border-stone-300 text-stone-400 bg-stone-100 cursor-not-allowed'
-                            : 'border-amber-400 text-amber-900 bg-amber-50 hover:bg-amber-100',
+                          'px-1.5 py-0.5 rounded border',
+                          cand.tone === 'good'
+                            ? 'border-emerald-300 text-emerald-800'
+                            : cand.tone === 'mystery'
+                              ? 'border-violet-300 text-violet-800'
+                              : 'border-stone-300 text-stone-700',
                         )}
                       >
-                        {isSelected ? (
-                          <>
-                            <Sparkles className="w-3 h-3 inline mr-1" /> 承继中…
-                          </>
-                        ) : (
-                          <>
-                            <Users className="w-3 h-3 inline mr-1" /> 承此衣钵
-                          </>
-                        )}
+                        {cand.evaluationLabel}
+                      </span>
+                      <button
+                        type="button"
+                        data-testid={`inheritance-toggle-${cand.id}`}
+                        onClick={() => setDetailId(cand.id)}
+                        className="ml-auto text-[10px] text-stone-500 underline-offset-2 hover:underline"
+                      >
+                        <Eye className="w-3 h-3 inline" /> 详述
                       </button>
                     </div>
                   </li>
@@ -345,9 +305,123 @@ export function InheritancePoolPanel({ className, defaultCollapsed = true }: Inh
           </div>
         </div>
       )}
+
+      {/* L8 整改：候选详情 Modal —— 岁数/灵根/血脉/因缘 tags/详述/承继按钮 */}
+      <Dialog
+        open={!!detailCandidate}
+        onOpenChange={(open) => {
+          if (!open) setDetailId(null);
+        }}
+      >
+        <DialogContent
+          className="max-w-md"
+          data-testid={detailCandidate ? `inheritance-detail-${detailCandidate.id}` : undefined}
+        >
+          {detailCandidate && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="font-serif-cn">
+                  {detailCandidate.name}
+                  <span className="ml-2 text-sm text-stone-500 font-normal">
+                    · {detailCandidate.realm}
+                  </span>
+                </DialogTitle>
+                <DialogDescription>
+                  <span
+                    className={cn(
+                      'inline-block text-[11px] px-1.5 py-0.5 rounded border mr-2',
+                      detailCandidate.tone === 'good'
+                        ? 'border-emerald-300 text-emerald-800'
+                        : detailCandidate.tone === 'mystery'
+                          ? 'border-violet-300 text-violet-800'
+                          : 'border-stone-300 text-stone-700',
+                    )}
+                  >
+                    {detailCandidate.evaluationLabel} · {(detailCandidate.eligibility * 100).toFixed(0)}%
+                  </span>
+                  {detailCandidate.age} 岁
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-2 text-[12px] text-stone-700 font-serif-cn">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-stone-500">灵根</span>
+                  <span
+                    className={cn(
+                      'text-[11px] px-1.5 py-0.5 rounded border',
+                      rootToneClass(detailCandidate.spiritualRoot),
+                    )}
+                  >
+                    {rootLabel(detailCandidate.spiritualRoot)}
+                  </span>
+                  {detailCandidate.bloodline && (
+                    <>
+                      <span className="text-stone-500">血脉</span>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded border border-rose-300 bg-rose-50 text-rose-900">
+                        {detailCandidate.bloodline}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {detailCandidate.karmaTags.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1">
+                    <span className="text-stone-500">因缘</span>
+                    {detailCandidate.karmaTags.slice(0, 8).map((tag, i) => (
+                      <span
+                        key={`${detailCandidate.id}-tag-${i}`}
+                        className="text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-white/70 text-stone-600"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {detailCandidate.traitNarrative && (
+                  <div className="text-[12px] text-stone-700 leading-relaxed">
+                    {detailCandidate.traitNarrative}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setDetailId(null)}
+                  className="px-3 py-1.5 rounded-md text-[12px] border border-stone-300 text-stone-600 bg-white hover:bg-stone-50"
+                >
+                  收起
+                </button>
+                <button
+                  type="button"
+                  data-testid={`inheritance-claim-${detailCandidate.id}`}
+                  onClick={() => handleClaim(detailCandidate.id)}
+                  disabled={!!selectedId}
+                  className={cn(
+                    'px-3 py-1.5 rounded-md text-[12px] font-serif-cn font-bold border transition-colors',
+                    selectedId
+                      ? 'border-stone-300 text-stone-400 bg-stone-100 cursor-not-allowed'
+                      : 'border-amber-400 text-amber-900 bg-amber-50 hover:bg-amber-100',
+                  )}
+                >
+                  {selectedId === detailCandidate.id ? (
+                    <>
+                      <Sparkles className="w-3 h-3 inline mr-1" /> 承继中…
+                    </>
+                  ) : (
+                    <>
+                      <Users className="w-3 h-3 inline mr-1" /> 承此衣钵
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
 
 export default InheritancePoolPanel;
-

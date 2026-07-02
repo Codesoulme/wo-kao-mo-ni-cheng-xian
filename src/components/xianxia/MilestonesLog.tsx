@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { REALMS } from '@/lib/xianxia/types';
-import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } from '@/lib/xianxia/display';
+import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect, sanitizeNarrative } from '@/lib/xianxia/display';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -85,8 +85,8 @@ export function MilestonesLog() {
         >
           <MilestoneItem
             age={birthEvent.age}
-            title={birthEvent.title}
-            narrative={birthEvent.narrative}
+            title={sanitizeNarrative(birthEvent.title)}
+            narrative={sanitizeNarrative(birthEvent.narrative)}
             color="#84cc16"
             tag="初生"
           />
@@ -109,8 +109,8 @@ export function MilestonesLog() {
             <MilestoneItem
               key={e.id || i}
               age={e.age}
-              title={e.title}
-              narrative={e.narrative}
+              title={sanitizeNarrative(e.title)}
+              narrative={sanitizeNarrative(e.narrative)}
               color="#eab308"
               tag="突破"
               effects={e.effects}
@@ -153,8 +153,8 @@ export function MilestonesLog() {
             <MilestoneItem
               key={e.id || i}
               age={e.age}
-              title={e.title}
-              narrative={e.narrative}
+              title={sanitizeNarrative(e.title)}
+              narrative={sanitizeNarrative(e.narrative)}
               color="#2e5c8a"
               tag="干扰"
               effects={e.effects}
@@ -186,7 +186,7 @@ export function MilestonesLog() {
             >
               <div className="flex items-center justify-between mb-0.5">
                 <span className="font-serif-cn font-semibold" style={{ color: RARITY_COLORS[item.rarity] }}>
-                  {item.name}
+                  {sanitizeNarrative(item.name)}
                 </span>
                 <span className="text-[9px] px-1 rounded" style={{
                   background: `${RARITY_COLORS[item.rarity]}20`,
@@ -195,7 +195,7 @@ export function MilestonesLog() {
                   {RARITY_LABEL[item.rarity]}
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">{item.description}</p>
+              <p className="text-[11px] text-muted-foreground">{sanitizeNarrative(item.description)}</p>
               {item.source && (
                 <div className="text-[9px] text-muted-foreground/70 mt-1">来源：{item.source}</div>
               )}
@@ -227,7 +227,7 @@ export function MilestonesLog() {
             >
               <div className="flex items-center justify-between mb-0.5">
                 <span className="font-serif-cn font-semibold" style={{ color: RARITY_COLORS[s.rarity] }}>
-                  {s.name}
+                  {sanitizeNarrative(s.name)}
                 </span>
                 <span className="text-[9px] px-1 rounded" style={{
                   background: `${RARITY_COLORS[s.rarity]}20`,
@@ -236,7 +236,7 @@ export function MilestonesLog() {
                   {RARITY_LABEL[s.rarity]}
                 </span>
               </div>
-              <p className="text-[11px] text-muted-foreground">{s.description}</p>
+              <p className="text-[11px] text-muted-foreground">{sanitizeNarrative(s.description)}</p>
               {s.source && (
                 <div className="text-[9px] text-muted-foreground/70 mt-1">来源：{s.source}</div>
               )}
@@ -257,8 +257,8 @@ export function MilestonesLog() {
         >
           <MilestoneItem
             age={endEvent.age}
-            title={endEvent.title}
-            narrative={endEvent.narrative}
+            title={sanitizeNarrative(endEvent.title)}
+            narrative={sanitizeNarrative(endEvent.narrative)}
             color={endEvent.eventType === 'ascension' ? '#fbbf24' : '#7f1d1d'}
             tag={endEvent.eventType === 'ascension' ? '飞升' : '终焉'}
           />
@@ -403,18 +403,18 @@ function ChoiceMilestoneItem({ choice }: { choice: any }) {
       </div>
       {expanded ? (
         <>
-          <p className="text-[11px] text-muted-foreground mb-1 italic xianxia-readable">{choice.prompt}</p>
+          <p className="text-[11px] text-muted-foreground mb-1 italic xianxia-readable">{sanitizeNarrative(choice.prompt)}</p>
           <div className="text-xs font-semibold font-serif-cn mb-1 text-primary xianxia-readable">
-            → {choice.chosenText}
+            → {sanitizeNarrative(choice.chosenText)}
           </div>
-          <p className="text-[11px] leading-relaxed text-foreground/90 xianxia-prose">{choice.result}</p>
+          <p className="text-[11px] leading-relaxed text-foreground/90 xianxia-prose">{sanitizeNarrative(choice.result)}</p>
         </>
       ) : (
         <>
           <div className="text-xs font-semibold font-serif-cn text-primary truncate min-w-0">
-            → {choice.chosenText}
+            → {sanitizeNarrative(choice.chosenText)}
           </div>
-          <p className="text-[10px] text-muted-foreground line-clamp-1 xianxia-readable">{choice.result}</p>
+          <p className="text-[10px] text-muted-foreground line-clamp-1 xianxia-readable">{sanitizeNarrative(choice.result)}</p>
         </>
       )}
     </div>
@@ -434,4 +434,7 @@ const ATTR_LABEL: Record<string, string> = {
   luck: '气运', comprehension: '悟性',
   spiritStones: '灵石', reputation: '声望',
   elementMetal: '金', elementWood: '木', elementWater: '水', elementFire: '火', elementEarth: '土',
+  spiritualRoot: '灵根',
+  bloodline: '血脉',
+  karmaTag: '因缘',
 };

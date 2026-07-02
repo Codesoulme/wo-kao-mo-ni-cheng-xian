@@ -104,6 +104,24 @@ export function DeathGuidancePanel({ character, defaultCollapsed = false }: Deat
 
   const isAscend = character.ascended === true;
 
+  // L11 信息流分层：合成一句告别遗言（用大字、文言）作为死亡瞬间主视觉。
+
+  //   此字段不强行依赖 character.lastWords（老存档无此字段），
+
+  //   仅以 isAscend / realm 拼出最简古风一句话，保持纯净 in-world 文案。
+
+  const farewell = isAscend
+
+    ? '道成圆满，此身归位天际。'
+
+    : '道山归去，一脉相承，缘再续。';
+
+  const realmName = (typeof character.realmName === 'string' && character.realmName)
+
+    || (typeof character.realm === 'string' ? character.realm : '')
+
+    || '凡人';
+
 
 
   const handleReincarnate = () => {
@@ -304,13 +322,17 @@ export function DeathGuidancePanel({ character, defaultCollapsed = false }: Deat
 
         <div style={{ marginTop: '10px' }}>
 
+          {/* L11 死亡瞬间：默认可见 · 大字文言短句 · 仅年岁 + 死因 + 一句遗言 */}
+
           <div
 
             className="rich-card"
 
+            data-testid="death-guidance-moment"
+
             style={{
 
-              padding: '10px 12px',
+              padding: '16px 14px',
 
               border: '1px solid #e8d2a8',
 
@@ -318,247 +340,367 @@ export function DeathGuidancePanel({ character, defaultCollapsed = false }: Deat
 
               background: 'rgba(255,253,247,0.7)',
 
-              fontSize: '13px',
-
               color: '#4a2a14',
 
               lineHeight: 1.6,
+
+              textAlign: 'left',
 
             }}
 
           >
 
-            <div style={{ marginBottom: '4px' }}>
+            <div
 
-              <span style={{ color: '#7a3a18', marginRight: '6px' }}>陨落因由</span>
+              style={{
+
+                fontSize: '11px',
+
+                color: '#7a3a18',
+
+                letterSpacing: '0.06em',
+
+                marginBottom: '6px',
+
+              }}
+
+            >
+
+              {eraLine}
+
+            </div>
+
+            <div
+
+              style={{
+
+                fontSize: '11px',
+
+                color: '#7a3a18',
+
+                letterSpacing: '0.06em',
+
+                marginBottom: '12px',
+
+              }}
+
+            >
+
+              <span style={{ marginRight: '6px' }}>陨落因由</span>
 
               <span>{cause}</span>
 
             </div>
 
-            <div>
+            <div
 
-              <span style={{ color: '#7a3a18', marginRight: '6px' }}>终年</span>
+              data-testid="death-guidance-farewell"
 
-              <span>{eraLine}</span>
+              style={{
+
+                fontSize: '20px',
+
+                fontWeight: 500,
+
+                color: '#5a2410',
+
+                letterSpacing: '0.08em',
+
+                fontFamily: 'inherit',
+
+                lineHeight: 1.5,
+
+              }}
+
+            >
+
+              {farewell}
 
             </div>
 
-            {hint && (
-
-              <div
-
-                style={{
-
-                  marginTop: '8px',
-
-                  padding: '6px 10px',
-
-                  borderLeft: '2px solid #b8814a',
-
-                  background: 'rgba(184,129,74,0.08)',
-
-                  color: '#5a2410',
-
-                  fontSize: '12px',
-
-                }}
-
-              >
-
-                {hint}
-
-              </div>
-
-            )}
-
           </div>
 
+          {/* L11 墓志铭：折叠态，默认收起，集中收纳境界/AI 评语/轮回入口 */}
 
+          <details
 
-          <div
+            data-testid="death-guidance-epitaph"
 
             style={{
 
               marginTop: '12px',
 
-              fontSize: '12px',
+              border: '1px solid #e8d2a8',
 
-              color: '#7a5a3a',
+              borderRadius: '6px',
 
-              letterSpacing: '0.04em',
+              background: 'rgba(255,253,247,0.55)',
 
-            }}
-
-          >
-
-            道途未绝，择一续缘：
-
-          </div>
-
-
-
-          <div
-
-            className="rich-button-row"
-
-            style={{
-
-              marginTop: '8px',
-
-              display: 'grid',
-
-              gridTemplateColumns: 'repeat(3, 1fr)',
-
-              gap: '8px',
+              padding: '6px 12px',
 
             }}
 
           >
 
-            <button
-
-              type="button"
-
-              className="rich-button"
-
-              data-testid="death-guidance-reincarnate"
-
-              onClick={handleReincarnate}
-
-              disabled={busy !== null}
+            <summary
 
               style={{
 
-                padding: '10px 8px',
+                cursor: 'pointer',
 
-                borderRadius: '6px',
+                fontSize: '12px',
 
-                border: '1px solid #b8814a',
+                color: '#7a3a18',
 
-                background: busy === '轮回重开' ? '#f4dfb6' : '#fff5dc',
+                letterSpacing: '0.04em',
 
-                color: '#5a2410',
+                listStyle: 'none',
 
-                fontSize: '13px',
-
-                fontWeight: 600,
-
-                cursor: busy ? 'wait' : 'pointer',
-
-                lineHeight: 1.3,
+                userSelect: 'none',
 
               }}
 
             >
 
-              轮回重开
+              墓志铭 · 展开往昔
 
-              <div style={{ fontSize: '10px', fontWeight: 400, color: '#7a4a28', marginTop: '2px' }}>
+            </summary>
 
-                承继衣钵，再世修仙
+            <div style={{ marginTop: '10px' }}>
 
-              </div>
+              <div
 
-            </button>
+                style={{
 
+                  fontSize: '12px',
 
+                  color: '#7a5a3a',
 
-            <button
+                  letterSpacing: '0.04em',
 
-              type="button"
+                  marginBottom: '8px',
 
-              className="rich-button"
+                }}
 
-              data-testid="death-guidance-reset"
+              >
 
-              onClick={handleResetToMortal}
+                <span style={{ color: '#7a3a18', marginRight: '6px' }}>境界</span>
 
-              disabled={busy !== null}
-
-              style={{
-
-                padding: '10px 8px',
-
-                borderRadius: '6px',
-
-                border: '1px solid #b8814a',
-
-                background: busy === '回归入凡' ? '#f4dfb6' : '#fff5dc',
-
-                color: '#5a2410',
-
-                fontSize: '13px',
-
-                fontWeight: 600,
-
-                cursor: busy ? 'wait' : 'pointer',
-
-                lineHeight: 1.3,
-
-              }}
-
-            >
-
-              回归入凡
-
-              <div style={{ fontSize: '10px', fontWeight: 400, color: '#7a4a28', marginTop: '2px' }}>
-
-                散尽修为，重新投胎
+                <span>{realmName}</span>
 
               </div>
 
-            </button>
+              {hint && (
 
+                <div
 
+                  style={{
 
-            <button
+                    marginBottom: '8px',
 
-              type="button"
+                    padding: '6px 10px',
 
-              className="rich-button"
+                    borderLeft: '2px solid #b8814a',
 
-              data-testid="death-guidance-observe"
+                    background: 'rgba(184,129,74,0.08)',
 
-              onClick={handleDismiss}
+                    color: '#5a2410',
 
-              disabled={busy !== null}
+                    fontSize: '12px',
 
-              style={{
+                  }}
 
-                padding: '10px 8px',
+                >
 
-                borderRadius: '6px',
+                  {hint}
 
-                border: '1px solid #d8b888',
+                </div>
 
-                background: '#fefcf5',
+              )}
 
-                color: '#5a3a18',
+              <div
 
-                fontSize: '13px',
+                style={{
 
-                fontWeight: 600,
+                  marginTop: '4px',
 
-                cursor: busy ? 'wait' : 'pointer',
+                  marginBottom: '6px',
 
-                lineHeight: 1.3,
+                  fontSize: '12px',
 
-              }}
+                  color: '#7a5a3a',
 
-            >
+                  letterSpacing: '0.04em',
 
-              继续旁观
+                }}
 
-              <div style={{ fontSize: '10px', fontWeight: 400, color: '#7a5a3a', marginTop: '2px' }}>
+              >
 
-                收敛此篇，留待后人
+                道途未绝，择一续缘：
 
               </div>
 
-            </button>
+              <div
 
-          </div>
+                className="rich-button-row"
+
+                style={{
+
+                  marginTop: '4px',
+
+                  display: 'grid',
+
+                  gridTemplateColumns: 'repeat(3, 1fr)',
+
+                  gap: '8px',
+
+                }}
+
+              >
+
+                <button
+
+                  type="button"
+
+                  className="rich-button"
+
+                  data-testid="death-guidance-reincarnate"
+
+                  onClick={handleReincarnate}
+
+                  disabled={busy !== null}
+
+                  style={{
+
+                    padding: '10px 8px',
+
+                    borderRadius: '6px',
+
+                    border: '1px solid #b8814a',
+
+                    background: busy === '轮回重开' ? '#f4dfb6' : '#fff5dc',
+
+                    color: '#5a2410',
+
+                    fontSize: '13px',
+
+                    fontWeight: 600,
+
+                    cursor: busy ? 'wait' : 'pointer',
+
+                    lineHeight: 1.3,
+
+                  }}
+
+                >
+
+                  轮回重开
+
+                  <div style={{ fontSize: '10px', fontWeight: 400, color: '#7a4a28', marginTop: '2px' }}>
+
+                    承继衣钵，再世修仙
+
+                  </div>
+
+                </button>
+
+                <button
+
+                  type="button"
+
+                  className="rich-button"
+
+                  data-testid="death-guidance-reset"
+
+                  onClick={handleResetToMortal}
+
+                  disabled={busy !== null}
+
+                  style={{
+
+                    padding: '10px 8px',
+
+                    borderRadius: '6px',
+
+                    border: '1px solid #b8814a',
+
+                    background: busy === '回归入凡' ? '#f4dfb6' : '#fff5dc',
+
+                    color: '#5a2410',
+
+                    fontSize: '13px',
+
+                    fontWeight: 600,
+
+                    cursor: busy ? 'wait' : 'pointer',
+
+                    lineHeight: 1.3,
+
+                  }}
+
+                >
+
+                  回归入凡
+
+                  <div style={{ fontSize: '10px', fontWeight: 400, color: '#7a4a28', marginTop: '2px' }}>
+
+                    散尽修为，重新投胎
+
+                  </div>
+
+                </button>
+
+                <button
+
+                  type="button"
+
+                  className="rich-button"
+
+                  data-testid="death-guidance-observe"
+
+                  onClick={handleDismiss}
+
+                  disabled={busy !== null}
+
+                  style={{
+
+                    padding: '10px 8px',
+
+                    borderRadius: '6px',
+
+                    border: '1px solid #d8b888',
+
+                    background: '#fefcf5',
+
+                    color: '#5a3a18',
+
+                    fontSize: '13px',
+
+                    fontWeight: 600,
+
+                    cursor: busy ? 'wait' : 'pointer',
+
+                    lineHeight: 1.3,
+
+                  }}
+
+                >
+
+                  继续旁观
+
+                  <div style={{ fontSize: '10px', fontWeight: 400, color: '#7a5a3a', marginTop: '2px' }}>
+
+                    收敛此篇，留待后人
+
+                  </div>
+
+                </button>
+
+              </div>
+
+            </div>
+
+          </details>
 
         </div>
 

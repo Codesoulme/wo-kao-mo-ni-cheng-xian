@@ -32,14 +32,19 @@ export function FateNodes({ onSelect }: FateNodesProps) {
           {fateNodes.map((node) => {
             const isCompleted = completed.has(node.index);
             const nodeRealmIdx = REALMS.findIndex(r => r.id === node.realm);
-            const isCurrent = !isCompleted && nodeRealmIdx <= currentRealmIdx + 1 && character.age >= node.triggerAge.min;
-            const isLocked = !isCompleted && nodeRealmIdx > currentRealmIdx + 1;
+            // L14 整改：拆分为两个 boolean 显式比较，避免窄屏圆点与文字重叠 + 单行表达式歧义。
+            const nodeAgeReached = character.age >= node.triggerAge.min;
+            const nodeRealmReached = nodeRealmIdx >= 0 && nodeRealmIdx <= currentRealmIdx + 1;
+            const isCurrent = !isCompleted && nodeAgeReached && nodeRealmReached;
+            const isLocked = !isCompleted && !nodeRealmReached;
 
             return (
               <div key={node.index} className="relative pl-10">
                 <div
+                  // L14 整改：窄屏圆点不再与文字重叠；固定 12×12px + margin-top:1px
+                  style={{ width: '12px', height: '12px', marginTop: '1px' }}
                   className={cn(
-                    "absolute left-[8px] top-2 w-4 h-4 rounded-full border-2 flex items-center justify-center z-10",
+                    "absolute left-[8px] top-2 rounded-full border-2 flex items-center justify-center z-10",
                     isCompleted ? "bg-primary border-primary text-primary-foreground" :
                     isCurrent ? "bg-primary/20 border-primary text-primary animate-pulse" :
                     "bg-card border-border text-muted-foreground"

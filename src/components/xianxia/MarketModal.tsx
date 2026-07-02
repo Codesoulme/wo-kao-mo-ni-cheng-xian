@@ -83,7 +83,8 @@ export function MarketModal() {
     sellPrice: estimateSellPrice(it),
   })), [estimateSellPrice]);
 
-  const marketCacheKey = character ? `xianxia-market-stock:${character.id}:${character.age}` : '';
+  const marketCacheKey = character ? `修仙坊市·第${character.age}岁·${character.id}` : '';
+  const legacyMarketCacheKey = character ? `xianxia-market-stock:${character.id}:${character.age}` : '';
 
   // 坊市货架：同一角色同一年只在第一次进入时刷新；买卖、切页、重开弹窗都沿用当年货架。
   const fetchMarketItems = useCallback(async () => {
@@ -98,6 +99,23 @@ export function MarketModal() {
         }
       } catch {
         window.localStorage.removeItem(marketCacheKey);
+      }
+    }
+    // 兼容旧 key：Worker-C I16 中文化迁移，一次性从旧 key 读出并写入新 key
+    if (typeof window !== 'undefined' && legacyMarketCacheKey && legacyMarketCacheKey !== marketCacheKey) {
+      const legacy = window.localStorage.getItem(legacyMarketCacheKey);
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy);
+          if (Array.isArray(parsed?.items)) {
+            window.localStorage.setItem(marketCacheKey, legacy);
+            window.localStorage.removeItem(legacyMarketCacheKey);
+            setMarketItems(parsed.items);
+            return;
+          }
+        } catch {
+          window.localStorage.removeItem(legacyMarketCacheKey);
+        }
       }
     }
 
