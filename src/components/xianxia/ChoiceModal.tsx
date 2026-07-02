@@ -23,7 +23,7 @@ export function ChoiceModal() {
   // 前情提要默认展开；用户可手动折叠以聚焦选项
   const [contextCollapsed, setContextCollapsed] = useState(false);
 
-  // 修真沉浸 P0 修复：把早返挪到所有 hooks 之后（避免 React "Rendered fewer hooks than expected"）
+  // 沉浸版 P0 修复：把早返挪到所有 hooks 之后（避免 React "Rendered fewer hooks than expected"）
   // hooks 必须在每次渲染顺序一致，下方 4 个 useState + 2 个 useMemo 必须无条件调用
   const hasContext = !!(pendingChoice?.contextNarrative || pendingChoice?.contextTitle);
   const formattedContext = useMemo(

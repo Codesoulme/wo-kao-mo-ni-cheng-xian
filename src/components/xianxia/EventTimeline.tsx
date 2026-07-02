@@ -216,7 +216,7 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
     return () => stopAnimation();
   }, [streamingText, eventIndex, startAnimation, stopAnimation]);
 
-  // 非流式模式：普通渲染（修真沉浸叙事段缩进兜底）
+  // 非流式模式：普通渲染（沉浸版叙事段缩进兜底）
   if (streamingText === undefined) {
     if (!text) return null;
     return <p>{formatNarrativeForDisplay(text)}</p>;

@@ -99,11 +99,11 @@ export async function POST(req: NextRequest) {
     const result = executeAIEvent(state, aiOutput);
     let finalState = result.state;
 
-    // 修真质感：年龄跳跃对账
+    // 沉浸感：年龄跳跃对账
     // prepareAdvanceCandidate 用 AI 的 timeAdvance 预增 state.age，但 AI 常常不填 / 填 1 年。
     // 推进完拿到叙事后，从 AI 的标题+正文里重新推断时间单位；如果推断出小时间单位
     // （入夜/翌日/数日后等，ageDeltaYears=0），但原预增 ≥ 1，就把多跳的岁数还回去，
-    // 世界历同步回滚。避免"叙事里写三日后却跳了一岁"的修真违和。
+    // 世界历同步回滚。避免"叙事里写三日后却跳了一岁"的叙事违和。
     const inferredInline = inferInlineTimeAdvance(aiOutput?.title, aiOutput?.narrative);
     if (inferredInline && inferredInline.ageDeltaYears < timeAdvance.ageDeltaYears) {
       const yearDelta = timeAdvance.ageDeltaYears - inferredInline.ageDeltaYears;
@@ -468,7 +468,7 @@ ${narrative || ''}`);
       }, finalState.age));
     }
 
-    // 修真沉浸·生命终结叙事：若这一轮角色因 ECS aging / 战斗 / 寿元等任何原因跨过了 alive=false，
+    // 沉浸版·生命终结叙事：若这一轮角色因 ECS aging / 战斗 / 寿元等任何原因跨过了 alive=false，
     // 单独追加一条"身殒道消"独立事件，避免玩家看到主事件叙事却在角色死亡时毫无征兆。
     if (char.alive !== finalState.alive && finalState.alive === false) {
       const deathCause = finalState.causeOfDeath || '寿元已尽，身隳道消';

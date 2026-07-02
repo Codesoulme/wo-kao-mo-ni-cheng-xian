@@ -1,5 +1,5 @@
 /**
- * 修真沉浸·叙事显示格式化（前端安全网）
+ * 沉浸版·叙事显示格式化（前端安全网）
  *
  * AI prompt 已经要求：用 \n\n 分段、每段以「\u3000\u3000」首行缩进。
  * 但 SSE 流式 + 部分模型偶发会让 AI 输出单段平铺，玩家看到的是一段没断行的长文。
@@ -46,7 +46,7 @@ export function formatNarrativeForDisplay(text: string): string {
 
   if (parts.length <= 1) return '\u3000\u3000' + trimmed;
 
-  // 按目标字数 60-120 分组（修真沉浸段目标 ~ 2-3 句）
+  // 按目标字数 60-120 分组（沉浸版段目标 ~ 2-3 句）
   const groups: string[] = [];
   let cur = '';
   for (const p of parts) {
@@ -63,7 +63,7 @@ export function formatNarrativeForDisplay(text: string): string {
   }
   if (cur) groups.push(cur);
 
-  // 合并过短的尾部段到上一段（修真沉浸尾段不应只 1 句）
+  // 合并过短的尾部段到上一段（沉浸版尾段不应只 1 句）
   if (groups.length >= 2 && groups[groups.length - 1].length < PARAGRAPH_TARGET_MIN) {
     const tail = groups.pop()!;
     groups[groups.length - 1] = groups[groups.length - 1] + tail;

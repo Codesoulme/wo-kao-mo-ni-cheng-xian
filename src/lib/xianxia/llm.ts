@@ -644,14 +644,14 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
     : '（暂无来源——可能无灵根或未装备功法）';
 
   // v11: 修为认知告警——不强制 AI 突破，但让 AI 必须清楚当前修为状态、决定破不破、并且让玩家能看出「AI 是故意不破」
-  // 修真游戏核心：AI 据剧情/状态/场景/因果生成；面板只承载投影。AI 应该比面板更懂当前的修炼瓶颈。
+  // 游戏核心：AI 据剧情/状态/场景/因果生成；面板只承载投影。AI 应该比面板更懂当前的修炼瓶颈。
   const cultivationRatio = (sc.expToBreak > 0) ? sc.cultivationExp / sc.expToBreak : 0;
   const isCappedAtBreak = sc.cultivationExp >= sc.expToBreak && sc.expToBreak > 0;
   const cultivationInsightNotice = (() => {
     const r = sc.cultivationInsight || '';
     return r ? `\n（修为状态机已记录的洞察：「${r}」）\n` : '';
   })();
-  // 修真沉浸版 PoC context hint
+  // 沉浸版 PoC context hint
   const realmBlock = realmTraitText || '';
 
   const factorsBlock = engineFactors || '';

@@ -273,7 +273,7 @@ export default function Home() {
             </div>
 
             {/* ===== DeathGuidance 触发 banner（仅 alive=false 且未触发传承结算） ===== */}
-            {/* 修真沉浸修法：传承结算（SettlementModal）已含完整死亡叙事 + 传承选择，
+            {/* 沉浸版：传承结算（SettlementModal）已含完整死亡叙事 + 传承选择，
                 与 DeathGuidancePanel 同时出现会重叠；settlementResult 到位时隐藏 banner。 */}
             {!character?.alive && !(settlementResult && settlementResult.characterId === character.id) && (
               <div className="shrink-0 px-3 pb-1" data-testid="death-guidance-banner">
