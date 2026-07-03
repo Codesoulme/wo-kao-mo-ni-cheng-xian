@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
+import { computeAlchemyHints } from '@/lib/xianxia/engine';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -21,6 +22,8 @@ const RARITY_LABEL: Record<string, string> = {
   common: '凡品', uncommon: '良品', rare: '稀有', epic: '史诗', legendary: '传说', mythic: '神话',
 };
 
+// SPIRIT_STONE_COST：UI 交互层的默认消耗值，仅用于展示与前端预校验。
+// 实际结算成本仍由引擎 alchemy() 权威裁决，此处不承担业务逻辑。
 const SPIRIT_STONE_COST = 10;
 
 // 从材料 effects 提取元素倾向（用于显示）
@@ -49,19 +52,14 @@ export function AlchemyFurnace() {
   const inventory = character?.inventory || [];
   const materials = inventory.filter(it => it.item_type === 'material');
 
-  // 预测成功率（与 engine.alchemy 公式一致，仅用于展示）
-  const predictedRate = useMemo(() => {
-    if (!character) return 0;
-    if (selected.length < 2) return 0;
-    const selectedItems = materials.filter(m => selected.includes(m.id));
-    if (selectedItems.length !== selected.length) return 0;
-    const comp = character.comprehension || 0;
-    const root = character.rootMultiplier || 0;
-    const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
-    const avgIdx = selectedItems.reduce((s, m) => s + RARITY_ORDER.indexOf(m.rarity), 0) / selectedItems.length;
-    const rate = 30 + comp * 0.4 + root * 5 + avgIdx * 8 - (selected.length - 2) * 5;
-    return Math.round(Math.max(10, Math.min(95, rate)));
-  }, [selected, materials, character]);
+  // 火候把握（引擎裁决 computeAlchemyHints，仅用于展示；不在前端复算公式）
+  const predictedRate = useMemo<number | null>(() => {
+    if (!character) return null;
+    if (selected.length < 2 || selected.length > 3) return null;
+    const hints = computeAlchemyHints(character, selected, SPIRIT_STONE_COST);
+    if (!hints.ok || typeof hints.baseSuccessRate !== 'number') return null;
+    return Math.round(hints.baseSuccessRate);
+  }, [selected, character]);
 
   if (!character) return null;
 
@@ -112,7 +110,19 @@ export function AlchemyFurnace() {
     }
   };
 
-  const successColor = predictedRate >= 70 ? '#22c55e' : predictedRate >= 40 ? '#eab308' : '#ef4444';
+  const successColor = predictedRate == null
+    ? '#94a3b8'
+    : predictedRate >= 70 ? '#22c55e'
+      : predictedRate >= 40 ? '#eab308'
+        : '#ef4444';
+
+  // 沉浸文案（数字+短评）
+  const flameLabel = predictedRate == null
+    ? '待入炉'
+    : predictedRate >= 70 ? '火候纯熟'
+      : predictedRate >= 50 ? '把握尚可'
+        : predictedRate >= 30 ? '略显飘忽'
+          : '凶险难料';
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -218,16 +228,19 @@ export function AlchemyFurnace() {
             {selected.length >= 2 && (
               <div className="rounded-md border border-primary/20 bg-primary/5 p-2 space-y-1.5">
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-muted-foreground">预测成功率</span>
-                  <span className="font-bold tabular-nums" style={{ color: successColor }}>
-                    {predictedRate}%
+                  <span className="text-muted-foreground font-serif-cn">丹火气象</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-serif-cn text-foreground/80">{flameLabel}</span>
+                    <span className="font-bold tabular-nums" style={{ color: successColor }}>
+                      {predictedRate == null ? '—' : `${predictedRate}%`}
+                    </span>
                   </span>
                 </div>
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full transition-all duration-300"
                     style={{
-                      width: `${predictedRate}%`,
+                      width: `${predictedRate ?? 0}%`,
                       background: `linear-gradient(90deg, ${successColor}, ${successColor}cc)`,
                     }}
                   />

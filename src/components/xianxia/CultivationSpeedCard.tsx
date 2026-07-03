@@ -18,7 +18,9 @@ export function CultivationSpeedCard() {
 
   const totalMult = character.cultivationMultiplier ?? 0;
   const flatBonus = character.cultivationFlatBonus ?? 0;
-  const factors: any[] = buildVisibleCultivationFactors(character);
+  // 引擎权威：character.cultivationFactors 由 engine/attributes.ts:computeCultivationFactors 计算，
+  // 已内置 scripture 兜底逻辑，UI 只作展示。
+  const factors: any[] = Array.isArray(character.cultivationFactors) ? character.cultivationFactors : [];
   const groupedSources = groupCultivationFactors(factors);
   const visibleSources = showAllSources ? groupedSources : groupedSources.slice(0, 3);
   const hiddenSourceCount = Math.max(0, groupedSources.length - visibleSources.length);
@@ -171,55 +173,6 @@ export function CultivationSpeedCard() {
       </CardContent>
     </Card>
   );
-}
-
-
-const CULTIVATION_EFFECT_ALIASES = new Set(['cultivationExp', 'cultivation', 'cultivationRate', 'cultivationMultiplier', 'cultivation_speed', '修为', '修炼速度']);
-const SCRIPTURE_NAME_RE = /诀|决|经|典|录|篇|章|解|式|术|功法|心法|秘籍|玉简|心得|真经|真解|引气|凝气|吐纳/;
-
-function defaultScriptureMultiplier(rarity?: string): number {
-  const multByRarity: Record<string, number> = {
-    common: 1.3, uncommon: 1.7, rare: 2.5, epic: 3.5, legendary: 4.5, mythic: 5.5,
-  };
-  return multByRarity[rarity || ''] || 1.5;
-}
-
-function buildVisibleCultivationFactors(character: any): any[] {
-  const factors = Array.isArray(character.cultivationFactors) ? [...character.cultivationFactors] : [];
-  const seen = new Set(factors.map(f => `${f.name}|${f.operation}|${f.value}`));
-
-  for (const it of character.equipped || []) {
-    const effects = Array.isArray(it.effects) ? it.effects : [];
-    const cultivationEffects = effects.filter((e: any) => CULTIVATION_EFFECT_ALIASES.has(e.target_attribute));
-    for (const eff of cultivationEffects) {
-      if (eff.operation !== 'multiply' && eff.operation !== 'add') continue;
-      if (eff.operation === 'multiply' && !(eff.value > 0)) continue;
-      if (eff.operation === 'add' && !eff.value) continue;
-      const value = Number(eff.value);
-      const key = `${it.name}|${eff.operation}|${value}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      factors.push({
-        name: it.name,
-        value,
-        operation: eff.operation,
-        rarity: it.rarity,
-        note: eff.operation === 'multiply' ? '功法加成' : '额外修为/岁',
-      });
-    }
-
-    const looksLikeScripture = it.item_type === 'scripture' || SCRIPTURE_NAME_RE.test(`${it.name || ''}${it.description || ''}`);
-    if (looksLikeScripture && !cultivationEffects.some((e: any) => e.operation === 'multiply')) {
-      const value = defaultScriptureMultiplier(it.rarity);
-      const key = `${it.name}|multiply|${value}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        factors.push({ name: it.name, value, operation: 'multiply', rarity: it.rarity, note: '功法加成' });
-      }
-    }
-  }
-
-  return factors;
 }
 
 

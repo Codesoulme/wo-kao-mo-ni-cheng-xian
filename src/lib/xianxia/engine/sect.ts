@@ -729,3 +729,25 @@ export function summarizeSectTrajectoryForPrompt(
 //  - character:    角色状态（id/age/npcs/longTermMemory）
 //  - history:      历史未决线索列表（PendingThread[]）
 // 返回：当前应触发的回响触发器集合（去重 + 紧迫度归一）
+
+
+// ==================== 玩家宗门身份派生 (B4) ====================
+// 引擎权威:UI 不再自行派生 sectRank。若 state 里已有真实 sectRank/position,尊重;
+// 否则按境界/年龄/战力派生兜底。原逻辑搬自 SectStorylinePanel.tsx:58 (inferRank)。
+export function derivePlayerSectRank(state: CharacterState): string {
+  const explicit = String((state as any).sectRank || (state as any).position || '').trim();
+  if (explicit) return explicit;
+  const realm = String(state.realm || '');
+  const age = Number(state.age || 0);
+  const power = Number((state as any).cultivationPower || (state as any).combatProjection?.totalPower || 0);
+  if (realm.includes('渡劫') || realm.includes('大乘')) return '长老';
+  if (realm.includes('化神') || realm.includes('元婴')) return '真传弟子';
+  if (realm.includes('结丹') || realm.includes('金丹')) return '内门弟子';
+  if (realm.includes('筑基')) return '内门弟子';
+  if (realm.includes('炼气')) {
+    if (age >= 25 && power > 30) return '内门弟子';
+    return '外门弟子';
+  }
+  if (age === 0) return '尚在襁褓';
+  return '外门弟子';
+}

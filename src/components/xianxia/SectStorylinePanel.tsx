@@ -55,22 +55,9 @@ const PHASE_TONE: Record<string, string> = {
   remnant: 'bg-sky-50 text-sky-900 border-sky-300',
 };
 
-function inferRank(character: any): string {
-  const realm = String(character?.realm || character?.cultivation || '');
-  const age = Number(character?.age || 0);
-  const power = Number(character?.cultivationPower || character?.combatProjection?.totalPower || 0);
-
-  if (realm.includes('渡劫') || realm.includes('大乘')) return '长老';
-  if (realm.includes('化神') || realm.includes('元婴')) return '真传弟子';
-  if (realm.includes('结丹') || realm.includes('金丹')) return '内门弟子';
-  if (realm.includes('筑基')) return '内门弟子';
-  if (realm.includes('炼气')) {
-    if (age >= 25 && power > 30) return '内门弟子';
-    return '外门弟子';
-  }
-  if (age === 0) return '尚在襁褓';
-  return '外门弟子';
-}
+// B4: 原 inferRank 已下沉到引擎 (engine/sect.ts derivePlayerSectRank)。
+// UI 直接读 character.sectRank(由 stateToResponse 派生),不再自派生数据契约字段。
+// 兜底:极旧存档没有 sectRank 字段时,显示"外门弟子"避免空态。
 
 function selectShortTermQuests(character: any, maxCount = 5): QuestEntry[] {
   if (!character || typeof character !== 'object') return [];
@@ -174,11 +161,12 @@ export function SectStorylinePanel({
   }, [character?.faction, character?.sect]);
 
   const currentRank = useMemo(() => {
+    // B4: 引擎权威。stateToResponse 已把 derivePlayerSectRank(state) 塞进 sectRank。
+    // position 是历史 fallback,极旧存档兜底才走"外门弟子"。
     if (!character) return '外门弟子';
-    const explicit = String(character.sectRank || character.position || '').trim();
-    if (explicit) return explicit;
-    return inferRank(character);
-  }, [character?.sectRank, character?.position, character?.realm, character?.age]);
+    const rank = String(character.sectRank || character.position || '').trim();
+    return rank || '外门弟子';
+  }, [character?.sectRank, character?.position]);
 
   const phase = useMemo(() => {
     if (!character) return { phase: 'stable' as const, reason: '宗门轨迹尚未显化，暂以稳态相待' };

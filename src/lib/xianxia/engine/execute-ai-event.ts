@@ -248,6 +248,9 @@ import {
   getDiscoveredStoryRealms,
 } from './exploration';
 import {
+  derivePlayerSectRank,
+} from './sect';
+import {
   ItemEffectResolveResult,
   addItems,
   equipItemsByIds,
@@ -1136,6 +1139,8 @@ export function stateToResponse(s: CharacterState) {
     // Task 24 新字段
     exploredRealms: s.exploredRealms || [],
     discoveredRealms: getDiscoveredStoryRealms(s),
+    // B4: 玩家宗门身份统一由引擎派生 (原 SectStorylinePanel 的 inferRank 已下沉)
+    sectRank: derivePlayerSectRank(s),
   };
 }
 

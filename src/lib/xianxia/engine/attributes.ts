@@ -238,6 +238,8 @@ import {
   normalizeThreadsCompletion,
   realmPowerMultiplier,
   sanitizeRealmProfile,
+  SCRIPTURE_NAME_RE,
+  defaultScriptureMultiplier,
 } from './shared';
 import {
   filterMeaningfulStatuses,
@@ -718,11 +720,13 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
       factors.push({ name: it.name, value: 0, operation: 'multiply', rarity: it.rarity as any, note: compat.reasons[0] || '\u6839\u57fa\u4e0d\u5408\uff0c\u6682\u96be\u4fee\u4e60' });
       continue;
     }
+    let hasMultiplyCultivationEffect = false;
     for (const rawEff of it.effects || []) {
       const eff = adaptTechniqueEffect(state, it, rawEff);
       if (!eff) continue;
       if (eff.target_attribute === 'cultivationExp') {
         if (eff.operation === 'multiply' && eff.value > 0) {
+          hasMultiplyCultivationEffect = true;
           factors.push({
             name: it.name,
             value: eff.value,
@@ -739,6 +743,22 @@ export function computeCultivationFactors(state: CharacterState): CultivationFac
             note: '额外修为/岁',
           });
         }
+      }
+    }
+    // 兜底：AI 生成 scripture 时若忘给 cultivationExp x multiplier 效果，
+    // 按名字/描述/类型识别为功法后补上稀有度默认倍率，
+    // 保证 UI 与引擎读到同一份权威 factors。
+    if (!hasMultiplyCultivationEffect) {
+      const looksLikeScripture = it.item_type === 'scripture'
+        || SCRIPTURE_NAME_RE.test(`${it.name || ''}${it.description || ''}`);
+      if (looksLikeScripture) {
+        factors.push({
+          name: it.name,
+          value: defaultScriptureMultiplier(it.rarity as string),
+          operation: 'multiply',
+          rarity: it.rarity as any,
+          note: '功法加成',
+        });
       }
     }
   }
