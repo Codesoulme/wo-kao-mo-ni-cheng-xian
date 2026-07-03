@@ -3841,8 +3841,7 @@ function smokeAi103RumorReliability(): void {
   assert(after0 >= 0.05, '0y should keep non-zero');
   log('ai103-rumor-reliability', { passed: true, after5, after100 });
 }
-  // AI-94 / AI-102: HeartIntentPanel 相关
-  // Worker A (AI-91~AI-103)
+  // Worker A (AI-91~AI-103)  (原 AI-94/AI-102 HeartIntentPanel 相关 smoke 已随组件移除)
   smokeAi91SanitizeCombatLog();
   smokeAi91NovelizeCombatLog();
   smokeAi92LootFromOpponent();
@@ -3866,9 +3865,7 @@ function smokeAi103RumorReliability(): void {
   smokeAi101NPCBehavior();
   smokeAi103RumorTrigger();
   smokeAi103RumorReliability();
-  smokeHeartIntentPanelExists();
-  smokeHeartIntentStoreUpdate();
-  smokeHeartIntentLabel();
+  // (原 AI-102 HeartIntent 三条 smoke 已随 HeartIntentPanel 移除)
   console.log(JSON.stringify({ passed: true, suite: 'xianxia-regression-smoke', db: withDb }));
 
   pgRunPhaseGGSmokes();
@@ -5693,7 +5690,7 @@ function smokeX001PageIntegratesAllPanels(): void {
   const missingImports = requiredImports.filter((name) => !src.includes(name));
   assert(missingImports.length === 0, 'missing imports in page.tsx: ' + missingImports.join(', '));
 
-  const removedImports = ['EndingPanel', 'YinyuanTimelinePanel', 'TechniqueCreatorPanel', 'PetPanel', 'FormationPanel'];
+  const removedImports = ['EndingPanel', 'YinyuanTimelinePanel', 'TechniqueCreatorPanel', 'PetPanel', 'FormationPanel', 'HeartIntentPanel'];
   // 匹配真实 import / require 语句，过滤注释
   const importLineRe = /^\s*(?:import|const|let|var)\s+[\s\S]*?from\s+['"][^'"]+['"]/gm;
   const importBlock: string[] = [];
@@ -5812,7 +5809,6 @@ function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
     // 人情
     'npc-growth-section',
     'sect-storyline-section',
-    'heart-intent-section',
     // 修行
     'cultivation-speed-section',
     'secret-realm-section',
@@ -5837,7 +5833,6 @@ function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
     'SaveSlotPanel',
     'NpcGrowthPanel',
     'SectStorylinePanel',
-    'HeartIntentPanel',
     'CultivationSpeedCard',
     'InventoryPanel',
     'WorldLegacyPanel',
@@ -5848,7 +5843,7 @@ function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
   const missingImports = requiredImports.filter((name) => !src.includes(name));
   assert(missingImports.length === 0, 'page.tsx 应 import 保留 panel，缺少: ' + missingImports.join(', '));
 
-  const removedImports = ['EndingPanel', 'YinyuanTimelinePanel', 'TechniqueCreatorPanel', 'PetPanel', 'FormationPanel'];
+  const removedImports = ['EndingPanel', 'YinyuanTimelinePanel', 'TechniqueCreatorPanel', 'PetPanel', 'FormationPanel', 'HeartIntentPanel'];
   // 匹配真实 import / require 语句，过滤注释
   const importLineRe = /^\s*(?:import|const|let|var)\s+[\s\S]*?from\s+['"][^'"]+['"]/gm;
   const componentUseRe = /<\s*([A-Z][A-Za-z0-9]+)/g;
@@ -6472,58 +6467,10 @@ function smokeAi85ComboDamageResolve(): void {
   log('combo-damage-resolve', { passed: true, base: 100, withCombo: withCombo.finalDamage, mult: withCombo.multiplier });
 }
 
-function smokeHeartIntentPanelExists(): void {
-  // AI-102: HeartIntentPanel 组件应存在并导出
-  const panelPath = 'E:\\aigame2_publish\\src\\components\\xianxia\\HeartIntentPanel.tsx';
-  const exists = existsSync(panelPath);
-  assert(exists, `HeartIntentPanel.tsx 应存在于 ${panelPath}`);
-  let exported = false;
-  if (exists) {
-    const src = readFileSync(panelPath, 'utf8');
-    exported = /export\s+function\s+HeartIntentPanel\s*\(/.test(src) || /export\s+const\s+HeartIntentPanel\s*=/.test(src);
-  }
-  assert(exported, `HeartIntentPanel 必须导出 HeartIntentPanel 组件`);
-  log('heart-intent-panel-exists', { passed: true, path: panelPath, exported });
-}
-
-function smokeHeartIntentStoreUpdate(): void {
-  // AI-102: 组件应能通过 store 修改 heartIntent / intents
-  // 边界：不动核心 action，使用 setCharacter 通用更新器
-  const panelPath = 'E:\\aigame2_publish\\src\\components\\xianxia\\HeartIntentPanel.tsx';
-  let usesSetCharacter = false;
-  let accessesHeartIntent = false;
-  let accessesIntents = false;
-  if (existsSync(panelPath)) {
-    const src = readFileSync(panelPath, 'utf8');
-    usesSetCharacter = /setCharacter\s*[,(]/.test(src) || /useGameStore/.test(src);
-    accessesHeartIntent = /character\.heartIntent|heartIntent/.test(src);
-    accessesIntents = /character\.intents|\.intents\b/.test(src);
-  }
-  assert(usesSetCharacter, 'HeartIntentPanel 必须调用 store.setCharacter 或 useGameStore');
-  assert(accessesHeartIntent, 'HeartIntentPanel 必须读取 character.heartIntent');
-  assert(accessesIntents, 'HeartIntentPanel 必须读取 character.intents[]');
-  log('heart-intent-store-update', { passed: true, usesSetCharacter, accessesHeartIntent, accessesIntents });
-}
-
-function smokeHeartIntentLabel(): void {
-  // AI-102: HEART_INTENT_LABEL 应从 display.ts 导出
-  const displayPath = 'E:\\aigame2_publish\\src\\lib\\xianxia\\display.ts';
-  let exported = false;
-  let hasLabels = false;
-  if (existsSync(displayPath)) {
-    const src = readFileSync(displayPath, 'utf8');
-    const m = src.match(/export\s+const\s+HEART_INTENT_LABEL[^=]*=\s*\{([\s\S]*?)\}\s+as\s+const/);
-    if (m) {
-      exported = true;
-      const body = m[1];
-      const labels = (body.match(/:\s*['"][^'"]+['"]/g) || []).map(s => s.replace(/[:'"\s]/g, ''));
-      hasLabels = labels.length >= 5 && labels.every(l => /[\u4e00-\u9fa5]/.test(l));
-    }
-  }
-  assert(exported, 'HEART_INTENT_LABEL 必须从 display.ts 导出 (as const)');
-  assert(hasLabels, 'HEART_INTENT_LABEL 必须包含至少 5 个中文标签');
-  log('heart-intent-label', { passed: true, exported, hasLabels });
-}// ============================================================================
+// (原 AI-102 smokeHeartIntentPanelExists / smokeHeartIntentStoreUpdate / smokeHeartIntentLabel
+//  三个 smoke 已随 HeartIntentPanel 组件与 HEART_INTENT_LABEL 常量一并移除 —— 未落地的老功能。)
+// ============================================================================
+// ============================================================================
 // Phase-G smoke 回归补强 (xiaoxin-C-补, 2026-06-27)
 // 追加 15 条 smoke-g-NNN-xxx；不动既有 smoke；允许 try/catch 标记 function-missing
 // 所有断言包在 try/catch 中，确保失败也仍输出 passed:true（function-missing）

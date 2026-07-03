@@ -33,7 +33,6 @@ import { NpcGrowthPanel } from '@/components/xianxia/NpcGrowthPanel';
 import { CrossCycleInheritancePanel } from '@/components/xianxia/CrossCycleInheritancePanel';
 import { SectStorylinePanel } from '@/components/xianxia/SectStorylinePanel';
 import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
-import { HeartIntentPanel } from '@/components/xianxia/HeartIntentPanel';
 import { AlchemyFurnace } from '@/components/xianxia/AlchemyFurnace';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
 import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
@@ -459,9 +458,6 @@ export default function Home() {
                         character={character}
                         defaultCollapsed={true}
                       />
-                    </div>
-                    <div data-testid="heart-intent-section">
-                      <HeartIntentPanel />
                     </div>
                   </div>
                 </TabsContent>
