@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { formatItemEffectLabel } from '@/lib/xianxia/display';
 import { toast } from 'sonner';
 import { FormationType } from '@/lib/xianxia/types';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -129,7 +130,7 @@ export function FormationPanel() {
       toast.success(data.message || '阵法激活');
       await loadList();
     } catch (err: any) {
-      toast.error('激活失败', { description: err.message });
+      toast.error('激活失败', { description: humanizeError(err) });
     } finally {
       setBusy(null);
     }
@@ -150,7 +151,7 @@ export function FormationPanel() {
       toast.success(data.message || '阵法已关闭');
       await loadList();
     } catch (err: any) {
-      toast.error('关闭失败', { description: err.message });
+      toast.error('关闭失败', { description: humanizeError(err) });
     } finally {
       setBusy(null);
     }

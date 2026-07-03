@@ -397,7 +397,7 @@ export function SectStorylinePanel({
 
           {trajectorySummary && (
             <details className="text-[10px] text-stone-500 font-serif-cn">
-              <summary className="cursor-pointer hover:text-stone-700">轨迹摘要（点击展开）</summary>
+              <summary className="cursor-pointer hover:text-stone-700">轨迹摘要（点入展开）</summary>
               <pre className="mt-1 whitespace-pre-wrap text-[9px] leading-relaxed bg-stone-50 p-1.5 rounded border border-stone-200">
                 {trajectorySummary}
               </pre>

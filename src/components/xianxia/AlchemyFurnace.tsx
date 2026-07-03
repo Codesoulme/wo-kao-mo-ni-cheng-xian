@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ItemEntry } from '@/lib/xianxia/types';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -105,7 +106,7 @@ export function AlchemyFurnace() {
         toast.error('丹炉炸裂', { description: '材料化为飞灰，仅得废丹' });
       }
     } catch (err: any) {
-      toast.error('炼丹失败', { description: err.message });
+      toast.error('炼丹失败', { description: humanizeError(err) });
     } finally {
       setBusy(false);
     }

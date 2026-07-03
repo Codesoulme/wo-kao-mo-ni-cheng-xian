@@ -13,6 +13,7 @@ import {
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatItemEffectLabel } from '@/lib/xianxia/display';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 // 稀有度配色（与 InventoryPanel 保持一致）
 const RARITY_COLORS: Record<string, string> = {
@@ -134,7 +135,7 @@ export function MarketModal() {
         window.localStorage.setItem(marketCacheKey, JSON.stringify({ characterId: character.id, age: character.age, items }));
       }
     } catch (err: any) {
-      toast.error('坊市加载失败', { description: err.message });
+      toast.error('坊市加载失败', { description: humanizeError(err) });
       setMarketOpen(false);
     } finally {
       setMarketLoading(false);
@@ -207,7 +208,7 @@ export function MarketModal() {
         description: `得「${data.boughtItem?.name || item.name}」，耗灵石 ${data.price}`,
       });
     } catch (err: any) {
-      toast.error('购买失败', { description: err.message });
+      toast.error('购买失败', { description: humanizeError(err) });
     } finally {
       setBusyId(null);
     }
@@ -235,7 +236,7 @@ export function MarketModal() {
         description: `去「${data.soldItem?.name || item.name}」，得灵石 ${data.sellPrice}`,
       });
     } catch (err: any) {
-      toast.error('出售失败', { description: err.message });
+      toast.error('出售失败', { description: humanizeError(err) });
     } finally {
       setBusyId(null);
     }

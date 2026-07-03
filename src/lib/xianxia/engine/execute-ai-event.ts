@@ -235,6 +235,9 @@ import {
   recalcCultivationMultiplier,
 } from './attributes';
 import {
+  deriveHeartDemonProjection,
+} from './heart-demon';
+import {
   appendCausalGraph,
   causalId,
 } from './causality';
@@ -1127,6 +1130,7 @@ export function stateToResponse(s: CharacterState) {
     worldFacts: s.worldFacts || [],
     // Task 22 新字段
     heartDemon: s.heartDemon ?? 0,
+    heartDemonProjection: deriveHeartDemonProjection(s),
     // Task 23 新字段
     pets: s.pets || [],
     // Task 24 新字段

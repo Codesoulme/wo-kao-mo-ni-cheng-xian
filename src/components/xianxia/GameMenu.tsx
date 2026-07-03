@@ -97,17 +97,17 @@ export function GameMenu() {
               className="text-xs cursor-pointer text-destructive focus:text-destructive"
             >
               <RotateCcw className="w-3.5 h-3.5 mr-2" />
-              <span>放弃模拟</span>
+              <span>放下此世</span>
             </DropdownMenuItem>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* 放弃模拟确认 */}
+      {/* 放下此世确认 */}
       <AlertDialog open={resetOpen} onOpenChange={setResetOpen}>
         <AlertDialogContent className="max-w-[300px]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="font-serif-cn text-base">放弃模拟？</AlertDialogTitle>
+            <AlertDialogTitle className="font-serif-cn text-base">放下此世？</AlertDialogTitle>
             <AlertDialogDescription className="text-xs leading-relaxed">
               放弃后会结束此世，并进入轮回结算。你仍可从旧物、命格、灵宠、法宝或因缘中选择可带入下一世的传承。确定要放下此世吗？
             </AlertDialogDescription>

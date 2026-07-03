@@ -145,6 +145,8 @@ import {
   FateEchoResolution,
   FateWeb,
   FatePredictedOutcome,
+  HeartDemonProjection,
+  HeartDemonTier,
 } from '../types';
 import type {
   PillSideEffect,
@@ -309,6 +311,86 @@ export function resolveHeartDemonTrial(state: CharacterState, victory: boolean):
     const dmg = Math.round(state.maxHp * 0.2);
     return { ...next, hp: Math.max(1, next.hp - dmg) }; // 不直接致死，留 1 血
   }
+}
+
+// ==================== 心魔投影：引擎裁决，UI 只读 ====================
+// 由 heartDemon 数值统一派生分级、色调、修炼惩罚，避免 HeartDemonCard / CharacterDetailSheet
+// 各自硬编阈值造成同一心魔在两处显示不一致。
+// 分级阈值：>=81 demonic / >=51 restless / >=21 unsettled / else calm
+// 修炼惩罚：与 computeEffectiveCultivationRate 完全同口径
+//   hd >= 30 时 penalty = min(0.7, floor((hd - 20) / 10) * 0.1)，30→0.1 / 60→0.4 / 90→0.7
+export function deriveHeartDemonProjection(state: CharacterState): HeartDemonProjection {
+  const hd = Math.max(0, Math.min(100, state.heartDemon ?? 0));
+
+  let tier: HeartDemonTier;
+  let tierLabel: string;
+  let tierIcon: string;
+  let tierColor: string;
+  let tierBorderOpacity: number;
+  let tierBgOpacity: number;
+  let barGradient: string;
+  if (hd >= 81) {
+    tier = 'demonic';
+    tierLabel = '心魔缠身';
+    tierIcon = '🔥';
+    tierColor = '#dc2626';
+    tierBorderOpacity = 0.5;
+    tierBgOpacity = 0.12;
+    barGradient = 'linear-gradient(90deg, #ef4444, #b91c1c)';
+  } else if (hd >= 51) {
+    tier = 'restless';
+    tierLabel = '心魔初现';
+    tierIcon = '👹';
+    tierColor = '#ea580c';
+    tierBorderOpacity = 0.45;
+    tierBgOpacity = 0.10;
+    barGradient = 'linear-gradient(90deg, #f97316, #c2410c)';
+  } else if (hd >= 21) {
+    tier = 'unsettled';
+    tierLabel = '道心无损';
+    tierIcon = '⚡';
+    tierColor = '#d97706';
+    tierBorderOpacity = 0.40;
+    tierBgOpacity = 0.08;
+    barGradient = 'linear-gradient(90deg, #f59e0b, #b45309)';
+  } else {
+    tier = 'calm';
+    tierLabel = '心境澄明';
+    tierIcon = '🍃';
+    tierColor = '#65a30d';
+    tierBorderOpacity = 0.30;
+    tierBgOpacity = 0.06;
+    barGradient = 'linear-gradient(90deg, #84cc16, #65a30d)';
+  }
+
+  // 与 computeEffectiveCultivationRate 内心魔惩罚公式完全一致
+  const penalty = hd >= 30 ? Math.min(0.7, Math.floor((hd - 20) / 10) * 0.1) : 0;
+  const penaltyPct = Math.round(penalty * 100);
+
+  let penaltyText: string;
+  if (penalty <= 0) {
+    penaltyText = '心魔尚浅，修行未阻';
+  } else if (hd >= 81) {
+    penaltyText = `修炼效率 -${penaltyPct}%，心魔真身将现`;
+  } else if (hd >= 51) {
+    penaltyText = `修炼效率 -${penaltyPct}%，可能触发心魔试炼`;
+  } else {
+    penaltyText = `修炼效率 -${penaltyPct}%`;
+  }
+
+  return {
+    value: hd,
+    tier,
+    tierLabel,
+    tierIcon,
+    tierColor,
+    tierBorderOpacity,
+    tierBgOpacity,
+    barGradient,
+    penalty,
+    penaltyPct,
+    penaltyText,
+  };
 }
 
 // ==================== Task 23: 灵宠系统 ====================

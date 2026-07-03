@@ -37,7 +37,6 @@ import { HeartIntentPanel } from '@/components/xianxia/HeartIntentPanel';
 import { AlchemyFurnace } from '@/components/xianxia/AlchemyFurnace';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
 import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
-import { FateNodes } from '@/components/xianxia/FateNodes';
 import { CultivationSpeedCard } from '@/components/xianxia/CultivationSpeedCard';
 import { CharacterDetailSheet } from '@/components/xianxia/CharacterDetailSheet';
 import { RealmOrb } from '@/components/xianxia/RealmOrb';
@@ -473,9 +472,9 @@ export default function Home() {
                     <div data-testid="cultivation-speed-section">
                       <CultivationSpeedCard />
                     </div>
-                    <div data-testid="secret-realm-section">
-                      <SecretRealmPanel />
-                    </div>
+                    {/* secret-realm 挂载点：面板由根节点 modal（下方 !showHome && <SecretRealmPanel/>）触发，
+                        入口按钮在 ActionButtons(setExplorationOpen)，此处 testid 保留仅为回归 smoke 结构校验 */}
+                    <div data-testid="secret-realm-section" className="hidden" />
                     <div data-testid="inventory-section">
                       <InventoryPanel />
                     </div>

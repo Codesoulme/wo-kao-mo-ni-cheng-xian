@@ -12,6 +12,7 @@ import type { CharacterState, GameEvent } from '@/lib/xianxia/store';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
 import { LOADING_LABELS } from '@/lib/xianxia/display';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 import { useStreamingPlaceholder } from '@/hooks/useStreamingPlaceholder';
 
 function latestActionProjections(events: GameEvent[]) {
@@ -194,7 +195,7 @@ export function ActionButtons() {
       });
 
       if (!response.body) {
-        throw new Error('No response body');
+        throw new Error('灵桥未通');
       }
 
       // 立即初始化流式状态
@@ -280,10 +281,10 @@ export function ActionButtons() {
                 console.log('[SSE advance] Received done, narrative length:', obj.narrative?.length, 'perf:', obj._debug_perf);
                 doneData = obj;
               } else if (obj.type === 'error') {
-                throw new Error(obj.error || 'SSE error');
+                throw new Error(obj.error || '天机线断');
               }
             } catch (e: any) {
-              if (e?.message?.includes('SSE error')) throw e;
+              if (e?.message?.includes('天机线断')) throw e;
               console.error('[SSE advance] Parse error:', e);
             }
           }
@@ -307,10 +308,10 @@ export function ActionButtons() {
                 console.log('[SSE advance] Recovered done from trailing buffer');
                 doneData = obj;
               } else if (obj.type === 'error') {
-                throw new Error(obj.error || 'SSE error');
+                throw new Error(obj.error || '天机线断');
               }
             } catch (e: any) {
-              if (e?.message?.includes('SSE error')) throw e;
+              if (e?.message?.includes('天机线断')) throw e;
               console.error('[SSE advance] Trailing buffer parse error:', e);
             }
           }
@@ -318,7 +319,7 @@ export function ActionButtons() {
       }
 
       if (!doneData) {
-        throw new Error('SSE 响应未完成');
+        throw new Error('推演未竟');
       }
 
       // ★ done 到达：同步更新所有状态
@@ -419,8 +420,8 @@ export function ActionButtons() {
         return;
       }
       console.error('[advance] Error:', err?.message);
-      setError(err.message);
-      toast.error('推进失败', { description: err.message });
+      setError(humanizeError(err));
+      toast.error('推进失败', { description: humanizeError(err) });
       autoCancelRef.current = true;
       finishStreamingNarrative();
     } finally {
@@ -527,8 +528,8 @@ export function ActionButtons() {
         prepareNextTurn(character.id);
       }
     } catch (err: any) {
-      setError(err.message);
-      toast.error('推进失败', { description: err.message });
+      setError(humanizeError(err));
+      toast.error('推进失败', { description: humanizeError(err) });
       autoCancelRef.current = true;
     } finally {
       advancingRef.current = false;

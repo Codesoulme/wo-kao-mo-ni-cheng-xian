@@ -24,6 +24,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
 import { GameMenu } from '@/components/xianxia/GameMenu';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 // 战斗动作类型
 type CombatAction = 'attack' | 'skill' | 'item' | 'talisman' | 'defend' | 'flee' | 'other';
@@ -183,8 +184,8 @@ export function CombatModal() {
         }
       }
     } catch (err: any) {
-      setError(err.message);
-      toast.error('行动失败', { description: err.message });
+      setError(humanizeError(err));
+      toast.error('行动失败', { description: humanizeError(err) });
     } finally {
       setBusy(false);
       setLoading(false);

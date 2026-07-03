@@ -16,6 +16,7 @@ import {
 } from '@/lib/xianxia/types';
 import { AlchemyFurnace } from './AlchemyFurnace';
 import { ItemDetailDialog } from './ItemDetailDialog';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -202,7 +203,7 @@ export function InventoryPanel() {
         toast.success(data.message);
       }
     } catch (err: any) {
-      toast.error('操作失败', { description: err.message });
+      toast.error('操作失败', { description: humanizeError(err) });
     } finally {
       setBusy(null);
     }
@@ -479,7 +480,7 @@ export function InventoryPanel() {
                   return (
                     <div key={type}>
                       <div className="text-[10px] text-muted-foreground mb-1 px-0.5 flex items-center gap-1">
-                        <span className="font-serif-cn">{ITEM_TYPE_LABEL[type] || type}</span>
+                        <span className="font-serif-cn">{ITEM_TYPE_LABEL[type] || '珍玩'}</span>
                         <span className="opacity-50">·</span>
                         <span>{items.reduce((sum, stack) => sum + stack.count, 0)}{'\u4ef6'}</span>
                         {items.length > 1 && <span className="opacity-60">{items.length}{'\u7c7b'}</span>}
@@ -591,7 +592,7 @@ export function InventoryPanel() {
                             className="w-full text-[10px] text-muted-foreground hover:text-primary flex items-center justify-center gap-1 py-1"
                           >
                             <ChevronDown className={cn("w-3 h-3 transition-transform", groupOpen && "rotate-180")} />
-                            {groupOpen ? `收起${ITEM_TYPE_LABEL[type] || type}` : `展开其余 ${items.length - 3} 件`}
+                            {groupOpen ? `收起${ITEM_TYPE_LABEL[type] || '珍玩'}` : `展开其余 ${items.length - 3} 件`}
                           </button>
                         )}
                       </div>

@@ -10,6 +10,8 @@ import type { CharacterState } from '@/lib/xianxia/store';
 
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
+import { humanizeAutoSaveError } from '@/lib/xianxia/error-humanize';
+
 
 
 interface DeathGuidancePanelProps {
@@ -274,7 +276,7 @@ export function DeathGuidancePanel({ character, defaultCollapsed = false }: Deat
 
           <AlertDescription>
 
-            角色年龄 {autoSaveError.age} 岁时落笔遇阻（{autoSaveError.reason}）：{autoSaveError.error}
+            {humanizeAutoSaveError(autoSaveError)}
 
             <div style={{ marginTop: '6px' }}>
 
