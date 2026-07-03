@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 // 灵宠物种图标（用 lucide 替代，简化为大致分类）
 function speciesIcon(species: string) {
@@ -102,8 +103,9 @@ export function PetPanel() {
       if (data.state) setCharacter({ ...character, ...data.state });
       toast.success(`灵宠${data.pet?.name || ''}喂养成功`);
     } catch (err: any) {
-      setError(err?.message || '喂养失败');
-      toast.error(err?.message || '喂养失败');
+      const msg = humanizeError(err);
+      setError(msg);
+      toast.error('喂养失败', { description: msg });
     } finally {
       setBusy(false);
       setLoading(false);
@@ -138,8 +140,8 @@ export function PetPanel() {
       toast.success(`\u5df2\u653e\u5f52\u300c${petName}\u300d`);
       setDismissTarget(null);
     } catch (e: any) {
-      setError(e.message);
-      toast.error('\u653e\u5f52\u5931\u8d25', { description: e.message });
+      setError(humanizeError(e));
+      toast.error('\u653e\u5f52\u5931\u8d25', { description: humanizeError(e) });
     } finally {
       setBusy(false);
       setLoading(false);
@@ -333,7 +335,7 @@ export function PetPanel() {
                                         </span>
                                       </div>
                                       <div className="text-[10px] text-muted-foreground truncate">
-                                        {it.description || it.item_type}
+                                        {it.description || '珍玩'}
                                       </div>
                                     </div>
                                   </DropdownMenuItem>

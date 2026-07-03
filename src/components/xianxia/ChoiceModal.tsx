@@ -10,6 +10,7 @@ import { formatNarrativeForDisplay } from '@/lib/xianxia/narrative-format';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -93,11 +94,11 @@ export function ChoiceModal() {
         toast.success(`获得物品：${data.newItems.map((i: any) => i.name).join('、')}`);
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(humanizeError(err));
       if (String(err.message || '').includes('请先配置 AI 接口')) {
         setAiConfigPromptOpen(true);
       } else {
-        toast.error('选择失败', { description: err.message });
+        toast.error('选择失败', { description: humanizeError(err) });
       }
     } finally {
       setBusy(false);

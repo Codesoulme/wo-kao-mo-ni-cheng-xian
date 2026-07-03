@@ -1,6 +1,34 @@
 // @ts-nocheck - script tool, no strict types needed
 
-﻿import { readFileSync, existsSync } from 'fs';
+﻿import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
+
+// [refactor barrel-split] 巨文件 llm.ts / engine.ts 已按域拆进同名子目录，原文件变 barrel。
+// 许多 smoke 用 readFileSync 对"源码正文"做字符串断言；正文搬进子目录后 barrel 里已无这些字面量。
+// readModuleSource：若给定 barrel 路径旁存在同名目录（llm/ 或 engine/），递归读取该目录全部 .ts 拼接返回；
+// 否则回退读原文件。测试意图（某指导语/marker 存在于该模块中）完全保留。
+function readModuleSource(barrelPath: string): string {
+  const dir = barrelPath.replace(/\.ts$/, '');
+  let dirIsModule = false;
+  try { dirIsModule = existsSync(dir) && statSync(dir).isDirectory(); } catch { dirIsModule = false; }
+  const parts: string[] = [];
+  try { parts.push(readFileSync(barrelPath, 'utf-8')); } catch { /* barrel 可能不存在，忽略 */ }
+  if (dirIsModule) {
+    const walk = (d: string) => {
+      for (const name of readdirSync(d)) {
+        const full = d + '/' + name;
+        let isDir = false;
+        try { isDir = statSync(full).isDirectory(); } catch { isDir = false; }
+        if (isDir) { walk(full); continue; }
+        if (name.endsWith('.ts')) {
+          try { parts.push(readFileSync(full, 'utf-8')); } catch { /* skip */ }
+        }
+      }
+    };
+    walk(dir);
+  }
+  return parts.join('\n');
+}
+
 
 // Phase-T #9: NPC self-growth (3 smokes)
 
@@ -78,7 +106,7 @@ function smokeR001SectPanelExists(): void {
 }
 
 function smokeR002EngineHasSectFunctions(): void {
-  const src = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const src = readModuleSource('src/lib/xianxia/engine.ts');
   assert(src.includes('function buildQuestEntriesFromThreads') || src.includes('export function buildQuestEntriesFromThreads'), 'engine should export buildQuestEntriesFromThreads');
   assert(src.includes('function evaluateSectPhase') || src.includes('export function evaluateSectPhase'), 'engine should export evaluateSectPhase');
   assert(src.includes('function summarizeSectTrajectoryForPrompt') || src.includes('export function summarizeSectTrajectoryForPrompt'), 'engine should export summarizeSectTrajectoryForPrompt');
@@ -1219,7 +1247,7 @@ function smokeSameYearContinuationDedup(): void {
   log('same-year-continuation-dedup', { passed: true });
 }
 function smokeAnnualNarrativePrompt(): void {
-  const source = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  const source = readModuleSource('src/lib/xianxia/llm.ts');
   assert(source.includes('年龄推进不是“一年只发生一件事”'), 'advance prompt should require annual multi-part narration');
   assert(source.includes('dueInSameYear=true 表示下一次岁月流转会优先处理同岁后续'), 'advance prompt should explain same-year continuation behavior');
   assert(source.includes('必须用 extraEvents 拆成多条短事件'), 'advance prompt should require extraEvents for multiple key beats');
@@ -1263,7 +1291,7 @@ function smokeTechniqueRequirements(): void {
 }
 
 function smokeNoProtagonistShieldPrompt(): void {
-  const source = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  const source = readModuleSource('src/lib/xianxia/llm.ts');
   assert(source.includes('\u4e0d\u8981\u4e3a\u4e86\u4fdd\u62a4\u73a9\u5bb6\u800c\u81ea\u52a8\u5339\u914d\u6218\u529b'), 'combat prompt should forbid protagonist shielding');
   assert(source.includes('causedDeath/eventType=death \u662f\u5408\u6cd5\u7ed3\u679c'), 'prompt should allow death as legitimate outcome');
   assert(source.includes('technique.requirements'), 'item prompt should require technique requirements');
@@ -2608,7 +2636,7 @@ function smokeP004PageHasInheritanceSection(): void {
 }
 
 function smokeP005EngineExportsCycleHooks(): void {
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function seedInheritancePoolFromEnding\s*\(/.test(engine),
     'engine.ts should export seedInheritancePoolFromEnding');
   assert(/export function selectNextProtagonist\s*\(/.test(engine),
@@ -3900,7 +3928,7 @@ function smokeMechanismPatternsCombatLabels(): void {
 
 function smokeEngineCultivationCategoryEnglish(): void {
   // P1 验证：engine.ts 中 cultivation attribute category enum 为英文
-  const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engineSource = readModuleSource('src/lib/xianxia/engine.ts');
   //  cultivationAttributeCategory map 输出英文
   assert(engineSource.includes("body: 'body'"), 'body category 应为英文');
   assert(engineSource.includes("spirit: 'spirit'"), 'spirit category 应为英文');
@@ -4025,7 +4053,7 @@ function smokeRealmVsIdentitySeparation(): void {
   // realm 字段不应该在 IDENTITY 内
   assert(!/faction.*REALM|realm.*IDENTITY/.test(displaySource), 'realm 与 identity 字段不应混淆');
   // types.ts CharacterState 已分字段
-  const typesSource = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const typesSource = readModuleSource('src/lib/xianxia/types.ts');
   // CharacterState 应该有 realm/realmLevel 和 faction/master/location 各自独立字段
   const charStateBlock = typesSource.match(/export\s+interface\s+CharacterState\s*\{[\s\S]+?\n\}/);
   assert(charStateBlock !== null, '应存在 CharacterState interface');
@@ -4069,7 +4097,7 @@ function smokeClueCarryOverTextBoundary(): void {
 
 function smokeYinyuanTitleNaturalPhrasing(): void {
   // AI-19: 因缘标题自然概括
-  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  const llmSource = readModuleSource('src/lib/xianxia/llm.ts');
   assert(/因缘标题自然概括/.test(llmSource), 'llm.ts 应包含"因缘标题自然概括"指导');
   // 列举规则
   assert(/不剧透/.test(llmSource), 'llm.ts 应要求标题不剧透');
@@ -4080,7 +4108,7 @@ function smokeYinyuanTitleNaturalPhrasing(): void {
 
 function smokeYinyuanNarrativeNoOutOfWorld(): void {
   // AI-18: 因缘叙事去局外词
-  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  const llmSource = readModuleSource('src/lib/xianxia/llm.ts');
   assert(/因缘叙事去局外词/.test(llmSource), 'llm.ts 应包含"因缘叙事去局外词"指导');
   // 列举具体禁止词
   assert(/上回说到/.test(llmSource) && /且听下回分解/.test(llmSource), 'llm.ts 应列举"上回说到""且听下回分解"等具体禁止词');
@@ -4119,7 +4147,7 @@ function smokeContinuousPushCombatSync(): void {
 
 function smokeStatusAffectsEvents(): void {
   // AI-15: 当前状态必须参与事件
-  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  const llmSource = readModuleSource('src/lib/xianxia/llm.ts');
   assert(/当前状态必须参与事件|状态必须参与|activeStatuses.*参与/.test(llmSource), 'llm.ts 应包含"当前状态必须参与事件"指导');
   assert(/无参与.*等于失忆|必须参与.*叙事/.test(llmSource), 'llm.ts 应有"无参与等于失忆"等强制约束');
   log('status-affects-events', { passed: true });
@@ -4330,7 +4358,7 @@ function smokeNoNewChineseAttributeKeysInEngine(): void {
   // AI-4: engine.ts 中 attributeNumber fallback 不应新增中文 key
   // 允许的中文 key 集合（与当前 engine.ts 中一致）
   const allowedChineseKeys = new Set(['神识', '魂魄', '神魂', '元神', '体魄', '肉身', '根骨']);
-  const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engineSource = readModuleSource('src/lib/xianxia/engine.ts');
   // 提取 attributeNumber(state, [...]) 中的字符串字面量
   const regex = /attributeNumber\([^)]*\[([^\]]+)\]\)/g;
   let match: RegExpExecArray | null;
@@ -4446,7 +4474,7 @@ function smokeSaveLoadIntegrity(): void {
 function smokeSaveLoadBackwardCompat(): void {
   // AI-35: 存档向后兼容 (JSON 字段 try-parse + default fallback)
   // 验证 display.ts 或 engine.ts 至少有一处 try-parse JSON 字段
-  const engineSource = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engineSource = readModuleSource('src/lib/xianxia/engine.ts');
   const displaySource = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
   const hasTryParse = /JSON\.parse.*try|catch.*JSON|try\s*\{[^}]*JSON\.parse/s.test(engineSource + displaySource);
   assert(hasTryParse, 'engine.ts/display.ts 应有 JSON parse 错误兜底');
@@ -4626,7 +4654,7 @@ function smokeTribulationModalFullyIntegrated(): void {
     'page.tsx 应 import TribulationModal');
   assert(/data-testid="tribulation-section"/.test(page), 'page.tsx 应渲染 tribulation-section');
   assert(/character\.tribulationPending/.test(page), 'page.tsx 应消费 tribulationPending');
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/tribulationPending\?:\s*TribulationSession\s*\|\s*null/.test(types), 'CharacterState 应有 tribulationPending');
   assert(/tribulationResult\?/.test(types), 'CharacterState 应有 tribulationResult');
   log('tribulation-modal-fully-integrated', { passed: true });
@@ -4686,7 +4714,7 @@ function smokeAscensionModalIntegrated(): void {
     'page.tsx 应 import AscensionModal');
   assert(/data-testid="ascension-section"/.test(page), 'page.tsx 应渲染 ascension-section');
   assert(/ascensionPending/.test(page), 'page.tsx 应消费 ascensionPending');
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/ascensionPending\?:\s*AscensionSession\s*\|\s*null/.test(types), 'CharacterState 应有 ascensionPending');
   log('ascension-modal-integrated', { passed: true });
 }
@@ -4698,7 +4726,7 @@ function smokeRestrictionModalIntegrated(): void {
     'page.tsx 应 import RestrictionModal');
   assert(/data-testid="restriction-section"/.test(page), 'page.tsx 应渲染 restriction-section');
   assert(/restrictionPending/.test(page), 'page.tsx 应消费 restrictionPending');
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/restrictionPending\?:\s*Restriction\s*\|\s*null/.test(types), 'CharacterState 应有 restrictionPending');
   log('restriction-modal-integrated', { passed: true });
 }
@@ -4717,7 +4745,7 @@ function smokeAllL3ModalsInLayout(): void {
 
 function smokeSecretRealmRestrictionField(): void {
   // AI-71: realm.restrictions + requiredRestrictionsPassed
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/restrictions\?:\s*Restriction\[\]/.test(types), 'SecretRealm 应有 restrictions?: Restriction[]');
   assert(/requiredRestrictionsPassed\?:\s*string\[\]/.test(types), 'SecretRealm 应有 requiredRestrictionsPassed?: string[]');
   log('secret-realm-restriction-field', { passed: true });
@@ -4725,7 +4753,7 @@ function smokeSecretRealmRestrictionField(): void {
 
 function smokeRealmEnterCheckDerivation(): void {
   // AI-71: deriveRealmRestrictionCheck
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function deriveRealmRestrictionCheck/.test(engine), 'engine.ts 应导出 deriveRealmRestrictionCheck');
   assert(/missingRestrictions/.test(engine), 'deriveRealmRestrictionCheck 应返回 missingRestrictions');
   // 边界：全部通过 → canEnter
@@ -4738,7 +4766,7 @@ function smokeRealmEnterCheckDerivation(): void {
 
 function smokeRestrictionTypesExist(): void {
   // AI-70: RestrictionType + RestrictionAccessMethod
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/type RestrictionType\s*=/.test(types), 'types.ts 应定义 RestrictionType');
   for (const t of ['door', 'trap', 'transport', 'seal', 'ward', 'barrier']) {
     assert(types.includes(`'${t}'`), `RestrictionType 应含 ${t}`);
@@ -4753,7 +4781,7 @@ function smokeRestrictionTypesExist(): void {
 
 function smokeRestrictionAccessCheck(): void {
   // AI-70: checkRestrictionAccess
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function checkRestrictionAccess/.test(engine), 'engine.ts 应导出 checkRestrictionAccess');
   assert(/accessMethod/.test(engine), 'checkRestrictionAccess 应处理 accessMethod');
   assert(/requiredItemId/.test(engine), 'checkRestrictionAccess 应处理 token/key');
@@ -4763,7 +4791,7 @@ function smokeRestrictionAccessCheck(): void {
 
 function smokeRestrictionTriggerDerivation(): void {
   // AI-70: deriveRestrictionTrigger + resolveRestrictionInteraction
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function deriveRestrictionTrigger/.test(engine), 'engine.ts 应导出 deriveRestrictionTrigger');
   assert(/export function resolveRestrictionInteraction/.test(engine), 'engine.ts 应导出 resolveRestrictionInteraction');
   assert(/'attempt'|'retreat'|'combat'/.test(engine), 'resolveRestrictionInteraction 应接受 3 种 choice');
@@ -4797,7 +4825,7 @@ function smokeRestrictionModalExists(): void {
 
 function smokeNpcWorldTierField(): void {
   // AI-69: npc.worldTier + crossRealmAccess
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/worldTier\?:\s*WorldTier/.test(types), 'WorldNpc 应有 worldTier?: WorldTier');
   assert(/crossRealmAccess\?:\s*boolean/.test(types), 'WorldNpc 应有 crossRealmAccess?: boolean');
   log('npc-world-tier-field', { passed: true });
@@ -4805,7 +4833,7 @@ function smokeNpcWorldTierField(): void {
 
 function smokeCrossRealmPathsDerivation(): void {
   // AI-69: deriveCrossRealmPaths
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function deriveCrossRealmPaths/.test(engine), 'engine.ts 应导出 deriveCrossRealmPaths');
   assert(/interface CrossRealmPath/.test(engine), 'engine.ts 应有 CrossRealmPath interface');
   assert(/'ascension'|'starSky'|'token'|'forbidden'/.test(engine), '应有 4 种通道类型');
@@ -4832,21 +4860,21 @@ function smokeCrossRealmDocsExist(): void {
 
 function smokeAscensionRequirementsExist(): void {
   // AI-68: WorldTier + AscensionRequirement
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/type WorldTier\s*=/.test(types), 'types.ts 应定义 WorldTier');
   for (const t of ['humanWorld', 'spiritWorld', 'immortalWorld']) {
     assert(types.includes(`'${t}'`), `WorldTier 应含 ${t}`);
   }
   assert(/interface AscensionRequirement/.test(types), 'types.ts 应有 AscensionRequirement interface');
   assert(/interface AscensionSession/.test(types), 'types.ts 应有 AscensionSession interface');
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function deriveAscensionRequirements/.test(engine), 'engine.ts 应导出 deriveAscensionRequirements');
   log('ascension-requirements-exist', { passed: true });
 }
 
 function smokeAscensionEligibilityCheck(): void {
   // AI-68: checkAscensionEligibility
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function checkAscensionEligibility/.test(engine), 'engine.ts 应导出 checkAscensionEligibility');
   assert(/missing/.test(engine), 'checkAscensionEligibility 应返回 missing 列表');
   assert(/lifespanMin|reputationMin|cultivationExpMin|daoHeartMin/.test(engine), 'checkAscensionEligibility 应校验 4 项数值');
@@ -4855,7 +4883,7 @@ function smokeAscensionEligibilityCheck(): void {
 
 function smokeAscensionTriggerDerivation(): void {
   // AI-68: deriveAscensionTrigger + resolveAscensionOutcome
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function deriveAscensionTrigger/.test(engine), 'engine.ts 应导出 deriveAscensionTrigger');
   assert(/export function resolveAscensionOutcome/.test(engine), 'engine.ts 应导出 resolveAscensionOutcome');
   // 大乘期 500 岁触发
@@ -4895,7 +4923,7 @@ function smokeAscensionModalExists(): void {
 
 function smokeTribulationTriggerExists(): void {
   // AI-67: deriveTribulationTrigger
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function deriveTribulationTrigger/.test(engine), 'engine.ts 应导出 deriveTribulationTrigger');
   assert(/'deity_transformation'/.test(engine), '天劫境界应含化神');
   // 逻辑
@@ -4906,7 +4934,7 @@ function smokeTribulationTriggerExists(): void {
 
 function smokeTribulationBoltResolution(): void {
   // AI-67: resolveTribulationBolt
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function resolveTribulationBolt/.test(engine), 'engine.ts 应导出 resolveTribulationBolt');
   assert(/boltNumber/.test(engine), 'resolveTribulationBolt 应接受 boltNumber');
   assert(/heartDemonPenalty/.test(engine), 'resolveTribulationBolt 应有 心魔惩罚逻辑');
@@ -4917,12 +4945,12 @@ function smokeTribulationBoltResolution(): void {
 
 function smokeHeartDemonTypes(): void {
   // AI-67: 5 种心魔
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/type HeartDemonType\s*=/.test(types), 'types.ts 应定义 HeartDemonType');
   for (const t of ['obsession', 'hatred', 'love', 'fear', 'regret']) {
     assert(types.includes(`'${t}'`), `HeartDemonType 应含 ${t}`);
   }
-  const engine = readFileSync('src/lib/xianxia/engine.ts', 'utf-8');
+  const engine = readModuleSource('src/lib/xianxia/engine.ts');
   assert(/export function resolveHeartDemon/.test(engine), 'engine.ts 应导出 resolveHeartDemon');
   const ui = readFileSync('src/components/xianxia/TribulationModal.tsx', 'utf-8');
   assert(/执念|恨意|情爱|恐惧|悔意/.test(ui), 'TribulationModal 应显示 5 种心魔中文 label');
@@ -4957,7 +4985,7 @@ function smokeTribulationModalExists(): void {
 
 function smokeCharacterSectHistoryField(): void {
   // AI-66: character.sectHistory
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/sectHistory\?:\s*SectHistoryEntry\[\]/.test(types), 'CharacterState 应有 sectHistory?: SectHistoryEntry[]');
   assert(/interface SectHistoryEntry/.test(types), 'types.ts 应定义 SectHistoryEntry interface');
   assert(/reason:\s*['"]joined['"]/.test(types), 'SectHistoryEntry 应有 reason enum');
@@ -4969,7 +4997,7 @@ function smokeCharacterSectHistoryField(): void {
 
 function smokeCharacterTeacherRefField(): void {
   // AI-66: character.teacherRef
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/teacherRef\?:\s*NpcRef\s*\|\s*null/.test(types), 'CharacterState 应有 teacherRef?: NpcRef | null');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
   assert(/RELATION_MENTOR_LABEL/.test(display), 'display.ts 应导出 RELATION_MENTOR_LABEL');
@@ -4979,14 +5007,14 @@ function smokeCharacterTeacherRefField(): void {
 
 function smokeCharacterApprenticesField(): void {
   // AI-66: character.apprentices
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/apprentices\?:\s*NpcRef\[\]/.test(types), 'CharacterState 应有 apprentices?: NpcRef[]');
   log('character-apprentices-field', { passed: true });
 }
 
 function smokePetTypeField(): void {
   // AI-65: pet.type
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/type\?:\s*['"]pet['"]\s*\|\s*['"]insect['"]\s*\|\s*['"]swarm['"]\s*\|\s*['"]beast['"]/.test(types),
     'Pet 应有 type?: pet|insect|swarm|beast');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
@@ -4997,7 +5025,7 @@ function smokePetTypeField(): void {
 
 function smokePetSwarmCountField(): void {
   // AI-65: pet.swarmCount
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/swarmCount\?:\s*number/.test(types), 'Pet 应有 swarmCount?: number');
   assert(swarmCountLogic(100) === 100, 'swarmCount 应正常');
   assert(swarmCountLogic(0) === 0, 'swarmCount 0 应正常');
@@ -5007,14 +5035,14 @@ function smokePetSwarmCountField(): void {
 
 function smokePetCombatSkillIds(): void {
   // AI-65: pet.combatSkillIds
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/combatSkillIds\?:\s*string\[\]/.test(types), 'Pet 应有 combatSkillIds?: string[]');
   log('pet-combat-skill-ids', { passed: true });
 }
 
 function smokeCharacterSpouseField(): void {
   // AI-64: character.spouse (NpcRef | null)
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/spouse\?:\s*NpcRef\s*\|\s*null/.test(types), 'CharacterState 应有 spouse?: NpcRef | null');
   assert(/interface NpcRef/.test(types), 'types.ts 应定义 NpcRef interface');
   assert(/intimacy:\s*number/.test(types), 'NpcRef 应有 intimacy: number');
@@ -5023,7 +5051,7 @@ function smokeCharacterSpouseField(): void {
 
 function smokeCharacterCultivationHarmonyBonus(): void {
   // AI-64: character.cultivationHarmonyBonus 0-50
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/cultivationHarmonyBonus\?:\s*number/.test(types), 'CharacterState 应有 cultivationHarmonyBonus?: number');
   const clamp = (v: number) => Math.max(0, Math.min(50, v));
   assert(clamp(60) === 50, 'cultivationHarmonyBonus > 50 应 clamp');
@@ -5036,7 +5064,7 @@ function smokeCharacterCultivationHarmonyBonus(): void {
 
 function smokeNpcSpouseOfField(): void {
   // AI-64: npc.spouseOf
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/spouseOf\?:\s*string\s*\|\s*null/.test(types), 'WorldNpc 应有 spouseOf?: string | null');
   assert(/dualCultivationProgress\?:\s*number/.test(types), 'WorldNpc 应有 dualCultivationProgress?: number');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
@@ -5047,7 +5075,7 @@ function smokeNpcSpouseOfField(): void {
 
 function smokeArtifactBondedField(): void {
   // AI-63: artifact.bonded
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/bonded\?:\s*boolean/.test(types), 'types.ts ItemEntry 应有 bonded?: boolean');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
   assert(/BONDED_ARTIFACT_LABEL/.test(display), 'display.ts 应导出 BONDED_ARTIFACT_LABEL');
@@ -5057,7 +5085,7 @@ function smokeArtifactBondedField(): void {
 
 function smokeArtifactSoulLinkField(): void {
   // AI-63: artifact.soulLink 0-100
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/soulLink\?:\s*number/.test(types), 'types.ts ItemEntry 应有 soulLink?: number');
   // 边界
   const clamp = (v: number) => Math.max(0, Math.min(100, v));
@@ -5071,7 +5099,7 @@ function smokeArtifactSoulLinkField(): void {
 
 function smokeArtifactSpiritField(): void {
   // AI-63: artifact.spirit / gestationDays
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/spirit\?:\s*string\s*\|\s*null/.test(types), 'types.ts ItemEntry 应有 spirit?: string | null');
   assert(/gestationDays\?:\s*number/.test(types), 'types.ts ItemEntry 应有 gestationDays?: number');
   const display = readFileSync('src/lib/xianxia/display.ts', 'utf-8');
@@ -5082,7 +5110,7 @@ function smokeArtifactSpiritField(): void {
 
 function smokeAlchemyHeatEnumExists(): void {
   // AI-62: AlchemyHeatLevel enum
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/export type AlchemyHeatLevel\s*=/.test(types), 'types.ts 应定义 AlchemyHeatLevel enum');
   for (const v of ['micro', 'weak', 'moderate', 'strong', 'extreme']) {
     assert(types.includes(`'${v}'`), `AlchemyHeatLevel 应含 ${v}`);
@@ -5095,7 +5123,7 @@ function smokeAlchemyHeatEnumExists(): void {
 
 function smokeFormationTypeEnumExists(): void {
   // AI-62: FormationCategory enum
-  const types = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const types = readModuleSource('src/lib/xianxia/types.ts');
   assert(/export type FormationCategory\s*=/.test(types), 'types.ts 应定义 FormationCategory enum');
   for (const v of ['binding', 'slaughter', 'illusion', 'defense', 'support', 'trap']) {
     assert(types.includes(`'${v}'`), `FormationCategory 应含 ${v}`);
@@ -5108,7 +5136,7 @@ function smokeFormationTypeEnumExists(): void {
 
 function smokeL1WorldDocsPromptInjection(): void {
   // AI-61: 8 个 L1 文档注入 llm.ts prompt
-  const llmSource = readFileSync('src/lib/xianxia/llm.ts', 'utf-8');
+  const llmSource = readModuleSource('src/lib/xianxia/llm.ts');
   assert(/WORLD_DOCS\s*=\s*\[/.test(llmSource), 'llm.ts 应定义 WORLD_DOCS 数组');
   const expectedDocs = [
     'spirit-roots.md', 'three-realms.md', 'tribulation-heart-demon.md',
@@ -6060,7 +6088,7 @@ function smokeTraeScriptsUsePynput(): void {
 
 function smokePillSideEffectTypesExist(): void {
   // AI-86: types.ts 应导出 PillSideEffect/PillEffectiveness/PillSideEffectResolution
-  const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const src = readModuleSource('src/lib/xianxia/types.ts');
   assert(/export type PillSideEffect\b/.test(src), 'types.ts 应导出 PillSideEffect');
   assert(/export interface PillEffectiveness\b/.test(src), 'types.ts 应导出 PillEffectiveness');
   assert(/export interface PillSideEffectResolution\b/.test(src), 'types.ts 应导出 PillSideEffectResolution');
@@ -6102,7 +6130,7 @@ function smokePillSideEffectResolution(): void {
 
 function smokeFormationDrawingTypesExist(): void {
   // AI-87: types.ts 应导出 FormationDrawingStep/Session/Progress
-  const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const src = readModuleSource('src/lib/xianxia/types.ts');
   assert(/export type FormationDrawingStep\b/.test(src), 'types.ts 应导出 FormationDrawingStep');
   assert(/export interface FormationDrawingSession\b/.test(src), 'types.ts 应导出 FormationDrawingSession');
   assert(/export interface FormationDrawingProgress\b/.test(src), 'types.ts 应导出 FormationDrawingProgress');
@@ -6154,7 +6182,7 @@ function smokeFormationDrawingFailureStreak(): void {
 
 function smokePetEvolutionTypesExist(): void {
   // AI-88: types.ts 应导出 PetEvolutionStage/Requirement/Eligibility
-  const src = readFileSync('src/lib/xianxia/types.ts', 'utf-8');
+  const src = readModuleSource('src/lib/xianxia/types.ts');
   assert(/export type PetEvolutionStage\b/.test(src), 'types.ts 应导出 PetEvolutionStage');
   assert(/export interface PetEvolutionRequirement\b/.test(src), 'types.ts 应导出 PetEvolutionRequirement');
   assert(/export interface PetEvolutionEligibility\b/.test(src), 'types.ts 应导出 PetEvolutionEligibility');
@@ -8961,8 +8989,9 @@ function smokeK624VerifyLLMPromptAugmentation(): void {
     'should NOT list textHealth as missing');
   assert(r3.registryPresent === true, 'partial -> registry present');
 
-  // 4) Real file path: read the actual llm.ts and confirm all 3 hooks are wired.
-  const realVerify = verifyLLMPromptAugmentation(undefined, 'src/lib/xianxia/llm.ts');
+  // 4) Real module source: aggregate the llm/ barrel-split directory and confirm all 3 hooks are wired.
+  //    [refactor] markers 已随拆分搬进 llm/ 子目录，传聚合正文作为首参（函数原样采信，跳过文件读取）。
+  const realVerify = verifyLLMPromptAugmentation(readModuleSource('src/lib/xianxia/llm.ts'));
   assert(realVerify.wiredCount === 3,
     'real llm.ts should have all 3 hooks wired (wiredCount=3), got=' + realVerify.wiredCount);
   assert(realVerify.registryPresent === true,

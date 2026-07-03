@@ -413,7 +413,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
     return (
       <div className="text-center py-12 text-muted-foreground text-sm">
         <p className="font-serif-cn">道未启，缘未至。</p>
-        <p className="mt-2 text-xs">点击"开始模拟"步入修仙之路</p>
+        <p className="mt-2 text-xs">点入"踏入此世"步入修仙之路</p>
       </div>
     );
   }
@@ -622,7 +622,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {!isExpanded && (
                   <div className="px-3 pb-1 text-[9px] text-muted-foreground/70 flex items-center gap-1">
                     <ChevronsUpDown className="w-2.5 h-2.5" />
-                    <span>点击展开详情</span>
+                    <span>点入展开详情</span>
                   </div>
                 )}
 

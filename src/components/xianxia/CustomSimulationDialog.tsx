@@ -193,7 +193,7 @@ export function CustomSimulationDialog() {
                     type="button"
                     onClick={() => toggleSelectedHeritage(item)}
                     className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-serif-cn text-primary transition hover:bg-primary/20"
-                    title={'\u70b9\u51fb\u653e\u56de\u4f20\u627f\u6c60'}
+                    title={'\u70b9\u5165\u653e\u56de\u4f20\u627f\u6c60'}
                   >
                     <span className="max-w-[10rem] truncate">{item.name}</span>
                     <X className="w-3 h-3 shrink-0" />

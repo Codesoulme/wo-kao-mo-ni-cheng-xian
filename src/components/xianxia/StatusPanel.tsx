@@ -226,11 +226,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                     {IDENTITY_SECTION_LABELS.reputation}：{character.reputation}
                   </span>
                 )}
-                {character.spiritStones !== undefined && (
-                  <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-700/90 shrink-0">
-                    {IDENTITY_SECTION_LABELS.spiritStones}：{character.spiritStones}
-                  </span>
-                )}
+                {/* 灵石数值不再在身份行重复显示；已由头像下角 Coins 徽标承载 */}
               </div>
 
               {/* 境界与修为同区展示 */}

@@ -9,6 +9,7 @@ import {
 } from '@/lib/xianxia/save-slots';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { humanizeAutoSaveError, humanizeError } from '@/lib/xianxia/error-humanize';
 
 interface Props {
   // Snapshot of current persistable state from the page.
@@ -60,7 +61,7 @@ export function SaveSlotPanel(props: Props) {
       });
       if (!result.ok) {
         // P1 关键修复: 失败时不再显示"已存档"误导文案
-        const errMsg = result.error || '存储空间不足或浏览器拒绝了写入';
+        const errMsg = humanizeError(result.error || '存储空间不足或浏览器拒绝了写入');
         setMsg(`存档失败：${errMsg}`);
         try { toast.error(`存档失败：${errMsg}`); } catch { /* sonner not ready */ }
         return;
@@ -72,7 +73,7 @@ export function SaveSlotPanel(props: Props) {
       if (autoSaveError) clearAutoSaveError();
       refresh();
     } catch (e: any) {
-      const errMsg = e?.message ?? String(e);
+      const errMsg = humanizeError(e);
       setMsg(`存档失败：${errMsg}`);
       try { toast.error(`存档失败：${errMsg}`); } catch { /* sonner not ready */ }
     } finally {
@@ -149,7 +150,7 @@ export function SaveSlotPanel(props: Props) {
         >
           <AlertTitle>上次自动存档失败</AlertTitle>
           <AlertDescription>
-            角色年龄 {autoSaveError.age} 岁时自动存档失败（{autoSaveError.reason}）：{autoSaveError.error}
+            {humanizeAutoSaveError(autoSaveError)}
             <div style={{ marginTop: '6px' }}>
               <button
                 type="button"

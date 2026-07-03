@@ -86,7 +86,7 @@ export function ItemDetailDialog({
                 {RARITY_LABEL[item.rarity] || item.rarity}
               </Badge>
               <Badge variant="outline" className="text-[10px] h-5 shrink-0">
-                {ITEM_TYPE_LABEL[item.item_type] || item.item_type}
+                {ITEM_TYPE_LABEL[item.item_type] || '珍玩'}
               </Badge>
             </div>
             <DialogTitle

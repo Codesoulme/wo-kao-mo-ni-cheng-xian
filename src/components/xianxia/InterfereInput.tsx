@@ -8,6 +8,7 @@ import { Send, Zap, Hourglass } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 const INTERFERE_COOLDOWN = 10; // \u5341\u8f7d\u4e00\u6b21
 
@@ -83,8 +84,8 @@ export function InterfereInput() {
 
       setValue('');
     } catch (err: any) {
-      setError(err.message);
-      toast.error('\u5e72\u9884\u5931\u8d25', { description: err.message });
+      setError(humanizeError(err));
+      toast.error('\u5e72\u9884\u5931\u8d25', { description: humanizeError(err) });
     } finally {
       setBusy(false);
       setLoading(false);
