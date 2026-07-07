@@ -1,9 +1,10 @@
 'use client';
 
+// 天道抉择——内联版。剧情文本框下方紧贴上一条事件出现，不再打断玩家。
+// 组件名保留 ChoiceModal 是为了向后兼容 import 路径；实际实现是 ChoiceInline。
+
 import { useGameStore } from '@/lib/xianxia/store';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Mountain, Sparkles, BookOpen, ChevronDown } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { formatNarrativeForDisplay } from '@/lib/xianxia/narrative-format';
@@ -21,22 +22,13 @@ export function ChoiceModal() {
   } = useGameStore();
   const [busy, setBusy] = useState(false);
   const [aiConfigPromptOpen, setAiConfigPromptOpen] = useState(false);
-  // 前情提要默认展开；用户可手动折叠以聚焦选项
-  const [contextCollapsed, setContextCollapsed] = useState(false);
 
-  // 沉浸版 P0 修复：把早返挪到所有 hooks 之后（避免 React "Rendered fewer hooks than expected"）
-  // hooks 必须在每次渲染顺序一致，下方 4 个 useState + 2 个 useMemo 必须无条件调用
-  const hasContext = !!(pendingChoice?.contextNarrative || pendingChoice?.contextTitle);
-  const formattedContext = useMemo(
-    () => pendingChoice?.contextNarrative ? formatNarrativeForDisplay(pendingChoice.contextNarrative) : '',
-    [pendingChoice?.contextNarrative],
-  );
+  // hooks 必须在无条件路径上调用，pendingChoice 缺失时的早返放在 hooks 之后
   const formattedPrompt = useMemo(
     () => pendingChoice?.prompt ? formatNarrativeForDisplay(pendingChoice.prompt) : '',
     [pendingChoice?.prompt],
   );
 
-  // hooks 调完之后再判：character / pendingChoice 缺失时不渲染
   if (!character || !pendingChoice) return null;
 
   const choose = async (idx: number) => {
@@ -63,7 +55,6 @@ export function ChoiceModal() {
       setPendingChoice(data.pendingChoice || null);
       setLastChange(data.changes || null);
 
-      // 记录选择
       addChoice({
         id: `choice-${Date.now()}`,
         age: data.state.age,
@@ -107,99 +98,48 @@ export function ChoiceModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <Card className="w-full max-w-md min-w-0 paper-texture border-primary/40 shadow-2xl scroll-reveal flex flex-col max-h-[92vh] sm:max-h-[88vh]">
-        <CardHeader className="pb-2 shrink-0">
-          <CardTitle className="text-base flex items-center gap-2 font-serif-cn min-w-0 xianxia-readable">
-            <Mountain className="w-4 h-4 text-primary" />
-            天道抉择
-            {pendingChoice.contextFateNodeName && (
-              <span className="seal text-[10px] ml-1">{pendingChoice.contextFateNodeName}</span>
+    <div data-testid="choice-inline" className="mt-3 space-y-3">
+      {/* 抉择情境正文——紧接最新事件叙述 */}
+      <p className="text-sm leading-relaxed text-foreground font-serif-cn xianxia-prose px-1">
+        {formattedPrompt}
+      </p>
+
+      {/* 选项按钮——重量与 EventTimeline 事件卡片对齐 */}
+      <div className="space-y-2">
+        {pendingChoice.options.map((opt, i) => (
+          <button
+            key={i}
+            onClick={() => choose(i)}
+            disabled={busy}
+            className={cn(
+              'w-full text-left p-3 rounded-lg border transition-all min-w-0',
+              'hover:border-primary hover:bg-primary/5 active:scale-[0.99]',
+              'border-border bg-card/60',
+              busy && 'opacity-50 cursor-not-allowed'
             )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="relative space-y-3 overflow-y-auto xianxia-scroll flex-1">
-          {/* 前情提要：因缘转折事件叙事 */}
-          {hasContext && (
-            <div className="rounded-lg border border-primary/30 bg-primary/5 overflow-hidden">
-              <button
-                onClick={() => setContextCollapsed(v => !v)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-primary/10 transition-colors min-w-0"
-              >
-                <BookOpen className="w-3.5 h-3.5 text-primary shrink-0" />
-                <span className="text-xs font-semibold font-serif-cn text-primary flex-1 min-w-0 xianxia-readable">
-                  前情提要
-                  {pendingChoice.contextAge !== undefined && (
-                    <span className="text-muted-foreground font-normal ml-1">· {pendingChoice.contextAge}岁</span>
-                  )}
-                </span>
-                <ChevronDown className={cn(
-                  "w-3.5 h-3.5 text-muted-foreground transition-transform shrink-0",
-                  contextCollapsed ? "" : "rotate-180"
-                )} />
-              </button>
-              {!contextCollapsed && (
-                <div className="px-3 pb-3 pt-1 space-y-1.5">
-                  {pendingChoice.contextTitle && (
-                    <h4 className="text-sm font-bold font-serif-cn text-foreground xianxia-readable">
-                      {pendingChoice.contextTitle}
-                    </h4>
-                  )}
-                  {pendingChoice.contextNarrative && (
-                    <p className="text-xs leading-relaxed text-foreground/85 font-serif-cn xianxia-prose">
-                      {formattedContext}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 抉择情境 */}
-          <div className="rounded-lg border border-border/60 bg-card/60 p-3">
-            <p className="text-sm leading-relaxed text-foreground/90 font-serif-cn xianxia-prose">
-              {formattedPrompt}
-            </p>
-          </div>
-
-          {/* 选项 */}
-          <div className="space-y-2">
-            {pendingChoice.options.map((opt, i) => (
-              <button
-                key={i}
-                onClick={() => choose(i)}
-                disabled={busy}
-                className={cn(
-                  "w-full text-left p-3 rounded-lg border-2 transition-all min-w-0",
-                  "hover:border-primary hover:bg-primary/5 active:scale-[0.99]",
-                  "border-border bg-card/60",
-                  busy && "opacity-50 cursor-not-allowed"
+          >
+            <div className="flex items-start gap-2">
+              <span className="seal shrink-0 mt-0.5">{i + 1}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold font-serif-cn xianxia-readable">{opt.text}</div>
+                {opt.hint && (
+                  <div className="text-[11px] text-muted-foreground mt-0.5 xianxia-readable">{opt.hint}</div>
                 )}
-              >
-                <div className="flex items-start gap-2">
-                  <span className="seal shrink-0 mt-0.5">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold font-serif-cn xianxia-readable">{opt.text}</div>
-                    {opt.hint && (
-                      <div className="text-[11px] text-muted-foreground mt-0.5 xianxia-readable">{opt.hint}</div>
-                    )}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {busy && createPortal(
-            <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
-              <div className="rounded-lg bg-background/95 border border-primary/40 shadow-2xl px-6 py-3 flex items-center gap-2 text-sm text-foreground backdrop-blur-sm animate-pulse">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span className="font-serif-cn">因果流转中...</span>
               </div>
-            </div>,
-            document.body
-          )}
-        </CardContent>
-      </Card>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {busy && createPortal(
+        <div className="fixed inset-0 z-[120] flex items-center justify-center pointer-events-none">
+          <div className="rounded-lg bg-background/95 border border-primary/40 shadow-2xl px-6 py-3 flex items-center gap-2 text-sm text-foreground backdrop-blur-sm animate-pulse">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <span className="font-serif-cn">因果流转中...</span>
+          </div>
+        </div>,
+        document.body
+      )}
 
       <Dialog open={aiConfigPromptOpen} onOpenChange={setAiConfigPromptOpen}>
         <DialogContent className="max-w-sm">

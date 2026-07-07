@@ -1,5 +1,6 @@
 // 修仙模拟器 - LLM 服务 / 生成器域
 // 拆分自 llm.ts：各 generate* 生成函数（年龄事件/选择/干扰/物品叙事/炼丹/坊市/拍卖/战利品/灵宠/结算/战斗/出生）
+import { WORLD_LORE_DECENNIAL_IMMORTAL } from '../origins';
 import {
   EngineStateContext,
   ItemEntry,
@@ -1119,7 +1120,8 @@ export function buildPreviousLifeBackground(legacies: PreviousWorldLegacy[] | un
 
   // 取前 3 条避免 narrative 膨胀
   const picked = hints.slice(0, 3);
-  return `降生之夜另有异处：${picked.join(' ') || '似有旧缘未散。'}`;
+  return `降生之夜另有异处：${picked.join(' ') || '似有旧缘未散。'}
+${WORLD_LORE_DECENNIAL_IMMORTAL}`;
 }
 
 export async function generateBirthEvent(

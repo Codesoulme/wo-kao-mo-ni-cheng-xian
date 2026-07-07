@@ -56,6 +56,35 @@ export interface WorldNpc {
 
   crossRealmAccess?: boolean;           // 是否持有跨域通行权
 
+
+  // 沉浸版 Phase-N: NPC 自身身体成长字段 — 凡人幼壮老、修真者突破/衰老都会写回
+
+  combatAttrs?: {
+
+    attack: number;
+
+    defense: number;
+
+    speed: number;
+
+    maxHp: number;
+
+  };
+
+  // 沉浸版 Phase-N: 最近一次年度推进的属性 delta（用于面板红绿微章展示）
+
+  lastGrowth?: {
+
+    attack: number;
+
+    defense: number;
+
+    speed: number;
+
+    maxHp: number;
+
+  };
+
 }
 
 

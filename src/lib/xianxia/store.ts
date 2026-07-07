@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { TribulationSession, AscensionSession, Restriction, HeartDemonType, CharacterState } from './types';
+import type { AchievementRecord } from './achievements';
 // ★ 任务 D 修复：消除 CharacterState 双份定义，canonical 来自 types.ts（更完整）
 //   store 层 re-export 保持旧 import 路径（`from '@/lib/xianxia/store'`）不破坏
 export type { CharacterState } from './types';
@@ -277,6 +278,9 @@ interface GameState {
   lastExploration: { eventId?: string; age?: number; realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string; effects?: any[] } | null;
 
   heritageVault: HeritageItem[];
+
+  // ===== 沉浸版 Phase-Z: AI 成就系统 =====
+  achievements: AchievementRecord[];
   selectedHeritage: SelectedHeritage;
   hallOfSimulations: SimulationHallRecord[];
   settlementResult: SettlementResult | null;
@@ -332,6 +336,7 @@ interface GameState {
   setLastExploration: (e: { eventId?: string; age?: number; realmName: string; realmTier: string; realmIcon: string; title: string; narrative: string; effects?: any[] } | null) => void;
   setHeritageVault: (items: HeritageItem[]) => void;
   addHeritageItems: (items: HeritageItem[]) => void;
+  addAchievements: (records: AchievementRecord[]) => void;
   setSelectedHeritage: (selected: SelectedHeritage) => void;
   toggleSelectedHeritage: (item: HeritageItem) => void;
   clearSelectedHeritage: () => void;
@@ -392,6 +397,7 @@ export const useGameStore = create<GameState>()(
       explorationOpen: false,
       lastExploration: null,
       heritageVault: [],
+      achievements: [],
       selectedHeritage: {},
       hallOfSimulations: [],
       settlementResult: null,
@@ -497,6 +503,12 @@ export const useGameStore = create<GameState>()(
         const known = new Set(s.heritageVault.map((item) => item.id));
         const fresh = items.filter((item) => !known.has(item.id));
         return { heritageVault: [...s.heritageVault, ...fresh] };
+      }),
+      addAchievements: (records) => set((s) => {
+        if (!Array.isArray(records) || records.length === 0) return {};
+        const known = new Set(s.achievements.map((r) => r.id));
+        const fresh = records.filter((r) => r && !known.has(r.id));
+        return fresh.length ? { achievements: [...s.achievements, ...fresh] } : {};
       }),
       setSelectedHeritage: (selected) => set({ selectedHeritage: selected }),
       setNewEventRange: (range) => set({ newEventRange: range }),

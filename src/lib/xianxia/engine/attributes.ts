@@ -363,6 +363,11 @@ export function dbToState(c: DBCharacter): CharacterState {
     npcs: safeParse<WorldNpc[]>((c as any).npcsJson || '[]', []),
     causalGraph: safeParse<CausalGraph>((c as any).causalGraphJson || '{ "nodes": [], "edges": [] }', { nodes: [], edges: [] }),
     worldFacts: safeParse<WorldFact[]>((c as any).worldFactsJson || '[]', []),
+    origin: safeParse<{ ethnicity: string; lineage: string } | null>((c as any).originJson || 'null', null),
+    bodyGrowthResidual: safeParse<{ attack: number; defense: number; speed: number; maxHp: number } | undefined>(
+      (c as any).bodyGrowthResidualJson || 'null',
+      undefined,
+    ),
   };
   // 持久化的 recentEventTypes / recentBlueprintCategories 不进 state（仅 ctx 用），但需要保留
   // 这里通过闭包变量传给 buildStateContext（在 advance route 中调用）
@@ -893,3 +898,133 @@ export function normalizeCultivationState(state: CharacterState): CharacterState
 }
 
 // 默认 equipNote（玩家点装备时若物品无 equipNote 则按类型生成）
+
+// ==================== 年度属性成长（沉浸版 Phase-N + Phase-8）====================
+// 之前 advance-sse 用 Math.max(state.xxx, baseline_age_formula) 兜底，导致出生定下的值永远锁死、
+// 后续年份 spiritualSense/soulStrength/physicalFoundation 不再增长 → 派生 force/guard/agility 也不动。
+// 本函数在每年推进时按「主角当前 age / realm / rootMultiplier / 出身 / 族裔」算 baseline delta，
+// 只在 baseline > current 时推 current（修真者 current 永远不被压低），保证年度成长可见。
+//
+// 同时维护 force / guard / agility（破势 / 护持 / 机变）的派生——这三项由 8 维 + comprehension/luck 派生，
+// 主项增长后自动刷新，不需要单独存。
+export interface AnnualAttributeGrowth {
+  state: CharacterState;
+  growth: {
+    attack: number;
+    defense: number;
+    speed: number;
+    spiritualSense: number;
+    soulStrength: number;
+    physicalFoundation: number;
+    maxHp: number;
+    maxMp: number;
+    force: number;
+    guard: number;
+    agility: number;
+  };
+  baseline: {
+    attack: number;
+    defense: number;
+    speed: number;
+    spiritualSense: number;
+    soulStrength: number;
+    physicalFoundation: number;
+    maxHp: number;
+    maxMp: number;
+  };
+}
+
+export function applyAnnualAttributeGrowth(state: CharacterState): AnnualAttributeGrowth {
+  const age = Math.max(0, Number(state.age || 0));
+  const realm = String(state.realm || 'mortal');
+  const mul = Number(state.rootMultiplier ?? 0.3);
+  // 修真后灵根倍率不再主导（realm 自己给大倍率）；mul 只在凡人段补底
+  const effectiveMul = realm === 'mortal' ? Math.max(0.1, mul) : 1.0;
+  // 凡人 baseline：放大成长系数，确保每年都能涨一点（避免「出生定值 > 年龄公式」导致 delta 一直 0）
+  // 修真者 current 远高于 baseline 时仍 max() 取 current，逻辑不变
+  const baselineAttack = Math.max(1, Math.floor(age * 1.2 * effectiveMul));
+  const baselineDefense = Math.max(1, Math.floor(age * 0.8 * effectiveMul));
+  const baselineSpeed = Math.max(3, 3 + Math.floor(age * 0.7 * effectiveMul));
+  const baselinePF = Math.max(1, Math.round(5 + age * 2.5 * effectiveMul));
+  const baselineSS = Math.max(1, 3 + Math.floor(age * 0.8 * effectiveMul));
+  const baselineSoul = Math.max(1, 3 + Math.floor(age * 0.7 * effectiveMul));
+  const baselineMaxHp = Math.max(10, 30 + age * 4);
+  const baselineMaxMp = Math.max(0, 10 + Math.floor(age * 0.8));
+
+  // 修真后 8 维由 deriveCoreCultivationAttributes 按 age × profile_power 推——为了保证"每年成长可见"，
+  // 在这里按 age 增量强制刷一次（每次 +age 时 derive 都会重算，但 firstNumber 短路会读到 state 上的旧值；
+  // 我们直接把 state 上的 8 维重置为 deriveCoreCultivationAttributes 当岁算出的值，让 delta 可见）。
+  const core = deriveCoreCultivationAttributes(state);
+
+  const newAttack = Math.max(state.attack || 0, baselineAttack);
+  const newDefense = Math.max(state.defense || 0, baselineDefense);
+  const newSpeed = Math.max(state.speed || 0, baselineSpeed);
+  const newMaxHp = Math.max(state.maxHp || 0, baselineMaxHp);
+  const newMaxMp = Math.max(state.maxMp || 0, baselineMaxMp);
+  const newPF = Math.max(state.physicalFoundation || 0, core.physicalFoundation, baselinePF);
+  const newSS = Math.max(state.spiritualSense || 0, core.spiritualSense, baselineSS);
+  const newSoul = Math.max(state.soulStrength || 0, core.soulStrength, baselineSoul);
+
+  const growth: AnnualAttributeGrowth['growth'] = {
+    attack: newAttack - (state.attack || 0),
+    defense: newDefense - (state.defense || 0),
+    speed: newSpeed - (state.speed || 0),
+    spiritualSense: newSS - (state.spiritualSense || 0),
+    soulStrength: newSoul - (state.soulStrength || 0),
+    physicalFoundation: newPF - (state.physicalFoundation || 0),
+    maxHp: newMaxHp - (state.maxHp || 0),
+    maxMp: newMaxMp - (state.maxMp || 0),
+    force: 0,
+    guard: 0,
+    agility: 0,
+  };
+
+  const nextState: CharacterState = {
+    ...state,
+    attack: newAttack,
+    defense: newDefense,
+    speed: newSpeed,
+    maxHp: newMaxHp,
+    maxMp: newMaxMp,
+    spiritualSense: newSS,
+    soulStrength: newSoul,
+    physicalFoundation: newPF,
+    // hp/mp 上限若提升，按上限补满（避免血条出现"超出血量"不一致）
+  };
+  if ((nextState.hp ?? 0) > nextState.maxHp) nextState.hp = nextState.maxHp;
+  if ((nextState.mp ?? 0) > nextState.maxMp) nextState.mp = nextState.maxMp;
+
+  // 派生 force / guard / agility（破势 / 护持 / 机变）—— 在派生时使用 nextState 的新值
+  const newForce = Math.max(0, Math.round((nextState.attack || 0) + (nextState.spiritualSense || 0) * 0.12 + (nextState.comprehension || 0) * 0.08));
+  const newGuard = Math.max(0, Math.round((nextState.defense || 0) + (nextState.physicalFoundation || 0) * 0.16 + (nextState.soulStrength || 0) * 0.06));
+  const newAgility = Math.max(0, Math.round((nextState.speed || 0) + (nextState.spiritualSense || 0) * 0.10 + (nextState.luck || 0) * 0.04));
+  // 把派生写进 combatProjection，UI 读取它即可看到破势/护持/机变增长
+  const prevProj = (state as any).combatProjection || {};
+  growth.force = newForce - (Number(prevProj.force) || 0);
+  growth.guard = newGuard - (Number(prevProj.guard) || 0);
+  growth.agility = newAgility - (Number(prevProj.agility) || 0);
+  nextState.combatProjection = {
+    ...prevProj,
+    force: newForce,
+    guard: newGuard,
+    agility: newAgility,
+    spiritualAwareness: nextState.spiritualSense,
+    soulStability: nextState.soulStrength,
+    bodyTenacity: nextState.physicalFoundation,
+  };
+
+  return {
+    state: nextState,
+    growth,
+    baseline: {
+      attack: baselineAttack,
+      defense: baselineDefense,
+      speed: baselineSpeed,
+      spiritualSense: baselineSS,
+      soulStrength: baselineSoul,
+      physicalFoundation: baselinePF,
+      maxHp: baselineMaxHp,
+      maxMp: baselineMaxMp,
+    },
+  };
+}

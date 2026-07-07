@@ -6,7 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  // 沉浸版 Phase-Release: 切 Postgres（Vercel Postgres / Neon / Supabase 都可）
+  // 本地开发时仍可用 SQLite 文件 url = "file:./dev.db"，部署到 Vercel 设 DATABASE_URL=postgres://...
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -171,6 +173,14 @@ model Character {
 
   // 世界历 JSON（WorldCalendarState）—— 持久化当前世界历，避免刷新后重置
   worldCalendarJson String @default("{\"eraName\":\"青岚仙历\",\"calendarYear\":5000,\"elapsedDays\":0}")
+
+  // 族裔/出身 —— 用于 body-growth 曲线差异 + 未来引擎读取
+  // 格式：{ ethnicity: "human"|..., lineage: "mortal"|... }；旧存档为 null，按 human/mortal fallback
+  originJson      String   @default("null")
+
+  // 身体成长浮点残余 —— body-growth.ts 用浮点记账，残余累加避免婴幼期多年无 chip
+  // 格式：{ attack: 0.2, defense: 0.2, speed: 0.2, maxHp: 0.0 }；旧存档 null 按 0 起算
+  bodyGrowthResidualJson String @default("null")
 
   events          EventLog[]
   // Phase-Event-Sourcing: 主事件流（source of truth）

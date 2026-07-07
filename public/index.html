@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#1c1917" />
+  <title>我靠模拟成仙</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #0c0a09; color: #fafaf9; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; overflow: hidden; }
+    #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+    .spin { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #44403c; border-top-color: #f59e0b; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hint { font-size: 13px; opacity: 0.7; text-align: center; padding: 0 24px; line-height: 1.6; }
+    .err { color: #fda4af; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div class="spin" aria-hidden="true"></div>
+    <div class="hint">灵台初开，天机乍启……</div>
+  </div>
+  <script>
+    // 沉浸版 Phase-Release: Capacitor WebView 入口
+    // 服务器 URL 在 capacitor.config.ts 的 server.url 配置
+    // 本 HTML 只是首屏 splash，加载后立即跳转到主公服务器根路径
+    (function () {
+      // 兜底 200ms 跳走 —— 不要让 splash 占太久
+      setTimeout(function () {
+        // Capacitor server.url 时，window.location 已是远端 origin，直接跳根路径
+        window.location.replace('/');
+      }, 200);
+    })();
+  </script>
+</body>
+</html>

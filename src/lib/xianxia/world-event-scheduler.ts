@@ -60,6 +60,7 @@ export type WorldEventType =
   // 秘境（2）
   | 'ancient_cave_open'       // 古修洞府开
   | 'ancient_cave_explored'   // 古修洞府探完
+  | 'immortal_descent'        // 仙人下凡寻徒（每十年一遇）
 
 export type WorldEventCategory =
   | 'spirit' | 'demon' | 'beast' | 'treasure'
@@ -506,6 +507,22 @@ const TEMPLATE_BUILDERS: TemplateBuilder[] = [
     effectsTemplate: {},
     hints: ['秘府关闭', '来晚一步', '道听途说'],
     triggerConditions: { minAge: 16, cooldown: 3, prerequisites: ['ancient_cave_open'] },
+  },
+  // 沉浸版：仙人下凡寻徒（每十年一遇）
+  {
+    type: 'immortal_descent',
+    title: '仙人下凡',
+    category: 'mortal_celestial',
+    duration: 1,
+    rarity: 'rare',
+    narrativeTemplate: '岁逢十年，灵脉共振。一日{place}上空忽现霞光万丈，{actor}抬头望去，但见仙人或驾鹤、或踏云而来，落在村口古槐之下，与几位老者低语数句后便四顾张望，似在寻觅有缘之人。',
+    effectsTemplate: {
+      threadTitle: '仙人问渡',
+      threadSummary: '仙人下凡寻徒，主角或被相中收为记名弟子、授予基础功法，或擦肩而过、仅窥仙家气象。',
+      previousWorldLegacies: '仙人亲授基础吐纳残篇',
+    },
+    hints: ['十年节点才可能出现', '或被收为记名弟子', '或被授予基础功法', '或擦肩而过仅窥仙家气象', '影响师承 character.teacherRef 与后续功法获取'],
+    triggerConditions: { minAge: 6, cooldown: 10 },
   },
 ];
 
@@ -961,6 +978,8 @@ const FALLBACK_CONFIGS: Record<WorldEventType, WorldEventConfig> = {
     narrativeTemplate: '宗门内因理念分裂为两派，山门染血。长老对峙，弟子各选其主。',
   },
   ancient_cave_explored: FALLBACK_GENERIC('ancient_cave_explored', '古修洞府探完', 'world-event-ancient-cave-explored'),
+  // 沉浸版：仙人下凡寻徒 → status '仙人问渡'，duration 1 年
+  immortal_descent: FALLBACK_GENERIC('immortal_descent', '仙人问渡', 'world-event-immortal-descent'),
 };
 
 function FALLBACK_GENERIC(type: WorldEventType, statusName: string, statusId: string, cultivationMultiplier?: number): WorldEventConfig {
@@ -1057,7 +1076,7 @@ export const rollWorldEvent = fallbackRollWorldEvent;
 // apply 函数（inject finalState）
 // ============================================================
 
-export function applyWorldEvent(state: any, event: WorldEvent): any {
+export function applyWorldEvent(state: any, event: WorldEvent, narrative?: string): any {
   const newState: any = { ...state };
   const cfg = FALLBACK_CONFIGS[event.type];
 
@@ -1150,7 +1169,82 @@ export function applyWorldEvent(state: any, event: WorldEvent): any {
     newState.previousWorldLegacies = legacies;
   }
 
+  // 沉浸版：仙人下凡 → 写入 legacy + 标记师承预备钩子（character.teacherRef 由 advance 引擎
+  //   据 narrative 是否出现「收为弟子 / 授予功法」关键句在后续步骤写入）
+  if (event.type === 'immortal_descent') {
+    const legacies: any[] = Array.isArray(newState.previousWorldLegacies) ? [...newState.previousWorldLegacies] : [];
+    legacies.push({
+      characterName: `下凡仙人 ${event.triggeredAge}`,
+      status: `${event.triggeredAge} 岁逢十年节点`,
+      summary: event.narrative,
+      relicSeeds: ['仙人亲授基础吐纳残篇'],
+      legendSeeds: ['十年一遇「仙人问渡」', '若 narrative 含「收为弟子」则挂 character.teacherRef'],
+    });
+    newState.previousWorldLegacies = legacies;
+    if (!newState.worldEventMeta) newState.worldEventMeta = {};
+    newState.worldEventMeta.immortalDescentPending = {
+      triggeredAge: event.triggeredAge,
+      narrative: event.narrative,
+      instruction:
+        '若 narrative 含「收为弟子 / 拜师 / 收我为徒」则写入 character.teacherRef；'
+        + '若含「授予功法 / 授我吐纳 / 传我口诀」则把 first technique roll 写入 character 的 techniques 通道（待接入）',
+    };
+
+    // 自动师承写入：扫 narrative，匹配「收为弟子 / 拜师 / 收我为徒 / 赐我入门」等关键句
+    if (narrative && typeof narrative === 'string') {
+      const hookResult = detectImmortalDisciple(narrative, event.triggeredAge);
+      if (hookResult.isDisciple) {
+        newState.teacherRef = {
+          npcId: `immortal-${event.triggeredAge}-${Math.floor(event.triggeredAge / 10)}`,
+          npcName: hookResult.teacherName || '下凡仙人',
+          intimacy: 60,
+          sinceAge: event.triggeredAge,
+        };
+        // 师承链：写入 sectHistory 第一条「拜入仙门」
+        if (!Array.isArray(newState.sectHistory)) newState.sectHistory = [];
+        newState.sectHistory = [
+          ...newState.sectHistory,
+          {
+            sectName: hookResult.teacherName || '下凡仙人',
+            role: '记名弟子',
+            joinedAge: event.triggeredAge,
+            reason: '仙人下凡十年节点被相中',
+            status: 'active',
+          },
+        ];
+      }
+    }
+  }
+
   return newState;
+}
+
+// ==================== 师承关键句检测 ====================
+// 仙人下凡的 narrative 里若出现以下关键句之一，则把仙人收为主角记名弟子 → 写入 character.teacherRef + sectHistory。
+// 设计为半文言/白话混用都能命中，关键句尽量用真人话 + 古文短词并集。
+export function detectImmortalDisciple(
+  narrative: string,
+  triggeredAge: number,
+): { isDisciple: boolean; teacherName?: string } {
+  if (!narrative || typeof narrative !== 'string') return { isDisciple: false };
+  const patterns: RegExp[] = [
+    /收.{0,4}为(记名)?弟子/,
+    /收.{0,4}为徒/,
+    /拜.{1,6}为师/,
+    /收.{0,4}入门下/,
+    /赐.{0,4}入门/,
+    /引.{0,4}入门/,
+    /收我为徒/,
+    /我.{0,3}(拜|拜入).{0,6}门下/,
+    /(认|拜).{1,8}为师/,
+  ];
+  const isDisciple = patterns.some((re) => re.test(narrative));
+  if (!isDisciple) return { isDisciple: false };
+  // 尝试从 narrative 里捕获「仙人 / 道长 / 真君 / 仙子」等称谓作为师父名
+  let teacherName: string | undefined;
+  const nameMatch = narrative.match(/(仙人|道长|真君|仙子|仙师|前辈|上仙|元婴真人|大能)[一-龥]{0,6}/);
+  if (nameMatch) teacherName = nameMatch[0];
+  return { isDisciple, teacherName };
 }
 
 // ============================================================

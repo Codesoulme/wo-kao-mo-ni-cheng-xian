@@ -311,16 +311,48 @@ export function applySpiritualRootChange(state: CharacterState, change?: Spiritu
 }
 
 // 天劫判定档位（修仙风味，不可外露为"算法/概率"机制词）
+// 沉浸版 Phase-Life 改造：
+// - 第一年到大限（age >= lifespan）：只标记 nearDeath + causeOfDeath='大限将至'，给 narrative 一年时间
+//   （LLM 写「延寿丹/续命/仙人相助」则 lifespan+delta；写「悄然辞世」则次年真正死亡）
+// - 第二年（age 仍 ≥ lifespan）：真正坐化；causeOfDeath 用「寿元已尽，坐化于世」
+// - 期间 lifespan 被扩展（lifespanNarrativeExtension）会清掉 nearDeath 标记
 export function checkLifespan(state: CharacterState): { state: CharacterState; died: boolean; reason?: string } {
   if (!state.alive) return { state, died: false };
-  if (state.age >= state.lifespan) {
+  if (state.age < state.lifespan) {
+    // 寿命内：清掉 nearDeath 标记
+    if (state.nearDeath || state.nearDeathYear) {
+      return {
+        state: { ...state, nearDeath: false, nearDeathYear: undefined },
+        died: false,
+      };
+    }
+    return { state, died: false };
+  }
+  // age >= lifespan：先看是不是上一年已标记过
+  if (state.nearDeath && typeof state.nearDeathYear === 'number' && state.age > state.nearDeathYear) {
+    // 上一年已给过机会，且没有延寿 → 真正坐化
     return {
-      state: { ...state, alive: false, hp: 0, causeOfDeath: '寿元已尽，坐化于世' },
+      state: {
+        ...state,
+        alive: false,
+        hp: 0,
+        causeOfDeath: state.causeOfDeath || '寿元已尽，坐化于世',
+      },
       died: true,
-      reason: '寿元已尽，坐化于世',
+      reason: state.causeOfDeath || '寿元已尽，坐化于世',
     };
   }
-  return { state, died: false };
+  // 第一次跨越大限：标记 nearDeath + causeOfDeath，活着
+  return {
+    state: {
+      ...state,
+      nearDeath: true,
+      nearDeathYear: state.age,
+      causeOfDeath: state.causeOfDeath || '大限将至',
+    },
+    died: false,
+    reason: '大限将至',
+  };
 }
 
 // ==================== 命节点检查 ====================

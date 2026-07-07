@@ -440,9 +440,7 @@ export function rollOrigin(opts: RollOriginOptions = {}): OriginRoll {
   return { ethnicity, lineage, companionItems, sealedFate };
 }
 
-// ==================== LLM Prompt 增强字符串 ====================
-
-export function buildOriginPrompt(origin: OriginRoll): string {
+// ==================== LLM Prompt 增强字符串 ====================// 沉浸版：修仙界世界常量 —— 仙人下凡寻徒（每十年一遇）// 用途：开局 buildOriginPrompt / buildPreviousLifeBackground 注入；十年事件模板复用。// 文风：半文言 + 白话混用，与世界观一致。export const WORLD_LORE_DECENNIAL_IMMORTAL = `【世界常量·十年一遇】修仙界有不成文的传统：每逢十年，天下灵脉共振日，偶有高境界仙人下凡游历红尘。仙人或驾鹤、或御剑、或踏云而来，在凡间村镇、山野秘谷寻觅有天赋的凡人少年。被相中者往往被收为记名弟子，授予基础功法或引渡入宗门修行；未受青睐者亦能窥见仙家气象，悟性高者甚至凭一面之缘自悟粗浅吐纳。因此，每十年那一年，凡间总有「仙人问渡」之说，主角出生于此世，自然身处这十年一度的大势之中。`.trim();export function buildOriginPrompt(origin: OriginRoll): string {
   const e = ETHNICITIES[origin.ethnicity];
   const l = LINEAGES[origin.lineage];
 
@@ -462,8 +460,7 @@ export function buildOriginPrompt(origin: OriginRoll): string {
   return `【角色族裔】${e.name}：${e.description}族裔特征：${e.traits}
 【角色出身】${l.name}：${l.description}
 ${companionStr}
-${sealedStr}`;
-}
+${sealedStr}${WORLD_LORE_DECENNIAL_IMMORTAL}`;}
 
 // ==================== Fallback 模板 ====================
 

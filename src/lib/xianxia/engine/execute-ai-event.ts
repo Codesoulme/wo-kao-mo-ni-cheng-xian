@@ -608,11 +608,47 @@ const procDedupeNarrative: AIEventProcessor = (ctx) => {
 };
 
 // 0. 年龄驱动的身体成长 + 叙事修正
+// - state 侧：拉到 baseline（若 current > baseline 则保留 current，故无 delta）
+// - UI 侧：把 4 项 growth delta 补一份到 appliedChanges，让事件卡片能看到
+//   「破势/护持/机变/气血上限 ±N（年岁 xx）」chip，玩家肉眼可见成长曲线在运作
 const procBodyGrowth: AIEventProcessor = (ctx) => {
   const { aiOutput } = ctx;
   const bodyGrowth = applyAgeBasedBodyGrowth(ctx.next, ctx.next.age, aiOutput.narrative);
   if (bodyGrowth.growth.attack || bodyGrowth.growth.defense || bodyGrowth.growth.speed || bodyGrowth.growth.maxHp) {
     ctx.next = bodyGrowth.state;
+    // 依年龄段选 reason 文案，避免机制词；婴幼/少年/壮年/中年/老年分段
+    const age = ctx.next.age;
+    const bodyModeReason = bodyGrowth.bodyModifier.mode === 'critically_ill'
+      ? '久病难愈，身骨凋敝'
+      : bodyGrowth.bodyModifier.mode === 'weak'
+        ? '旧疾未消，气血未复'
+        : bodyGrowth.bodyModifier.mode === 'recovered'
+          ? '病愈初起，身骨渐复'
+          : '';
+    let reason: string;
+    if (bodyModeReason) {
+      reason = bodyModeReason;
+    } else if (age <= 5) {
+      reason = '襁褓渐长，身骨初开';
+    } else if (age <= 12) {
+      reason = '年岁滋养，身骨渐盈';
+    } else if (age <= 18) {
+      reason = '少年抽条，筋骨拔节';
+    } else if (age <= 40) {
+      reason = '壮年当盛，气血充盈';
+    } else if (age <= 60) {
+      reason = '年岁渐长，气血微减';
+    } else if (age <= 80) {
+      reason = '中年之末，筋骨略衰';
+    } else {
+      reason = '暮年将至，气血凋零';
+    }
+    const growthChanges: AttributeChange[] = [];
+    if (bodyGrowth.growth.attack) growthChanges.push({ attribute: 'attack', delta: bodyGrowth.growth.attack, reason });
+    if (bodyGrowth.growth.defense) growthChanges.push({ attribute: 'defense', delta: bodyGrowth.growth.defense, reason });
+    if (bodyGrowth.growth.speed) growthChanges.push({ attribute: 'speed', delta: bodyGrowth.growth.speed, reason });
+    if (bodyGrowth.growth.maxHp) growthChanges.push({ attribute: 'maxHp', delta: bodyGrowth.growth.maxHp, reason });
+    ctx.appliedChanges.push(...growthChanges);
     ctx.effectResolveTrace.push({
       severity: 'info',
       code: 'age_body_growth',
@@ -1141,6 +1177,14 @@ export function stateToResponse(s: CharacterState) {
     discoveredRealms: getDiscoveredStoryRealms(s),
     // B4: 玩家宗门身份统一由引擎派生 (原 SectStorylinePanel 的 inferRank 已下沉)
     sectRank: derivePlayerSectRank(s),
+    // Phase-Z: FxLayer 触发源——这些字段由 advance / advance-sse 在 finalState 上临时挂，
+    // 前端 useFxFromCharacter 读取后播飘字/过场/光柱/成就 toast 后即清。
+    // 之前没放进白名单导致前端永远拿不到，是 4 类特效完全没触发的根因。
+    __lastAnnualGrowth: (s as any).__lastAnnualGrowth,
+    __lastBreakthrough: (s as any).__lastBreakthrough,
+    __lastAchievements: (s as any).__lastAchievements,
+    __lastDrops: (s as any).__lastDrops,
+    __lastHeritageAdditions: (s as any).__lastHeritageAdditions,
   };
 }
 

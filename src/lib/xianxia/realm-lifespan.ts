@@ -79,3 +79,142 @@ export function nearLifespan(age: number | undefined | null, lifespan: number | 
   const p = lifespanPressure(age, lifespan);
   return p === 'near_end' || p === 'critical' || p === 'expired';
 }
+
+// ==================== 沉浸版 Phase-Life: 动态寿命 ====================
+// 之前 character.lifespan = 80 写死后终身不变，NPC 不到 80 岁就暴毙、玩家延寿丹药没用、修真者不因突破延寿。
+// 现按 state 动态评估：
+//   base      = REALM_LIFESPAN_TABLE[realm].base + level * perLevel
+//   mul       = 灵根倍率 (rootMultiplier, 0.3 凡人杂灵根 ... 2.0+ 天灵根)
+//   bodyMul   = 1 + (体魄 / 200) (体魄破百 +50%, 破三百 +150%)
+//   realmBoost= 修真后 (realmIdx - 1) × 80 加成（修真境界越高寿元越长）
+//   lineage   = 仙门嫡传 / 神明转世 / 王族遗血 加成（血脉潜力）
+//   items     = 物品/丹药/法旨累计 lifespanDelta
+//   heritage  = 传承池中前代留下的"延命丹"等加到 lifespan（开局时由 advance-preload 解析）
+// 修真者 current > base 仍 max() 取 current，避免被压回。
+// 凡人默认 80；单灵根 + 仙门嫡传可达 100+；金丹修士可达 600+。
+
+import type { CharacterState } from './types';
+
+export interface DeriveLifespanInput {
+  realm?: string | null;
+  realmLevel?: number;
+  rootMultiplier?: number;
+  physicalFoundation?: number;
+  // 软加成：开局时已知（族裔/出身/传承池）
+  lineageBoost?: number;     // 0..1（如仙门嫡传 0.15、神明转世 0.30、王族遗血 0.20）
+  ethnicityBoost?: number;   // 0..0.2（妖族 0.15 / 灵族 0.10 / 羽族 0.05）
+  heritageBonus?: number;    // 传承池累计（如有"延命丹"再加 30）
+  itemsDelta?: number;       // 物品累计 lifespanDelta（runtime 累计）
+}
+
+/**
+ * 计算最终寿命：基础 + 灵根 / 身体 / 血脉加成 + 传承 / 物品加成。
+ * 修真者 current 已 > base 时仍 max() 取 current。
+ */
+export function deriveLifespan(input: DeriveLifespanInput): number {
+  const realm = String(input.realm || 'mortal');
+  const realmLevel = Math.max(0, Math.floor(input.realmLevel || 0));
+  const cfg = REALM_LIFESPAN_TABLE[realm];
+  const base = cfg ? cfg.base + realmLevel * cfg.perLevel : 80;
+  // 灵根倍率：凡人 rootMultiplier 默认 0.3（杂灵根），单灵根 1.0，天灵根 2.0+
+  const mul = Math.max(0.3, Number(input.rootMultiplier ?? 0.3));
+  // 体魄加成：体魄每 100 点加 50% 寿命，体魄 200 → 100%（×2），300 → 150%（×2.5）
+  // 这样凡人 12 岁体魄破百，单灵根 → 80 × 1 × 2 × 1.0 = 160
+  const pf = Math.max(0, Number(input.physicalFoundation || 0));
+  const bodyMul = 1 + (pf / 100) * 0.5;
+  // 血脉加成（族裔 + 出身）
+  const lineageMul = 1 + Math.max(0, Number(input.lineageBoost || 0)) + Math.max(0, Number(input.ethnicityBoost || 0));
+  // 传承池 / 物品累计
+  const bonus = Math.max(0, Number(input.heritageBonus || 0)) + Math.max(0, Number(input.itemsDelta || 0));
+  // 综合：base × 灵根 × 体魄 × 血脉 + 传承
+  const computed = Math.round(base * mul * bodyMul * lineageMul + bonus);
+  return Math.max(1, computed);
+}
+
+/**
+ * 从 character state 评估最终寿命（含族裔 / 出身 / 灵根 / 体魄 / 传承 / 物品）。
+ * - 修真者 current > base 时仍 max() 取 current，避免被压回
+ * - 凡人 default 80；修真按 baseByRealm + 灵根 + 体魄 + 血脉加成
+ */
+export function deriveLifespanFromState(state: Partial<CharacterState> | any, opts?: {
+  lineageBoost?: number;
+  ethnicityBoost?: number;
+  heritageBonus?: number;
+  itemsDelta?: number;
+}): number {
+  if (!state || typeof state !== 'object') return 80;
+  // 修真者保留 current 上限（已被境界 / 传承大幅提高时不让公式压回）
+  const base = getLifespanByRealm(state.realm, Number(state.realmLevel || 0));
+  const computed = deriveLifespan({
+    realm: state.realm,
+    realmLevel: state.realmLevel,
+    rootMultiplier: state.rootMultiplier,
+    physicalFoundation: state.physicalFoundation ?? state.derivedCoreCultivationAttributes?.physicalFoundation,
+    lineageBoost: opts?.lineageBoost,
+    ethnicityBoost: opts?.ethnicityBoost,
+    heritageBonus: opts?.heritageBonus,
+    itemsDelta: opts?.itemsDelta,
+  });
+  // 修真者：取 max(current 上限, computed)。凡人：computed（基础 80）。
+  // 注意：凡人 current 上限 = 80 不是 "硬墙"——只是默认起步；体魄/灵根/血脉加成应能突破
+  const current = Number(state.lifespan || 0);
+  const realm = String(state.realm || 'mortal');
+  if (realm !== 'mortal') {
+    return Math.max(current > 0 ? current : base, computed);
+  }
+  // 凡人：computed 与 current 取大（体魄加成可突破 80）
+  return Math.max(current > 0 ? current : 0, computed);
+}
+
+/**
+ * 死亡过渡钩子：检测 narrative 中是否提及延寿 / 续命 / 服用丹药等。
+ * 命中则按规则延长 lifespan（基础 +30 / +50 / +100 等）。
+ * 仅作为引擎侧兜底；LLM 自然写 narrative + 延寿物品亦可走 itemsDelta 路径。
+ */
+export interface LifespanExtensionMatch {
+  extended: number;        // 延长年数
+  reason: string;          // 触发句
+  hint: 'minor' | 'major' | 'major-pill' | 'immortal-favor';
+}
+
+const EXTENSION_PATTERNS: { re: RegExp; delta: number; hint: LifespanExtensionMatch['hint']; label: string }[] = [
+  { re: /(延年益寿|延寿|续命|回春)/,                                 delta: 20,  hint: 'minor',        label: '延寿类' },
+  { re: /(服下|服用|炼化|吞下|吃下)([^，。\s]{0,8})(延寿|续命|回春|九转|长生|不老|延年)/, delta: 40, hint: 'major',  label: '服用延寿丹' },
+  { re: /(九转金丹|长生丹|延命金丹|不死药|不老泉)/,                   delta: 50,  hint: 'major-pill',   label: '高级延寿丹' },
+  { re: /(仙人赐|仙人救|仙人相助|神明垂怜|天道眷顾|续命法旨|加寿)/, delta: 100, hint: 'immortal-favor', label: '仙人/天道恩赐' },
+];
+
+export function detectLifespanExtension(narrative: string): LifespanExtensionMatch | null {
+  if (!narrative || typeof narrative !== 'string') return null;
+  // 从最强到最弱匹配，避免弱规则吃掉强规则
+  const sorted = [...EXTENSION_PATTERNS].sort((a, b) => b.delta - a.delta);
+  for (const p of sorted) {
+    if (p.re.test(narrative)) {
+      return { extended: p.delta, reason: p.label, hint: p.hint };
+    }
+  }
+  return null;
+}
+
+/**
+ * 寿命状态机：基于 age / lifespan / nearDeath / 死亡过渡年份，给 advance 引擎用。
+ * - 'alive'         : 正常
+ * - 'near-death'    : 已到大限（age >= lifespan），留出"最后一年"让 narrative 收尾或延寿
+ * - 'transition'    : 已 near-death 一次但没死/没延寿，第二年再判
+ * - 'dead'          : 已坐化
+ */
+export type LifePhase = 'alive' | 'near-death' | 'transition' | 'dead';
+
+export function getLifePhase(state: any): LifePhase {
+  if (!state || !state.alive) return 'dead';
+  if (state.nearDeath && state.nearDeathYear !== undefined && state.age > state.nearDeathYear) {
+    return 'transition';
+  }
+  if (state.nearDeath && state.nearDeathYear !== undefined) {
+    return 'near-death';
+  }
+  if (typeof state.age === 'number' && typeof state.lifespan === 'number' && state.age >= state.lifespan) {
+    return 'near-death';
+  }
+  return 'alive';
+}

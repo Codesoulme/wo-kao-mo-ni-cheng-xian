@@ -152,11 +152,39 @@ export function StatusPanel({ character }: StatusPanelProps) {
             </div>
 
             <div className="flex-1 min-w-0">
+              {/* 寿元焦虑条：横向进度条 + 颜色按比率分级（与下方 MiniBar 风格一致，自实现避免依赖 shadcn indicatorClassName） */}
+              {character.lifespan > 0 && (() => {
+                const lifespanPct = Math.max(0, Math.min(100, (character.age / character.lifespan) * 100));
+                const lifespanColor = lifespanPct >= 90
+                  ? '#dc2626'
+                  : lifespanPct >= 70
+                  ? '#f43f5e'
+                  : lifespanPct >= 50
+                  ? '#f59e0b'
+                  : '#10b981';
+                const pulse = lifespanPct >= 90 ? 'animate-pulse' : '';
+                return (
+                  <div className="flex items-center gap-1.5 mt-1.5" data-section="lifespan">
+                    <span className="text-[10px] text-muted-foreground shrink-0 tabular-nums whitespace-nowrap">
+                      寿元 {character.age} / {character.lifespan} 岁 · 余 {lifespanLeft} 年
+                    </span>
+                    <div className={`flex-1 h-1.5 bg-muted/60 rounded-full overflow-hidden min-w-[56px] ${pulse}`}>
+                      <div
+                        className="h-full rounded-full transition-all duration-700"
+                        style={{
+                          width: `${lifespanPct}%`,
+                          background: `linear-gradient(to right, ${lifespanColor}aa, ${lifespanColor})`,
+                          boxShadow: `0 0 4px ${lifespanColor}66`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                     <h2 className="font-serif-cn text-base font-bold truncate shrink min-w-[3rem]">{character.name}</h2>
-                    <span className="seal text-[9px] shrink-0">修</span>
                     <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[92px] shrink">
                       <Sprout className="w-2.5 h-2.5 shrink-0" />
                       <span className="truncate">{rootLabel}</span>

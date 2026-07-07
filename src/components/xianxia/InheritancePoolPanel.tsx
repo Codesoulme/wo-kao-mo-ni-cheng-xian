@@ -136,7 +136,7 @@ interface InheritancePoolPanelProps {
   defaultCollapsed?: boolean;
 }
 
-export function InheritancePoolPanel({ className, defaultCollapsed = true }: InheritancePoolPanelProps) {
+export function InheritancePoolPanel({ className, defaultCollapsed = false }: InheritancePoolPanelProps) {
   const character = useGameStore((s) => s.character);
   const inheritancePool = useGameStore((s) => s.inheritancePool);
   const inheritanceCandidates = useGameStore((s) => s.inheritanceCandidates);

@@ -1,18 +1,13 @@
-﻿'use client';
+'use client';
+
+// 轮回结算——内联版。周目结束时紧贴剧情文本框下方出现，玩家在剧情流里完成传承选择。
+// 因为内联版无"关闭"按钮，玩家只能点"归入轮回"完成流程；原 archiveStarted 拦截逻辑不再需要。
 
 import { useState } from 'react';
 import { useGameStore, type HeritageItem } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollText, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
@@ -39,8 +34,6 @@ export function SettlementModal() {
   const { settlementResult, setSettlementResult, addHeritageItems, addHallRecord, addWorldLegacy, worldCalendar, reset } = useGameStore();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [confirming, setConfirming] = useState(false);
-  // P0-8: 一旦发出归档请求就锁死对话框，禁止玩家通过 ESC/X/外部点击逃出本世
-  const [archiveStarted, setArchiveStarted] = useState(false);
 
   const options = settlementResult?.options || [];
   const selectedItem = options.find((option) => selectedIds.includes(option.id));
@@ -57,7 +50,6 @@ export function SettlementModal() {
   const confirm = async () => {
     if (confirming) return;
     setConfirming(true);
-    setArchiveStarted(true);
     const heritageItems: HeritageItem[] = selectedItem ? [selectedItem].map(({ reason: _reason, ...item }) => item) : [];
 
     try {
@@ -99,90 +91,75 @@ export function SettlementModal() {
   };
 
   return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (open) return; // open 由 settlementResult 控制
-        if (archiveStarted) return; // 归档中/成功后保持锁死
-        if (typeof window !== 'undefined' && window.confirm('放弃本世归档？一切将不存')) {
-          // 玩家确认放弃 → 关闭弹窗（保留 settlementResult 但跳过本世：仅清空选择）
-          setSelectedIds([]);
-          setSettlementResult(null);
-        }
-      }}
-    >
-      <DialogContent className="max-w-md max-h-[86dvh] overflow-y-auto paper-texture">
-        <DialogHeader>
-          <DialogTitle className="font-serif-cn flex items-center gap-2">
-            <ScrollText className="w-5 h-5 text-primary" />
-            {settlementResult.title}
-          </DialogTitle>
-          <DialogDescription className="leading-relaxed font-serif-cn">
-            轮回不携一世修为，只认尚未散尽的旧缘。请在天命浮现的旧物、命格、灵宠、法宝或体质中择其一，留作下一世开端。
-          </DialogDescription>
-        </DialogHeader>
+    <div data-testid="settlement-inline" className="mt-3 space-y-3 rounded-lg paper-texture border border-primary/30 p-4">
+      <div className="space-y-1">
+        <h3 className="font-serif-cn text-base font-bold text-foreground flex items-center gap-2 xianxia-readable">
+          <ScrollText className="w-5 h-5 text-primary" />
+          {settlementResult.title}
+        </h3>
+        <p className="text-xs leading-relaxed text-muted-foreground font-serif-cn xianxia-prose">
+          轮回不携一世修为，只认尚未散尽的旧缘。请在天命浮现的旧物、命格、灵宠、法宝或体质中择其一，留作下一世开端。
+        </p>
+      </div>
 
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="pt-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">总体评价</span>
-              <Badge variant="secondary" className="font-serif-cn">{settlementResult.rank}</Badge>
-            </div>
-            <div className="text-2xl font-bold text-primary tabular-nums">{settlementResult.score}</div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {settlementResult.summary}
-            </p>
-          </CardContent>
-        </Card>
-
-        <div className="space-y-2">
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="pt-4 space-y-2">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-serif-cn font-semibold">可带出传承</div>
-            <div className="text-xs text-muted-foreground">{selectedIds.length}/1</div>
+            <span className="text-sm text-muted-foreground">总体评价</span>
+            <Badge variant="secondary" className="font-serif-cn">{settlementResult.rank}</Badge>
           </div>
-          {options.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-              此世因缘尚浅，未凝出可带走之物。入殿留名，来世再问天命。
-            </div>
-          ) : (
-            options.map((option) => {
-              const checked = selectedIds.includes(option.id);
-              return (
-                <label
-                  key={option.id}
-                  className="w-full block text-left rounded-lg border bg-card/70 p-3 transition hover:bg-muted/40 cursor-pointer"
-                >
-                  <div className="flex gap-3">
-                    <Checkbox
-                      checked={checked}
-                      onCheckedChange={() => toggle(option.id)}
-                      className="mt-1"
-                      aria-label={option.name}
-                    />
-                    <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-serif-cn text-sm font-semibold truncate">{option.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded border ${RARITY_CLASS[option.rarity] || RARITY_CLASS.common}`}>
-                          {RARITY_LABEL[option.rarity] || option.rarity}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{option.description}</p>
-                      <p className="text-[10px] text-primary/80 leading-relaxed">{option.reason}</p>
-                    </div>
-                  </div>
-                </label>
-              );
-            })
-          )}
-        </div>
+          <div className="text-2xl font-bold text-primary tabular-nums">{settlementResult.score}</div>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {settlementResult.summary}
+          </p>
+        </CardContent>
+      </Card>
 
-        <DialogFooter>
-          <Button onClick={confirm} disabled={confirming} className="w-full font-serif-cn tracking-wider">
-            <Sparkles className={`w-4 h-4 mr-2 ${confirming ? 'animate-spin' : ''}`} />
-            {confirming ? '归档旧世...' : '归入轮回，开启下一世'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-serif-cn font-semibold">可带出传承</div>
+          <div className="text-xs text-muted-foreground">{selectedIds.length}/1</div>
+        </div>
+        {options.length === 0 ? (
+          <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+            此世因缘尚浅，未凝出可带走之物。入殿留名，来世再问天命。
+          </div>
+        ) : (
+          options.map((option) => {
+            const checked = selectedIds.includes(option.id);
+            return (
+              <label
+                key={option.id}
+                className="w-full block text-left rounded-lg border bg-card/70 p-3 transition hover:bg-muted/40 cursor-pointer"
+              >
+                <div className="flex gap-3">
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={() => toggle(option.id)}
+                    className="mt-1"
+                    aria-label={option.name}
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-serif-cn text-sm font-semibold truncate">{option.name}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${RARITY_CLASS[option.rarity] || RARITY_CLASS.common}`}>
+                        {RARITY_LABEL[option.rarity] || option.rarity}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{option.description}</p>
+                    <p className="text-[10px] text-primary/80 leading-relaxed">{option.reason}</p>
+                  </div>
+                </div>
+              </label>
+            );
+          })
+        )}
+      </div>
+
+      <Button onClick={confirm} disabled={confirming} className="w-full font-serif-cn tracking-wider">
+        <Sparkles className={`w-4 h-4 mr-2 ${confirming ? 'animate-spin' : ''}`} />
+        {confirming ? '归档旧世...' : '归入轮回，开启下一世'}
+      </Button>
+    </div>
   );
 }

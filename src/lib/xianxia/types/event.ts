@@ -147,6 +147,46 @@ export const EVENT_BLUEPRINTS: EventBlueprint[] = [
 
   { category: 'social', name: '师门任务', description: '宗门指派的任务，完成可获贡献', weight: 10, minRealm: 1, maxRealm: 6, minAge: 12, maxAge: 9999, requireFaction: true, examples: ['宗门指派任务', '师门差遣', '代师传讯'] },
 
+  // ===== Phase-本主扩池（修仙小说常见桥段补档）=====
+
+  // --- 凡人/幼龄 ---
+  { category: 'daily', name: '村中疫病', description: '乡间时疫、瘴疠、伤寒蔓延，凡人家庭的惨痛与求生', weight: 9, minRealm: 0, maxRealm: 1, minAge: 3, maxAge: 16, examples: ['村中孩童接连发热', '邻家母亲咳血而亡', '父亲拖病体上山采药', '乡里求神拜佛不愈'] },
+  { category: 'encounter', name: '异象入梦', description: '胎梦、托梦、仙鹤衔枝等异象埋下仙缘伏笔', weight: 8, minRealm: 0, maxRealm: 1, minAge: 4, maxAge: 14, examples: ['梦见白鹤入怀', '灶王爷托梦指路', '祖坟冒青烟', '夜半紫气入室'] },
+  { category: 'emotion', name: '童养风波', description: '凡俗亲情纠葛：童养亲事、过继、改姓、与弟妹争宠', weight: 6, minRealm: 0, maxRealm: 1, minAge: 5, maxAge: 16, examples: ['妹妹被抱养走', '与姐姐争绣花针', '给童养媳起名', '听娘说她差点没活下来'] },
+  { category: 'combat', name: '山野遇妖', description: '凡人视角偶遇低阶妖兽侥幸逃脱或被救', weight: 6, minRealm: 0, maxRealm: 1, minAge: 6, maxAge: 14, examples: ['山中采菇见巨蟒', '夜里被狼精追', '井底爬出龟妖', '村口乌鸦开口说话'] },
+
+  // --- 炼气期 ---
+  { category: 'encounter', name: '灵气潮汐', description: '天地灵气异动：灵雨、灵潮、地脉涌泉，修行与采集事半功倍', weight: 7, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['三年一度灵雨', '灵潮涌泉口', '地脉翻涌金光', '潮汐之夜采灵'] },
+  { category: 'social', name: '同门暗手', description: '师门内部资源、人情、嫉妒引发的隐性冲突', weight: 7, minRealm: 1, maxRealm: 6, minAge: 12, maxAge: 9999, requireFaction: true, examples: ['师兄暗中克扣丹药', '师妹告密到长老', '坐骑被下绊子', '宗门考核被换题'] },
+  { category: 'cultivation', name: '杂役修行', description: '灵田耕作、丹房打杂、看护灵兽、巡山护阵等低阶差役积累修为', weight: 7, minRealm: 1, maxRealm: 3, minAge: 12, maxAge: 60, requireFaction: true, examples: ['灵田除草引灵气入体', '丹房看火领悟药性', '喂食灵鹤体悟禽息', '巡山时听师叔讲法'] },
+  { category: 'exploration', name: '误闯妖穴', description: '采药、赶路或避雨时误入妖兽巢穴，被迫周旋或借势逃出', weight: 9, minRealm: 1, maxRealm: 5, minAge: 12, maxAge: 9999, examples: ['避雨入狐妖洞府', '采药惊动守山蛇', '进洞躲避撞见蝠王', '迷路误入蟾蜍宫'] },
+  { category: 'combat', name: '散修围邪', description: '多名散修自发围攻邪修据点、魔修窝、盗匪山寨', weight: 7, minRealm: 1, maxRealm: 5, minAge: 12, maxAge: 9999, examples: ['围剿山贼修士窝', '众散修清剿血修', '协助同道剿灭噬人谷', '坊市外围伏击劫修'] },
+  { category: 'trade', name: '鬼市淘宝', description: '夜开鬼市、黑市、销赃点，货色奇诡但价格低、风险高', weight: 6, minRealm: 1, maxRealm: 6, minAge: 14, maxAge: 9999, examples: ['鬼市子时开张', '购得一柄来历不明的剑', '鬼市摊主讨封', '买到疑似血修遗物'] },
+  { category: 'emotion', name: '故友来信', description: '多年未见的旧友、世交、师门旧识突然来信或来访', weight: 6, minRealm: 1, maxRealm: 7, minAge: 14, maxAge: 9999, examples: ['师兄寄来一封密信', '儿时玩伴忽成散修', '救命恩人之女寻上门', '失联多年的妹妹寄来玉牌'] },
+
+  // --- 筑基-金丹 ---
+  { category: 'heritage', name: '血脉觉醒', description: '祖上/血脉中封存的力量因刺激而初步觉醒，伴随异象', weight: 8, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['眉心浮现祖纹', '眼底泛出重瞳', '重病后神识暴涨', '伤口中渗出灵血'] },
+  { category: 'heritage', name: '玉简解封', description: '所得玉简/典籍因修为达标而解开更高层封印', weight: 7, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['底层功法令牌亮光', '玉简第二层禁制自解', '壁画中走出人影', '残本补全下半卷'] },
+  { category: 'trial', name: '神识出游', description: '神识凝聚成形出窍夜行、神游万里、入梦探察', weight: 7, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['阴神夜游百里', '神识入他人梦中', '观己神魂之形', '窥探禁地边缘'] },
+  { category: 'social', name: '宗门内斗', description: '宗门内部派系之争、长老夺权、继承人风波将主角卷入', weight: 8, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, requireFaction: true, examples: ['派系之争被要求站队', '长老弟子争继承位', '宗门会议投票', '掌门闭关诸事皆变'] },
+  { category: 'combat', name: '旧仇相见', description: '昔日结怨的对手/仇家/旧识重出江湖，主动寻仇或对峙', weight: 7, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['曾败于己手的强敌回归', '杀兄仇家登门', '逃掉多年的仇人拜山头', '师门弃徒寻仇归来'] },
+  { category: 'inner_demon', name: '夺舍暗伏', description: '暗中发现自己疑似被人觊觎肉身/有夺舍邪修盯上', weight: 6, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['魂魄不属于自己的某一瞬', '元神中多出一缕怨念', '识海有他人试探', '肉身被人暗中做法'] },
+  { category: 'social', name: '推恩招安', description: '上位势力以封赏、官职、庇护招揽或试探，附带条件', weight: 6, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['大宗递来外门客卿帖', '圣朝赐下散阶', '城主府许以名誉长老', '魔道欲收为记名'] },
+  { category: 'encounter', name: '天机推演', description: '卦师、龟甲、灵签、应梦之类预警某事将至或藏某物', weight: 7, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['路遇卦师点破命数', '龟甲裂出下下卦', '三更签语应梦', '观星见妖星犯宫'] },
+  { category: 'trial', name: '丹劫炸炉', description: '炼丹炼器引发天地异象（丹劫/器劫），成败一瞬', weight: 6, minRealm: 2, maxRealm: 7, minAge: 30, maxAge: 9999, examples: ['炼丹引来雷火', '炼器炸炉波及坊市', '丹成异香百里', '法宝引来器灵'] },
+
+  // --- 高阶（60岁+/金丹元婴）---
+  { category: 'social', name: '妖市夜宴', description: '高阶散修/妖族/邪修共同出席的地下夜宴，机会与风险并存', weight: 7, minRealm: 3, maxRealm: 7, minAge: 60, maxAge: 9999, examples: ['妖王设宴招客', '散修大豪交换会', '邪修血宴试探', '地下黑市主客问礼'] },
+  { category: 'combat', name: '大道之争', description: '同阶天骄为争道争位而对决，往往伴随宗门或势力站队', weight: 9, minRealm: 3, maxRealm: 7, minAge: 80, maxAge: 9999, examples: ['圣子之争生死擂', '同阶争渡天劫名额', '两位绝世妖修斗法', '气运之子对决'] },
+  { category: 'heritage', name: '上古妖圣遗血', description: '觉醒或接触上古大妖血脉传承，伴随神魂/血脉剧变', weight: 6, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['妖圣残魂入识海', '瞳孔变金', '血液中浮现纹路', '身边妖兽俯首'] },
+  { category: 'inner_demon', name: '前世今生梦', description: '神魂强到触及前世/上世记忆碎片，陷入因果之问', weight: 6, minRealm: 3, maxRealm: 7, minAge: 100, maxAge: 9999, examples: ['梦中见另一张脸', '识海浮现陌生地名', '前世仇家今世重逢', '故人托梦陈情'] },
+
+  // --- 通用 ---
+  { category: 'cultivation', name: '法宝反噬', description: '祭炼或催动超出自身承受的法宝，遭神识/气血反噬', weight: 6, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['强行催动禁器吐血', '法宝自爆伤主', '剑灵反噬识海', '借法器一瞬苦撑'] },
+  { category: 'emotion', name: '情债难偿', description: '凡人/低阶女修/道侣等人情债，因修为差距或世事而难以兑现', weight: 6, minRealm: 1, maxRealm: 7, minAge: 18, maxAge: 9999, examples: ['当年约定的俗世娘子', '道侣寿元将尽', '旧友一家求护', '恩公遗孀寻来'] },
+  { category: 'encounter', name: '灵宠救主', description: '灵宠/坐骑/法灵在危难时反哺、护主、通报危机', weight: 5, minRealm: 1, maxRealm: 7, minAge: 12, maxAge: 9999, examples: ['灵鹤挡刀', '剑灵强行护主', '灵狐引路脱困', '坐骑嘶鸣示警'] },
+  { category: 'social', name: '人情债登门', description: '旧日欠下的人情/因果/誓言被人登门索取', weight: 6, minRealm: 1, maxRealm: 7, minAge: 14, maxAge: 9999, examples: ['当年救命恩人求药', '族中长辈要挟做主', '欠下同道一枚阵旗', '誓约到期被召'] },
+
 ];
 
 

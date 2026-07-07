@@ -26,6 +26,20 @@ export function NpcGrowthPanel({ className, defaultCollapsed = true }: NpcGrowth
     return list.filter((n) => n && typeof n === 'object' && typeof n.id === 'string');
   }, [character]);
 
+  // sorted 必须在所有早返之前调用，否则 npcs 由空变非空时 hook 数量会变，触发 React 报错
+  const sorted = useMemo(() => {
+    const list = [...npcs];
+    list.sort((a, b) => {
+      const aDead = a.attitude === 'unknown';
+      const bDead = b.attitude === 'unknown';
+      if (aDead !== bDead) return aDead ? -1 : 1;
+      const relA = typeof a.relationshipScore === 'number' ? a.relationshipScore : 0;
+      const relB = typeof b.relationshipScore === 'number' ? b.relationshipScore : 0;
+      return relB - relA;
+    });
+    return list;
+  }, [npcs]);
+
   if (!character) return null;
   if (character.alive === false || character.ascended === true) return null;
 
@@ -66,19 +80,6 @@ export function NpcGrowthPanel({ className, defaultCollapsed = true }: NpcGrowth
       </section>
     );
   }
-
-  const sorted = useMemo(() => {
-    const list = [...npcs];
-    list.sort((a, b) => {
-      const aDead = a.attitude === 'unknown';
-      const bDead = b.attitude === 'unknown';
-      if (aDead !== bDead) return aDead ? -1 : 1;
-      const relA = typeof a.relationshipScore === 'number' ? a.relationshipScore : 0;
-      const relB = typeof b.relationshipScore === 'number' ? b.relationshipScore : 0;
-      return relB - relA;
-    });
-    return list;
-  }, [npcs]);
 
   return (
     <section
@@ -243,7 +244,7 @@ export function NpcGrowthPanel({ className, defaultCollapsed = true }: NpcGrowth
 function YearChange({ npc }: { npc: any }) {
   const mem = typeof npc.memory === 'string' ? npc.memory : '';
   const isDead = npc.attitude === 'unknown' && /仙逝|陨落|归道/.test(mem);
-  const segments: { icon: any; text: string; tone: string }[] = [];
+  const segments: { icon: any; text: string; tone: string; testid?: string }[] = [];
 
   if (isDead) {
     segments.push({
@@ -264,6 +265,28 @@ function YearChange({ npc }: { npc: any }) {
     segments.push({ icon: Clock, text: '年华流转', tone: 'text-stone-600' });
   }
 
+  // 沉浸版 Phase-N: 渲染 NPC 自身属性年度变化微章（攻/防/速/血）
+  const growth = npc && typeof npc === 'object' ? npc.lastGrowth : null;
+  if (growth && typeof growth === 'object') {
+    const attrEntries: { key: string; label: string; delta: number }[] = [
+      { key: 'attack',  label: '攻', delta: Number(growth.attack)  || 0 },
+      { key: 'defense', label: '防', delta: Number(growth.defense) || 0 },
+      { key: 'speed',   label: '速', delta: Number(growth.speed)   || 0 },
+      { key: 'maxHp',   label: '血', delta: Number(growth.maxHp)   || 0 },
+    ];
+    for (const entry of attrEntries) {
+      if (entry.delta === 0) continue;
+      const sign = entry.delta > 0 ? '+' : '−';
+      const tone = entry.delta > 0 ? 'text-emerald-700' : 'text-rose-700';
+      segments.push({
+        icon: entry.delta > 0 ? ArrowUp : Heart,
+        text: entry.label + sign + Math.abs(entry.delta),
+        tone,
+        testid: 'npc-growth-attr-' + npc.id + '-' + entry.key,
+      });
+    }
+  }
+
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       {segments.map((seg, i) => {
@@ -271,6 +294,7 @@ function YearChange({ npc }: { npc: any }) {
         return (
           <span
             key={'change-' + npc.id + '-' + i}
+            data-testid={seg.testid}
             className={cn(
               'text-[10px] px-1.5 py-0.5 rounded border border-stone-200 bg-white/70 inline-flex items-center gap-1',
               seg.tone,

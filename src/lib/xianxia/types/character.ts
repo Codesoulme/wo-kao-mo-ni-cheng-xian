@@ -294,6 +294,10 @@ export interface CharacterState {
 
   causeOfDeath: string;
 
+  // 沉浸版 Phase-Life: 大限过渡标记 — 第一年到 lifespan 不立刻死，第二年才真正坐化
+  nearDeath?: boolean;
+  nearDeathYear?: number;
+
   faction: string; master: string; location: string;
 
   fateNodes: number[];
@@ -449,6 +453,19 @@ export interface CharacterState {
   merit: number;
   // 杀业累计（≥0）
   sin: number;
+
+  // 族裔/出身（用于 body-growth 曲线差异）；旧存档为 null，按 human/unknown fallback
+  origin?: { ethnicity: string; lineage: string } | null;
+
+  // 身体成长浮点残余：atk/def/spd/maxHp 浮点 baseline 与已发放整数之间的差值
+  // 让婴幼段 factor 变化 <1 时也能通过残余累加，每 2~3 年至少出一次 +1 chip
+  // 旧存档缺失时按 0 起算，不影响修仙者高属性
+  bodyGrowthResidual?: {
+    attack: number;
+    defense: number;
+    speed: number;
+    maxHp: number;
+  };
 }
 
 

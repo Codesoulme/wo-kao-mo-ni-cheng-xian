@@ -12,6 +12,7 @@ import { generateBirthEvent, buildPreviousLifeBackground } from '@/lib/xianxia/l
 import { rollBirthConstitution, heritageToStatus } from '@/lib/xianxia/constitutions';
 import { formatWorldTimeDisplay, hiddenEventMeta, normalizeWorldCalendar, worldTimeStamp } from '@/lib/xianxia/world-time';
 import { rollOrigin, type Ethnicity, type Lineage } from '@/lib/xianxia/origins';
+import { computeBodyBaseline } from '@/lib/xianxia/body-growth';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -118,6 +119,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // 出生属性：按 age=0 的 body-growth 曲线算（考虑族裔/出身差异）
+    // 之前是固定 hp:100/attack:10/defense:5/speed:10 — 婴儿一出生就顶着成年数据、没有从小长大体验
+    // 现在婴儿是真的婴儿（attack≈1、defense≈1、speed≈1、maxHp≈10-15），随年龄推进由 body-growth 逐年长
+    const birthBody = computeBodyBaseline(0, 'mortal', origin.ethnicity as any, origin.lineage as any);
+    // mp/maxMp 也按 0 岁婴儿算：50 是成年凡人值，0 岁 factor 0.05 → 保底 5
+    const birthMp = Math.max(5, Math.round(50 * 0.05));
+
     const character = await db.character.create({
       data: {
         userId: user?.id ?? null,
@@ -136,13 +144,13 @@ export async function POST(req: NextRequest) {
         elementWater: el.water,
         elementFire: el.fire,
         elementEarth: el.earth,
-        hp: 100,
-        maxHp: 100,
-        mp: 50,
-        maxMp: 50,
-        attack: 10,
-        defense: 5,
-        speed: 10,
+        hp: birthBody.maxHp,
+        maxHp: birthBody.maxHp,
+        mp: birthMp,
+        maxMp: birthMp,
+        attack: birthBody.attack,
+        defense: birthBody.defense,
+        speed: birthBody.speed,
         luck: Math.floor(40 + Math.random() * 40),
         comprehension: Math.floor(40 + Math.random() * 40),
         spiritStones: 0,
@@ -161,6 +169,7 @@ export async function POST(req: NextRequest) {
         memoryJson: JSON.stringify([`${birth.name}降生于${birth.birthplace}，${birth.family}。${birth.rootDetail}。${statusList.length ? `天生或轮回带有${statusList.map((s: any) => s.name).join('、')}。` : ''}`]),
         petsJson: JSON.stringify(inheritedPets),
         worldCalendarJson: JSON.stringify(normalizeWorldCalendar(worldCalendar)),
+        originJson: JSON.stringify({ ethnicity: origin.ethnicity, lineage: origin.lineage }),
       },
     });
 

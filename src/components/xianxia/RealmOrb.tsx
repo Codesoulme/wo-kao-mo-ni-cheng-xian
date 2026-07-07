@@ -23,17 +23,24 @@ export function RealmOrb({
 
   const dim = size === 'sm' ? 56 : size === 'lg' ? 120 : 80;
   const pct = Math.max(0, Math.min(1, totalProgress));
+  // 沉浸版 Phase-Z: 差 10% 突破时金光提示
+  const nearBreak = pct >= 0.9;
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-1" data-testid="realm-orb" data-pct={pct.toFixed(3)} data-near-break={nearBreak ? 'true' : 'false'}>
       <div
-        className="relative rounded-full orb-glow flex items-center justify-center"
+        className={cn(
+          'relative rounded-full orb-glow flex items-center justify-center transition-all duration-700',
+          nearBreak && 'animate-pulse',
+        )}
         style={{
           width: dim, height: dim,
           background: `radial-gradient(circle at 50% 30%, ${realmColor}33, transparent 70%), radial-gradient(circle at 50% 100%, ${realmColor}, ${realmColor}88 60%, transparent)`,
           color: realmColor,
           border: `2px solid ${realmColor}`,
-          boxShadow: `0 0 20px ${realmColor}66, inset 0 -10px 20px rgba(0,0,0,0.3)`,
+          boxShadow: nearBreak
+            ? `0 0 32px ${realmColor}cc, 0 0 60px ${realmColor}88, inset 0 -10px 20px rgba(0,0,0,0.3)`
+            : `0 0 20px ${realmColor}66, inset 0 -10px 20px rgba(0,0,0,0.3)`,
         }}
       >
         {/* 填充层 */}
@@ -59,6 +66,17 @@ export function RealmOrb({
           {realmMaxLevel > 0 && (
             <div className="text-[10px] text-muted-foreground">{realmLevel + 1} / {realmMaxLevel} 层</div>
           )}
+          {/* 沉浸版 Phase-Z: 修为进度文字 */}
+          <div
+            className={cn(
+              'mt-0.5 text-[10px] tabular-nums',
+              nearBreak ? 'font-bold text-amber-600' : 'text-muted-foreground',
+            )}
+            data-testid="realm-orb-progress"
+          >
+            修为 {(pct * 100).toFixed(1)}%
+            {nearBreak && ' · 临近破境'}
+          </div>
         </div>
       )}
     </div>

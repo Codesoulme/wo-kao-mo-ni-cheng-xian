@@ -5,7 +5,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { executeAIEvent, checkLifespan, applyChanges, stateToResponse, tryBreakthrough, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tryHeartDemonTrial, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
+import { executeAIEvent, checkLifespan, applyAnnualAttributeGrowth, applyChanges, stateToResponse, tryBreakthrough, addThreads, advanceThread, completeThread, failThread, startCombat, generateCharacterIntents, tryHeartDemonTrial, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
+import { detectLifespanExtension } from '@/lib/xianxia/realm-lifespan';
+import { parseAchievementMarkers, applyAchievements } from '@/lib/xianxia/achievements';
+import { tickAllNpcsForYear } from '@/lib/xianxia/npc-growth';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { sanitizeEventDraft, truncateNarrativeAtSentence, completeNarrative } from '@/lib/xianxia/display';
 import { appendNarrativeContractAuditEffect } from '@/lib/xianxia/state-change-log';
@@ -99,6 +102,17 @@ export async function POST(req: NextRequest) {
     const result = executeAIEvent(state, aiOutput);
     let finalState = result.state;
 
+    // 沉浸版 Phase-N: 主角年度属性成长（修真后 8 维 / 凡人基础 / force/guard/agility）
+    try {
+      const growthResult = applyAnnualAttributeGrowth(finalState);
+      if (growthResult && growthResult.state) {
+        finalState = growthResult.state;
+        (finalState as any).__lastAnnualGrowth = growthResult.growth;
+      }
+    } catch (e) {
+      console.warn('[advance] applyAnnualAttributeGrowth failed:', e);
+    }
+
     // 沉浸感：年龄跳跃对账
     // prepareAdvanceCandidate 用 AI 的 timeAdvance 预增 state.age，但 AI 常常不填 / 填 1 年。
     // 推进完拿到叙事后，从 AI 的标题+正文里重新推断时间单位；如果推断出小时间单位
@@ -174,8 +188,25 @@ ${breakthroughText}`;
     // 寿元检查
     if (!result.died && !finalState.ascended) {
       const life = checkLifespan(finalState);
+      finalState = life.state;
+      // 沉浸版 Phase-Life: 大限过渡 + narrative 延寿检测
+      try {
+        const narr = String((aiOutput as any)?.narrative ?? '');
+        const ext = detectLifespanExtension(narr);
+        if (ext && (finalState as any).nearDeath) {
+          finalState = { ...finalState, lifespan: (finalState.lifespan || 0) + ext.extended, nearDeath: false, nearDeathYear: undefined, causeOfDeath: undefined };
+          (finalState as any).__lastLifespanExtension = { delta: ext.extended, reason: ext.reason, hint: ext.hint };
+        }
+      } catch {}
+      // 沉浸版 Phase-Life: 末尾按当前属性重算 lifespan（修真者随境界提升）
+      try {
+        const { deriveLifespanFromState } = await import('@/lib/xianxia/realm-lifespan');
+        const computed = deriveLifespanFromState(finalState);
+        const cur = Number(finalState.lifespan || 0);
+        if (computed > cur) finalState = { ...finalState, lifespan: computed };
+      } catch {}
+
       if (life.died) {
-        finalState = life.state;
         result.died = true;
         result.deathReason = life.reason;
         aiOutput.causedDeath = true;
@@ -551,6 +582,61 @@ ${narrative || ''}`);
         actionProjections: draft.actionProjections || [],
         createdAt: created.createdAt,
       });
+    }
+
+    // ===== 沉浸版 Phase-Z: AI 成就判定 =====
+    try {
+      const aiNarrative = String((aiOutput as any)?.narrative ?? '');
+      const parsedAch = parseAchievementMarkers(aiNarrative);
+      if (parsedAch.length > 0) {
+        const achResult = applyAchievements(finalState, parsedAch, {
+          triggeredAge: Number(finalState.age ?? 0),
+        });
+        if (achResult && achResult.state && achResult.newAchievements.length > 0) {
+          finalState = achResult.state;
+          (finalState as any).__lastAchievements = achResult.newAchievements.map((a) => ({
+            id: a.definition.id,
+            name: a.definition.name,
+            bucket: a.definition.bucket,
+            reward: a.reward,
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('[advance] applyAchievements failed:', e);
+    }
+
+    // ===== 沉浸版 Phase-Z: 破境事件 → 飘字层自动 emit 全屏过场 =====
+    try {
+      if (result && (result as any).breakthroughHappened) {
+        const prevRealm = String((state as any)?.realm ?? '');
+        const nextRealm = String((finalState as any)?.realm ?? prevRealm);
+        if (prevRealm && nextRealm && prevRealm !== nextRealm) {
+          (finalState as any).__lastBreakthrough = {
+            fromRealm: prevRealm,
+            toRealm: nextRealm,
+            triggeredAge: Number(finalState.age ?? 0),
+          };
+        }
+      }
+    } catch {}
+
+    // ===== 沉浸版 Phase-N: NPC 年度推进（年龄/亲疏/属性成长/偶发破境/偶发寿终）=====
+    // 之前 store.tickNpcsForYear 全工程没人调——advance 推进后 npcs 不更新；
+    // 这里在 finalState 落地前强制推一年，与 advance-sse 同源。
+    try {
+      const safeAgeBefore = Number(state.age ?? 0);
+      const safeAgeAfter = Number(finalState.age ?? safeAgeBefore);
+      const yearsAdvanced = Math.max(1, safeAgeAfter - safeAgeBefore);
+      const prevNpcs = Array.isArray(finalState.npcs) ? finalState.npcs : [];
+      if (prevNpcs.length > 0) {
+        const npcResult = tickAllNpcsForYear(prevNpcs, yearsAdvanced, safeAgeAfter);
+        if (npcResult && Array.isArray(npcResult.nextNpcs)) {
+          finalState = { ...finalState, npcs: npcResult.nextNpcs };
+        }
+      }
+    } catch (e) {
+      console.warn('[advance] tickAllNpcsForYear failed:', e);
     }
 
     // ===== 后台预热下一岁：玩家点第二次推进时 0 等待 =====

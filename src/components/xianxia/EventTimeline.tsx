@@ -6,6 +6,7 @@ import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } 
 import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, useCallback, Fragment } from 'react';
 import { formatNarrativeForDisplay } from '@/lib/xianxia/narrative-format';
+import { XianxiaRibbon } from './XianxiaRibbon';
 
 interface EventTimelineProps {
   events: GameEvent[];
@@ -233,18 +234,15 @@ function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }, 
   const displayLabel = cleanVisibleTimeLabel(event.worldTime?.displayLabel || event.worldTime?.label);
   const worldLabel = event.worldTime?.label;
   const segmentLabel = cleanVisibleTimeLabel(event.timeAdvance?.label);
-  const ageText = ageMeta.isContinuation ? '' : `${event.age}\u5c81`;
+  // \u540c\u5e74\u53d9\u4e8b\u7684\u989d\u5916/\u7eed\u5199\u4e8b\u4ef6\uff1a\u672c\u4e3b\u6307\u793a\u540c\u5e74\u5185\u4e0d\u518d\u663e\u793a\u65f6\u95f4/\u5b63\u8282
+  if (ageMeta.isContinuation) return '';
+  const ageText = `${event.age}\u5c81`;
   const open = '\u3010';
   const close = '\u3011';
 
   // 如果 worldTime/displayLabel 已包含岁数，避免重复拼接
   const displayLabelHasAge = displayLabel && displayLabel.includes(`${event.age}\u5c81`);
 
-  // 同年叙事的额外/续写事件：必须显示自己的 timeAdvance.label，不能复用上一条的 displayLabel
-  if (ageMeta.isContinuation && segmentLabel) {
-    const combined = displayLabel && displayLabel !== segmentLabel ? `${displayLabel} · ${segmentLabel}` : segmentLabel;
-    return ageText ? `${ageText} · ${combined}` : combined;
-  }
   // 普通事件：有 displayLabel 则用
   if (displayLabel) return ageText && !displayLabelHasAge ? `${ageText} · ${displayLabel}` : displayLabel;
   // 兜底：用 worldLabel + segmentLabel 组装
@@ -257,7 +255,9 @@ function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }, 
 function buildFallbackTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
   const worldLabel = event.worldTime?.label;
   const segmentLabel = cleanVisibleTimeLabel(event.timeAdvance?.label);
-  const ageText = ageMeta.isContinuation ? '' : `${event.age}\u5c81`;
+  // \u540c\u5e74\u53d9\u4e8b\u7684\u989d\u5916/\u7eed\u5199\u4e8b\u4ef6\uff1a\u672c\u4e3b\u6307\u793a\u540c\u5e74\u5185\u4e0d\u518d\u663e\u793a\u65f6\u95f4/\u5b63\u8282
+  if (ageMeta.isContinuation) return '';
+  const ageText = `${event.age}\u5c81`;
   const open = '\u3010';
   const close = '\u3011';
   if (worldLabel && segmentLabel) return `${ageText} · ${segmentLabel}${open}${worldLabel}${close}`;
@@ -447,6 +447,9 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
 
       {/* 中线 */}
       <div className="absolute left-[18px] top-12 bottom-2 w-px bg-gradient-to-b from-border via-border to-transparent" />
+
+      {/* 沉浸版天象词徽章：扫最近 3 条 narrative 命中关键词出 chip */}
+      <XianxiaRibbon narratives={events.slice(-3).map((e) => e?.narrative ?? '')} />
 
       <div className="space-y-2">
         {events.map((event, idx) => {

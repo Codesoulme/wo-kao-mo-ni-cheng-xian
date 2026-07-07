@@ -184,7 +184,7 @@ export async function callLLMText(systemPrompt: string, userPrompt: string, opti
         headers,
         body: JSON.stringify({
           model,
-          max_tokens: 8192,
+          max_tokens: 16384,
           temperature: 0.7,
           top_p: 0.9,
           repetition_penalty: 1.15,
@@ -267,7 +267,7 @@ export async function callLLMStream(
     : JSON.stringify({
           model,
           stream: true,
-          max_tokens: 8192,
+          max_tokens: 16384,
           temperature: 0.7,
           top_p: 0.9,
           repetition_penalty: 1.15,

@@ -6,7 +6,8 @@ import { NextRequest } from 'next/server';
 let sseHeartbeat: NodeJS.Timeout | null = null;
 import { db } from '@/lib/db';
 import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
-import { buildStateContext, executeAIEvent, stateToResponse } from '@/lib/xianxia/engine';
+import { buildStateContext, executeAIEvent, stateToResponse, applyAnnualAttributeGrowth } from '@/lib/xianxia/engine';
+import { parseAchievementMarkers, applyAchievements } from '@/lib/xianxia/achievements';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
 import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
@@ -24,8 +25,11 @@ import {
 import { getCurrentUser } from '@/lib/auth-helpers';
 // 修仙界感改进 - 任务 D：寿元压力
 import { lifespanPressure, lifespanPressureStatus, nearLifespan } from '@/lib/xianxia/realm-lifespan';
+import { detectLifespanExtension, deriveLifespanFromState, getLifePhase } from '@/lib/xianxia/realm-lifespan';
 // 修仙界感改进 - 任务 E：世界级事件调度器
 import { rollWorldEvent, applyWorldEvent, decayWorldEvents, parseWorldEventMarkers, buildAvailableWorldEventsPrompt, type WorldEvent } from '@/lib/xianxia/world-event-scheduler';
+import { buildAchievementPromptHint } from '@/lib/xianxia/achievements';
+import { tickAllNpcsForYear } from '@/lib/xianxia/npc-growth';
 // 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 SSE 路径上也跑一次 world.tick()
 // 优化：缓存 World + Systems + Entity 跨多次 advance 复用，避免每次 new World() + addSystem() + createCharacterEntity()（节省 200-500ms/advance）
 import { World } from '@/lib/xianxia/ecs/core';
@@ -92,8 +96,26 @@ function extractNarrativeField(rawText: string): { content: string; closed: bool
       result += ch; i += 1; continue;
     }
     if (ch === '"') {
-      // 字符串结束
-      return { content: result, closed: true };
+      // 检查这个 " 是真闭合还是 LLM 在正文里嵌的对话引号
+      // 真闭合：后面（跳过空白/换行后）必须紧跟 JSON 结构字符 , } ] 之一
+      // 否则视为正文内容里的引号，继续吸收
+      let j = i + 1;
+      while (j < rawText.length && /[\s\r\n]/.test(rawText[j])) j += 1;
+      const nextStruct = rawText[j];
+      if (j >= rawText.length) {
+        // 流还没到，无法判断——暂时按未闭合处理，等更多 delta
+        // 但要把这个 " 也吸收进 result（如果真闭合，下轮 delta 到达时会重新判定）
+        // 保守做法：如果流真的结束在这，parseJSON 会在服务端 aiOutput 阶段兜底
+        return { content: result, closed: false };
+      }
+      if (nextStruct === ',' || nextStruct === '}' || nextStruct === ']') {
+        // 字符串真结束
+        return { content: result, closed: true };
+      }
+      // 不是结构字符 → 这个 " 是正文里的引号，吸进去继续
+      result += ch;
+      i += 1;
+      continue;
     }
     result += ch;
     i += 1;
@@ -224,6 +246,13 @@ export async function POST(req: NextRequest) {
           ctx.worldEventAvailablePrompt = '';
         }
 
+        // 沉浸版 Phase-Z: 成就种子池提示（AI 据 narrative 自主决定是否触发）
+        try {
+          ctx.achievementPromptHint = buildAchievementPromptHint();
+        } catch {
+          ctx.achievementPromptHint = '';
+        }
+
         // 3) 真流式：直接调 callLLMStream，累积 rawText，实时提取 narrative 字段
         //    LLM 边生成 token，我们边从累积 rawText 中抽出 narrative 字符串推给前端
         const userPrompt = buildAdvancePrompt(ctx, isFateNode, qualityMode);
@@ -239,12 +268,13 @@ export async function POST(req: NextRequest) {
             rawText += delta;
             const { content: extracted, closed } = extractNarrativeField(rawText);
             if (extracted && extracted.length > prevNarrative.length) {
-              // 兜底正则替换：LLM 偶尔在 narrative 里写"变化+1"等占位符，prompt 虽约束但仍可能漏出
-              // 这里服务端先 replace 成"（属性变化，详见结算）"占位，让客户端不直接看到"变化+1不知道是什么"
-              const sanitized = extracted
-                .replace(/变化\s*\+\s*\d+/g, '（属性见结算）')
-                .replace(/属性\s*\+\s*\d+/g, '（属性见结算）')
-                .replace(/(修为|悟性|灵根|根骨|福缘|机缘|气运|天赋|命格|血脉|体魄|神识|魂魄)\s*\+\s*\d+/g, '（$1见结算）');
+              // 兜底正则替换：LLM 偶尔在 narrative 里写"变化+1""破势+1"等占位符，prompt 虽约束但仍可能漏出
+              // 这里服务端先 replace 掉整段含字段名的"破势+1""护持+2""机变+3""气血上限+8"等占位符
+              // 规则从 display.ts MECHANISM_PATTERNS 同步，避免分散两套规则导致漏
+              const sanitized = extracted.replace(
+                /(?:变化|属性|修为|悟性|灵根|根骨|福缘|机缘|气运|天赋|命格|血脉|体魄|神识|魂魄|破势|护持|机变|气血(?:上限)?|灵力(?:上限)?|声望|寿元)\s*[\+\-±]\s*\d{1,8}/g,
+                '',
+              );
               const newDelta = sanitized.slice(prevNarrative.length);
               prevNarrative = sanitized;
               if (!firstDeltaSent) {
@@ -330,6 +360,21 @@ export async function POST(req: NextRequest) {
         try {
           const execResult = executeAIEvent(state, aiOutput);
           finalState = execResult.state;
+
+          // 沉浸版 Phase-N: 主角年度属性成长（spiritualSense / soulStrength / physicalFoundation / attack / defense / speed / maxHp / maxMp）
+          // 派生 force/guard/agility（破势/护持/机变）顺势刷新，让面板可见逐年成长。
+          // 修真者 current > baseline 时保留 current；凡人按 age × rootMultiplier 兜底。
+          try {
+            const growthResult = applyAnnualAttributeGrowth(finalState);
+            if (growthResult && growthResult.state) {
+              finalState = growthResult.state;
+              // 把成长 delta 写进 eventEffects 让 buildEventDisplayEffects 自动渲染到卡片
+              (finalState as any).__lastAnnualGrowth = growthResult.growth;
+            }
+          } catch (e) {
+            console.warn('[advance-sse] applyAnnualAttributeGrowth failed:', e);
+          }
+
           // 凡人基础属性补底（修 user 反馈"基础属性一出生给全部值不合理"+"强制给值不合理"）
           // 不是强制覆盖（仙人孩子应继承父母根骨），而是补底 max(LLM给的值, age_baseline × rootMultiplier)：
           //   - LLM 给的值被尊重（不强制覆盖）
@@ -356,7 +401,22 @@ export async function POST(req: NextRequest) {
             if ((finalState.hp ?? 0) > finalState.maxHp) finalState.hp = finalState.maxHp;
             if ((finalState.mp ?? 0) > finalState.maxMp) finalState.mp = finalState.maxMp;
           }
-          displayEffects = buildEventDisplayEffects({
+                        // 沉浸版 Phase-Z: 破境事件 → 飘字层自动 emit 全屏过场
+              try {
+                if (execResult && (execResult as any).breakthroughHappened) {
+                  const prevRealm = String((state as any)?.realm ?? '');
+                  const nextRealm = String((finalState as any)?.realm ?? prevRealm);
+                  if (prevRealm && nextRealm && prevRealm !== nextRealm) {
+                    (finalState as any).__lastBreakthrough = {
+                      fromRealm: prevRealm,
+                      toRealm: nextRealm,
+                      triggeredAge: Number(finalState.age ?? 0),
+                    };
+                  }
+                }
+              } catch {}
+
+displayEffects = buildEventDisplayEffects({
             before: state,
             after: finalState,
             changes: execResult.appliedChanges || [],
@@ -540,6 +600,71 @@ export async function POST(req: NextRequest) {
               // 1. decay 已有 active 事件
               finalState = decayWorldEvents(finalState, yearsAdvanced);
 
+              // 1.35 沉浸版 Phase-Z: 稀有物品掉落（diff inventory，rare+ emit DropBurst）
+              try {
+                const prevInv = Array.isArray((state as any)?.inventory) ? (state as any).inventory : [];
+                const nextInv = Array.isArray((finalState as any)?.inventory) ? (finalState as any).inventory : [];
+                const prevIds = new Set(prevInv.map((it: any) => String(it?.id ?? it?.name ?? '')));
+                const drops: any[] = [];
+                for (const it of nextInv) {
+                  if (!it) continue;
+                  const id = String(it.id ?? it.name ?? '');
+                  if (prevIds.has(id)) continue;
+                  const r = String(it.rarity ?? 'common');
+                  if (!['rare', 'epic', 'legendary', 'mythic'].includes(r)) continue;
+                  drops.push({ id, name: String(it.name ?? '异宝'), rarity: r, category: String(it.category ?? it.type ?? '') });
+                }
+                if (drops.length > 0) (finalState as any).__lastDrops = drops;
+              } catch {}
+
+              // 沉浸版 Phase-Life: 末尾按当前属性重算 lifespan（灵根/体魄/境界），
+              // 让修真者寿命随境界提升，物品延寿丹延命后重算。
+              // 保留 max(current, computed) 防修真者 current > 公式上界时压回。
+              try {
+                const { deriveLifespanFromState } = await import('@/lib/xianxia/realm-lifespan');
+                const computed = deriveLifespanFromState(finalState);
+                const cur = Number((finalState as any).lifespan || 0);
+                if (computed > cur) {
+                  (finalState as any).lifespan = computed;
+                  (finalState as any).__lastLifespanRecalc = { from: cur, to: computed };
+                }
+              } catch {}
+
+              // 1.4 沉浸版 Phase-Z: AI 成就判定（从 narrative 解析 [ACHIEVEMENT]/[REWARD] 标记）
+              // 成就触发后写入 character.achievements + heritageVault（局外传承池）
+              try {
+                const parsedAch = parseAchievementMarkers(llmNarrative || '');
+                if (parsedAch.length > 0) {
+                  const achResult = applyAchievements(finalState, parsedAch, { triggeredAge: ageAfterTick });
+                  if (achResult && achResult.state && achResult.newAchievements.length > 0) {
+                    finalState = achResult.state;
+                    (finalState as any).__lastAchievements = achResult.newAchievements.map((a) => ({
+                      id: a.definition.id,
+                      name: a.definition.name,
+                      bucket: a.definition.bucket,
+                      reward: a.reward,
+                    }));
+                  }
+                }
+              } catch (e) {
+                console.warn('[advance-sse] applyAchievements failed:', e);
+              }
+
+              // 1.5 沉浸版 Phase-N: NPC 年度推进（年龄/亲疏/属性成长/偶发破境/偶发寿终）
+              // 之前 NPC tick 只挂在 store.tickNpcsForYear，没人调——前端推进后 npcs 不更新。
+              // 现在在 advance 主流程里强制推一年，与主角年龄增长保持一致。
+              try {
+                const prevNpcs = Array.isArray((finalState as any)?.npcs) ? (finalState as any).npcs : [];
+                if (prevNpcs.length > 0) {
+                  const npcResult = tickAllNpcsForYear(prevNpcs, yearsAdvanced, ageAfterTick);
+                  if (npcResult && Array.isArray(npcResult.nextNpcs)) {
+                    finalState = { ...finalState, npcs: npcResult.nextNpcs };
+                  }
+                }
+              } catch (e) {
+                console.warn('[advance-sse] tickAllNpcsForYear failed:', e);
+              }
+
               let worldEvent: WorldEvent | null = null;
 
               // 2. 优先解析 LLM 输出中的 [WORLD_EVENT] 标记
@@ -564,7 +689,7 @@ export async function POST(req: NextRequest) {
               }
 
               if (worldEvent) {
-                finalState = applyWorldEvent(finalState, worldEvent);
+                finalState = applyWorldEvent(finalState, worldEvent, llmNarrative);
                 console.log('[advance-sse] 世界级事件注入:', worldEvent.type, 'at age', worldEvent.triggeredAge, 'duration', worldEvent.duration, '年');
                 // 把世界级事件追加到本次 eventLog.effects（前端展示）
                 try {
@@ -621,11 +746,36 @@ export async function POST(req: NextRequest) {
                 (finalState as any).statusJson = JSON.stringify(statusList);
               }
             }
-            // 寿元已尽：强制 death
-            if (lifespanPressure(ageAfter, lifespanAfter) === 'expired' && (finalState as any).alive !== false) {
-              (finalState as any).alive = false;
-              (finalState as any).causeOfDeath = (finalState as any).causeOfDeath || '寿终正寝';
-              (finalState as any).hp = 0;
+            // 寿元已尽：第一次标记 nearDeath，第二次才真正坐化
+            const pressureNow = lifespanPressure(ageAfter, lifespanAfter);
+            if (pressureNow === 'expired' && (finalState as any).alive !== false) {
+              const wasNearDeath = (finalState as any).nearDeath === true
+                && typeof (finalState as any).nearDeathYear === 'number'
+                && ageAfter > (finalState as any).nearDeathYear;
+              if (wasNearDeath) {
+                (finalState as any).alive = false;
+                (finalState as any).causeOfDeath = (finalState as any).causeOfDeath || '寿元已尽，坐化于世';
+                (finalState as any).hp = 0;
+              } else {
+                (finalState as any).nearDeath = true;
+                (finalState as any).nearDeathYear = ageAfter;
+                (finalState as any).causeOfDeath = (finalState as any).causeOfDeath || '大限将至';
+              }
+            } else if (pressureNow !== 'expired') {
+              // 在寿元内：检测 narrative 延寿
+              try {
+                const llmNarr = String((aiOutput as any)?.narrative ?? '');
+                const ext = detectLifespanExtension(llmNarr);
+                if (ext && (finalState as any).nearDeath) {
+                  const oldLife = Number((finalState as any).lifespan || 0);
+                  (finalState as any).lifespan = oldLife + ext.extended;
+                  (finalState as any).nearDeath = false;
+                  (finalState as any).nearDeathYear = undefined;
+                  (finalState as any).causeOfDeath = undefined;
+                  (finalState as any).__lastLifespanExtension = { delta: ext.extended, reason: ext.reason, hint: ext.hint };
+                  console.log('[advance-sse] 延寿延命：', ext.reason, '+' + ext.extended, '年');
+                }
+              } catch {}
             }
           }
         } catch (e) {

@@ -7,6 +7,7 @@ import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-r
 import { deriveCombatStance } from '@/lib/xianxia/engine';
 import type { CombatStance } from '@/lib/xianxia/types';
 import { COMBAT_STANCE_LABEL } from '@/lib/xianxia/types';
+import { haptic } from '@/lib/haptics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -157,6 +158,19 @@ export function CombatModal() {
       }
       if (newFloats.length) {
         setFloats(prev => [...prev, ...newFloats]);
+        // 沉浸版 Phase-Z: 暴击 → 屏震 + haptic
+        if (newFloats.some((f) => (f as any).type === 'crit')) {
+          haptic('crit');
+          if (typeof document !== 'undefined') {
+            document.body.classList.remove('animate-[fx-screen-shake_0.3s_ease-in-out]');
+            // 触发重排以重启动画
+            void document.body.offsetWidth;
+            document.body.classList.add('animate-[fx-screen-shake_0.3s_ease-in-out]');
+            window.setTimeout(() => document.body.classList.remove('animate-[fx-screen-shake_0.3s_ease-in-out]'), 320);
+          }
+        } else {
+          haptic('hit');
+        }
         // 1.2 秒后清除飘字
         setTimeout(() => {
           setFloats(prev => prev.filter(f => !newFloats.find(nf => nf.id === f.id)));

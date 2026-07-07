@@ -5,6 +5,7 @@
  */
 
 import type { WorldNpc, WorldNpcAttitude } from './types';
+import { computeBodyBaseline } from './body-growth';
 
 export function npcHash(input: string): number {
   let h = 0;
@@ -38,7 +39,7 @@ export function nextRealmId(current: string | undefined): string | null {
   return REALM_ORDER[idx + 1];
 }
 
-function baseLifespanFor(realm: string | undefined): number {
+export function baseLifespanFor(realm: string | undefined): number {
   switch (realm) {
     case 'mortal': return 80;
     case 'qi_refining': return 120;
@@ -71,6 +72,9 @@ export interface NpcGrowthChange {
   realmAfter?: string;
   relationshipDelta?: number;
   relationshipAfter?: number;
+  // 沉浸版 Phase-N: NPC 自身身体属性年度变化（凡人幼壮老 + 修真者境界成长）
+  attrDelta?: { attack: number; defense: number; speed: number; maxHp: number };
+  attrAfter?: { attack: number; defense: number; speed: number; maxHp: number };
   narrativeHint: string;
 }
 
@@ -98,12 +102,26 @@ export function tickNpcAge(npc: WorldNpc, yearDelta: number, characterAge: numbe
     }
   }
   const dieRoll = seededRand(seedKey + '|die');
+
+  // 沉浸版 Phase-N: NPC 自身身体属性 baseline（无族裔/出身差异，按人族凡人标准）
+  // 修真者已经走在境界倍率上，breakthrough 命中后再叠加 — 这里统一算一次给面板显示
+  const prevBaseline = npc.combatAttrs
+    || computeBodyBaseline(prevAge, realm, 'human', 'unknown');
+  const nextBaseline = computeBodyBaseline(nextAge, realm, 'human', 'unknown');
+
   if (dieChance > 0 && dieRoll < dieChance) {
     const updated: WorldNpc = {
       ...npc,
       lastSeenAge: nextAge,
       attitude: 'unknown',
       memory: appendMemory(npc.memory, '于青岚仙历' + characterAge + '年仙逝，享年约 ' + nextAge + ' 岁。'),
+      combatAttrs: prevBaseline,
+      lastGrowth: {
+        attack: 0,
+        defense: 0,
+        speed: 0,
+        maxHp: 0,
+      },
     };
     return {
       next: updated,
@@ -113,6 +131,8 @@ export function tickNpcAge(npc: WorldNpc, yearDelta: number, characterAge: numbe
         kind: 'died',
         ageAfter: nextAge,
         realmAfter: realm,
+        attrDelta: { attack: 0, defense: 0, speed: 0, maxHp: 0 },
+        attrAfter: prevBaseline,
         narrativeHint: npc.name + ' 寿终正寝，享年 ' + nextAge + ' 岁。',
       },
     };
@@ -143,11 +163,28 @@ export function tickNpcAge(npc: WorldNpc, yearDelta: number, characterAge: numbe
     }
   }
 
+  // 沉浸版 Phase-N: 修真者修为已成 → 属性保留；凡人/低境界 → baseline 拉伸
+  // 取 max(prevBaseline, nextBaseline)：修真峰值不被凡人曲线压低，但凡人幼壮老正常推
+  const newCombatAttrs = {
+    attack: Math.max(prevBaseline.attack, nextBaseline.attack),
+    defense: Math.max(prevBaseline.defense, nextBaseline.defense),
+    speed: Math.max(prevBaseline.speed, nextBaseline.speed),
+    maxHp: Math.max(prevBaseline.maxHp, nextBaseline.maxHp),
+  };
+  const attrDelta = {
+    attack: newCombatAttrs.attack - prevBaseline.attack,
+    defense: newCombatAttrs.defense - prevBaseline.defense,
+    speed: newCombatAttrs.speed - prevBaseline.speed,
+    maxHp: newCombatAttrs.maxHp - prevBaseline.maxHp,
+  };
+
   const updated: WorldNpc = {
     ...npc,
     lastSeenAge: nextAge,
     realm: nextRealm,
     relationshipScore: Number(nextRelationship.toFixed(2)),
+    combatAttrs: newCombatAttrs,
+    lastGrowth: attrDelta,
   };
 
   let kind: NpcGrowthChange['kind'] = 'aged';
@@ -170,6 +207,8 @@ export function tickNpcAge(npc: WorldNpc, yearDelta: number, characterAge: numbe
       realmAfter: nextRealm,
       relationshipDelta,
       relationshipAfter: nextRelationship,
+      attrDelta,
+      attrAfter: newCombatAttrs,
       narrativeHint,
     },
   };

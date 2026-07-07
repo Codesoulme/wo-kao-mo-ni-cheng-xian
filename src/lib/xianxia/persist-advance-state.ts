@@ -71,5 +71,9 @@ export function buildAdvanceStateData(state: any, opts?: {
     styleAnchorsJson: state.styleAnchors ? JSON.stringify(state.styleAnchors) : '[]',
     entityEntriesJson: state.entityEntries ? JSON.stringify(state.entityEntries) : '[]',
     lastEventAge: opts?.lastEventAge ?? state.age,
+    // 身体成长浮点残余：浮点 baseline 与已发放整数间的累计差，供下一年继续累加
+    bodyGrowthResidualJson: state.bodyGrowthResidual
+      ? JSON.stringify(state.bodyGrowthResidual)
+      : 'null',
   };
 }

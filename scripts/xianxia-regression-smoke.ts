@@ -75,12 +75,495 @@ function smokeT004NpcGrowthPanelRenders(): void {
   log('smoke-t-004-npc-growth-panel-renders', { passed: true });
 }
 
+// Phase-N: NPC 身体成长字段 + 面板年度属性微章
+function smokeT005NpcBodyGrowthWritten(): void {
+  const mod = require('../src/lib/xianxia/npc-growth.ts');
+  // 凡人少年 → 推进 5 岁，属性应该全部增长
+  const npcs = [
+    { id: 'npc-young', name: '小书童', firstMetAge: 10, lastSeenAge: 10, realm: 'mortal', attitude: 'friendly' as any, relationshipScore: 30, memory: '' },
+  ];
+  const result = mod.tickAllNpcsForYear(npcs, 5, 15);
+  const npc = result.nextNpcs[0];
+  assert(npc && npc.combatAttrs, 'combatAttrs should be written after tick');
+  const ca = npc.combatAttrs;
+  assert(typeof ca.attack === 'number' && ca.attack > 0, `attack should be > 0, got ${ca.attack}`);
+  assert(typeof ca.maxHp === 'number' && ca.maxHp >= 10, `maxHp should be >= 10, got ${ca.maxHp}`);
+  assert(npc.lastGrowth, 'lastGrowth should be written after tick');
+  const growth = npc.lastGrowth;
+  // 10 岁 → 15 岁属于成长段，attack/defense/speed 应增加
+  assert(growth.attack > 0, `attack should grow from age 10→15, got ${growth.attack}`);
+  assert(growth.defense > 0, `defense should grow from age 10→15, got ${growth.defense}`);
+  assert(growth.maxHp > 0, `maxHp should grow from age 10→15, got ${growth.maxHp}`);
+  // change 也应携带 attrDelta + attrAfter
+  const change = result.changes[0];
+  assert(change && change.attrDelta, 'change.attrDelta should be populated');
+  assert(change.attrDelta.attack === growth.attack, 'change.attrDelta.attack should match lastGrowth.attack');
+  assert(change.attrAfter && change.attrAfter.attack === ca.attack, 'change.attrAfter.attack should match combatAttrs.attack');
+  log('smoke-t-005-npc-body-growth-written', { passed: true });
+}
+
+function smokeT006NpcAgingDecay(): void {
+  const mod = require('../src/lib/xianxia/npc-growth.ts');
+  // 凡人壮年 40 → 推进到 70 岁（已进入衰退段），属性应下降
+  const npcs = [
+    { id: 'npc-aged', name: '老猎户', firstMetAge: 40, lastSeenAge: 40, realm: 'mortal', attitude: 'neutral' as any, relationshipScore: 0, memory: '' },
+  ];
+  const result = mod.tickAllNpcsForYear(npcs, 30, 70);
+  const npc = result.nextNpcs[0];
+  assert(npc && npc.lastGrowth, 'lastGrowth should be present');
+  const growth = npc.lastGrowth;
+  // 衰退段：40→70 岁 maxHp 应低于壮年峰值
+  assert(typeof npc.combatAttrs.maxHp === 'number', 'combatAttrs.maxHp should be number');
+  assert(npc.combatAttrs.maxHp < 100, `mortal age 70 maxHp should be < 100, got ${npc.combatAttrs.maxHp}`);
+  // growth.delta 可能为 0（baseline 在浮点上下取整后保持），但 attrAfter 一定要写
+  assert(result.changes[0].attrAfter && typeof result.changes[0].attrAfter.maxHp === 'number', 'change.attrAfter should be populated even in aging');
+  log('smoke-t-006-npc-aging-decay', { passed: true });
+}
+
+function smokeT007NpcGrowthPanelRendersAttrBadges(): void {
+  const src = readFileSync('src/components/xianxia/NpcGrowthPanel.tsx', 'utf-8');
+  assert(src.includes('lastGrowth'), 'panel should read npc.lastGrowth');
+  assert(src.includes('npc-growth-attr-'), 'panel should emit attr badge testid');
+  assert(src.includes('attack') && src.includes('defense') && src.includes('speed') && src.includes('maxHp'), 'panel should cover all four attrs');
+  // 应该至少渲染 ±N 文案
+  assert(src.includes('+') && src.includes('−'), 'panel should render positive/negative deltas');
+  log('smoke-t-007-npc-growth-panel-renders-attr-badges', { passed: true });
+}
+
+// 沉浸版：仙人下凡寻徒 —— 世界观常量 / 事件模板 / 师承钩子
+function smokeT008WorldLoreDecennialImmortal(): void {
+  // origins.ts 导出常量
+  const originsSrc = readModuleSource('src/lib/xianxia/origins.ts');
+  assert(/export const WORLD_LORE_DECENNIAL_IMMORTAL/.test(originsSrc), 'origins.ts should export WORLD_LORE_DECENNIAL_IMMORTAL');
+  assert(originsSrc.includes('仙人下凡') || originsSrc.includes('仙人'), 'constant should reference 仙人');
+  assert(/每.*?十年|十年一遇|每逢十年/.test(originsSrc), 'constant should encode decennial cadence');
+  // buildOriginPrompt 已注入常量
+  assert(/WORLD_LORE_DECENNIAL_IMMORTAL[\s\S]{0,40}\${sealedStr}/.test(originsSrc) || /\$\{sealedStr\}[\s\S]{0,40}WORLD_LORE_DECENNIAL_IMMORTAL/.test(originsSrc),
+    'buildOriginPrompt return should reference the constant');
+  // generators.ts 注入到 buildPreviousLifeBackground
+  const genSrc = readModuleSource('src/lib/xianxia/llm/generators.ts');
+  assert(genSrc.includes("from '../origins'"), 'generators.ts should import WORLD_LORE_DECENNIAL_IMMORTAL from ../origins');
+  assert(/buildPreviousLifeBackground[\s\S]*?WORLD_LORE_DECENNIAL_IMMORTAL/.test(genSrc), 'buildPreviousLifeBackground should append the lore constant');
+  log('smoke-t-008-world-lore-decennial-immortal', { passed: true });
+}
+
+function smokeT009ImmortalDescentTemplate(): void {
+  const mod = require('../src/lib/xianxia/world-event-scheduler.ts');
+  // FALLBACK_CONFIGS 包含 immortal_descent
+  const state = { age: 10, realm: 'mortal', ethnicity: 'human', lineage: 'mortal', previousWorldLegacies: [], worldEvent: { activeEvents: [], history: [] } };
+  const history = [];
+  const events = mod.getAvailableEvents(state, { eraName: '青岚', calendarYear: 5000, elapsedDays: 0 }, history, { limit: 100 });
+  const tpl = events.find((e) => e.type === 'immortal_descent');
+  assert(tpl, 'immortal_descent template should be available for age 10 mortal');
+  assert(tpl.title === '仙人下凡', `title should be 仙人下凡, got ${tpl.title}`);
+  assert(tpl.rarity === 'rare', `rarity should be rare, got ${tpl.rarity}`);
+  assert(tpl.triggerConditions.cooldown === 10, `cooldown should be 10, got ${tpl.triggerConditions.cooldown}`);
+  assert(tpl.triggerConditions.minAge === 6, `minAge should be 6, got ${tpl.triggerConditions.minAge}`);
+  assert(tpl.effectsTemplate.threadTitle === '仙人问渡', 'effects should register thread 仙人问渡');
+  assert(tpl.narrativeTemplate.includes('灵脉共振'), 'narrativeTemplate should encode decennial resonance');
+  log('smoke-t-009-immortal-descent-template', { passed: true });
+}
+
+function smokeT010ImmortalDescentDiscipleHook(): void {
+  const mod = require('../src/lib/xianxia/world-event-scheduler.ts');
+  // 1. detectImmortalDisciple 命中关键词
+  const positive = mod.detectImmortalDisciple('仙人见我灵根不凡，便收我为记名弟子，传我吐纳口诀。', 10);
+  assert(positive.isDisciple, 'narrative with 收为弟子 should be detected');
+  assert(positive.teacherName, 'teacher name should be extracted');
+
+  const negative = mod.detectImmortalDisciple('仙人看了一眼便驾鹤而去，未曾与我交谈半句。', 10);
+  assert(!negative.isDisciple, 'narrative without disciple keywords should NOT be detected');
+
+  // 2. applyWorldEvent 写入 legacies + 匹配 narrative 后写 teacherRef
+  const state = { age: 10, realm: 'mortal', ethnicity: 'human', lineage: 'mortal', previousWorldLegacies: [] };
+  const event = {
+    id: 'we-immortal-10-1',
+    type: 'immortal_descent',
+    triggeredAge: 10,
+    triggeredWorldTime: { eraName: '青岚', calendarYear: 5000, elapsedDays: 0 },
+    duration: 1,
+    effects: { threadTitle: '仙人问渡', previousWorldLegacies: '仙人亲授基础吐纳残篇' },
+    narrative: '仙人下凡模板',
+    appliedTo: 'this',
+  };
+  const narrative = '那年仙人正好路过我家村口，见我跪拜，便含笑将我收为记名弟子，赐号云深。';
+  const next = mod.applyWorldEvent(state, event, narrative);
+  assert(Array.isArray(next.previousWorldLegacies) && next.previousWorldLegacies.length >= 1, 'previousWorldLegacies should be appended');
+  assert(next.previousWorldLegacies[0].relicSeeds.includes('仙人亲授基础吐纳残篇'), 'legacy should include 仙人亲授基础吐纳残篇');
+  assert(next.teacherRef && typeof next.teacherRef === 'object', 'teacherRef should be written after disciple keyword match');
+  assert(next.teacherRef.sinceAge === 10, `teacherRef.sinceAge should be 10, got ${next.teacherRef.sinceAge}`);
+  assert(Array.isArray(next.sectHistory) && next.sectHistory.length >= 1, 'sectHistory should record the initiation');
+  assert(next.sectHistory[0].joinedAge === 10, 'sectHistory entry should record joinedAge');
+  log('smoke-t-010-immortal-descent-disciple-hook', { passed: true });
+}
+
+// 沉浸版 Phase-N: advance 路由主流程必须调 NPC tick —— 之前只挂在 store，没人调，前端看不到属性变化
+function smokeT011AdvanceRoutesTickNpcs(): void {
+  const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  assert(sseSrc.includes("from '@/lib/xianxia/npc-growth'"), 'advance-sse should import tickAllNpcsForYear');
+  assert(sseSrc.includes('tickAllNpcsForYear('), 'advance-sse should call tickAllNpcsForYear in main flow');
+  // 触发位置必须在 decayWorldEvents 之后（与年龄推进同步）
+  const decayIdx = sseSrc.indexOf('decayWorldEvents(finalState, yearsAdvanced)');
+  const tickIdx = sseSrc.indexOf('tickAllNpcsForYear(prevNpcs');
+  assert(decayIdx > 0 && tickIdx > decayIdx, 'NPC tick should be called after decayWorldEvents');
+  // 也接进非 sse advance 路由
+  const advSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  assert(advSrc.includes("from '@/lib/xianxia/npc-growth'"), 'advance should import tickAllNpcsForYear');
+  assert(advSrc.includes('tickAllNpcsForYear('), 'advance should call tickAllNpcsForYear');
+  // 行为断言：tickAllNpcsForYear 推一年后 npc.lastGrowth 应非空
+  const mod = require('../src/lib/xianxia/npc-growth.ts');
+  const npcs = [{ id: 'npc-x', name: '张三', firstMetAge: 12, lastSeenAge: 12, realm: 'mortal', attitude: 'friendly' as any, relationshipScore: 30, memory: '' }];
+  const result = mod.tickAllNpcsForYear(npcs, 1, 13);
+  assert(result.nextNpcs[0].lastGrowth, 'after tick, npc.lastGrowth should be defined');
+  assert(result.nextNpcs[0].combatAttrs, 'after tick, npc.combatAttrs should be defined');
+  log('smoke-t-011-advance-routes-tick-npcs', { passed: true });
+}
+
+// 沉浸版 Phase-N + Phase-8：主角年度属性成长（凡人）
+function smokeT012AnnualAttributeGrowthMortal(): void {
+  const mod = require('../src/lib/xianxia/engine/attributes.ts');
+  // 凡人 12 岁，rootMultiplier 0.3
+  const state = {
+    age: 12,
+    realm: 'mortal',
+    rootMultiplier: 0.3,
+    attack: 1,
+    defense: 1,
+    speed: 3,
+    maxHp: 30,
+    maxMp: 10,
+    physicalFoundation: 0,
+    spiritualSense: 0,
+    soulStrength: 0,
+    comprehension: 5,
+    luck: 5,
+    hp: 30,
+    mp: 10,
+  };
+  const r = mod.applyAnnualAttributeGrowth(state);
+  assert(r && r.state, 'applyAnnualAttributeGrowth should return state');
+  assert(r.state.attack > state.attack, `attack should grow: ${state.attack} → ${r.state.attack}`);
+  assert(r.state.physicalFoundation > 0, 'physicalFoundation should be > 0 after growth');
+  assert(r.state.spiritualSense >= 3, 'spiritualSense should be at least baseline');
+  // growth.delta 应有非零正数
+  assert(r.growth.attack > 0, `growth.attack should be positive, got ${r.growth.attack}`);
+  assert(r.growth.physicalFoundation > 0 || r.growth.spiritualSense > 0 || r.growth.soulStrength > 0,
+    'at least one of 8-dim attrs should grow');
+  // 推两年后，state 应该继续涨
+  const r2 = mod.applyAnnualAttributeGrowth({ ...r.state, age: r.state.age + 2 });
+  assert(r2.state.attack >= r.state.attack, `attack should keep growing on second tick: ${r.state.attack} → ${r2.state.attack}`);
+  log('smoke-t-012-annual-attribute-growth-mortal', { passed: true });
+}
+
+// 修真者 current 高于 baseline 时必须保留 current（不被压低）
+function smokeT013AnnualAttributeGrowthCultivator(): void {
+  const mod = require('../src/lib/xianxia/engine/attributes.ts');
+  const state = {
+    age: 50,
+    realm: 'foundation',
+    rootMultiplier: 1.0,
+    attack: 1000,
+    defense: 800,
+    speed: 200,
+    maxHp: 5000,
+    maxMp: 2000,
+    physicalFoundation: 1500,
+    spiritualSense: 1200,
+    soulStrength: 1100,
+    comprehension: 80,
+    luck: 40,
+    hp: 5000,
+    mp: 2000,
+  };
+  const r = mod.applyAnnualAttributeGrowth(state);
+  // current 必须不被压低
+  assert(r.state.attack >= state.attack, `cultivator attack should not decrease: ${state.attack} → ${r.state.attack}`);
+  assert(r.state.spiritualSense >= state.spiritualSense, `cultivator spiritualSense should not decrease`);
+  // 修真后 8 维应至少与原值持平或上涨
+  assert(r.state.physicalFoundation >= state.physicalFoundation, 'PF should not decrease');
+  // growth.delta 应允许为 0（修真巅峰时 baseline < current）
+  assert(typeof r.growth.attack === 'number', 'growth.attack should be number');
+  log('smoke-t-013-annual-attribute-growth-cultivator', { passed: true });
+}
+
+// 派生 force/guard/agility 必须随主项增长而刷新
+function smokeT014AnnualAttributeGrowthDerivedProjection(): void {
+  const mod = require('../src/lib/xianxia/engine/attributes.ts');
+  const state = {
+    age: 15,
+    realm: 'mortal',
+    rootMultiplier: 0.5,
+    attack: 5,
+    defense: 3,
+    speed: 5,
+    maxHp: 50,
+    maxMp: 20,
+    physicalFoundation: 0,
+    spiritualSense: 0,
+    soulStrength: 0,
+    comprehension: 10,
+    luck: 6,
+    hp: 50,
+    mp: 20,
+  };
+  const r = mod.applyAnnualAttributeGrowth(state);
+  assert(r.state.combatProjection, 'combatProjection should be populated');
+  assert(typeof r.state.combatProjection.force === 'number' && r.state.combatProjection.force > 0, 'force should be > 0');
+  assert(typeof r.state.combatProjection.guard === 'number' && r.state.combatProjection.guard > 0, 'guard should be > 0');
+  assert(typeof r.state.combatProjection.agility === 'number' && r.state.combatProjection.agility > 0, 'agility should be > 0');
+  // force = attack + spiritualSense*0.12 + comprehension*0.08 → 至少包含 attack
+  assert(r.state.combatProjection.force >= state.attack, `force >= attack: ${r.state.combatProjection.force} >= ${state.attack}`);
+  // 推一年后再次调用，force/guard/agility 应继续涨（神识/体魄/魂魄是 0.04~0.16 系数）
+  const r2 = mod.applyAnnualAttributeGrowth({ ...r.state, age: r.state.age + 5 });
+  assert(r2.state.combatProjection.force >= r.state.combatProjection.force,
+    `force should keep growing: ${r.state.combatProjection.force} → ${r2.state.combatProjection.force}`);
+  assert(r2.state.combatProjection.agility >= r.state.combatProjection.agility,
+    `agility should keep growing: ${r.state.combatProjection.agility} → ${r2.state.combatProjection.agility}`);
+  log('smoke-t-014-annual-attribute-growth-derived-projection', { passed: true });
+}
+
+// 沉浸版 Phase-Z: AI 成就系统
+function smokeT015AiAchievementsMarkerParse(): void {
+  const mod = require('../src/lib/xianxia/achievements.ts');
+  const narrative = '那年仙人正好路过我家村口。[ACHIEVEMENT:disciple-of-immortal] 见我根骨不错……[REWARD:scripture/rare/仙人吐纳残篇/前辈亲授的入门吐纳法]';
+  const parsed = mod.parseAchievementMarkers(narrative);
+  assert(parsed.length === 1, `should parse 1 achievement, got ${parsed.length}`);
+  assert(parsed[0].definition.id === 'disciple-of-immortal', `id should match, got ${parsed[0].definition.id}`);
+  assert(parsed[0].reward.category === 'scripture', `category should be scripture, got ${parsed[0].reward.category}`);
+  assert(parsed[0].reward.rarity === 'rare', `rarity should be rare, got ${parsed[0].reward.rarity}`);
+  assert(parsed[0].reward.name === '仙人吐纳残篇', `name should be 仙人吐纳残篇, got ${parsed[0].reward.name}`);
+  log('smoke-t-015-ai-achievements-marker-parse', { passed: true });
+}
+
+function smokeT016AiAchievementsApplyReward(): void {
+  const mod = require('../src/lib/xianxia/achievements.ts');
+  const state = { age: 10 };
+  const narrative = '[ACHIEVEMENT:first-decade] 主角悄然渡过十年……[REWARD:treasure/common/十年礼/初入江湖的小小心意]';
+  const parsed = mod.parseAchievementMarkers(narrative);
+  const result = mod.applyAchievements(state, parsed, { triggeredAge: 10 });
+  assert(result.newAchievements.length === 1, `should have 1 new achievement, got ${result.newAchievements.length}`);
+  const na = result.newAchievements[0];
+  assert(na.definition.id === 'first-decade', `id should be first-decade, got ${na.definition.id}`);
+  assert(na.reward.name === '十年礼', `reward name should be 十年礼, got ${na.reward.name}`);
+  // 应该附在 state 上供前端 hook 取出
+  assert(Array.isArray((state as any).__lastHeritageAdditions), '__lastHeritageAdditions should be populated on state');
+  assert((state as any).__lastHeritageAdditions[0].source === 'achievement:first-decade', 'source should reference achievement id');
+  // 二次 apply 同一 id 应去重
+  const parsed2 = mod.parseAchievementMarkers(narrative);
+  const already = new Set([na.definition.id]);
+  const r2 = mod.applyAchievements(state, parsed2, { triggeredAge: 11, alreadyTriggered: already });
+  assert(r2.newAchievements.length === 0, `duplicate apply should return 0 new, got ${r2.newAchievements.length}`);
+  log('smoke-t-016-ai-achievements-apply-reward', { passed: true });
+}
+
+function smokeT017AiAchievementsUnknownIdIgnored(): void {
+  const mod = require('../src/lib/xianxia/achievements.ts');
+  const narrative = '[ACHIEVEMENT:unknown-id-999] 自由发挥的内容……[REWARD:scripture/rare/瞎编/AI 不应编出未注册成就]';
+  const parsed = mod.parseAchievementMarkers(narrative);
+  assert(parsed.length === 0, `unknown id should be ignored, got ${parsed.length} parsed`);
+  log('smoke-t-017-ai-achievements-unknown-id-ignored', { passed: true });
+}
+
+// FxLayer + fx-store
+function smokeT018FxStoreEmitAndRemove(): void {
+  const mod = require('../src/components/xianxia/fx-store.ts');
+  const useFxStore = mod.useFxStore;
+  const { emitFxs, fxId } = mod;
+  const initial = useFxStore.getState().events.length;
+  emitFxs([
+    { id: fxId('delta'), kind: 'delta', label: '攻', value: 1 },
+    { id: fxId('delta'), kind: 'delta', label: '血', value: 3 },
+  ]);
+  const after = useFxStore.getState().events.length;
+  assert(after === initial + 2, `events should grow by 2, got ${after - initial}`);
+  // 清除
+  useFxStore.getState().clear();
+  assert(useFxStore.getState().events.length === 0, 'clear should empty events');
+  log('smoke-t-018-fx-store-emit-and-remove', { passed: true });
+}
+
+function smokeT019FxLayerRendersBreakthrough(): void {
+  const src = readFileSync('src/components/xianxia/FxLayer.tsx', 'utf-8');
+  assert(src.includes('BreakthroughOverlay'), 'FxLayer should export BreakthroughOverlay');
+  assert(src.includes('fx-breakthrough'), 'should use fx-breakthrough animation');
+  assert(src.includes('DropBurst'), 'FxLayer should include DropBurst for rare drops');
+  assert(src.includes('AchievementToast'), 'FxLayer should include AchievementToast');
+  // mount in page.tsx
+  const pageSrc = readFileSync('src/app/page.tsx', 'utf-8');
+  assert(pageSrc.includes('<FxLayer />'), 'page.tsx should mount <FxLayer />');
+  log('smoke-t-019-fx-layer-renders-breakthrough', { passed: true });
+}
+
+function smokeT020RealmOrbProgress(): void {
+  const src = readFileSync('src/components/xianxia/RealmOrb.tsx', 'utf-8');
+  assert(src.includes('data-testid="realm-orb-progress"'), 'RealmOrb should expose progress testid');
+  assert(src.includes('nearBreak'), 'RealmOrb should compute nearBreak flag');
+  assert(src.includes('animate-pulse'), 'RealmOrb should pulse on near-break');
+  log('smoke-t-020-realm-orb-progress', { passed: true });
+}
+
+function smokeT021AdvanceEmitsBreakthroughFlag(): void {
+  const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  assert(sseSrc.includes('__lastBreakthrough'), 'advance-sse should write __lastBreakthrough on breakthrough');
+  const advSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  assert(advSrc.includes('__lastBreakthrough'), 'advance should write __lastBreakthrough on breakthrough');
+  log('smoke-t-021-advance-emits-breakthrough-flag', { passed: true });
+}
+
+// 沉浸版 Phase-Z: AI 完全主导奖励（不卡白名单）
+function smokeT022AiRewardCustomCategory(): void {
+  const mod = require('../src/lib/xianxia/achievements.ts');
+  // category 是白名单之外的字符串（elixir / memory-fragment）+ rarity 自定义（divine / ancient）
+  const narrative = '[ACHIEVEMENT:qi-refining] 那年主角第一次引气入体……[REWARD:elixir/divine/九转金丹/炼化后突破无瓶颈]';
+  const parsed = mod.parseAchievementMarkers(narrative);
+  assert(parsed.length === 1, `should parse 1, got ${parsed.length}`);
+  const r = parsed[0].reward;
+  assert(r.category === 'elixir', `category should be elixir (custom), got ${r.category}`);
+  assert(r.rarity === 'divine', `rarity should be divine (custom), got ${r.rarity}`);
+  assert(r.name === '九转金丹', `name should be 九转金丹, got ${r.name}`);
+  log('smoke-t-022-ai-reward-custom-category', { passed: true });
+}
+
+function smokeT023AiRewardExtractFromNarrative(): void {
+  const mod = require('../src/lib/xianxia/achievements.ts');
+  // AI 忘了写 [REWARD]，但 narrative 里出现「被赐 X」「获得 X」等动词
+  const narrative = '[ACHIEVEMENT:disciple-of-immortal] 仙人见我根骨不错，便含笑将「清心诀」传我入门，清风拂面。';
+  const parsed = mod.parseAchievementMarkers(narrative);
+  assert(parsed.length === 1, `should parse 1, got ${parsed.length}`);
+  const r = parsed[0].reward;
+  assert(r.name === '清心诀', `extracted name should be 清心诀, got ${r.name}`);
+  // description 应来自整段 body 截断
+  assert(typeof r.description === 'string' && r.description.length > 0, 'description should be populated');
+  log('smoke-t-023-ai-reward-extract-from-narrative', { passed: true });
+}
+
+function smokeT024AiRewardDefaultFallback(): void {
+  const mod = require('../src/lib/xianxia/achievements.ts');
+  // narrative 完全不提奖励（甚至没 [REWARD] 也没动词）→ 兜底 default
+  const narrative = '[ACHIEVEMENT:century-mark] 主角悄然渡过百年。';
+  const parsed = mod.parseAchievementMarkers(narrative);
+  assert(parsed.length === 1, `should parse 1, got ${parsed.length}`);
+  const r = parsed[0].reward;
+  // name 应来自 def.name + 之礼
+  assert(r.name === '百年沧桑之礼', `default name should be 百年沧桑之礼, got ${r.name}`);
+  assert(r.category === 'artifact', `default category should be artifact, got ${r.category}`);
+  assert(r.rarity === 'rare', `default rarity should be rare, got ${r.rarity}`);
+  log('smoke-t-024-ai-reward-default-fallback', { passed: true });
+}
+
+// 沉浸版 Phase-Life: 寿命公式 + 死亡过渡 + 延寿
+function smokeT025DeriveLifespanMortal(): void {
+  const mod = require('../src/lib/xianxia/realm-lifespan.ts');
+  // 凡人 default cap 80：rootMultiplier 0.3，no body → max(80, 24) = 80
+  const lowMul = mod.deriveLifespanFromState({ realm: 'mortal', rootMultiplier: 0.3, physicalFoundation: 0, lifespan: 80 });
+  assert(lowMul === 80, `mortal default 80, got ${lowMul}`);
+  // 仙门嫡传 + 单灵根 + 体魄破百 → 应明显超过 80
+  // computed = 80 × 1.0 × (1 + 100/100*0.5) × (1 + 0.15 + 0.10) = 80 × 1.5 × 1.25 = 150
+  const highMul = mod.deriveLifespanFromState({ realm: 'mortal', rootMultiplier: 1.0, physicalFoundation: 100 }, { lineageBoost: 0.15, ethnicityBoost: 0.10 });
+  assert(highMul > 80, `sect_heir mortal should be > 80, got ${highMul}`);
+  // 体魄 200 + bodyMul 2.0 + 灵根 0.5 → 80 × 0.5 × 2.0 × 1.0 = 80，与 lowMul 相等（公式正确）
+  // 改测：体魄 200 + 灵根 0.7 → 80 × 0.7 × 2.0 = 112
+  const bodyBoost = mod.deriveLifespanFromState({ realm: 'mortal', rootMultiplier: 0.7, physicalFoundation: 200, lifespan: 80 });
+  assert(bodyBoost > lowMul, `body boost should raise lifespan: ${lowMul} → ${bodyBoost}`);
+  log('smoke-t-025-derive-lifespan-mortal', { passed: true });
+}
+
+function smokeT026DeriveLifespanCultivator(): void {
+  const mod = require('../src/lib/xianxia/realm-lifespan.ts');
+  // 炼气期 rootMultiplier 1.0 → base 120
+  const qi = mod.deriveLifespanFromState({ realm: 'qi_refining', rootMultiplier: 1.0, physicalFoundation: 50 });
+  assert(qi >= 120, `qi_refining lifespan should be >= 120, got ${qi}`);
+  // 金丹期 → base 500
+  const jin = mod.deriveLifespanFromState({ realm: 'golden_core', rootMultiplier: 1.5, physicalFoundation: 100 });
+  assert(jin >= 500, `golden_core lifespan should be >= 500, got ${jin}`);
+  // 修真者 current 上限保留：传入 state.lifespan=1000 修真者，computed < 1000 时取 1000
+  const cur = mod.deriveLifespanFromState({ realm: 'qi_refining', rootMultiplier: 0.5, physicalFoundation: 0, lifespan: 1000 });
+  assert(cur === 1000, `cultivator current preserved, got ${cur}`);
+  log('smoke-t-026-derive-lifespan-cultivator', { passed: true });
+}
+
+function smokeT027LifespanNearDeathTransition(): void {
+  const mod = require('../src/lib/xianxia/realm-lifespan.ts');
+  // 凡人 80 → age 80 第一年：getLifePhase 应 near-death
+  const phase1 = mod.getLifePhase({ alive: true, age: 80, lifespan: 80 });
+  assert(phase1 === 'near-death', `age=lifespan should be near-death, got ${phase1}`);
+  // 修真者已延寿 age 99 / lifespan 100：未到
+  const alive = mod.getLifePhase({ alive: true, age: 99, lifespan: 100 });
+  assert(alive === 'alive', `age<lifespan should be alive, got ${alive}`);
+  // 已 nearDeath 且 age > nearDeathYear → transition（实际应死）
+  const trans = mod.getLifePhase({ alive: true, age: 81, lifespan: 80, nearDeath: true, nearDeathYear: 80 });
+  assert(trans === 'transition', `second year should be transition, got ${trans}`);
+  // alive=false → dead
+  const dead = mod.getLifePhase({ alive: false });
+  assert(dead === 'dead', `not alive should be dead, got ${dead}`);
+  // 死亡过渡在 extend 后被清掉
+  const recovered = mod.getLifePhase({ alive: true, age: 80, lifespan: 130, nearDeath: false });
+  assert(recovered === 'alive', `extended lifespan should be alive, got ${recovered}`);
+  log('smoke-t-027-lifespan-near-death-transition', { passed: true });
+}
+
+function smokeT028LifespanNarrativeExtension(): void {
+  const mod = require('../src/lib/xianxia/realm-lifespan.ts');
+  // narrative 含"延寿" → 触发 minor +20
+  const minor = mod.detectLifespanExtension('仙人赠了一枚延年益寿丹。');
+  assert(minor && minor.extended >= 20, `minor should extend >= 20, got ${minor && minor.extended}`);
+  // narrative 含"服用九转金丹" → major-pill +50
+  const pill = mod.detectLifespanExtension('主角服下九转金丹，顿觉生机充盈。');
+  assert(pill && pill.extended >= 40, `major-pill should extend >= 40, got ${pill && pill.extended}`);
+  // narrative 含"仙人赐" → immortal-favor +100
+  const favor = mod.detectLifespanExtension('仙人赐下续命法旨，饶你不死。');
+  assert(favor && favor.extended >= 100, `immortal-favor should extend >= 100, got ${favor && favor.extended}`);
+  // 普通 narrative 不触发
+  const none = mod.detectLifespanExtension('主角在山间漫步，无所事事。');
+  assert(none === null, `normal narrative should not trigger, got ${none}`);
+  log('smoke-t-028-lifespan-narrative-extension', { passed: true });
+}
+
+function smokeT029AdvanceRoutesCallDeriveLifespan(): void {
+  const sseSrc = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  assert(sseSrc.includes('deriveLifespanFromState'), 'advance-sse should call deriveLifespanFromState');
+  assert(sseSrc.includes('detectLifespanExtension'), 'advance-sse should call detectLifespanExtension');
+  assert(/nearDeath:\s*true|nearDeath\s*=\s*true/.test(sseSrc), 'advance-sse should set nearDeath on first crossing');
+  const advSrc = readFileSync('src/app/api/game/advance/route.ts', 'utf-8');
+  assert(advSrc.includes('detectLifespanExtension'), 'advance should call detectLifespanExtension');
+  // 死亡过渡在 lifecycle.ts
+  const lcSrc = readFileSync('src/lib/xianxia/engine/lifecycle.ts', 'utf-8');
+  assert(lcSrc.includes('nearDeathYear'), 'lifecycle.ts should track nearDeathYear');
+  assert(/nearDeath:\s*true|nearDeath\s*=\s*true/.test(lcSrc), 'lifecycle.ts should set nearDeath on first crossing');
+  log('smoke-t-029-advance-routes-call-derive-lifespan', { passed: true });
+}
+
 function pgRunPhaseTNpcGrowthSmokes(): void {
   const cases = [
     { name: 'smoke-t-001-npc-growth-helper-exists', fn: smokeT001NpcGrowthHelperExists },
     { name: 'smoke-t-002-npc-growth-advances-age', fn: smokeT002NpcGrowthAdvancesAge },
     { name: 'smoke-t-003-npc-growth-can-die', fn: smokeT003NpcGrowthCanDie },
     { name: 'smoke-t-004-npc-growth-panel-renders', fn: smokeT004NpcGrowthPanelRenders },
+    { name: 'smoke-t-005-npc-body-growth-written', fn: smokeT005NpcBodyGrowthWritten },
+    { name: 'smoke-t-006-npc-aging-decay', fn: smokeT006NpcAgingDecay },
+    { name: 'smoke-t-007-npc-growth-panel-renders-attr-badges', fn: smokeT007NpcGrowthPanelRendersAttrBadges },
+    { name: 'smoke-t-008-world-lore-decennial-immortal', fn: smokeT008WorldLoreDecennialImmortal },
+    { name: 'smoke-t-009-immortal-descent-template', fn: smokeT009ImmortalDescentTemplate },
+    { name: 'smoke-t-010-immortal-descent-disciple-hook', fn: smokeT010ImmortalDescentDiscipleHook },
+    { name: 'smoke-t-011-advance-routes-tick-npcs', fn: smokeT011AdvanceRoutesTickNpcs },
+    { name: 'smoke-t-012-annual-attribute-growth-mortal', fn: smokeT012AnnualAttributeGrowthMortal },
+    { name: 'smoke-t-013-annual-attribute-growth-cultivator', fn: smokeT013AnnualAttributeGrowthCultivator },
+    { name: 'smoke-t-014-annual-attribute-growth-derived-projection', fn: smokeT014AnnualAttributeGrowthDerivedProjection },
+    { name: 'smoke-t-015-ai-achievements-marker-parse', fn: smokeT015AiAchievementsMarkerParse },
+    { name: 'smoke-t-016-ai-achievements-apply-reward', fn: smokeT016AiAchievementsApplyReward },
+    { name: 'smoke-t-017-ai-achievements-unknown-id-ignored', fn: smokeT017AiAchievementsUnknownIdIgnored },
+    { name: 'smoke-t-018-fx-store-emit-and-remove', fn: smokeT018FxStoreEmitAndRemove },
+    { name: 'smoke-t-019-fx-layer-renders-breakthrough-overlay', fn: smokeT019FxLayerRendersBreakthrough },
+    { name: 'smoke-t-020-realm-orb-progress-near-break', fn: smokeT020RealmOrbProgress },
+    { name: 'smoke-t-021-advance-emits-breakthrough-flag', fn: smokeT021AdvanceEmitsBreakthroughFlag },
+    { name: 'smoke-t-022-ai-reward-custom-category', fn: smokeT022AiRewardCustomCategory },
+    { name: 'smoke-t-023-ai-reward-extract-from-narrative', fn: smokeT023AiRewardExtractFromNarrative },
+    { name: 'smoke-t-024-ai-reward-default-fallback', fn: smokeT024AiRewardDefaultFallback },
+    { name: 'smoke-t-025-derive-lifespan-mortal', fn: smokeT025DeriveLifespanMortal },
+    { name: 'smoke-t-026-derive-lifespan-cultivator-realm', fn: smokeT026DeriveLifespanCultivator },
+    { name: 'smoke-t-027-lifespan-near-death-transition', fn: smokeT027LifespanNearDeathTransition },
+    { name: 'smoke-t-028-lifespan-narrative-extension', fn: smokeT028LifespanNarrativeExtension },
+    { name: 'smoke-t-029-advance-routes-call-derive-lifespan', fn: smokeT029AdvanceRoutesCallDeriveLifespan },
   ];
   for (const c of cases) {
     try {
@@ -2419,10 +2902,17 @@ function smokeBodyGrowth(): void {
   assert(state.attack === 30, `修仙后 80岁 attack 保留: ${state.attack} (baseline ${Math.round(5 * 0.65 * 1.5)})`);
   assert(state.maxHp === 200, `修仙后 80岁 maxHp 保留: ${state.maxHp}`);
 
-  // 测试 9: 修仙境界倍率
+  // 测试 9: 修仙境界倍率——生长期不区分境界，衰退段按境界寿元拉伸
+  // 25 岁金丹 = 25 岁凡人 (壮年 baseline * 3 倍境界)
   const golden = { ...baseMortal, realm: 'golden_core' };
   state = applyAgeBasedBodyGrowth(golden, 25).state;
-  assert(state.attack === 15, `金丹 25岁 attack = 5*1*3 = 15: ${state.attack}`);
+  assert(state.attack === 15, `金丹 25岁 attack = 5 * 1.0 * 3 = 15: ${state.attack}`);
+  // 100 岁金丹 = 生理 45 岁 (仍近壮年)
+  state = applyAgeBasedBodyGrowth(golden, 100).state;
+  assert(state.attack >= 14, `金丹 100岁 (生理约45) attack ≈ 15: ${state.attack}`);
+  // 500 岁金丹 = 生理 100 岁 (寿终耄耋)
+  state = applyAgeBasedBodyGrowth(golden, 500).state;
+  assert(state.attack <= 8, `金丹 500岁 (寿终) attack 明显衰: ${state.attack}`);
 
   // 测试 10: 100 岁耄耋
   state = applyAgeBasedBodyGrowth(baseMortal, 100).state;
@@ -2497,13 +2987,13 @@ function smokeBodyGrowthWithNarrative(): void {
   let s = applyAgeBasedBodyGrowth(baseMortal, 25, '他打猎归来，酒足饭饱，身体健壮。').state;
   assert(s.attack === 5, `25岁健康凡人 attack=5: ${s.attack}`);
 
-  // 测试 2: 25 岁体弱凡人 → attack 应该是 round(5*1*0.5)=round(2.5)=3 但 current 0 → max(0, 3) = 3
+  // 测试 2: 25 岁体弱凡人 → floor(5*1*0.5)=floor(2.5)=2（新浮点残余 floor 语义）
   s = applyAgeBasedBodyGrowth(baseMortal, 25, '他自幼体弱，瘦弱不堪，连锄头都举不起。').state;
-  assert(s.attack === 3, `25岁体弱凡人 attack=3: ${s.attack}`);
+  assert(s.attack === 2, `25岁体弱凡人 attack=2: ${s.attack}`);
 
-  // 测试 3: 25 岁缠绵病榻 → attack 应该是 round(5*0.3)=round(1.5)=2
+  // 测试 3: 25 岁缠绵病榻 → floor(5*0.3)=floor(1.5)=1
   s = applyAgeBasedBodyGrowth(baseMortal, 25, '他缠绵病榻，气息奄奄，濒临死亡。').state;
-  assert(s.attack === 2, `25岁重病凡人 attack=2: ${s.attack}`);
+  assert(s.attack === 1, `25岁重病凡人 attack=1: ${s.attack}`);
 
   // 测试 4: 修仙后 25 岁 + 重病叙事 → attack 保留修仙巅峰
   const advanced = { ...baseMortal, attack: 30, defense: 30, speed: 30, maxHp: 200, realm: 'golden_core' };

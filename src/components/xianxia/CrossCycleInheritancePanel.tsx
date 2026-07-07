@@ -25,7 +25,7 @@ const KIND_LABEL: Record<string, string> = {
   unknown: '未明',
 };
 
-export function CrossCycleInheritancePanel({ character, heritageVault, claimedPoolIds, defaultCollapsed = true }: Props) {
+export function CrossCycleInheritancePanel({ character, heritageVault, claimedPoolIds, defaultCollapsed = false }: Props) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const charAge = character?.age ?? 0;
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 import { useGameStore } from '@/lib/xianxia/store';
 import { StartScreen } from '@/components/xianxia/StartScreen';
 import { StatusPanel } from '@/components/xianxia/StatusPanel';
@@ -30,15 +31,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, ScrollText, Compass, GitBranch, Users, Sword, Globe } from 'lucide-react';
 import { ResetWorldButton } from '@/components/xianxia/ResetWorldButton';
 import { NpcGrowthPanel } from '@/components/xianxia/NpcGrowthPanel';
+import { NpcMiniBar } from '@/components/xianxia/NpcMiniBar';
 import { CrossCycleInheritancePanel } from '@/components/xianxia/CrossCycleInheritancePanel';
 import { SectStorylinePanel } from '@/components/xianxia/SectStorylinePanel';
 import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
 import { AlchemyFurnace } from '@/components/xianxia/AlchemyFurnace';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
 import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
+import { AchievementsPanel } from '@/components/xianxia/AchievementsPanel';
 import { CultivationSpeedCard } from '@/components/xianxia/CultivationSpeedCard';
 import { CharacterDetailSheet } from '@/components/xianxia/CharacterDetailSheet';
 import { RealmOrb } from '@/components/xianxia/RealmOrb';
+import { FxLayer } from '@/components/xianxia/FxLayer';
+import { useFxFromCharacter } from '@/components/xianxia/use-fx-from-state';
 
 // 客户端 hydration 检测：避免 SSR/CSR mismatch
 // 用微任务延迟 setState，避免在 effect body 同步调用触发 react-hooks 规则
@@ -68,6 +73,8 @@ export default function Home() {
   // Phase-M: 自动存档（年龄推进、突破、死亡、关键剧情时自动写入槽 3）
   const lastBreakthrough = character?.lastBreakthrough;
   const lastDeath = character?.causeOfDeath ?? null;
+  // 沉浸版 Phase-Z: 把 character 上的瞬时事件翻译成飘字 / 突破 / 成就 toast
+  useFxFromCharacter({ character });
   useAutoSave({
     character,
     worldCalendar: useGameStore.getState().worldCalendar,
@@ -124,6 +131,77 @@ export default function Home() {
   const storyScrollTopRef = useRef(0);
   const settlingCharacterIdRef = useRef<string | null>(null);
 
+  // ===== 触屏左右滑动切换主 Tab (含实时跟手动画) =====
+  // 顺序:道途 → 命途 → 传承 → 人情 → 修行(与 TabsList 顺序一致)。
+  // 手指向左滑(swipe-left) = 下一个 tab;向右滑 = 上一个。不循环。
+  // 只识别水平主导且位移 > 阈值的滑动;有 pendingChoice/战斗结算时锁在 story 不切。
+  // 拖动过程中滑轨实时跟手(dragOffset),松手后由 CSS transition 平滑收拢到目标 tab。
+  const MAIN_TAB_ORDER = ['story', 'xiuxing', 'mingtu', 'chuancheng', 'renqing'];
+  const SWIPE_MIN_DIST = 60;      // 最小水平位移(px)才切换 tab
+  const SWIPE_MAX_OFF_AXIS = 40;  // 垂直位移超过此值则视为滚动而非滑动
+  const swipeStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
+  const swipeAxisRef = useRef<'unknown' | 'x' | 'y'>('unknown');
+  const [swipeDragOffset, setSwipeDragOffset] = useState(0);
+  const [swipeDragging, setSwipeDragging] = useState(false);
+  const isMainTab = MAIN_TAB_ORDER.indexOf(effectiveTab) >= 0;
+  const mainTabIdx = Math.max(0, MAIN_TAB_ORDER.indexOf(effectiveTab));
+
+  const handleSwipeStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) { swipeStartRef.current = null; return; }
+    const t = e.touches[0];
+    swipeStartRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+    swipeAxisRef.current = 'unknown';
+  }, []);
+
+  const handleSwipeMove = useCallback((e: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    if (!start) return;
+    if (pendingChoice || combatResultPending) return;
+    if (!isMainTab) return; // 兼容 tab 不参与滑轨动画
+    const t = e.touches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    // 首次判定滑动方向:哪个先超过 8px 就锁死轴向
+    if (swipeAxisRef.current === 'unknown') {
+      if (absX < 8 && absY < 8) return;
+      swipeAxisRef.current = absX > absY ? 'x' : 'y';
+    }
+    if (swipeAxisRef.current !== 'x') return; // 垂直滚动,不干扰
+    // 到头时加阻尼:第一个/最后一个 tab 反方向滑只跟一半
+    let offset = dx;
+    if ((mainTabIdx === 0 && dx > 0) || (mainTabIdx === MAIN_TAB_ORDER.length - 1 && dx < 0)) {
+      offset = dx * 0.35;
+    }
+    setSwipeDragging(true);
+    setSwipeDragOffset(offset);
+  }, [pendingChoice, combatResultPending, isMainTab, mainTabIdx]);
+
+  const handleSwipeEnd = useCallback((e: React.TouchEvent) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    const wasDragging = swipeDragging;
+    setSwipeDragging(false);
+    setSwipeDragOffset(0);
+    if (!start) return;
+    if (pendingChoice || combatResultPending) return;
+    if (!isMainTab) return;
+    if (swipeAxisRef.current !== 'x') return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    if (absX < SWIPE_MIN_DIST) return;
+    if (absY > SWIPE_MAX_OFF_AXIS && absY > absX * 0.6) return;
+    const nextIdx = dx < 0 ? mainTabIdx + 1 : mainTabIdx - 1;
+    if (nextIdx < 0 || nextIdx >= MAIN_TAB_ORDER.length) return;
+    setTab(MAIN_TAB_ORDER[nextIdx]);
+    // 松手后 dragOffset 归零 + tab 切换,滑轨会通过 CSS transition 平滑收拢到目标位置
+    void wasDragging;
+  }, [pendingChoice, combatResultPending, isMainTab, mainTabIdx, swipeDragging]);
+
   useEffect(() => {
     if (!hydrated) return;
     if (typeof window === 'undefined') return;
@@ -147,6 +225,26 @@ export default function Home() {
       if (storyScrollRef.current) storyScrollRef.current.scrollTop = top;
     });
   }, [effectiveTab]);
+
+  // 剧情节点内联出现时（渡劫/飞升/禁制/抉择/结算），自动滚到底部，让新节点进入视口
+  const hasStoryNode = !!(pendingChoice
+    || settlementResult
+    || character?.tribulationPending
+    || character?.ascensionPending
+    || character?.restrictionPending);
+  const prevHasStoryNodeRef = useRef(false);
+  useEffect(() => {
+    if (hasStoryNode && !prevHasStoryNodeRef.current) {
+      // 从无到有：滚到底
+      const node = storyScrollRef.current;
+      if (node) {
+        requestAnimationFrame(() => {
+          node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+        });
+      }
+    }
+    prevHasStoryNodeRef.current = hasStoryNode;
+  }, [hasStoryNode]);
 
   // 页面挂载/刷新时，若有持久化的 character 但无 events，则拉取完整状态
   useEffect(() => {
@@ -281,58 +379,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* AI-72: L3 modals 占位（飞升/禁制），按 character 状态条件渲染 */}
-            {character.ascensionPending && (
-              <div className="shrink-0 px-3 pb-2" data-testid="ascension-section">
-                <AscensionModal
-                  session={character.ascensionPending}
-                  onRoll={async () => {/* 由 store / route 触发 */}}
-                  onEnd={async () => {/* 由 store / route 触发 */}}
-                />
-              </div>
-            )}
-            {character.restrictionPending && (
-              <div className="shrink-0 px-3 pb-2" data-testid="restriction-section">
-                <RestrictionModal
-                  restriction={character.restrictionPending}
-                  onInteract={async () => {/* 由 store / route 触发 */}}
-                />
-              </div>
-            )}
-
-            {/* AI-74: TribulationModal 接入（onBolt → /api/game/tribulation/action, onEnd → /api/game/tribulation/end） */}
-            {character.tribulationPending && (
-              <div className="shrink-0 px-3 pb-2" data-testid="tribulation-section">
-                <TribulationModal
-                  session={character.tribulationPending}
-                  onBolt={async (boltNumber) => {
-                    // P1-2 修复：前端不再发送任何 roll/数值字段，避免玩家 DevTools 反复触发直到 random >= 0.5 刷渡劫。
-                    // characterRoll / heartDemon / soulStrength / bondedArtifactResonance 全部由后端从 character 派生（确定性 hash 算 roll）。
-                    await fetch('/api/game/tribulation/action', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        action: 'bolt',
-                        characterId: character.id,
-                        boltNumber,
-                      }),
-                    });
-                  }}
-                  onHeartDemon={async () => {/* 由心魔面板触发 */}}
-                  onEnd={async () => {
-                    await fetch('/api/game/tribulation/end', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        sessionId: character.tribulationPending?.id ?? '',
-                        outcome: 'passed',
-                        boltsCompleted: character.tribulationPending?.boltsCompleted ?? 0,
-                      }),
-                    });
-                  }}
-                />
-              </div>
-            )}
+            {/* 剧情节点全部下移到 story 滚动容器内（EventTimeline 后紧接内联出现）。 */}
 
             {/* ===== 5 个主 Tab 切换 ===== */}
             <div className="shrink-0 px-3 pb-2" data-testid="main-tab-list">
@@ -341,6 +388,10 @@ export default function Home() {
                   <TabsTrigger value="story" className="text-[10px] sm:text-xs gap-1">
                     <BookOpen className="w-3 h-3" />
                     <span>道途</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="xiuxing" className="text-[10px] sm:text-xs gap-1">
+                    <Sword className="w-3 h-3" />
+                    <span>修行</span>
                   </TabsTrigger>
                   <TabsTrigger value="mingtu" className="text-[10px] sm:text-xs gap-1">
                     <Compass className="w-3 h-3" />
@@ -353,10 +404,6 @@ export default function Home() {
                   <TabsTrigger value="renqing" className="text-[10px] sm:text-xs gap-1">
                     <Users className="w-3 h-3" />
                     <span>人情</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="xiuxing" className="text-[10px] sm:text-xs gap-1">
-                    <Sword className="w-3 h-3" />
-                    <span>修行</span>
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -373,65 +420,138 @@ export default function Home() {
             </div>
 
             {/* ===== Tab 内容区 ===== */}
-            <div className="flex-1 overflow-hidden">
-              <Tabs value={effectiveTab} onValueChange={setTab} className="h-full">
-                {/* 道途（原 story：互动叙事 + 战斗） */}
-                <TabsContent value="story" forceMount className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full flex flex-col">
+            {/* 触屏左右滑动切主 tab:道途 ↔ 命途 ↔ 传承 ↔ 人情 ↔ 修行 */}
+            <div
+              className="flex-1 overflow-hidden relative"
+              onTouchStart={handleSwipeStart}
+              onTouchMove={handleSwipeMove}
+              onTouchEnd={handleSwipeEnd}
+              data-testid="main-tab-swipe-zone"
+            >
+              {/* 5 个主 tab 走横向滑轨:所有 tab 并排渲染,translateX 定位到当前 tab */}
+              {/* dragOffset 在触屏拖动时提供实时跟手偏移;松手后由 setTab 触发 CSS transition 平滑收拢 */}
+              {isMainTab ? (
+                <div
+                  className={cn(
+                    'h-full flex',
+                    swipeDragging ? '' : 'transition-transform duration-300 ease-out',
+                  )}
+                  style={{
+                    width: `${MAIN_TAB_ORDER.length * 100}%`,
+                    transform: `translate3d(calc(${-mainTabIdx * (100 / MAIN_TAB_ORDER.length)}% + ${swipeDragOffset}px), 0, 0)`,
+                  }}
+                >
+                  {/* 道途(story):互动叙事 + 战斗 */}
+                  <div className="h-full flex flex-col" style={{ width: `${100 / MAIN_TAB_ORDER.length}%` }}>
                     <div
                       ref={storyScrollRef}
                       onScroll={(e) => { storyScrollTopRef.current = e.currentTarget.scrollTop; }}
                       className="flex-1 overflow-y-auto xianxia-scroll px-3 pb-2"
                     >
+                      <NpcMiniBar />
                       <EventTimeline events={events} newEventRange={newEventRange ?? undefined} streamingEvent={streamingNarrative ?? undefined} settlingHint={settlingHint} />
+
+                      {/* 剧情节点内联区：紧接最新事件出现，玩家在剧情流内完成交互 */}
+                      {character.tribulationPending && (
+                        <div data-testid="tribulation-section">
+                          <TribulationModal
+                            session={character.tribulationPending}
+                            onBolt={async (boltNumber) => {
+                              // P1-2 修复：前端不再发送任何 roll/数值字段，避免玩家 DevTools 反复触发直到 random >= 0.5 刷渡劫。
+                              // characterRoll / heartDemon / soulStrength / bondedArtifactResonance 全部由后端从 character 派生（确定性 hash 算 roll）。
+                              await fetch('/api/game/tribulation/action', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  action: 'bolt',
+                                  characterId: character.id,
+                                  boltNumber,
+                                }),
+                              });
+                            }}
+                            onHeartDemon={async () => {/* 由心魔面板触发 */}}
+                            onEnd={async () => {
+                              await fetch('/api/game/tribulation/end', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  sessionId: character.tribulationPending?.id ?? '',
+                                  outcome: 'passed',
+                                  boltsCompleted: character.tribulationPending?.boltsCompleted ?? 0,
+                                }),
+                              });
+                            }}
+                          />
+                        </div>
+                      )}
+                      {character.ascensionPending && (
+                        <div data-testid="ascension-section">
+                          <AscensionModal
+                            session={character.ascensionPending}
+                            onRoll={async () => {/* 由 store / route 触发 */}}
+                            onEnd={async () => {/* 由 store / route 触发 */}}
+                          />
+                        </div>
+                      )}
+                      {character.restrictionPending && (
+                        <div data-testid="restriction-section">
+                          <RestrictionModal
+                            restriction={character.restrictionPending}
+                            onInteract={async () => {/* 由 store / route 触发 */}}
+                          />
+                        </div>
+                      )}
+                      <ChoiceModal />
+                      <SettlementModal />
                     </div>
-                    {/* 推进按钮 */}
-                    <div className="shrink-0 px-3 py-2 border-t border-border/40 bg-card/40">
-                      <ActionButtons />
+                    {!pendingChoice
+                      && !character.tribulationPending
+                      && !character.ascensionPending
+                      && !character.restrictionPending
+                      && !settlementResult && (
+                      <div className="shrink-0 px-3 py-2 border-t border-border/40 bg-card/40">
+                        <ActionButtons />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 修行(xiuxing):修炼速度 + 秘境 + 宝物 + 修为印记 */}
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2" style={{ width: `${100 / MAIN_TAB_ORDER.length}%` }}>
+                    <div data-testid="cultivation-speed-section">
+                      <CultivationSpeedCard />
+                    </div>
+                    <div data-testid="secret-realm-section" className="hidden" />
+                    <div data-testid="inventory-section">
+                      <InventoryPanel />
+                    </div>
+                    <div data-testid="achievements-section">
+                      <AchievementsPanel />
                     </div>
                   </div>
-                </TabsContent>
 
-                {/* 状态（兼容原 status tab - 通过 setTab('status') 触发） */}
-                <TabsContent value="status" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
-                    <StatusList />
-                  </div>
-                </TabsContent>
-
-                {/* 史册（兼容原 scroll tab - 通过 setTab('scroll') 触发） */}
-                <TabsContent value="scroll" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
-                    <MilestonesLog />
-                  </div>
-                </TabsContent>
-
-                {/* 命途：轮回投影 + 因缘长河 + 命运终章 */}
-                <TabsContent value="mingtu" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
+                  {/* 命途(mingtu):轮回投影 + 因缘长河 + 命运终章 */}
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2" style={{ width: `${100 / MAIN_TAB_ORDER.length}%` }}>
                     <div data-testid="cycle-projection-section">
                       <CycleProjectionPanel
                         character={character}
                         defaultCollapsed={true}
                       />
                     </div>
-                    {/* EndingPanel 结局谱：剧透性过强，玩家没玩完就知道所有结局，破坏沉浸 → 不展示 */}
-                    {/* YinyuanTimelinePanel 命途时间线：暴露伏笔/预兆，让玩家主动制造触发条件，破坏 AI 涌现叙事 → 不展示 */}
+                    {/* EndingPanel 结局谱:剧透性过强,不展示 */}
+                    {/* YinyuanTimelinePanel 命途时间线:暴露伏笔,不展示 */}
                   </div>
-                </TabsContent>
 
-                {/* 传承：跨周目传承 + 继承池（仅轮回）+ 存档 */}
-                <TabsContent value="chuancheng" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
+                  {/* 传承(chuancheng):跨周目传承 + 继承池 + 存档 */}
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2" style={{ width: `${100 / MAIN_TAB_ORDER.length}%` }}>
                     <div data-testid="cross-cycle-section">
                       <CrossCycleInheritancePanel
                         character={character}
-                        defaultCollapsed={true}
+                        defaultCollapsed={false}
                       />
                     </div>
                     {character?.alive === false && (
                       <div data-testid="inheritance-section-wrapper">
-                        <InheritancePoolPanel defaultCollapsed={true} />
+                        <InheritancePoolPanel defaultCollapsed={false} />
                       </div>
                     )}
                     <div data-testid="save-slot-section">
@@ -442,11 +562,9 @@ export default function Home() {
                       />
                     </div>
                   </div>
-                </TabsContent>
 
-                {/* 人情：故交旧雨 + 宗门剧情 + 心之所向 */}
-                <TabsContent value="renqing" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
+                  {/* 人情(renqing):故交旧雨 + 宗门剧情 */}
+                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2" style={{ width: `${100 / MAIN_TAB_ORDER.length}%` }}>
                     <div data-testid="npc-growth-section">
                       <NpcGrowthPanel
                         character={character}
@@ -460,58 +578,57 @@ export default function Home() {
                       />
                     </div>
                   </div>
-                </TabsContent>
-
-                {/* 修行：修炼速度 + 秘境 + 宝物（灵宠/阵法在宝页底部） */}
-                <TabsContent value="xiuxing" className="h-full m-0 data-[state=inactive]:hidden">
-                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2">
-                    <div data-testid="cultivation-speed-section">
-                      <CultivationSpeedCard />
-                    </div>
-                    {/* secret-realm 挂载点：面板由根节点 modal（下方 !showHome && <SecretRealmPanel/>）触发，
-                        入口按钮在 ActionButtons(setExplorationOpen)，此处 testid 保留仅为回归 smoke 结构校验 */}
-                    <div data-testid="secret-realm-section" className="hidden" />
-                    <div data-testid="inventory-section">
-                      <InventoryPanel />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* 世界：世界遗留 + 重置（独立入口，由 GameMenu 触发；smoke 期望 testid 存在） */}
-                <div data-testid="world-legacy-section" className="hidden">
-                  <WorldLegacyPanel />
                 </div>
-                <div data-testid="reset-world-section" className="hidden">
-                  <ResetWorldButton />
+              ) : (
+                // 兼容 tab (status/scroll):由 setTab('status'|'scroll') 触发,单独全屏渲染
+                <div className="h-full">
+                  {effectiveTab === 'status' && (
+                    <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
+                      <StatusList />
+                    </div>
+                  )}
+                  {effectiveTab === 'scroll' && (
+                    <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4">
+                      <MilestonesLog />
+                    </div>
+                  )}
                 </div>
-                {/* 注：原 4 tab 兼容性 - status/inventory/scroll 在新结构中分散到对应 tab，
-                    此处 WorldLegacyPanel + ResetWorldButton 通过独立的"世界"入口触发。
-                    为不丢失原 scroll tab（MilestonesLog），在 story tab 中保留史册摘要以备回退。 */}
-              </Tabs>
+              )}
+
+              {/* 世界:独立入口,不进主 tab;smoke 期望 testid 存在 */}
+              <div data-testid="world-legacy-section" className="hidden">
+                <WorldLegacyPanel />
+              </div>
+              <div data-testid="reset-world-section" className="hidden">
+                <ResetWorldButton />
+              </div>
+              {/* 注:5 主 tab 走滑轨 translateX 平滑切换;兼容 tab (status/scroll) 走独立分支单独渲染。
+                  原 <Tabs> 外壳不再包这块内容,tab state 由外层同步 <Tabs> (TabsList) 控制。 */}
             </div>
           </div>
         )}
       </main>
-      {character && !showHome && character.alive && !pendingChoice && !combatResultPending && (
+      {character && !showHome && character.alive && !pendingChoice && !combatResultPending
+        && !character.tribulationPending && !character.ascensionPending && !character.restrictionPending
+        && !settlementResult && (
         <div className="shrink-0 max-w-md mx-auto w-full">
           <InterfereInput />
         </div>
       )}
 
-      {/* 选择弹窗 */}
-      {!showHome && <ChoiceModal />}
+      {/* ChoiceModal / SettlementModal 已改内联，挂载在 story 滚动容器内。 */}
 
       {/* 战斗弹窗（全屏，最上层；combatSession.status='ongoing' 时显示） */}
+      {/* 沉浸版 Phase-Z: 全局特效层（飘字 / 突破 / 稀有掉落 / 成就） */}
+      {!showHome && <FxLayer />}
+
       {!showHome && <CombatModal />}
 
-      {/* 坊市交易弹窗（z-[55]，介于 ChoiceModal 与 CombatModal 之间） */}
+      {/* 坊市交易弹窗（z-[55]，与秘境同层） */}
       {!showHome && <MarketModal />}
 
       {/* 秘境探索弹窗（z-[55]，与坊市同层；探索结果 z-[60]） */}
       {!showHome && <SecretRealmPanel />}
-
-      {/* 轮回结算 */}
-      <SettlementModal />
     </div>
   );
 }
