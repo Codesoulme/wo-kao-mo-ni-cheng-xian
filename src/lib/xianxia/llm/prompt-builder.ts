@@ -203,15 +203,19 @@ export const SCENE_PROMPTS: Record<string, string> = {
 - 禁止元叙述/上帝视角评论：narrative 里不能写"X 年纪尚小，对 Y 还只是懵懂的喜悦""他还不明白这意味着什么""这一刻她还不懂..."这类对角色认知状态的旁白式总结。角色不理解的事，直接用具体行为/反应呈现（不哭、没反应、被抱起来就走开），不要用一句"懵懂的喜悦"概括。AI 不要替玩家解读角色心理，让玩家自己感受。
 - 命节点只作长期参考/灵感锚点；可以借其主题启发事件，但不得强行认定角色命运、不得机械按节点推进。
 - 真正的重大抉择、突破、生死关头可生成 hasChoice=true 与 choice 选项；不要因为命节点参考本身就强制给选择。
-- 【抉择频率倾向——重要】本主近期希望提升玩家参与感，凡遇到下列场景之一，**优先**给出 hasChoice=true：
+- 【抉择频率硬指标——每两年至少一次】本主明确要求：**每 2 年（含）以内至少出现 1 次 hasChoice=true**，长期占比接近 50%。判断本轮是否给抉择的顺序：
+  1) 若上一次抉择已过去 2 年或更久 → **本轮必须** hasChoice=true（找一个 narrative 里最自然的分叉点，哪怕轻量：喝哪碗汤/走哪条路/答不答话/收不收礼/去不去看/理不理会），不许推迟到下一年；
+  2) 若上一次抉择在 1 年内且本轮完全无叙事岔路（纯闭关、纯天灾旁观、纯纯童蒙无意识片段），可 hasChoice=false；
+  3) 其余任何情况都优先给 hasChoice=true。
+  下列场景一律**必须**给出 hasChoice=true：
   * 角色即将做出承诺/拜师/收徒/认亲/族谱/道侣等关系抉择；
   * 面对两种以上修行路径（功法/师承/宗门/散修/旁门）或战斗策略分流；
   * 发现/拾取/购买/赠予某件重要物品（法宝/丹方/秘籍/信物）时的处置选择；
   * 探索秘境的入口/退路/分支抉择；
   * 处理人情债/恩仇/誓言履行的方式选择；
   * 涉及重要信息（如身世、师命、遗言、信件）公开与隐瞒的取舍；
-  * 普通年份只要叙事中已出现一个明显岔路口（去/留/打/避/接/拒/换/舍），就生成一个轻量抉择。
-  即使蓝图主题不带上述关键词，只要当年叙事里存在"可以走另一条路"的暗示点，也鼓励至少给出 hasChoice=true 一次让玩家参与方向；只在纯闭关独修、纯旁观叙述、纯凡人日常无任何分叉的极少数情况下保持 hasChoice=false。
+  * 叙事中出现"可以走另一条路"的任意暗示点（去/留/打/避/接/拒/换/舍/问/闭口）。
+  即便本轮主线简短，也可以在结尾追加一个轻量 choice（例如"当晚回房时"层面的选择），只要不生硬即可。**不要**因为"这年很平"就一律略过——这是玩家参与感的核心。
 - choice 结构必须为：{"prompt":"抉择问题","options":[{"text":"选项文字（必填，勿留空）","hint":"选后可能的叙事倾向（可选）"}]}，2-4 个选项；hasChoice=true 时 options 每项必须有非空 text。
 - 【拍卖会入场规则】若蓝图/情境是拍卖大会、拍卖行、黑市大拍、交易大会等大型拍卖，不要在本轮直接生成完整拍卖长剧情；只能写轻量入场邀请/场外见闻，并设置 hasChoice=true，choice 让玩家确认是否进入（如「入场竞拍」「只在外场观望」「转身离去」）。未确认进入前，不生成逐件拍品、竞拍者资产心理和大段竞价流程，避免无谓消耗。
 - 普通年份主 narrative **150-250 字**，这是单气泡舒适上限；若叙事完整写完会超过 250 字，或同一岁发生多个关键片段（如先童年趣事、后灵气初触、再破境），**必须用 extraEvents 拆成多条短事件**，每条 60-150 字，依次排好时间戳（timeAdvance.label 写"数日后"/"数月后"等），让前端逐条分气泡显示。**严禁在中途硬切**：单条 narrative 必须是一个动作或场景的完整闭环，不要在"手指还没碰到鸡尾巴，那鸡"这种半截动作上停住。如果写到 250 字发现故事还没讲完，不要继续硬塞在本条里，立刻用 extraEvents 续写。 narrative 字段**绝对禁止**以冒号、引号开头但未闭合的对话结尾，必须在完整句子上结束。
@@ -512,6 +516,20 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
     `（修为加成不足/功法不适配/无丹药无传承时，AI 可合理选择「不突破」——但 narrative 必须明确写出角色自己心里明白为什么不破，是「知道而不能」不是「不知道」）\n`;
   const cultivationCriticalAlert = `\n⚠️【修为到你必须心里有数】\n${cultivationStatusContext}⚠️\n`;
 
+  // 沉浸版 Phase-Release: 抉择频率硬指标——注入距上次抉择的年数，配合系统区规则 1)
+  const choiceIntervalNotice = (() => {
+    const events = Array.isArray(ctx.recentEvents) ? ctx.recentEvents : [];
+    const lastChoiceEvent = [...events].reverse().find(e => String(e.eventType || '') === 'choice');
+    if (!lastChoiceEvent) {
+      return `\n【抉择频率状态】近期无抉择记录，本轮**必须** hasChoice=true（从叙事里挑一个自然分叉点，哪怕轻量）。\n`;
+    }
+    const gap = Math.max(0, sc.age - lastChoiceEvent.age);
+    if (gap >= 2) {
+      return `\n【抉择频率状态】距上次抉择已过 ${gap} 年，本轮**必须** hasChoice=true。\n`;
+    }
+    return `\n【抉择频率状态】距上次抉择 ${gap} 年；若本轮叙事有分叉点，仍鼓励 hasChoice=true（长期占比约 50%）。\n`;
+  })();
+
   const speedGuidance = isLightMode ? `
 【普通年份轻量推演】
 本轮不是命节点或强因果事件。请保持世界逻辑和角色连续性，但输出更紧凑：
@@ -575,7 +593,7 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
     ...ctx.longTermMemory.filter(m => /已获得|获得|相赠|赠予|传授|拜师|已入|已结/.test(m)).slice(-8).map(m => `- 已记录经历：${m}`),
   ].slice(-24).join('\n') || '（暂无已得之物或已定来源）';
 
-  return `${cultivationCriticalAlert}
+  return `${cultivationCriticalAlert}${choiceIntervalNotice}
 【状态快照区】
 角色：${sc.name}（${sc.gender === 'male' ? '男' : '女'}），${sc.age}岁
 寿元：${sc.lifespan}岁（剩余约${sc.lifespan - sc.age}岁）
@@ -613,6 +631,7 @@ ${sc.age < 6 ? `【幼龄角色行为约束】（必须遵守：角色目前仅$
 - narrative 必须符合${sc.age <= 1 ? '婴儿/幼儿' : '幼童'}的真实行为能力：只能写被动感知（看到/听到）、基本生理反应（哭/笑/困/饿）、在成人协助下的简单互动。
 - 若无抚养者陪同（如流浪儿），叙事应体现无助、依赖路人、乞讨、躲藏等幼童独自求生的真实处境。
 ` : ''}
+${buildAgePhaseAndRelationHint(sc, ctx)}
 【当前修炼心得】（玩家「宝」页修炼速度栏展示文本，由你上一轮生成，本轮可更新）
 ${curInsight || '（尚未生成，本轮请首次生成）'}
 【当前修炼速度来源条目】（引擎权威计算，数字准确，与顶部倍率一致；你必须在 cultivationInsight 文本中引用这些来源与数字，不可编造或增减）
@@ -983,6 +1002,7 @@ itemEntry 结构：{id,name,description,item_type,rarity,effects:[...],source,eq
 【物品修改规则——AI 联动】
 - 战斗中兵器/防具/法宝可能损毁：把对应物品 id 填入 removedItemIds
 - 丹药服用消耗：填入 removedItemIds
+- 【同一段剧情内的采集-使用闭环——必须填 removedItemIds】若 narrative 里在同一段内先"上山采得草药/灵石/木料/丹方"再"当场煎给父亲/服下/交出/献上/焚烧"，**不要把它加进 newItems 又留着**：这种一进一出的道具在剧情结束时已经不在角色身上，请**只把叙事写清即可，不要写入 newItems**（因为 UI 收获栏只呈现进背包留住的东西）。若一定要在 newItems 里出现（如玩家需要"看到自己确实采到过"），必须**在同一次 JSON 里把这个 id 同时列进 removedItemIds**，让引擎在结算时把它移除，避免物品栏残留一个"父亲已经用掉的药"。
 - 物品升级/精炼：不要在 newItems 重复给已有物品；若要升级，用 removedItemIds 移除旧物品 + newItems 给出新版（同名但属性更强、rarity 更高）
 - 偷窃/赠送/典当物品：用 removedItemIds 移除
 - 新获物品：填入 newItems，必须含完整字段与 effects
@@ -1058,6 +1078,7 @@ ${sc.age < 6 ? `【幼龄角色行为约束】（必须遵守：角色目前仅$
 - narrative 必须符合${sc.age <= 1 ? '婴儿/幼儿' : '幼童'}的真实行为能力：只能写被动感知（看到/听到）、基本生理反应（哭/笑/困/饿）、在成人协助下的简单互动。
 - 若无抚养者陪同（如流浪儿），叙事应体现无助、依赖路人、乞讨、躲藏等幼童独自求生的真实处境。
 ` : ''}
+${buildAgePhaseAndRelationHint(sc, ctx)}
 【未决线索区】（保持连续性）
 ${ctx.pendingThreads?.length ? ctx.pendingThreads.map(t => `- [${t.status}] ${t.title}（截止 ${t.deadlineAge} 岁，剩 ${t.deadlineAge - sc.age} 岁）：${t.description}`).join('\n') : '（无）'}
 
@@ -1134,6 +1155,7 @@ ${sc.age < 6 ? `【幼龄角色行为约束】（必须遵守：角色目前仅$
 - narrative 必须符合${sc.age <= 1 ? '婴儿/幼儿' : '幼童'}的真实行为能力：只能写被动感知（看到/听到）、基本生理反应（哭/笑/困/饿）、在成人协助下的简单互动。
 - 若无抚养者陪同（如流浪儿），叙事应体现无助、依赖路人、乞讨、躲藏等幼童独自求生的真实处境。
 ` : ''}
+${buildAgePhaseAndRelationHint(sc, ctx)}
 【未决线索区】（保持连续性）
 ${ctx.pendingThreads?.length ? ctx.pendingThreads.map(t => `- [${t.status}] ${t.title}（截止 ${t.deadlineAge} 岁，剩 ${t.deadlineAge - sc.age} 岁）：${t.description}`).join('\n') : '（无）'}
 
@@ -1203,4 +1225,45 @@ removedItemIds：若玩家行动导致物品消耗/损坏（如服用丹药、�
 
 【未决线索字段 & 战斗触发】newThreads / advanceThreads / completeThreadIds / failThreadIds / triggerCombat——同 advance 场景规则。玩家干扰可能触发战斗（如"攻击某人"→ triggerCombat；"闯入妖兽领地"→ triggerCombat）或推进/完成/失败线索（accepted=false 时所有线索字段必须为空数组/null，不可推进剧情）。
 【干扰连续性硬规则】accepted=true 时，若玩家行动改变了角色目标/位置/承诺/关系/秘境入口/入门资格，必须创建或推进 pendingThread；下一次正常流年会优先承接它。不要让干扰后的角色下一年自顾自跑路。`;
+}
+
+// 沉浸版 Phase-Release: 年龄段行为参考 + 关系/子嗣硬门槛
+// 用来修复：中年角色的剧情写得像小孩、凭空冒出前文没有的儿子/道侣
+export function buildAgePhaseAndRelationHint(sc: any, ctx: any): string {
+  const age = Number(sc?.age || 0);
+  if (age < 6) return ''; // 幼龄段已有独立约束
+
+  const npcs = (ctx as any)?.npcs || (ctx as any)?.relatedNPCs || [];
+  const relText = (n: any) => String(n?.relation || n?.role || n?.tag || '');
+  const hasSpouse = Array.isArray(npcs) && npcs.some((n: any) => /道侣|妻子|夫君|丈夫|正妻|夫人|发妻|结发/.test(relText(n)));
+  // hasChild 目前未直接用于门槛判定，但保留以便未来在 pendingThreads 校验中复用
+  // const hasChild = Array.isArray(npcs) && npcs.some((n: any) => /儿子|女儿|长子|次子|长女|次女|子嗣|孩儿|骨血/.test(relText(n)));
+
+  let phaseHint = '';
+  if (age >= 6 && age < 12) {
+    phaseHint = `【年龄段·幼学（${age}岁）】写读书识字、家里活计（劈柴/挑水/放牛/看铺）、跟父兄学手艺、与同龄玩伴的口角小事；可以有心事但不写成年人的顿悟。不写婚配、不写子嗣、不写独当一面主事。`;
+  } else if (age >= 12 && age < 16) {
+    phaseHint = `【年龄段·少年（${age}岁）】开始承担一部分成人劳作、初有主见但仍受长辈管束；情感上可有朦胧倾心却不宜论及婚嫁；可试探性接触修行/江湖/生意，但不宜远走。不写婚娶、不写子嗣。`;
+  } else if (age >= 16 && age < 25) {
+    phaseHint = `【年龄段·弱冠（${age}岁）】可议亲事、可独立成事、可远行拜师游学；但**只有在此前明确写过成亲的前提下**才可提及配偶或子嗣。`;
+  } else if (age >= 25 && age < 40) {
+    phaseHint = `【年龄段·壮年（${age}岁）】主事、独立、家业/宗门/买卖有实权；写老练、写世故、写心结与承担；${hasSpouse ? '已成家' : '**尚未婚配** — 不许无缘无故提配偶或孩子'}。`;
+  } else if (age >= 40 && age < 60) {
+    phaseHint = `【年龄段·中年（${age}岁）】写沉稳、写权衡、写辈分与人情累积。成年人的叙事必须区别于少年——不写童趣、不写"第一次见到修士就震撼不已"、不写幼稚的懵懂反应；此年龄已经见过世面。${hasSpouse ? '已成家' : '未有配偶 — 不许突然出现子嗣'}。`;
+  } else if (age >= 60) {
+    phaseHint = `【年龄段·晚岁（${age}岁）】写衰老与回望；亲眷或有零落，同辈或有故去；写年轻时未完之心愿、遗物、旧地重游、后辈嘱托。凡人身体已明显退化。`;
+  }
+
+  const relationLine = Array.isArray(npcs) && npcs.length
+    ? npcs.slice(0, 8).map((n: any) => `${n.name || '?'}(${relText(n) || '?'})`).join('、')
+    : '（尚无重要关系记录）';
+
+  const relationHardRule = `
+【关系/子嗣硬门槛——避免凭空出现家人】
+- 状态快照的 NPC/关系区已列出角色**当前实际存在**的关系，narrative 不得**首次凭空引入**"儿子/女儿/道侣/妻子/丈夫"等前文从未出现过的直系关系。
+- 若确需引入子嗣：必须先在此前的某年剧情里**明确写过**成亲/怀孕/生子的关键事件；本轮才可写"孩子已经几岁"。
+- 现有关系：${relationLine}
+- 若这些关系里没有配偶/子嗣，本轮**严禁**在 narrative 或 pendingThreads 里以已知既定事实的口吻提及"你的儿子/你的道侣/你妻子"。
+`;
+  return phaseHint + relationHardRule;
 }

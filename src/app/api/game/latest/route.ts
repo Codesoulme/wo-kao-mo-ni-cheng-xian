@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   try {
     // 生产模式（ADMIN_TOKEN 已设）→ 必须登录 + 收窄 where
     // dev 模式（ADMIN_TOKEN 未设 / SKIP_AUTH=1）→ 跳过 userId check，保留旧行为（避免破坏现有 488+ smoke）
-    const isProdMode = !!process.env.ADMIN_TOKEN;
+    const isProdMode = process.env.SKIP_AUTH !== '1' && !!process.env.ADMIN_TOKEN;
     let user: { id: string } | null = null;
     if (isProdMode) {
       user = await getCurrentUser();

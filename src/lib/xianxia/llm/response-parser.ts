@@ -282,6 +282,16 @@ function fixNarrativeAge(narrative: string, correctAge: number, charName?: strin
 }
 
 function reduceNarrativeAgeMentions(narrative: string, correctAge: number, charName?: string): string {
+  // \u6c89\u6d78\u7248 Phase-Release: \u4fdd\u7559 AI \u5199\u7684\u5e74\u9f84\u63d0\u53ca\u4e0d\u518d\u66b4\u529b\u64e6\u9664\u3002
+  // \u539f\u903b\u8f91\u4f1a\u628a "X\u5c81\u7684{\u89d2\u8272\u540d}" / "X\u5c81\u65f6\uff0c" / "X\u5c81\u7684\u4ed6/\u5979/\u5b69\u5b50" \u7b49\u6574\u4f53\u5220\u9664\u6216\u66ff\u6362\u4e3a\u89d2\u8272\u540d\uff0c\u5bfc\u81f4\uff1a
+  //   - \u73a9\u5bb6\u770b\u5230\u6d41\u5f0f\u5199\u51fa\u7684\u6b63\u6587\u4e0e\u843d\u5e93\u540e\u6b63\u6587\u4e0d\u4e00\u81f4\uff08"\u683c\u5f0f\u7a81\u7136\u53d8\u4e86"\uff09
+  //   - \u597d\u53e5\u5b50\u88ab\u786c\u5207
+  //   - "\u521a\u6ee1X\u5c81"\u8fd9\u79cd\u81ea\u7136\u53d9\u8ff0\u88ab\u7a7a\u6807\u70b9\u53d6\u4ee3
+  // \u73b0\u5728\u53ea\u4ea4\u7531 fixNarrativeAge \u4fee\u6b63\u660e\u663e\u9519\u7684\u6570\u5b57\uff1b\u6b63\u786e\u7684\u3001\u4ee5\u53ca \u00b11 \u5c81\u7684\u5408\u7406\u8868\u8ff0\u4e00\u5f8b\u4fdd\u7559\u3002
+  return narrative;
+}
+
+function _reduceNarrativeAgeMentions_legacy(narrative: string, correctAge: number, charName?: string): string {
   if (!narrative) return narrative;
   const safeCharName = String(charName || '').trim();
   const ageWords = Array.from(new Set([String(correctAge), numToZhAge(correctAge)].filter(Boolean))).map(escapeRegExp).join('|');

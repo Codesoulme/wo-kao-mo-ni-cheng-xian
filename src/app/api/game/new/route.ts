@@ -13,6 +13,9 @@ import { rollBirthConstitution, heritageToStatus } from '@/lib/xianxia/constitut
 import { formatWorldTimeDisplay, hiddenEventMeta, normalizeWorldCalendar, worldTimeStamp } from '@/lib/xianxia/world-time';
 import { rollOrigin, type Ethnicity, type Lineage } from '@/lib/xianxia/origins';
 import { computeBodyBaseline } from '@/lib/xianxia/body-growth';
+import { getChronicle, saveChronicle } from '@/lib/xianxia/world-chronicle-store';
+import { ensureChronicleCoverage } from '@/lib/xianxia/world-chronicle-generator';
+import { getFolkloreContext } from '@/lib/xianxia/world-chronicle-tick';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -43,7 +46,41 @@ export async function POST(req: NextRequest) {
       previousLivesCount: typeof body?.previousLivesCount === 'number' ? body.previousLivesCount : 1,
     });
 
-    const birth = await generateBirthEvent(customName, previousWorldLegacies, origin);
+    // ─────────────────────────────────────────────
+    // 世界大事年表：出生时确保未来 500 年已排定
+    // ─────────────────────────────────────────────
+    let folklore: { past: any[]; nowActive: any[]; upcoming: any[] } = { past: [], nowActive: [], upcoming: [] };
+    try {
+      // chronicle 尚未与 worldCalendar 对齐时，用 worldCalendar 的 currentYear 起手
+      const preChron = await getChronicle();
+      const currentYear = Math.max(preChron.currentYear || 0, worldCalendar.calendarYear || 5000);
+      if (preChron.currentYear !== currentYear || preChron.eraName !== worldCalendar.eraName) {
+        await saveChronicle({ currentYear, eraName: worldCalendar.eraName });
+      }
+      const targetYear = Math.max(preChron.generatedUntilYear, currentYear + 500);
+      await ensureChronicleCoverage(targetYear, `pending-${Date.now()}`);
+      const c2 = await getChronicle();
+      folklore = getFolkloreContext(c2, currentYear, 300, 30);
+    } catch (e) {
+      console.warn('[new/route] chronicle ensure failed (non-fatal):', (e as any)?.message || e);
+    }
+
+    const birth = await generateBirthEvent(customName, previousWorldLegacies, origin, {
+      eraName: worldCalendar.eraName,
+      calendarYear: worldCalendar.calendarYear,
+      worldRecentHistory: folklore.past.map((e: any) => ({
+        scheduledYear: e.scheduledYear,
+        actualEndYear: e.actualEndYear,
+        type: e.type,
+        narrativeSeed: e.narrativeSeed,
+      })),
+      worldNowActive: folklore.nowActive.map((e: any) => ({
+        scheduledYear: e.scheduledYear,
+        actualStartYear: e.actualStartYear,
+        type: e.type,
+        narrativeSeed: e.narrativeSeed,
+      })),
+    });
 
     // 双保险：即使 LLM 漏掉前世暗示，narrative 也至少拼一段前世背景兜底
     const previousLifeNarrative = buildPreviousLifeBackground(previousWorldLegacies);
@@ -53,7 +90,22 @@ export async function POST(req: NextRequest) {
 
     const birthConstitution = rollBirthConstitution();
     const inheritedStatuses = selectedHeritage.map(heritageToStatus).filter(Boolean);
-    const statusList = [birthConstitution, ...inheritedStatuses].filter(Boolean);
+    // 沉浸版 Phase-Release: fate 类传承（命格）之前无处安放——补入 status
+    // 之前 kind='fate' 不匹配 heritageToStatus(仅收 constitution)、也不匹配 inheritedItems(白名单里没有)、更不是 pet，
+    // 导致玩家在传承池选了命格却在开档角色状态里完全丢失。
+    const inheritedFates = selectedHeritage
+      .filter((h: any) => h?.kind === 'fate')
+      .map((h: any, idx: number) => ({
+        id: `status_fate_${Date.now().toString(36)}_${idx}`,
+        name: String(h.name || h.payload?.name || '轮回命格').slice(0, 16),
+        description: String(h.description || h.payload?.description || '轮回中带来的命格。').slice(0, 160),
+        category: 'special' as const,
+        rarity: ['common','uncommon','rare','epic','legendary','mythic'].includes(h.rarity) ? h.rarity : 'rare',
+        duration: -1,
+        source: '轮回带入',
+        effects: Array.isArray(h.payload?.effects) ? h.payload.effects : [{ target_attribute: 'luck', operation: 'add', value: 2, description: '前世余泽' }],
+      }));
+    const statusList = [birthConstitution, ...inheritedStatuses, ...inheritedFates].filter(Boolean);
 
     // 伴生灵物 → 写入 inventory；先天封印/命格 → 写入 status
     const originItems = origin.companionItems.map((c, idx) => ({
@@ -110,7 +162,9 @@ export async function POST(req: NextRequest) {
     }));
 
     // P1 step2: 创建角色时绑定当前 user（dev 模式 user=null → userId 写入 null）
-    const isProdMode = !!process.env.ADMIN_TOKEN;
+    // 沉浸版 Phase-Release: SKIP_AUTH=1 时无条件按 dev 模式走，不查 user（单机开发/测试模式）
+    const skipAuth = process.env.SKIP_AUTH === '1';
+    const isProdMode = !skipAuth && !!process.env.ADMIN_TOKEN;
     let user: { id: string } | null = null;
     if (isProdMode) {
       user = await getCurrentUser();
@@ -126,6 +180,54 @@ export async function POST(req: NextRequest) {
     // mp/maxMp 也按 0 岁婴儿算：50 是成年凡人值，0 岁 factor 0.05 → 保底 5
     const birthMp = Math.max(5, Math.round(50 * 0.05));
 
+    // 2026-07-08 修复：传承池带入的 effects 之前只挂在 status 上，玩家点开状态才能看到影响，
+    //   基线值（luck/comprehension/attack/…）却是 route 里重 roll 的固定随机，
+    //   导致玩家选了「luck+2 命格」但角色开局 luck 面板值毫无变化——像"传承没生效"。
+    //   这里在写库前，把所有传承/命格/伴生灵物 status 的 `add` 类型效果并进基线值。
+    //   multiply/cultivationExp 类不并（那是修炼倍率，走 factors 通道，别的位置计算）。
+    const BASELINE_ADD_TARGETS = new Set<string>([
+      'luck', 'comprehension', 'attack', 'defense', 'speed',
+      'maxHp', 'maxMp', 'reputation', 'spiritStones',
+      'elementMetal', 'elementWood', 'elementWater', 'elementFire', 'elementEarth',
+      'heartDemon',
+    ]);
+    const baselineDelta: Record<string, number> = {};
+    const collectEffects = (effects: any[] | undefined) => {
+      if (!Array.isArray(effects)) return;
+      for (const eff of effects) {
+        if (!eff || typeof eff !== 'object') continue;
+        if (eff.operation !== 'add') continue;
+        const attr = String(eff.target_attribute || '');
+        if (!BASELINE_ADD_TARGETS.has(attr)) continue;
+        const val = Number(eff.value);
+        if (!Number.isFinite(val)) continue;
+        baselineDelta[attr] = (baselineDelta[attr] || 0) + val;
+      }
+    };
+    for (const s of statusList) collectEffects((s as any)?.effects);
+    for (const it of [...inheritedItems, ...originItems]) collectEffects((it as any)?.effects);
+
+    // luck / comprehension 是 route 里 roll 的随机值，先保存基线再叠加
+    const baseLuck = Math.floor(40 + Math.random() * 40);
+    const baseComp = Math.floor(40 + Math.random() * 40);
+    const finalLuck = baseLuck + (baselineDelta.luck || 0);
+    const finalComp = baseComp + (baselineDelta.comprehension || 0);
+    const finalMaxHp = birthBody.maxHp + (baselineDelta.maxHp || 0);
+    const finalMaxMp = birthMp + (baselineDelta.maxMp || 0);
+    const finalAttack = birthBody.attack + (baselineDelta.attack || 0);
+    const finalDefense = birthBody.defense + (baselineDelta.defense || 0);
+    const finalSpeed = birthBody.speed + (baselineDelta.speed || 0);
+    const finalReputation = 0 + (baselineDelta.reputation || 0);
+    const finalSpiritStones = 0 + (baselineDelta.spiritStones || 0);
+    const finalHeartDemon = 0 + (baselineDelta.heartDemon || 0);
+    const finalElements = {
+      metal: el.metal + (baselineDelta.elementMetal || 0),
+      wood: el.wood + (baselineDelta.elementWood || 0),
+      water: el.water + (baselineDelta.elementWater || 0),
+      fire: el.fire + (baselineDelta.elementFire || 0),
+      earth: el.earth + (baselineDelta.elementEarth || 0),
+    };
+
     const character = await db.character.create({
       data: {
         userId: user?.id ?? null,
@@ -139,22 +241,23 @@ export async function POST(req: NextRequest) {
         realmLevel: 0,
         cultivationExp: 0,
         expToBreak: 100,
-        elementMetal: el.metal,
-        elementWood: el.wood,
-        elementWater: el.water,
-        elementFire: el.fire,
-        elementEarth: el.earth,
-        hp: birthBody.maxHp,
-        maxHp: birthBody.maxHp,
-        mp: birthMp,
-        maxMp: birthMp,
-        attack: birthBody.attack,
-        defense: birthBody.defense,
-        speed: birthBody.speed,
-        luck: Math.floor(40 + Math.random() * 40),
-        comprehension: Math.floor(40 + Math.random() * 40),
-        spiritStones: 0,
-        reputation: 0,
+        elementMetal: finalElements.metal,
+        elementWood: finalElements.wood,
+        elementWater: finalElements.water,
+        elementFire: finalElements.fire,
+        elementEarth: finalElements.earth,
+        hp: finalMaxHp,
+        maxHp: finalMaxHp,
+        mp: finalMaxMp,
+        maxMp: finalMaxMp,
+        attack: finalAttack,
+        defense: finalDefense,
+        speed: finalSpeed,
+        luck: finalLuck,
+        comprehension: finalComp,
+        spiritStones: finalSpiritStones,
+        reputation: finalReputation,
+        heartDemon: finalHeartDemon,
         alive: true,
         ascended: false,
         causeOfDeath: '',
@@ -174,24 +277,16 @@ export async function POST(req: NextRequest) {
     });
 
     // 写入出生事件
+    // 沉浸版 Phase-Release: narrative 只保留 AI 写的自然叙事，不再暴露后台"命数/轮回余泽/伴生/封印/前世因果"的元描述
+    //   —— 这些数据都在角色状态里（statusList / inventory / sealedFate 已入 status / pet），
+    //   玩家从属性弹窗、物品栏、状态标签就能看到；出生正文没必要罗列。
+    //   AI 的 birth.background 已经按 origin/legacy 生成了带暗示的叙事，直接用就行。
     const event = await db.eventLog.create({
       data: {
         characterId: character.id,
         age: 0,
         title: '降生于世',
-        narrative: `${birth.background}${statusList.length ? `
-
-此生命数另有异处：${statusList.map((s: any) => `${s.name}，${s.description}`).join('；')}。` : ''}${inheritedItems.length ? `
-
-轮回余泽随身而来：${inheritedItems.map((i: any) => i.name).join('、')}。` : ''}${originItems.length ? `
-
-伴生灵物随胎而至：${originItems.map((i: any) => i.name).join('、')}。` : ''}${origin.sealedFate ? `
-
-先天封印暗伏：${origin.sealedFate.name}，${origin.sealedFate.unlockHint}` : ''}${inheritedPets.length ? `
-
-尚有灵宠因果相随：${inheritedPets.map((p: any) => p.name).join('、')}。` : ''}${previousLifeNarrative ? `
-
-前世因果暗合：${previousLifeNarrative}` : ''}`,
+        narrative: birth.background,
         eventType: 'normal',
         effects: JSON.stringify([hiddenEventMeta({ worldTime, actionProjections: [] })]),
       },

@@ -10,7 +10,7 @@ import { CycleProjectionPanel } from '@/components/xianxia/CycleProjectionPanel'
 import { EventTimeline } from '@/components/xianxia/EventTimeline';
 import { StatusList } from '@/components/xianxia/StatusList';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
-import { SaveSlotPanel } from '@/components/xianxia/SaveSlotPanel';
+import { SaveSlotPanel } from '@/components/xianxia/SaveSlotPanel'; // 沉浸版 Phase-Release: 单存档多周目 UI 已下线，import 保留以兼容 hooks/type 定义
 import { InheritancePoolPanel } from '@/components/xianxia/InheritancePoolPanel';
 import { DeathGuidancePanel } from '@/components/xianxia/DeathGuidancePanel';
 import { useAutoSave } from '@/lib/xianxia/useAutoSave';
@@ -126,7 +126,8 @@ export default function Home() {
 
   const combatSession = character?.combatSession;
   const combatResultPending = Boolean(combatSession && combatSession.status !== 'ongoing');
-  const effectiveTab = pendingChoice || combatResultPending ? 'story' : tab;
+  // 沉浸版 Phase-Release: 抉择时允许切换 tab 看资源/信息（只有战斗结算才继续锁 story）
+  const effectiveTab = combatResultPending ? 'story' : tab;
   const storyScrollRef = useRef<HTMLDivElement | null>(null);
   const storyScrollTopRef = useRef(0);
   const settlingCharacterIdRef = useRef<string | null>(null);
@@ -156,7 +157,8 @@ export default function Home() {
   const handleSwipeMove = useCallback((e: React.TouchEvent) => {
     const start = swipeStartRef.current;
     if (!start) return;
-    if (pendingChoice || combatResultPending) return;
+    // 沉浸版 Phase-Release: 抉择时允许滑动切 tab；只有战斗结算才锁
+    if (combatResultPending) return;
     if (!isMainTab) return; // 兼容 tab 不参与滑轨动画
     const t = e.touches[0];
     const dx = t.clientX - start.x;
@@ -176,7 +178,7 @@ export default function Home() {
     }
     setSwipeDragging(true);
     setSwipeDragOffset(offset);
-  }, [pendingChoice, combatResultPending, isMainTab, mainTabIdx]);
+  }, [combatResultPending, isMainTab, mainTabIdx]);
 
   const handleSwipeEnd = useCallback((e: React.TouchEvent) => {
     const start = swipeStartRef.current;
@@ -185,7 +187,7 @@ export default function Home() {
     setSwipeDragging(false);
     setSwipeDragOffset(0);
     if (!start) return;
-    if (pendingChoice || combatResultPending) return;
+    if (combatResultPending) return;
     if (!isMainTab) return;
     if (swipeAxisRef.current !== 'x') return;
     const t = e.changedTouches[0];
@@ -200,7 +202,7 @@ export default function Home() {
     setTab(MAIN_TAB_ORDER[nextIdx]);
     // 松手后 dragOffset 归零 + tab 切换,滑轨会通过 CSS transition 平滑收拢到目标位置
     void wasDragging;
-  }, [pendingChoice, combatResultPending, isMainTab, mainTabIdx, swipeDragging]);
+  }, [combatResultPending, isMainTab, mainTabIdx, swipeDragging]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -504,8 +506,8 @@ export default function Home() {
                       <ChoiceModal />
                       <SettlementModal />
                     </div>
-                    {!pendingChoice
-                      && !character.tribulationPending
+                    {/* 沉浸版 Phase-Release: 抉择时不再藏起底部按钮，只置灰不可按（内部 atChoice=disabled 已处理） */}
+                    {!character.tribulationPending
                       && !character.ascensionPending
                       && !character.restrictionPending
                       && !settlementResult && (
@@ -554,13 +556,7 @@ export default function Home() {
                         <InheritancePoolPanel defaultCollapsed={false} />
                       </div>
                     )}
-                    <div data-testid="save-slot-section">
-                      <SaveSlotPanel
-                        snapshot={fullSnapshot}
-                        onLoadSlot={handleLoadSlot}
-                        refreshKey={slotRefresh}
-                      />
-                    </div>
+                    {/* 沉浸版 Phase-Release: 单存档多周目游戏，不再需要"轮回手札·存档"多槽位 UI —— 已移除 SaveSlotPanel */}
                   </div>
 
                   {/* 人情(renqing):故交旧雨 + 宗门剧情 */}

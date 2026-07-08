@@ -98,37 +98,49 @@ export function ChoiceModal() {
   };
 
   return (
-    <div data-testid="choice-inline" className="mt-3 space-y-3">
-      {/* 抉择情境正文——紧接最新事件叙述 */}
-      <p className="text-sm leading-relaxed text-foreground font-serif-cn xianxia-prose px-1">
-        {formattedPrompt}
-      </p>
+    <div data-testid="choice-inline" className="mt-3">
+      {/* 沉浸版 Phase-Release: 抉择改成与剧情事件卡片一致的容器（paper-texture 边框）
+          宽度 100% 自然被父级容器约束到剧情框同宽 */}
+      <div className="paper-texture rounded-xl border border-primary/30 shadow-sm overflow-hidden">
+        {/* 抉择标签条 */}
+        <div className="px-3 py-2 border-b border-primary/20 bg-primary/5 flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <span className="text-xs font-serif-cn font-semibold tracking-wider text-primary/90">天道抉择</span>
+        </div>
 
-      {/* 选项按钮——重量与 EventTimeline 事件卡片对齐 */}
-      <div className="space-y-2">
-        {pendingChoice.options.map((opt, i) => (
-          <button
-            key={i}
-            onClick={() => choose(i)}
-            disabled={busy}
-            className={cn(
-              'w-full text-left p-3 rounded-lg border transition-all min-w-0',
-              'hover:border-primary hover:bg-primary/5 active:scale-[0.99]',
-              'border-border bg-card/60',
-              busy && 'opacity-50 cursor-not-allowed'
-            )}
-          >
-            <div className="flex items-start gap-2">
-              <span className="seal shrink-0 mt-0.5">{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold font-serif-cn xianxia-readable">{opt.text}</div>
-                {opt.hint && (
-                  <div className="text-[11px] text-muted-foreground mt-0.5 xianxia-readable">{opt.hint}</div>
+        {/* 情境正文 */}
+        <div className="px-3 py-3">
+          <p className="text-sm leading-relaxed text-foreground font-serif-cn xianxia-prose">
+            {formattedPrompt}
+          </p>
+
+          {/* 选项按钮——宽度对齐正文 */}
+          <div className="space-y-2 mt-3">
+            {pendingChoice.options.map((opt, i) => (
+              <button
+                key={i}
+                onClick={() => choose(i)}
+                disabled={busy}
+                className={cn(
+                  'w-full text-left p-3 rounded-lg border transition-all min-w-0',
+                  'hover:border-primary hover:bg-primary/5 active:scale-[0.99]',
+                  'border-border/60 bg-background/60',
+                  busy && 'opacity-50 cursor-not-allowed'
                 )}
-              </div>
-            </div>
-          </button>
-        ))}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="seal shrink-0 mt-0.5">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold font-serif-cn xianxia-readable">{opt.text}</div>
+                    {opt.hint && (
+                      <div className="text-[11px] text-muted-foreground mt-0.5 xianxia-readable">{opt.hint}</div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {busy && createPortal(

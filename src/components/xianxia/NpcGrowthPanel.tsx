@@ -144,6 +144,12 @@ export function NpcGrowthPanel({ className, defaultCollapsed = true }: NpcGrowth
                         <span className="font-serif-cn font-bold text-sm text-stone-800">
                           {npc.name || '无名故人'}
                         </span>
+                        {/* 沉浸版 Phase-Release: 关系/身份挪到头部，一眼看清是父/母/道侣/邻居 */}
+                        {npc.role && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border border-primary/30 bg-primary/8 text-primary/85 font-serif-cn">
+                            {String(npc.role).slice(0, 12)}
+                          </span>
+                        )}
                         <span className="text-[10px] text-stone-500">
                           {age} 岁 · {realmLabel(npc.realm)}
                         </span>
@@ -170,10 +176,10 @@ export function NpcGrowthPanel({ className, defaultCollapsed = true }: NpcGrowth
                             ✗ 仙逝
                           </span>
                         )}
-                        {!isDead && npc.realm && npc.realm !== 'mortal' && (
+                        {!isDead && npc.realm && npc.realm !== 'mortal' && String(npc.realm).trim() !== '' && (
                           <span
                             data-testid={testid('npc-growth-realm', npc.id)}
-                            className="text-[10px] px-1.5 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-900"
+                            className="text-[10px] px-1.5 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary"
                           >
                             <ArrowUp className="w-3 h-3 inline" /> 修行中人
                           </span>

@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
   const { sessionId, outcome, boltsCompleted } = parsed.data;
 
-  const isProdMode = !!process.env.ADMIN_TOKEN;
+  const isProdMode = process.env.SKIP_AUTH !== '1' && !!process.env.ADMIN_TOKEN;
   if (isProdMode) {
     const user = await getCurrentUser();
     if (!user) {

@@ -6,9 +6,11 @@ generator client {
 }
 
 datasource db {
-  // 沉浸版 Phase-Release: 切 Postgres（Vercel Postgres / Neon / Supabase 都可）
-  // 本地开发时仍可用 SQLite 文件 url = "file:./dev.db"，部署到 Vercel 设 DATABASE_URL=postgres://...
-  provider = "postgresql"
+  // 沉浸版 Phase-Release: 支持 SQLite（本地 dev）+ Postgres（Vercel 部署）
+  // 本地默认 DATABASE_URL="file:./dev.db" 走 SQLite
+  // Vercel 部署设 DATABASE_URL=postgres://... 走 Postgres
+  // schema 字段只用 String/int/boolean 等通用类型，两者都支持
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -315,6 +317,21 @@ model ProjectionSnapshot {
   updatedAt        DateTime @updatedAt
 
   @@index([characterId])
+}
+
+
+// ─────────────────────────────────────────────────────────────
+// World Chronicle: 世界日历年驱动的跨角色事件表（单例）
+// 由 AI 在角色出生时预排 500 年大事件；跨角色持久化；玩家不感知调度
+// ─────────────────────────────────────────────────────────────
+model WorldChronicle {
+  id                  String   @id @default("default")
+  eraName             String   @default("青岚仙历")
+  currentYear         Int      @default(5000)
+  generatedUntilYear  Int      @default(5000)
+  scheduleJson        String   @default("[]")
+  historyJson         String   @default("[]")
+  updatedAt           DateTime @updatedAt
 }
 
 

@@ -26,8 +26,18 @@ import { getCurrentUser } from '@/lib/auth-helpers';
 // 修仙界感改进 - 任务 D：寿元压力
 import { lifespanPressure, lifespanPressureStatus, nearLifespan } from '@/lib/xianxia/realm-lifespan';
 import { detectLifespanExtension, deriveLifespanFromState, getLifePhase } from '@/lib/xianxia/realm-lifespan';
-// 修仙界感改进 - 任务 E：世界级事件调度器
-import { rollWorldEvent, applyWorldEvent, decayWorldEvents, parseWorldEventMarkers, buildAvailableWorldEventsPrompt, type WorldEvent } from '@/lib/xianxia/world-event-scheduler';
+// 修仙界感改进 - 任务 E：世界级事件调度器（已废弃 — 保留 import 供旧存档 fallback 读取）
+import { applyWorldEvent, decayWorldEvents, type WorldEvent } from '@/lib/xianxia/world-event-scheduler';
+// 世界大事年表 · 出生预排 + tick 驱动
+import { getChronicle } from '@/lib/xianxia/world-chronicle-store';
+import { tickChronicle, getFolkloreContext } from '@/lib/xianxia/world-chronicle-tick';
+import { ensureChronicleCoverage } from '@/lib/xianxia/world-chronicle-generator';
+import {
+  parseInfluenceMarkers,
+  applyInfluencesToChronicle,
+  stripInfluenceMarkers,
+} from '@/lib/xianxia/world-chronicle-influence';
+import { applyEventEffectsToCharacter, removeEventStatusFromCharacter } from '@/lib/xianxia/world-event-scheduler';
 import { buildAchievementPromptHint } from '@/lib/xianxia/achievements';
 import { tickAllNpcsForYear } from '@/lib/xianxia/npc-growth';
 // 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 SSE 路径上也跑一次 world.tick()
@@ -148,7 +158,7 @@ export async function POST(req: NextRequest) {
       };
 
       try {
-        const isProdMode = !!process.env.ADMIN_TOKEN;
+        const isProdMode = process.env.SKIP_AUTH !== '1' && !!process.env.ADMIN_TOKEN;
         let user: { id: string } | null = null;
         if (isProdMode) {
           user = await getCurrentUser();
@@ -212,6 +222,7 @@ export async function POST(req: NextRequest) {
 
         // 构建 worldCalendar
         let worldCalendar = char.worldCalendarJson ? JSON.parse(char.worldCalendarJson) : null;
+        const worldCalendarBefore = worldCalendar ? { ...worldCalendar } : null;
         if (worldCalendar && timeAdvance) {
           // 修复 P0-1：原代码以 3 参调用 → time.elapsedDays 拿到 undefined → NaN 写库 → "青岚仙历 NaN 年"
           worldCalendar = advanceWorldCalendar(worldCalendar, timeAdvance);
@@ -238,11 +249,47 @@ export async function POST(req: NextRequest) {
         const ctx: any = buildStateContext(state, recentEvents.slice(qualityMode === 'light' ? -3 : -5), narrativeContractFeedback.slice(-3));
         ctx.blueprint = blueprint;
         ctx.suggestedTimeAdvance = timeAdvance;
-        // 任务 E v2：把可触发的世界级事件模板注入 prompt（按 age/realm/族裔/cooldown/prereq 过滤后）
+        // 世界大事年表：把当前世事流转（近百年历史 + 当下发生 + 传闻卜卦）作为 prompt 背景注入
         try {
-          const historyWE = (state as any)?.worldEvent?.history ?? [];
-          ctx.worldEventAvailablePrompt = buildAvailableWorldEventsPrompt(state, worldCalendar || undefined, historyWE, { maxItems: 8 });
-        } catch {
+          const chronicleForPrompt = await getChronicle();
+          const currentYear = Number(worldCalendar?.calendarYear ?? chronicleForPrompt.currentYear ?? 5000);
+          const folklore = getFolkloreContext(chronicleForPrompt, currentYear, 120, 30);
+          const lines: string[] = [];
+          lines.push('【天下大势·世事流转】（供 AI 自然融入，可提可不提）');
+          lines.push(`当前世界年：${chronicleForPrompt.eraName} ${currentYear} 年`);
+          if (folklore.past.length > 0) {
+            lines.push('');
+            lines.push('近百余年间已发生：');
+            for (const e of folklore.past) {
+              const y = e.actualEndYear ?? e.scheduledYear;
+              const yearsAgo = Math.max(0, currentYear - y);
+              lines.push(`- ${y} 年前后，${e.narrativeSeed}（已过 ${yearsAgo} 年）`);
+            }
+          }
+          if (folklore.nowActive.length > 0) {
+            lines.push('');
+            lines.push('当下正在发生：');
+            for (const e of folklore.nowActive) {
+              const sy = e.actualStartYear ?? e.scheduledYear;
+              const years = Math.max(0, currentYear - sy);
+              lines.push(`- 自 ${sy} 年起，${e.narrativeSeed}（已持续 ${years} 年）`);
+            }
+          }
+          if (folklore.upcoming.length > 0) {
+            lines.push('');
+            lines.push('近年传闻卜卦（未成事实，仅茶肆闲谈/长辈提及）：');
+            for (const e of folklore.upcoming) {
+              lines.push(`- ${e.narrativeSeed}`);
+            }
+          }
+          lines.push('');
+          lines.push('【规则】');
+          lines.push('- 这些是世界背景。若剧情自然涉及（茶肆闲谈、长辈提起、路见异象、告示、传闻）可以带出；不涉及也无需强提。');
+          lines.push('- 当下正在发生的事件若与角色所在地点/身份相关，请在 narrative 中让角色感知（远方也可通过传闻）。');
+          lines.push('- 若角色行为对世界事件有影响（干预、参与、扭转），用 [WORLD_EVENT_INFLUENCE:eventId type=advance|delay|weaken|amplify|cancel reason="..."] 标记。');
+          ctx.worldEventAvailablePrompt = lines.join('\n');
+        } catch (e) {
+          console.warn('[advance-sse] folklore context build failed:', (e as any)?.message || e);
           ctx.worldEventAvailablePrompt = '';
         }
 
@@ -275,13 +322,21 @@ export async function POST(req: NextRequest) {
                 /(?:变化|属性|修为|悟性|灵根|根骨|福缘|机缘|气运|天赋|命格|血脉|体魄|神识|魂魄|破势|护持|机变|气血(?:上限)?|灵力(?:上限)?|声望|寿元)\s*[\+\-±]\s*\d{1,8}/g,
                 '',
               );
-              const newDelta = sanitized.slice(prevNarrative.length);
-              prevNarrative = sanitized;
-              if (!firstDeltaSent) {
-                firstDeltaSent = true;
-                console.log('[SSE] First narrative delta sent, total raw:', rawText.length, 'narrative:', extracted.length);
+              // 剥离世界事件干预标记 [WORLD_EVENT_INFLUENCE:...]（引擎元数据，不给玩家看）
+              // 流式期间标记可能横跨 chunk 边界：若见到未闭合的 `[WORLD`，把当前 sanitized 截到 `[` 之前，
+              // 等 `]` 抵达后再让 emit 追上（后续 chunk 到来时 extracted 变长，sanitized 再计算就能剥完整段）
+              let sanitized2 = sanitized.replace(/\[WORLD_EVENT_INFLUENCE:[^\]]*\]/gi, '');
+              const openIdx = sanitized2.search(/\[WORLD_EVENT_INFLUENCE:[^\]]*$/i);
+              if (openIdx >= 0) sanitized2 = sanitized2.slice(0, openIdx);
+              const newDelta = sanitized2.slice(prevNarrative.length);
+              prevNarrative = sanitized2;
+              if (newDelta.length > 0) {
+                if (!firstDeltaSent) {
+                  firstDeltaSent = true;
+                  console.log('[SSE] First narrative delta sent, total raw:', rawText.length, 'narrative:', extracted.length);
+                }
+                send('narrative_delta', { type: 'narrative_delta', delta: newDelta });
               }
-              send('narrative_delta', { type: 'narrative_delta', delta: newDelta });
             }
             // ★ narrative 字符串字段闭合时（LLM 写完 narrative 在准备下一个字段），立即通知前端
             // → 玩家立刻看到"收获结算中..."提示，不再干等 LLM 写剩余 changes/items/npcs
@@ -295,14 +350,16 @@ export async function POST(req: NextRequest) {
               // 现在 emit 完整 narrative，让玩家看到所有内容
               // prompt 约束 LLM 写简短完整（400-600 字）来控制长度
               // max_tokens 截断是 LLM 真实上限问题，不是客户端能截断解决的
-              const lastChar = prevNarrative.trim().slice(-1);
+              // narrative_complete 时最后再剥一遍干预标记（overwrite 前端已渲染，保底方案）
+              const cleaned = stripInfluenceMarkers(prevNarrative);
+              const lastChar = cleaned.trim().slice(-1);
               const isComplete = /[。！？!?;；]/.test(lastChar);
               if (!isComplete) {
-                console.warn('[SSE] narrative 末尾不完整（可能被 max_tokens 截断），保留全部内容 emit:', prevNarrative.slice(-50));
+                console.warn('[SSE] narrative 末尾不完整（可能被 max_tokens 截断），保留全部内容 emit:', cleaned.slice(-50));
               }
               narrativeClosedSent = true;
-              console.log('[SSE] narrative field closed, sent narrative_complete event (len:', prevNarrative.length, ', complete:', isComplete, ')');
-              send('narrative_complete', { type: 'narrative_complete', narrative: prevNarrative });
+              console.log('[SSE] narrative field closed, sent narrative_complete event (len:', cleaned.length, ', complete:', isComplete, ')');
+              send('narrative_complete', { type: 'narrative_complete', narrative: cleaned });
             }
           }, { qualityMode });
         } catch (e: any) {
@@ -324,13 +381,17 @@ export async function POST(req: NextRequest) {
           console.warn('[SSE] Final parse failed, using extracted narrative');
           aiOutput = { narrative: prevNarrative || rawText };
         }
+        // 最终 aiOutput.narrative 剥离世界事件干预标记（引擎元数据不入库/展示）
+        if (typeof aiOutput.narrative === 'string') {
+          aiOutput.narrative = stripInfluenceMarkers(aiOutput.narrative);
+        }
         if (Array.isArray(aiOutput.extraEvents)) {
           aiOutput.extraEvents = aiOutput.extraEvents.map((e: any) => ({
             ...e,
-            narrative: cleanNarrativeAge(String(e?.narrative || ''), ctx.character.age, ctx.character.name),
+            narrative: stripInfluenceMarkers(cleanNarrativeAge(String(e?.narrative || ''), ctx.character.age, ctx.character.name)),
           }));
         }
-        if (!aiOutput.narrative) aiOutput.narrative = prevNarrative || rawText;
+        if (!aiOutput.narrative) aiOutput.narrative = stripInfluenceMarkers(prevNarrative || rawText);
 
         // 4) 若 AI 输出包含选择，进入选择状态（和 non-SSE advance 保持一致）
         if (aiOutput.hasChoice) {
@@ -587,17 +648,16 @@ displayEffects = buildEventDisplayEffects({
               ecsCache = null;
             }
 
-            // 修仙界感改进 - 任务 E v2：世界级事件调度器（LLM 决策 + fallback）
-            // 优先级：
-            //   1) decay 已有 active 事件
-            //   2) 从 aiOutput.narrative 解析 [WORLD_EVENT:type]...[/WORLD_EVENT] 标记（LLM 自主决定触发）
-            //   3) 若无标记 → fallback rollWorldEvent（向后兼容旧 random roll 逻辑）
-            // 失败仅 console.error，不阻断 SSE 主流程。
+            // 世界大事年表 · tick 驱动
+            //   1) 读 chronicle
+            //   2) tickChronicle(from, to) → justStarted / active / justConcluded
+            //   3) 对 justStarted/active 事件应用效应到 finalState；对 justConcluded 事件清 status
+            //   4) 若 generatedUntilYear - yearTo < 100 → 后台静默补齐 500 年（fire-and-forget）
             try {
               const ageAfterTick = Number((finalState as any).age ?? 0);
               const yearsAdvanced = Math.max(1, ageAfterTick - Number(ageBefore ?? ageAfterTick));
 
-              // 1. decay 已有 active 事件
+              // 1. decay 旧存档的 activeEvents（保 backward-compat；新档 worldEvent 字段为空即 noop）
               finalState = decayWorldEvents(finalState, yearsAdvanced);
 
               // 1.35 沉浸版 Phase-Z: 稀有物品掉落（diff inventory，rare+ emit DropBurst）
@@ -617,9 +677,7 @@ displayEffects = buildEventDisplayEffects({
                 if (drops.length > 0) (finalState as any).__lastDrops = drops;
               } catch {}
 
-              // 沉浸版 Phase-Life: 末尾按当前属性重算 lifespan（灵根/体魄/境界），
-              // 让修真者寿命随境界提升，物品延寿丹延命后重算。
-              // 保留 max(current, computed) 防修真者 current > 公式上界时压回。
+              // 沉浸版 Phase-Life: 末尾按当前属性重算 lifespan
               try {
                 const { deriveLifespanFromState } = await import('@/lib/xianxia/realm-lifespan');
                 const computed = deriveLifespanFromState(finalState);
@@ -630,10 +688,10 @@ displayEffects = buildEventDisplayEffects({
                 }
               } catch {}
 
-              // 1.4 沉浸版 Phase-Z: AI 成就判定（从 narrative 解析 [ACHIEVEMENT]/[REWARD] 标记）
-              // 成就触发后写入 character.achievements + heritageVault（局外传承池）
+              // 1.4 沉浸版 Phase-Z: AI 成就判定
               try {
-                const parsedAch = parseAchievementMarkers(llmNarrative || '');
+                const llmNarrForAch = String((aiOutput as any)?.narrative ?? '');
+                const parsedAch = parseAchievementMarkers(llmNarrForAch);
                 if (parsedAch.length > 0) {
                   const achResult = applyAchievements(finalState, parsedAch, { triggeredAge: ageAfterTick });
                   if (achResult && achResult.state && achResult.newAchievements.length > 0) {
@@ -650,9 +708,7 @@ displayEffects = buildEventDisplayEffects({
                 console.warn('[advance-sse] applyAchievements failed:', e);
               }
 
-              // 1.5 沉浸版 Phase-N: NPC 年度推进（年龄/亲疏/属性成长/偶发破境/偶发寿终）
-              // 之前 NPC tick 只挂在 store.tickNpcsForYear，没人调——前端推进后 npcs 不更新。
-              // 现在在 advance 主流程里强制推一年，与主角年龄增长保持一致。
+              // 1.5 沉浸版 Phase-N: NPC 年度推进
               try {
                 const prevNpcs = Array.isArray((finalState as any)?.npcs) ? (finalState as any).npcs : [];
                 if (prevNpcs.length > 0) {
@@ -665,39 +721,116 @@ displayEffects = buildEventDisplayEffects({
                 console.warn('[advance-sse] tickAllNpcsForYear failed:', e);
               }
 
-              let worldEvent: WorldEvent | null = null;
-
-              // 2. 优先解析 LLM 输出中的 [WORLD_EVENT] 标记
+              // ─── 世界大事年表：tick ───────────────────────────
               try {
-                const historyWE = ((finalState as any)?.worldEvent?.history ?? []) as WorldEvent[];
-                const llmNarrative = String((aiOutput as any)?.narrative ?? '');
-                const markerResult = parseWorldEventMarkers(llmNarrative, finalState, worldCalendar || undefined, historyWE);
-                if (markerResult) {
-                  worldEvent = markerResult.event;
-                  console.log('[advance-sse] 世界级事件（LLM 决策）触发:', worldEvent.type, 'at age', worldEvent.triggeredAge);
-                }
-              } catch (e) {
-                console.warn('[advance-sse] parseWorldEventMarkers failed:', e);
-              }
+                const chronicle = await getChronicle();
+                const yearFrom = Number(worldCalendarBefore?.calendarYear ?? worldCalendar?.calendarYear ?? chronicle.currentYear);
+                const yearTo = Number(worldCalendar?.calendarYear ?? chronicle.currentYear);
 
-              // 3. 无标记时 fallback 走 random roll
-              if (!worldEvent) {
-                worldEvent = rollWorldEvent(finalState, worldCalendar || undefined);
-                if (worldEvent) {
-                  console.log('[advance-sse] 世界级事件（fallback）触发:', worldEvent.type, 'at age', worldEvent.triggeredAge);
+                // 更新 chronicle currentYear 到最新
+                if (chronicle.currentYear !== yearTo) {
+                  try {
+                    await (db as any).worldChronicle.update({ where: { id: 'default' }, data: { currentYear: yearTo } });
+                  } catch {}
                 }
-              }
 
-              if (worldEvent) {
-                finalState = applyWorldEvent(finalState, worldEvent, llmNarrative);
-                console.log('[advance-sse] 世界级事件注入:', worldEvent.type, 'at age', worldEvent.triggeredAge, 'duration', worldEvent.duration, '年');
-                // 把世界级事件追加到本次 eventLog.effects（前端展示）
+                const tickResult = await tickChronicle(chronicle, yearFrom, yearTo);
+
+                // 世界大事年表 · 玩家干预标记解析
+                // AI 若在 narrative 中打了 [WORLD_EVENT_INFLUENCE:...] 标记，这里解析并落库；
+                // 若因 advance 使某 scheduled 事件提前进入 due 窗口，二次 tick 转 active 并追加效应。
+                try {
+                  const llmNarrative = String((aiOutput as any)?.narrative ?? '');
+                  if (llmNarrative) {
+                    const influences = parseInfluenceMarkers(llmNarrative);
+                    if (influences.length > 0) {
+                      const result = await applyInfluencesToChronicle(influences, {
+                        currentYear: yearTo,
+                        characterId,
+                      });
+                      console.log('[chronicle] influences parsed:', influences.length, 'applied:', result.applied.length, 'skipped:', result.skipped.length);
+                      if (result.skipped.length > 0) {
+                        console.log('[chronicle] influences skipped:', result.skipped);
+                      }
+                      // 应用完再跑一次 tick 以捕获 advance 后进入 due 窗口的事件
+                      if (result.applied.length > 0) {
+                        try {
+                          const chronicleAfter = await getChronicle();
+                          const secondTick = await tickChronicle(chronicleAfter, yearFrom, yearTo);
+                          for (const ev of secondTick.justStarted) {
+                            // 去重：一次 tick 已经处理过的 eventId 不再重复
+                            if (tickResult.justStarted.some(x => x.id === ev.id)) continue;
+                            finalState = applyEventEffectsToCharacter(finalState, {
+                              id: ev.id,
+                              type: ev.type,
+                              scheduledYear: ev.scheduledYear,
+                              actualStartYear: ev.actualStartYear,
+                              plannedDuration: ev.plannedDuration,
+                              actualDuration: ev.actualDuration,
+                              narrativeActual: ev.narrativeActual,
+                              narrativeSeed: ev.narrativeSeed,
+                            });
+                            tickResult.justStarted.push(ev);
+                            console.log('[chronicle] justStarted (post-influence):', ev.type, 'at year', ev.actualStartYear);
+                          }
+                          for (const ev of secondTick.justConcluded) {
+                            if (tickResult.justConcluded.some(x => x.id === ev.id)) continue;
+                            finalState = removeEventStatusFromCharacter(finalState, ev.type);
+                            tickResult.justConcluded.push(ev);
+                          }
+                        } catch (e2) {
+                          console.warn('[chronicle] second tick after influence failed (non-fatal):', (e2 as any)?.message || e2);
+                        }
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.error('[chronicle] influence parse/apply failed (non-fatal):', (e as any)?.message || e);
+                }
+
+                // 应用 justStarted 事件效应
+                for (const ev of tickResult.justStarted) {
+                  finalState = applyEventEffectsToCharacter(finalState, {
+                    id: ev.id,
+                    type: ev.type,
+                    scheduledYear: ev.scheduledYear,
+                    actualStartYear: ev.actualStartYear,
+                    plannedDuration: ev.plannedDuration,
+                    actualDuration: ev.actualDuration,
+                    narrativeActual: ev.narrativeActual,
+                    narrativeSeed: ev.narrativeSeed,
+                  });
+                  console.log('[chronicle] justStarted:', ev.type, 'at year', ev.actualStartYear);
+                }
+
+                // 处理 concluded 事件（清 status）
+                for (const ev of tickResult.justConcluded) {
+                  finalState = removeEventStatusFromCharacter(finalState, ev.type);
+                  console.log('[chronicle] justConcluded:', ev.type, 'end year', ev.actualEndYear);
+                }
+
+                // 把 justStarted / active 事件挂到 aiOutput（供前端展示）
                 try {
                   const evt = (aiOutput as any)?.choice ? null : aiOutput;
-                  if (evt && typeof evt === 'object') {
-                    (evt as any).worldEvent = worldEvent;
+                  if (evt && typeof evt === 'object' && tickResult.justStarted.length > 0) {
+                    (evt as any).worldChronicleEvents = tickResult.justStarted.map((e) => ({
+                      id: e.id,
+                      type: e.type,
+                      narrativeSeed: e.narrativeSeed,
+                      actualStartYear: e.actualStartYear,
+                    }));
                   }
                 } catch {}
+
+                // 后台静默补齐（fire-and-forget）
+                if (chronicle.generatedUntilYear - yearTo < 100) {
+                  const nextTarget = chronicle.generatedUntilYear + 500;
+                  void ensureChronicleCoverage(nextTarget, characterId)
+                    .then((r) => console.log('[chronicle] bg fill done:', r))
+                    .catch((e) => console.error('[chronicle] bg fill failed:', (e as any)?.message || e));
+                }
+              } catch (e) {
+                console.error('[advance-sse] chronicle tick failed (non-fatal):', (e as any)?.message || e);
               }
             } catch (e) {
               console.error('[advance-sse] world event scheduler failed (non-fatal):', e);

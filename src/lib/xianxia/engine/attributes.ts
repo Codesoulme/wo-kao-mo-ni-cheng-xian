@@ -224,6 +224,7 @@ import type {
 import {
   evaluateTechniqueCompatibility,
   isConstitutionStatus,
+  isFateStatus,
 } from './items';
 import {
   buildStateContext,

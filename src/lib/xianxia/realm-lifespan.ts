@@ -145,6 +145,23 @@ export function deriveLifespanFromState(state: Partial<CharacterState> | any, op
   if (!state || typeof state !== 'object') return 80;
   // 修真者保留 current 上限（已被境界 / 传承大幅提高时不让公式压回）
   const base = getLifespanByRealm(state.realm, Number(state.realmLevel || 0));
+  const realm = String(state.realm || 'mortal');
+
+  // 沉浸版 Phase-Release: 凡人不走灵根 × 体魄 × 血脉的复合公式——凡人的 80 是硬顶，
+  // 只有明确的血脉软加成 / 传承池延命丹 / 事件级延寿（服延寿丹/仙人赐寿）才可突破。
+  // 之前的问题：凡人 rootMultiplier=1.0 + 体魄从 5 涨到 200 让 bodyMul 从 1 涨到 2，导致寿命从 80 一路涨到 160-240。
+  if (realm === 'mortal') {
+    const softBoost = 1
+      + Math.max(0, Number(opts?.lineageBoost || 0))
+      + Math.max(0, Number(opts?.ethnicityBoost || 0));
+    const bonus = Math.max(0, Number(opts?.heritageBonus || 0))
+      + Math.max(0, Number(opts?.itemsDelta || 0));
+    const mortalComputed = Math.round(80 * softBoost + bonus);
+    const current = Number(state.lifespan || 0);
+    // 凡人：computed 与 current 取大——事件延寿累计已写入 current，不让重算把它压回去
+    return Math.max(current > 0 ? current : mortalComputed, mortalComputed);
+  }
+
   const computed = deriveLifespan({
     realm: state.realm,
     realmLevel: state.realmLevel,
@@ -155,15 +172,9 @@ export function deriveLifespanFromState(state: Partial<CharacterState> | any, op
     heritageBonus: opts?.heritageBonus,
     itemsDelta: opts?.itemsDelta,
   });
-  // 修真者：取 max(current 上限, computed)。凡人：computed（基础 80）。
-  // 注意：凡人 current 上限 = 80 不是 "硬墙"——只是默认起步；体魄/灵根/血脉加成应能突破
+  // 修真者：取 max(current 上限, computed)。
   const current = Number(state.lifespan || 0);
-  const realm = String(state.realm || 'mortal');
-  if (realm !== 'mortal') {
-    return Math.max(current > 0 ? current : base, computed);
-  }
-  // 凡人：computed 与 current 取大（体魄加成可突破 80）
-  return Math.max(current > 0 ? current : 0, computed);
+  return Math.max(current > 0 ? current : base, computed);
 }
 
 /**

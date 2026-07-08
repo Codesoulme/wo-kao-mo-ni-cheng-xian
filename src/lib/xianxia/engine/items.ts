@@ -315,6 +315,24 @@ export function isConstitutionStatus(status: Partial<StatusEntry> | null | undef
   return status.category === 'special' && CONSTITUTION_NAME_RE.test(text);
 }
 
+// 命格 / 封印 / 前世烙印类 status —— 传承池带入的「fate」类目走这里，
+// 玩家角色出生就该看到这条 chip，且不能被后续 buff/debuff 从 topStatuses 里挤掉。
+// 2026-07-08：新增 isFateStatus 供 StatusPanel 单独分类，避免出现"选了命格但看不到"。
+const FATE_NAME_RE = /命格|封印|命盘|命数|命途|命脉|命轮|因果|轮回|宿命|印记|烙印|前世|来生/;
+export function isFateStatus(status: Partial<StatusEntry> | null | undefined): boolean {
+  if (!status || !status.name) return false;
+  if (isConstitutionStatus(status)) return false;
+  // 明确标注来源为"轮回带入"（传承池路径）的 special status 一律归为命格类
+  if (status.category === 'special' && status.source === '轮回带入') return true;
+  if (status.category === 'special' && status.source === '先天封印') return true;
+  // 名称/描述含命格关键字的 special status（origins.ts 里 rollSealedFate 的产物走这条）
+  if (status.category === 'special') {
+    const text = `${status.name || ''} ${status.description || ''}`;
+    if (FATE_NAME_RE.test(text)) return true;
+  }
+  return false;
+}
+
 const DEFAULT_EQUIP_NOTE: Record<string, string> = {
   weapon: '手持', armor: '身穿', accessory: '佩戴', artifact: '悬身', scripture: '修习',
 };

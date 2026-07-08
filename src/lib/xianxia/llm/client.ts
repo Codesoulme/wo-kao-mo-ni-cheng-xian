@@ -56,43 +56,63 @@ export function resetGameAI() {
 
 async function loadAIConfig(): Promise<RuntimeAIConfig> {
   if (cachedAIConfig) return cachedAIConfig;
-  const raw = await fs.readFile(path.join(process.cwd(), '.xianxia-ai-config'), 'utf-8');
-  const cfg = JSON.parse(raw);
 
-  // 新格式：profiles 数组 + activeId
-  if (Array.isArray(cfg?.profiles) && cfg.profiles.length > 0) {
+  // 沉浸版 Phase-Release: profiles 为空时静默 fallback 到主公内置 key
+  //   - 优先读 .xianxia-ai-config（玩家自己在设置里填的）
+  //   - 没有再 fallback 到环境变量 MINIMAX_M3_KEY（主公服务器的临时额度）
+  //   - UI 上不暴露 fallback 来源（AIConfigDialog 只显示 profiles 列表，玩家永远看到空列表）
+  const cfgPath = path.join(process.cwd(), '.xianxia-ai-config');
+  let cfg: any = null;
+  try {
+    const raw = await fs.readFile(cfgPath, 'utf-8');
+    cfg = JSON.parse(raw);
+  } catch {
+    cfg = null;
+  }
+
+  // 玩家自己填的 profiles 优先
+  if (cfg && Array.isArray(cfg?.profiles) && cfg.profiles.length > 0) {
     const activeId = String(cfg.activeId || cfg.profiles[0]?.id || '');
     const active = cfg.profiles.find((p: any) => p.id === activeId) || cfg.profiles[0];
-    if (!active?.baseUrl || !active?.apiKey) {
-      throw new Error('游戏 AI 配置不完整，请在设置中填写当前接口的 Base URL 和 API Key');
+    if (active?.baseUrl && active?.apiKey) {
+      cachedAIConfig = {
+        baseUrl: String(active.baseUrl).trim().replace(/\/+$/, ''),
+        apiKey: resolveApiKey(active.apiKey),
+        model: String(active.model || 'ark-code-latest').trim() || 'ark-code-latest',
+        liteModel: active.liteModel ? String(active.liteModel).trim() : undefined,
+        chatId: active.chatId ? String(active.chatId) : undefined,
+        userId: active.userId ? String(active.userId) : undefined,
+      };
+      return cachedAIConfig;
     }
+  }
+
+  // 旧格式兼容
+  if (cfg && cfg?.baseUrl && cfg?.apiKey) {
     cachedAIConfig = {
-      baseUrl: String(active.baseUrl).trim().replace(/\/+$/, ''),
-      apiKey: resolveApiKey(active.apiKey),
-      model: String(active.model || 'ark-code-latest').trim() || 'ark-code-latest',
-      liteModel: active.liteModel ? String(active.liteModel).trim() : undefined,
-      chatId: active.chatId ? String(active.chatId) : undefined,
-      userId: active.userId ? String(active.userId) : undefined,
+      baseUrl: String(cfg.baseUrl).trim().replace(/\/+$/, ''),
+      apiKey: resolveApiKey(cfg.apiKey),
+      model: String(cfg?.model || cfg?.modelName || 'ark-code-latest').trim() || 'ark-code-latest',
+      liteModel: cfg?.liteModel ? String(cfg.liteModel).trim() : undefined,
+      chatId: cfg?.chatId ? String(cfg.chatId) : undefined,
+      userId: cfg?.userId ? String(cfg.userId) : undefined,
     };
     return cachedAIConfig;
   }
 
-  // 旧格式兼容：直接 baseUrl/apiKey
-  const baseUrl = String(cfg?.baseUrl || '').trim().replace(/\/+$/, '');
-  const apiKey = resolveApiKey(cfg?.apiKey);
-  const model = String(cfg?.model || cfg?.modelName || 'ark-code-latest').trim() || 'ark-code-latest';
-  if (!baseUrl || !apiKey) {
-    throw new Error('游戏 AI 配置不完整，请在设置中填写 Base URL 和 API Key');
+  // Fallback：主公内置 minimax M3（玩家看到的就是"游戏自动帮配好"）
+  const fbKey = process.env.MINIMAX_M3_KEY || process.env.MINIMAX_API_KEY;
+  if (fbKey) {
+    cachedAIConfig = {
+      baseUrl: 'https://api.minimaxi.com/anthropic',
+      apiKey: fbKey,
+      model: 'MiniMax-M3',
+    };
+    console.log('[AI] fallback to built-in MINIMAX_M3 key (no user profile)');
+    return cachedAIConfig;
   }
-  cachedAIConfig = {
-    baseUrl,
-    apiKey,
-    model,
-    liteModel: cfg?.liteModel ? String(cfg.liteModel).trim() : undefined,
-    chatId: cfg?.chatId ? String(cfg.chatId) : undefined,
-    userId: cfg?.userId ? String(cfg.userId) : undefined,
-  };
-  return cachedAIConfig;
+
+  throw new Error('游戏 AI 配置不可用：玩家未配置 + 服务端无内置 key');
 }
 
 /**
@@ -221,7 +241,16 @@ export async function callLLMText(systemPrompt: string, userPrompt: string, opti
       stopReason = data?.choices?.[0]?.finish_reason || '';
     }
     if (!content) throw new Error('AI 接口返回为空');
-    setCachedLLM(cacheKey, content);
+    // 沉浸版 Phase-Release: 被截断的响应不进缓存——否则同 prompt 后续调用永远吐这条坏 JSON
+    const truncated =
+      stopReason === 'max_tokens' ||
+      stopReason === 'length' ||
+      stopReason === 'content_filter';
+    if (!truncated) {
+      setCachedLLM(cacheKey, content);
+    } else {
+      console.warn(`[LLM] 响应被截断（stopReason=${stopReason}），跳过缓存，本次仍返回给调用方以走 fallback 分支`);
+    }
     return content;
   } catch (err: any) {
     console.error('LLM call failed:', err?.message || err);

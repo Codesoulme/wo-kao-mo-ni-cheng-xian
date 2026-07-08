@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: '缺少 characterId 或 action' }, { status: 400 });
     }
 
-    const isProdMode = !!process.env.ADMIN_TOKEN;
+    const isProdMode = process.env.SKIP_AUTH !== '1' && !!process.env.ADMIN_TOKEN;
     let user: { id: string } | null = null;
     if (isProdMode) {
       user = await getCurrentUser();

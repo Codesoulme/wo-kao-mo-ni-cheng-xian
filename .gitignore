@@ -46,3 +46,4 @@ dev-server.log.err
 *.bak
 *.bak2
 logs/bench/
+*.apk

@@ -29,7 +29,33 @@ type LegacyConfig = {
   model?: string;
 };
 
-const CONFIG_PATH = path.join(process.cwd(), '.xianxia-ai-config');
+// 沉浸版 Phase-Release: 同时检查 cwd 和 cwd/..（standalone / 普通 next start 都覆盖）
+const CONFIG_CANDIDATES = [
+  path.join(process.cwd(), '.xianxia-ai-config'),
+  path.join(process.cwd(), '..', '.xianxia-ai-config'),
+];
+async function readConfigFromDisk(): Promise<string | null> {
+  for (const p of CONFIG_CANDIDATES) {
+    try {
+      return await fs.readFile(p, 'utf-8');
+    } catch {
+      // 继续尝试下一个
+    }
+  }
+  return null;
+}
+async function writeConfigToDisk(content: string): Promise<boolean> {
+  // 写到第一个能写的路径（避免覆盖主公项目根的版本）
+  for (const p of CONFIG_CANDIDATES) {
+    try {
+      await fs.writeFile(p, content, { encoding: 'utf-8', mode: 0o600 });
+      return true;
+    } catch {
+      // 继续尝试下一个
+    }
+  }
+  return false;
+}
 
 function maskKey(key: string) {
   if (!key) return '';
@@ -45,7 +71,8 @@ function generateId() {
 
 async function readMultiConfig(): Promise<MultiConfig | null> {
   try {
-    const raw = await fs.readFile(CONFIG_PATH, 'utf-8');
+    const raw = await readConfigFromDisk();
+    if (!raw) return null;
     const cfg = JSON.parse(raw);
 
     // 新格式：有 profiles 数组
@@ -78,7 +105,7 @@ async function readMultiConfig(): Promise<MultiConfig | null> {
       };
       const newConfig: MultiConfig = { activeId: profile.id, profiles: [profile] };
       // 立即写回新格式
-      await fs.writeFile(CONFIG_PATH, `${JSON.stringify(newConfig, null, 2)}\n`, { encoding: 'utf-8', mode: 0o600 });
+      await writeConfigToDisk(`${JSON.stringify(newConfig, null, 2)}\n`);
       return newConfig;
     }
 
@@ -89,21 +116,34 @@ async function readMultiConfig(): Promise<MultiConfig | null> {
 }
 
 async function writeMultiConfig(config: MultiConfig) {
-  await fs.writeFile(CONFIG_PATH, `${JSON.stringify(config, null, 2)}\n`, { encoding: 'utf-8', mode: 0o600 });
+  await writeConfigToDisk(`${JSON.stringify(config, null, 2)}\n`);
   resetGameAI();
 }
 
+// 沉浸版 Phase-Release: 与 llm/client.ts 中 fallback 逻辑一致
+function hasBuiltInFallback(): boolean {
+  return !!(process.env.MINIMAX_M3_KEY || process.env.MINIMAX_API_KEY);
+}
+
 // GET：返回所有接口配置 + 当前选中
-export async function GET(req: NextRequest) {
-  const auth = requireAuth(req);
-  if (!auth.ok) return auth.response;
+// 沉浸版 Phase-Release: GET 公开访问（只暴露 masked apiKey），供前端 ensureAIConfigured() 检查配置状态；
+//   POST 仍走 requireAuth 保护写入
+export async function GET(_req: NextRequest) {
   const config = await readMultiConfig();
+  const hasFallback = hasBuiltInFallback();
   if (!config) {
-    return NextResponse.json({ configured: false, activeId: null, profiles: [] });
+    // 玩家未配置 profiles，但服务端有内置 key —— 视为已配置
+    return NextResponse.json({
+      configured: hasFallback,
+      activeId: null,
+      profiles: [],
+      usingBuiltIn: hasFallback,
+    });
   }
   const activeProfile = config.profiles.find(p => p.id === config.activeId) || config.profiles[0];
   return NextResponse.json({
-    configured: !!activeProfile,
+    configured: !!activeProfile || hasFallback,
+    usingBuiltIn: !activeProfile && hasFallback,
     activeId: config.activeId || config.profiles[0]?.id,
     profiles: config.profiles.map(p => ({
       id: p.id,
@@ -168,8 +208,9 @@ export async function POST(req: NextRequest) {
       const targetId = String(body?.profileId || '').trim();
       config.profiles = config.profiles.filter(p => p.id !== targetId);
       if (config.profiles.length === 0) {
-        // 删光了，删除配置文件
-        try { await fs.unlink(CONFIG_PATH); } catch { /* ignore */ }
+        // 删光了，删除配置文件（cwd 优先，fallback cwd/..）
+        try { await fs.unlink(path.join(process.cwd(), '.xianxia-ai-config')); } catch { /* ignore */ }
+        try { await fs.unlink(path.join(process.cwd(), '..', '.xianxia-ai-config')); } catch { /* ignore */ }
         resetGameAI();
         return NextResponse.json({ success: true, configured: false, activeId: null, profiles: [] });
       }

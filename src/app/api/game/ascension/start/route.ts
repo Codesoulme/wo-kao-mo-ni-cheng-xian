@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: '参数错误' }, { status: 400 });
   const { characterId, currentTier } = parsed.data;
 
-  const isProdMode = !!process.env.ADMIN_TOKEN;
+  const isProdMode = process.env.SKIP_AUTH !== '1' && !!process.env.ADMIN_TOKEN;
   let user: { id: string } | null = null;
   if (isProdMode) {
     user = await getCurrentUser();

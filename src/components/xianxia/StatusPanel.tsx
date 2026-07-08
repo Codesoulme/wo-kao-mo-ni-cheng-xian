@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { CharacterState } from '@/lib/xianxia/store';
-import { filterMeaningfulStatuses, isConstitutionStatus } from '@/lib/xianxia/engine';
+import { filterMeaningfulStatuses, isConstitutionStatus, isFateStatus } from '@/lib/xianxia/engine';
 import { REALM_SECTION_LABELS, IDENTITY_SECTION_LABELS, isRealmAttribute, isIdentityAttribute } from '@/lib/xianxia/display';
 import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-registry';
 import { RealmOrb } from './RealmOrb';
@@ -78,7 +78,16 @@ export function StatusPanel({ character }: StatusPanelProps) {
     .sort((a: any, b: any) => (RARITY_ORDER[b.rarity] || 0) - (RARITY_ORDER[a.rarity] || 0));
   const topConstitutions = constitutionStatuses.slice(0, 2);
   const constitutionExtraCount = Math.max(0, constitutionStatuses.length - topConstitutions.length);
-  const visibleStatuses = meaningfulStatuses.filter(status => !isConstitutionStatus(status));
+  // 命格 / 前世封印 / 轮回带入类 status：与体质并列固定挂在灵根 chip 右侧，
+  //   不再和普通增益/负面 status 抢 topStatuses 的 3 格。
+  //   来源包括：a) 传承池选的 fate 类目（source='轮回带入'）
+  //           b) origin.sealedFate 生成的先天封印（source='先天封印'）
+  const fateStatuses = meaningfulStatuses
+    .filter(isFateStatus)
+    .sort((a: any, b: any) => (RARITY_ORDER[b.rarity] || 0) - (RARITY_ORDER[a.rarity] || 0));
+  const topFates = fateStatuses.slice(0, 2);
+  const fateExtraCount = Math.max(0, fateStatuses.length - topFates.length);
+  const visibleStatuses = meaningfulStatuses.filter(status => !isConstitutionStatus(status) && !isFateStatus(status));
   const topStatuses = visibleStatuses
     .map((s: any, __idx: number) => ({ ...s, __idx }))
     .filter((s: any) => s && s.name && s.category !== 'identity' && s.category !== 'quest')
@@ -185,7 +194,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                     <h2 className="font-serif-cn text-base font-bold truncate shrink min-w-[3rem]">{character.name}</h2>
-                    <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-700 dark:text-emerald-400 min-w-0 max-w-[92px] shrink">
+                    <span className="inline-flex items-center gap-0.5 rounded bg-primary/8 px-1.5 py-0.5 text-[9px] text-primary/85 min-w-0 max-w-[92px] shrink border border-primary/25">
                       <Sprout className="w-2.5 h-2.5 shrink-0" />
                       <span className="truncate">{rootLabel}</span>
                     </span>
@@ -220,6 +229,51 @@ export function StatusPanel({ character }: StatusPanelProps) {
                     {constitutionExtraCount > 0 && (
                       <span className="shrink-0 rounded-full bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground tabular-nums">
                         +{constitutionExtraCount}
+                      </span>
+                    )}
+                    {/* 命格 chip：与体质同排，用紫色系区分，鼠标点开看详情。
+                        紫色调和体质的高稀有度色区分开，玩家扫一眼就能看到自己带的命格。 */}
+                    {topFates.map((s: any, idx: number) => {
+                      const fateColor = '#7c3aed';
+                      return (
+                        <Popover key={s.id || `fate-${s.name}-${idx}`}>
+                          <PopoverTrigger asChild>
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              data-testid={`status-fate-${s.id || s.name}`}
+                              className="inline-flex max-w-[92px] shrink items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[9px] font-serif-cn cursor-pointer min-w-0"
+                              style={{ borderColor: `${fateColor}55`, background: `${fateColor}14`, color: fateColor }}
+                              title={s.description || s.name}
+                            >
+                              <span className="truncate">{s.name}</span>
+                            </span>
+                          </PopoverTrigger>
+                          <PopoverContent align="start" side="bottom" className="w-64 p-3 paper-texture border-primary/20 shadow-xl">
+                            <div className="space-y-1.5 font-serif-cn">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-sm font-bold" style={{ color: fateColor }}>{s.name}</div>
+                                <span className="text-[10px] text-muted-foreground shrink-0">命格</span>
+                              </div>
+                              {s.description && <p className="text-[11px] leading-relaxed text-foreground/85 xianxia-prose">{s.description}</p>}
+                              {s.source && <div className="text-[10px] text-muted-foreground xianxia-readable">来源：{s.source}</div>}
+                              {Array.isArray(s.effects) && s.effects.length > 0 && (
+                                <div className="flex flex-wrap gap-1 pt-1 border-t border-border/40">
+                                  {s.effects.slice(0, 4).map((eff: any, k: number) => (
+                                    <span key={k} className="rounded bg-muted/50 px-1.5 py-0.5 text-[9px] text-muted-foreground xianxia-chip">
+                                      {eff.description || '命格影响'}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      );
+                    })}
+                    {fateExtraCount > 0 && (
+                      <span className="shrink-0 rounded-full bg-violet-500/10 px-1.5 py-0.5 text-[9px] text-violet-600 tabular-nums">
+                        +{fateExtraCount}
                       </span>
                     )}
                     {character.ascended && (
@@ -288,7 +342,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                   <div className="grid grid-cols-3 gap-1 min-w-0 flex-1 overflow-hidden">
                     {topStatuses.map((s: any, idx: number) => {
                     const negative = s.category === 'debuff' || /伤|毒|虚|痛|劫|魔|损|衰/.test(s.name);
-                    const color = negative ? '#c8453c' : '#2f8f5b';
+                    const color = negative ? '#c8453c' : '#4a6b8a';
                     return (
                       <Popover key={s.id || `${s.name}-${idx}`}>
                         <PopoverTrigger asChild>

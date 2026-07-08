@@ -21,4 +21,19 @@ if (existsSync(staticDir)) {
 if (existsSync(publicDir)) {
   await cp(publicDir, standalonePublicDir, { recursive: true, force: true });
 }
+
+// 沉浸版 Phase-Release: 复制 .env.local + .xianxia-ai-config 到 standalone 目录
+// 玩家无配置时 fallback 读 process.env.MINIMAX_M3_KEY（来自 .env.local）
+const envLocalSrc = path.join(root, '.env.local');
+const envLocalDst = path.join(standaloneDir, '.env.local');
+if (existsSync(envLocalSrc)) {
+  await cp(envLocalSrc, envLocalDst, { recursive: false });
+  console.log('[copy-standalone-assets] .env.local copied.');
+}
+const aiConfigSrc = path.join(root, '.xianxia-ai-config');
+const aiConfigDst = path.join(standaloneDir, '.xianxia-ai-config');
+if (existsSync(aiConfigSrc)) {
+  await cp(aiConfigSrc, aiConfigDst, { recursive: false });
+  console.log('[copy-standalone-assets] .xianxia-ai-config copied.');
+}
 console.log('[copy-standalone-assets] standalone assets copied.');

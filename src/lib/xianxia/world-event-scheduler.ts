@@ -607,6 +607,10 @@ export interface AvailableEventsFilterOpts {
   limit?: number;
 }
 
+/**
+ * @deprecated 世界大事年表改造后，改由 world-chronicle-tick 驱动。
+ * 保留供旧存档/旧代码兼容读取。
+ */
 export function getAvailableEvents(
   state: any,
   worldTime: { eraName: string; calendarYear: number; elapsedDays: number } | undefined,
@@ -708,6 +712,9 @@ export function applyEventTemplate(
 
 // 解析 narrative 中的 [WORLD_EVENT:type]...[/WORLD_EVENT] 标记
 // 返回该次触发的事件；若没有标记返回 null
+/**
+ * @deprecated 改由 world-chronicle-generator 编排，不再依赖 LLM 标记。
+ */
 export function parseWorldEventMarkers(
   narrative: string,
   state: any,
@@ -780,6 +787,9 @@ export function isTemplateEligible(
 // 构建 advance prompt 注入文本：天道传入当前可触发模板
 // ============================================================
 
+/**
+ * @deprecated 改由 world-chronicle-tick + folkloreContext 驱动 prompt。
+ */
 export function buildAvailableWorldEventsPrompt(
   state: any,
   worldTime: { eraName: string; calendarYear: number; elapsedDays: number } | undefined,
@@ -1007,6 +1017,9 @@ interface WorldEventConfig {
 }
 
 // 旧 API 兼容：fallbackRollWorldEvent
+/**
+ * @deprecated 世界事件改由 AI 出生时预排（chronicle）；不再走 random roll。
+ */
 export function fallbackRollWorldEvent(
   state: any,
   worldTime?: { eraName: string; calendarYear: number; elapsedDays: number },
@@ -1076,6 +1089,10 @@ export const rollWorldEvent = fallbackRollWorldEvent;
 // apply 函数（inject finalState）
 // ============================================================
 
+/**
+ * @deprecated 事件效应部分已拆到 applyEventEffects，供 chronicle-tick 复用。
+ * applyWorldEvent 仅供旧代码兼容用；新代码请走 world-chronicle-* 系列。
+ */
 export function applyWorldEvent(state: any, event: WorldEvent, narrative?: string): any {
   const newState: any = { ...state };
   const cfg = FALLBACK_CONFIGS[event.type];
@@ -1340,4 +1357,116 @@ export const WORLD_EVENT_TYPES_LEGACY: WorldEventType[] = [
 
 export function getWorldEventTemplate(type: WorldEventType): WorldEventTemplate | undefined {
   return TEMPLATE_BY_TYPE[type];
+}
+
+// ============================================================
+// 世界大事年表 · 兼容层：把 ScheduledWorldEvent 效应应用到 character state
+// 由 world-chronicle-tick 调用；从旧 applyWorldEvent 里抽出的"效应写入"部分。
+// ============================================================
+
+export interface ChronicleEventLike {
+  id: string;
+  type: WorldEventType;
+  actualStartYear?: number;
+  scheduledYear: number;
+  plannedDuration: number;
+  actualDuration?: number;
+  narrativeActual?: string;
+  narrativeSeed: string;
+}
+
+/**
+ * 把年表事件的效应写入 character state（cultivationMultiplier / lifespan / rootMultiplier
+ * / statusList / pendingThreads），返回新 state。可安全多次叠加（会去重 status）。
+ */
+export function applyEventEffectsToCharacter(state: any, event: ChronicleEventLike): any {
+  const tpl = TEMPLATE_BY_TYPE[event.type];
+  if (!tpl) return state;
+  const newState: any = { ...state };
+  const cfg = FALLBACK_CONFIGS[event.type];
+  const duration = event.actualDuration ?? event.plannedDuration ?? tpl.duration;
+  const triggeredAge = Number(state?.age ?? 0);
+  const narrative = event.narrativeActual || event.narrativeSeed;
+
+  // cultivationMultiplier：乘性叠加
+  if (tpl.effectsTemplate.cultivationMultiplier !== undefined) {
+    const m = tpl.effectsTemplate.cultivationMultiplier;
+    const cur = Number(newState.cultivationMultiplier ?? 1.0);
+    newState.cultivationMultiplier = cur * m;
+  }
+  // lifespanModifier：加性
+  if (tpl.effectsTemplate.lifespanModifier !== undefined && typeof newState.lifespan === 'number') {
+    newState.lifespan = Math.max(1, newState.lifespan + tpl.effectsTemplate.lifespanModifier);
+  }
+  // rootMultiplierBoost
+  if (tpl.effectsTemplate.rootMultiplierBoost !== undefined && typeof newState.rootMultiplier === 'number') {
+    newState.rootMultiplier = newState.rootMultiplier + tpl.effectsTemplate.rootMultiplierBoost;
+  }
+
+  // status 注入（避免重复）
+  const statusList: any[] = Array.isArray(newState.statusList) ? [...newState.statusList] : [];
+  if (cfg && !statusList.some((s: any) => s && s.id === cfg.statusId)) {
+    statusList.push({
+      id: cfg.statusId,
+      name: cfg.statusName,
+      category: 'world',
+      rarity: 'legendary',
+      description: cfg.statusDescription(triggeredAge),
+      source: 'world-chronicle',
+      duration,
+      eventType: event.type,
+    });
+    newState.statusList = statusList;
+    newState.statuses = statusList;
+    newState.statusJson = JSON.stringify(statusList);
+  }
+
+  // pendingThread 注入
+  if (tpl.effectsTemplate.threadTitle) {
+    const threads: any[] = Array.isArray(newState.pendingThreads) ? [...newState.pendingThreads] : [];
+    if (!threads.some((t: any) => t && t.title === tpl.effectsTemplate.threadTitle)) {
+      threads.push({
+        title: tpl.effectsTemplate.threadTitle,
+        description: tpl.effectsTemplate.threadSummary ?? narrative,
+        category: 'world-event',
+        urgency: 'medium',
+        deadlineAge: triggeredAge + Math.max(1, duration) * 12,
+        source: 'world-chronicle',
+      });
+      newState.pendingThreads = threads;
+    }
+  }
+
+  // 飞升遗泽：世代记忆
+  if (event.type === 'great_cultivator_ascend') {
+    const legacies: any[] = Array.isArray(newState.previousWorldLegacies) ? [...newState.previousWorldLegacies] : [];
+    legacies.push({
+      characterName: `飞升大能 ${event.actualStartYear ?? event.scheduledYear}`,
+      status: `${event.actualStartYear ?? event.scheduledYear} 年飞升`,
+      summary: narrative,
+      relicSeeds: ['飞升遗泽'],
+      legendSeeds: [`飞升者余泽 +10% 修为 ${duration} 年`],
+    });
+    newState.previousWorldLegacies = legacies;
+  }
+
+  return newState;
+}
+
+/**
+ * 移除 concluded 事件带来的 status（供 chronicle-tick 归档时清理）
+ */
+export function removeEventStatusFromCharacter(state: any, eventType: WorldEventType): any {
+  const cfg = FALLBACK_CONFIGS[eventType];
+  if (!cfg) return state;
+  const statusList: any[] = Array.isArray(state.statusList) ? [...state.statusList] : [];
+  const idx = statusList.findIndex((s: any) => s && s.id === cfg.statusId);
+  if (idx < 0) return state;
+  statusList.splice(idx, 1);
+  return {
+    ...state,
+    statusList,
+    statuses: statusList,
+    statusJson: JSON.stringify(statusList),
+  };
 }

@@ -1128,6 +1128,12 @@ export async function generateBirthEvent(
   name?: string,
   previousWorldLegacies?: PreviousWorldLegacy[],
   origin?: OriginRoll,
+  worldContext?: {
+    eraName?: string;
+    calendarYear?: number;
+    worldRecentHistory?: Array<{ scheduledYear: number; actualEndYear?: number; type: string; narrativeSeed: string }>;
+    worldNowActive?: Array<{ actualStartYear?: number; scheduledYear: number; type: string; narrativeSeed: string }>;
+  },
 ): Promise<BirthResult> {
   // 1. 引擎权威：后端先 roll 灵根类型和五行组合（LLM 不可自由发挥）
   const root = rollSpiritualRoot();
@@ -1174,6 +1180,15 @@ ${hasLegacies ? `
 - 前世故事在 narrative 中要**自然暗示**（不要直接说"前世"二字，用巧合/直觉/梦境/旧物相认/老人隐约低语/出生异象等方式呈现）
 - 必须给主角安排**至少 2-3 处与前世相关的小细节**（异象/直觉/巧合/梦中声音/老物相认），分散嵌在背景叙事中
 - legacy 在 narrative 中可以是"父母口中传下来的旧物/梦中反复出现的符号/周岁抓周时独取之物/邻家老者一句嘀咕"，避免直白叙述
+` : ''}
+${worldContext && ((worldContext.worldRecentHistory && worldContext.worldRecentHistory.length) || (worldContext.worldNowActive && worldContext.worldNowActive.length)) ? `
+【降生时的世界】
+${worldContext.eraName || '青岚仙历'} ${worldContext.calendarYear || ''} 年。近三百年内曾发生的大事：
+${(worldContext.worldRecentHistory || []).map(e => `- ${e.actualEndYear ?? e.scheduledYear} 年前后，${e.narrativeSeed}`).join('\n') || '- （太平年月）'}
+当下仍在延续的：
+${(worldContext.worldNowActive || []).map(e => `- 自 ${e.actualStartYear ?? e.scheduledYear} 年起，${e.narrativeSeed}`).join('\n') || '- （无大事延续）'}
+
+规则：这些只是世界背景。降生 narrative 中提不提这些完全由你判断——若与角色出身/家世/异象有关系，可自然带入；无关就不用提。不要罗列，不要写"当前世事：……"，避免机械。
 ` : ''}
 严格 JSON 输出。`;
 

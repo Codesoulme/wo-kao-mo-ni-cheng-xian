@@ -503,7 +503,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) return NextResponse.json({ success: false, error: '来意不明' }, { status: 400 });
     const { characterId, action, lotId, bid } = parsed.data;
 
-    const isProdMode = !!process.env.ADMIN_TOKEN;
+    const isProdMode = process.env.SKIP_AUTH !== '1' && !!process.env.ADMIN_TOKEN;
     let user: { id: string } | null = null;
     if (isProdMode) {
       user = await getCurrentUser();

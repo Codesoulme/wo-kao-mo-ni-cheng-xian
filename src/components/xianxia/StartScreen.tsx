@@ -85,6 +85,13 @@ export function StartScreen({
         <p className="text-xs text-muted-foreground mt-4 max-w-xs mx-auto leading-relaxed">
           {'\u4ece\u51e1\u5c18\u8d77\u6b65\uff0c\u5728\u5c81\u6708\u3001\u56e0\u679c\u4e0e\u6289\u62e9\u4e2d\u8d70\u51fa\u81ea\u5df1\u7684\u4fee\u4ed9\u8def\u3002\u6b64\u4e16\u65e0\u5b9a\uff0c\u552f\u89c1\u771f\u5fc3\u3002'}
         </p>
+        {/* \u6c89\u6d78\u7248 Phase-Release: AI \u514d\u8d23\u58f0\u660e */}
+        <p
+          data-testid="ai-disclaimer"
+          className="text-[10px] text-muted-foreground/70 mt-3 tracking-wide"
+        >
+          {'\u5185\u5bb9\u7531 AI \u751f\u6210\uff0c\u4ec5\u4f9b\u53c2\u8003'}
+        </p>
       </div>
 
       {/* 开始卡片 */}
