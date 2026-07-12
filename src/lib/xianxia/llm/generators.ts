@@ -242,6 +242,13 @@ export async function generateItemActionNarrative(
 2. 更新 cultivationInsight（60-150 字，规则同 advance 场景：必须引用引擎提供的准确来源名称与数字）
 来源条目由引擎权威计算，你不可输出 cultivationFactors 字段（已从 schema 移除）。
 
+【避免开局同质化——本条最高优先级】
+玩家已经玩过多局，反复看到"祖父欲言又止 / 前朝遗族 / 药商家 / 金印玉佩 / 老树重发 / 檐下风铃 / 断齿木梳 / 抓周不取常物"就会觉得雷同。本局请**主动跳出这个模板**：
+- 家世从 ①②④⑤ 组的概率合起来至少和 ③ 组前朝遗族一样高
+- 出生场景避开"天地异象+老物象征+长辈遮掩"三件套
+- 允许主角就是普普通通的一个婴儿，narrative 甚至可以完全不写机缘暗示（把机缘留给后续年岁）
+- 允许把"修仙"直接摆到桌面上：父母就是修士 / 家里就有法器 / 出生地就在宗门内——修仙世界的婴儿本来就未必生在凡人堆里
+
 严格 JSON 输出。`;
 
   const user = `【状态快照】
@@ -772,6 +779,7 @@ export async function generateCombatRoundProposal(args: {
 - 必须给 tacticalSituation：判断当前战势节奏（压制、僵持、破绽、濒危、脱身窗口、反转、混乱）、谁占优、原因、玩家可抓的破口、敌方压力。
 - 必须给 nextActions 2-4 个【下一拍临场动作】：它们是 UI 面板的交互投影，应根据当前战势自然生成，例如诱敌露绽、借地形拉开、以法器硬换、佯败脱身；不要只给固定普攻。除非使用真实背包物，否则 actionType 优先用 other/defense/flee/basic_attack。
 - 严禁机械战报：不得出现"造成X点伤害""受到X点伤害""HP""扣血""本回合""结算""公式"等字样；数值只作为幕后事实，叙事一律文学化转写（如"血光迸现""真气一窒""踉跄半步"）。
+- 【叙事格式（必须遵守）】narrative 用「\n」分 2-3 个短自然段。每段开头用「　　」（两个全角空格 U+3000）首行缩进；段间只用一次「\n」，不要空一整行。每段必须以中文句末标点「。！？」或「」」结尾——**严禁**在逗号「，」、顿号「、」、分号「；」后换行断段。
 严格只返回 JSON。`;
 
   const user = `角色：${sc.name}，${sc.age}岁，${sc.realmName}
@@ -1090,32 +1098,54 @@ function summarizeLegaciesForPrompt(legacies: PreviousWorldLegacy[] | undefined,
 
 /**
  * LLM 失败时的兜底：依据 legacy 列表拼一段简短的前世暗示叙事。
- * 每件 legacy 至少给出 1 句暗示（异象 / 直觉 / 巧合），不直说"前世"二字。
+ * 每件 legacy 至少给出 1 句暗示（自我发现 / 身体记忆 / 器物本身），避免"祖父欲言又止 / 抓周独取"等被玩家吐槽的套路。
  * - 输出约 80-160 字，适合拼到 birth.background 后面
  */
 export function buildPreviousLifeBackground(legacies: PreviousWorldLegacy[] | undefined): string {
   if (!Array.isArray(legacies) || legacies.length === 0) return '';
 
+  // 每类给 3 个变体，按 legacy 索引轮换，避免连续 fallback 长得完全一样
+  const HINT_POOL: Record<string, string[]> = {
+    scripture: [
+      '识海深处偶有几笔符文闪过，醒时只留残念，说不清何来。',
+      '幼年学字，笔画间隐隐带着不属这年纪的顿挫。',
+      '听人念经或诵咒，会莫名跟着记住半句，家人以为聪慧。',
+    ],
+    artifact: [
+      '床头柜底常年有一件小物，母亲说不知何时就在那里。',
+      '幼时把玩一件不知从哪捡回的旧铁片，磨得发亮却从不肯放手。',
+      '洗澡时偶露腰间一道浅痕，形似某种器物压过。',
+    ],
+    pet: [
+      '院里那只野猫/野狗不知何时开始只黏这孩子，赶都赶不走。',
+      '襁褓期常有小鸟停在窗棂，鸣叫两声便飞走。',
+      '一岁多时家中常闻不属这季节的兽鸣声，寻不到源头。',
+    ],
+    fate: [
+      '不到两岁便学会一个不知从谁那儿看来的手势，做得极自然。',
+      '午睡时偶尔哼一段没人教过的调子，母亲听着觉得熟悉又不能确指。',
+      '对某个方位/某种气味有说不清的亲近，人未开口，脚已朝那儿走。',
+    ],
+    default: [
+      '幼时对某个字/某样物件有远超年岁的执着，说不清缘由。',
+      '偶尔说梦话，用词与年纪严重不符，家人当作童言无忌。',
+      '某种旧木头/旧布/旧金属的气味会让这孩子安静下来。',
+    ],
+  };
+
+  // 用 legacy 数量做种子挑变体，确定性不重复
+  const pickVariant = (arr: string[], seed: number): string => arr[seed % arr.length];
+
   const hints: string[] = [];
   for (let i = 0; i < legacies.length; i++) {
     const it = legacies[i] || {};
-    const name = String(it.name || it.payload?.name || '此物').slice(0, 12);
     const category = String(it.category || it.type || it.kind || '').toLowerCase();
-    const desc = String(it.description || it.payload?.description || '').slice(0, 40);
-
-    if (category.includes('scripture') || category.includes('功法') || category.includes('technique')) {
-      hints.push(`梦中常有玄奥符文流转，醒时唯余几笔，疑是久远前的手泽。`);
-    } else if (category.includes('artifact') || category.includes('法宝') || category.includes('weapon') || category.includes('armor')) {
-      hints.push(`此子落地时左掌紧握一缕寒光，似器似刃，父母不敢强取。`);
-    } else if (category.includes('pet') || category.includes('灵宠')) {
-      hints.push(`伴生有灵物相随，见之者皆言其目光老成，不似初生。`);
-    } else if (category.includes('bond') || category.includes('命格') || category.includes('fate')) {
-      hints.push(`村中老人偶尔低语："这孩子的命数，似在哪儿见过。"`);
-    } else if (desc) {
-      hints.push(`襁褓之中偶有异香，似与"${name}"暗合，村人啧啧称奇。`);
-    } else {
-      hints.push(`此子周岁抓周时，独取那物不放，旁人皆笑。`);
-    }
+    let bucket = 'default';
+    if (category.includes('scripture') || category.includes('功法') || category.includes('technique')) bucket = 'scripture';
+    else if (category.includes('artifact') || category.includes('法宝') || category.includes('weapon') || category.includes('armor')) bucket = 'artifact';
+    else if (category.includes('pet') || category.includes('灵宠')) bucket = 'pet';
+    else if (category.includes('bond') || category.includes('命格') || category.includes('fate')) bucket = 'fate';
+    hints.push(pickVariant(HINT_POOL[bucket], i + Math.floor(Date.now() / 3600000)));
   }
 
   // 取前 3 条避免 narrative 膨胀
@@ -1166,20 +1196,31 @@ export async function generateBirthEvent(
 - 灵根：已由天道判定为「${rootInfo.name}」，灵根详情请基于以下信息生成：${rootTypeHint[root]}。
 - 灵根详情 rootDetail 格式：如"${pickedZh}凡灵根"、"${pickedZh}真灵根"、"五行杂灵根"、"无灵根"、"${pickedZh}天灵根"、"混沌灵根"。必须与上述灵根类型和突出属性一致。
 ${originBlock}
-- 出生地：修仙世界地点（如"青云山下一处凡人村落"、"东海之滨渔村"、"北荒边陲小镇"等），需与族裔/出身契合。
-- 家世：凡人家庭/落魄修士之后/书香门第/农户/猎户/商户等。尽量选择**非农非猎户**的家庭（如落魄散修之后/书香门第/前朝遗族/边境驿丞/退隐老兵/药商/故旧之后等），增加家世多样性；若出身为妖族/巫族/羽族/海族/灵族，请按其族裔特征描写（妖族可能带鳞片/角/异瞳，巫族可能带纹身/灵巫之力）。
-- 背景：100-200字描写出生时的情境、天象、家世氛围，可暗示灵根特征（如天灵根降生时有异象）。若附带伴生灵物，请叙述其来历（胎里带来/出生异象/父母遗物）；若附带先天封印/命格，请暗示角色被封印的特殊命格与解封契机。
+- 出生地：修仙世界地点。地点池请从多层世界中随机取样，覆盖 ①凡俗市井（东海之滨渔村 / 北荒边陲小镇 / 西凉商队歇脚驿 / 江南水乡书院旁 / 南疆瘴林边寨 / 十字路口的破庙 / 战乱后废村 / 漕运码头船坞…）②修仙聚落外围（青云宗山门下三十里的凡人聚居镇 / 灵植峰药田佃户村 / 坊市外围临时集镇 / 传送阵驿站客栈 / 妖兽领地边界哨镇…）③修仙世家内部（三流丹修家族分支 / 落魄剑门旁支老宅 / 已断传承的血脉遗族祖屋 / 巫祝一族祭坛后山 / 依附中型宗门的外门世仆家庭…）④宗门内部（中小型宗门山门内部的杂役院 / 外门弟子子女院 / 有主脉血脉之家在山门内的私宅 / 药园/兽苑/藏经阁掌事之家…）⑤更奇特的（漂泊法舟上、跨界渡口、灵矿工棚、秘境边缘、群山孤岛…）
+- 家世：**扩大家世池，避免反复挑同类**。以下 5 组，本次随机挑一组或跨组组合，不要总是挑第 1 组的"药商/前朝遗族"：
+  ① 凡俗底层：农户/猎户/渔夫/樵夫/挑夫/铁匠学徒/驿卒/戍卒/僧道游脚/说书人/杂耍艺人/走乡货郎/漕工/矿工/十字路口弃婴（被路过之人捡回）
+  ② 凡俗中层：坐堂医/教书先生/账房/漕运掌柜/衙门书办/退隐老兵/山寨遗孤/边关驿丞/藩镇裨将后代/寺庙义子/私塾山长/道观小道童
+  ③ 前朝遗脉：前朝遗族旁支/亡国将门后裔/流放宗室子弟/断嗣的士族末裔/前朝御医之后/前代散修坐化后遗孤（这类之前用得多，本次少用）
+  ④ 修仙散修/边缘：落魄散修之后/闭关多年才归的散修之子/游方术士的私生子/坊市老药师之子/秘境守墓人之后/驱邪法师传人/巫祝血裔
+  ⑤ **修仙世家/宗门内部（这类之前完全没写过，本次高权重考虑）**：中小丹修家族嫡系 / 剑门旁支弟子的血脉子女 / 中型宗门外门弟子成家后的子嗣（父母都是筑基期/金丹期低阶修士）/ 大宗门执事家的私生子 / 宗门药园管事之家 / 世家附庸家族的血脉传人 / 已破落但底子还在的修仙世家嫡长孙 / 宗门山门下弟子村专门供奉子弟的家庭 / 灵矿主家的儿子
+  按主角出身族裔灵活选组；妖族/巫族/羽族/海族/灵族则按其族裔特征描写（妖族可能带鳞片/角/异瞳，巫族可能带纹身/灵巫之力）。修仙家族/宗门出身的主角，父母大概率本身是修士，家中常有低阶法器/丹药/功法残卷，甚至开局就有师承预约或直系血亲的修为传承——这类出身**不需要**再写"父母朴素凡人"，可以直接是修士家庭。
+- 背景：100-200字描写出生时的情境与家世氛围。**关于"天象异象"的硬约束**：天灵根 / 混沌灵根 时可以写异象（且异象要与灵根属性契合）；真灵根 / 凡灵根 / 杂灵根 / 无灵根 时，**不要**写天降异象、老树重发、风铃自鸣、山谷共振等"天地皆知"的场面——这些用滥了。可以写小而具体的日常氛围（接生时刚下过雨、家里那盆兰花正好开、隔壁人家在办喜事、母亲难产但撑过来了、父亲刚从远处归家、正是采药的季节…）；修仙世家/宗门出身时，出生环境自然带修仙元素（父母在闭关中、丹房里飘出药香、外院有师兄传灵讯过来、后山灵田收成刚好…），不需要额外造异象。若附带伴生灵物，请叙述其来历（胎里带来/父母遗物/长辈托付）；若附带先天封印/命格，请暗示角色被封印的特殊命格与解封契机。
 ${hasLegacies ? `
-【前世因果——必须遵守】
-天道传入 previousWorldLegacies（轮回带入），你必须为每件遗产生成前世故事，并在 narrative 中自然呈现：
-- 前世身份（如"前朝剑修/边陲小派掌门/灭门遗孤/散修/魔门弃徒/坊市老药师/洞府守墓人..."）
-- 死亡原因（如"渡劫失败/被人暗算/与敌同归于尽/寿终正寝/坐化/为护弟子而亡/心魔反噬..."）
-- 携带物品来历（与前世身份/死亡原因挂钩，不要凭空出现；物品自带"旧主残意"）
-- 残留执念（如"未竟的仇怨/未修成的功法/未能相守的人/未了的心愿/未找到的真相"）
-- 与今生的巧合（如"转世投到仇人村/父母是前世旧识/灵根与前世功法契合/幼时常做同一个梦/家乡地名与前世山门相近"）
-- 前世故事在 narrative 中要**自然暗示**（不要直接说"前世"二字，用巧合/直觉/梦境/旧物相认/老人隐约低语/出生异象等方式呈现）
-- 必须给主角安排**至少 2-3 处与前世相关的小细节**（异象/直觉/巧合/梦中声音/老物相认），分散嵌在背景叙事中
-- legacy 在 narrative 中可以是"父母口中传下来的旧物/梦中反复出现的符号/周岁抓周时独取之物/邻家老者一句嘀咕"，避免直白叙述
+【前世因果——克制处理，避免"长辈欲言又止"套路】
+天道传入 previousWorldLegacies（轮回带入），你要为遗产找一个此生的落脚点，但**明确禁止**以下反复被玩家吐槽的写法：
+- 祖父/父亲/祖母"欲言又止/沉默不语/眼神闪躲/锁在檀匣中/祖辈相传"
+- 出生时"檐下风铃自鸣九响"、"老树一夜重发新枝"、"接生婆看见异象"
+- "抓周独取某物"、"梦中有人抚顶"、"崖下埋着无字木牌"
+- "金印/玉牌/古篆残缺无人能识"这一整套组合
+
+正确的处理方式（选 1 处即可，不必凑 2-3 处）：
+A. 自己发现型：小时候在阁楼/柴房/河边独自捡到旧物；某个不经意瞬间某个念头蹦出来
+B. 外人一句话型：路过的僧道客商多看一眼；同龄玩伴讲的一句怪话；街上说书人恰好在讲一段跟主角命数相关的旧事
+C. 身体记忆型：某个动作/习惯/口音/字迹自己不知从哪学来；对某种气味/景物有说不清的亲近或厌恶
+D. 器物本身型：物件本身出现在意想不到的位置（不是长辈"锁在檀匣里祖辈相传"），比如床底下一直有、井底浮上来、鸟叼进屋
+E. **完全不点破型**：narrative 里根本不涉及前世痕迹，把线索留给后续年岁触发（这也是完全合法的写法）
+
+如果本局灵根不高（凡/杂/真），前世因果的呈现**优先选 E 或 C**，让它成为伏笔而不是开局奇观；不必解释每件 legacy 的前世身份、死亡原因、残留执念——这些在你脑内成立即可，narrative 不必展开。
 ` : ''}
 ${worldContext && ((worldContext.worldRecentHistory && worldContext.worldRecentHistory.length) || (worldContext.worldNowActive && worldContext.worldNowActive.length)) ? `
 【降生时的世界】
@@ -1202,17 +1243,24 @@ ${(worldContext.worldNowActive || []).map(e => `- 自 ${e.actualStartYear ?? e.s
   "background": "出生背景叙事（100-200字）"
 }
 
+【叙事格式（必须遵守，与 advance/choose/combat 场景对齐）】
+- background 字段用「\\n」分 2-3 个短自然段；
+- 每段开头用「　　」（两个全角空格 U+3000）首行缩进；
+- 段间只用一次「\\n」，不要空一整行；
+- 每段必须以中文句末标点「。！？」或「」」结尾——严禁在逗号「，」、顿号「、」、分号「；」后换行断段；
+- 从一个具体动作/物件/感官切入（如产房烛火、祖父的旧剑襁褓上的绣纹、院中树影的摇动），不写"这孩子将来不平凡"等抽象概括。
+
 注意：不要输出 spiritualRoot 字段，灵根类型已由天道判定为「${root}」，你只需生成对应的 rootDetail 文字描述。${hasLegacies ? `
 
-【前世带入（previousWorldLegacies）—— 必须落实到 narrative】
+【前世带入（previousWorldLegacies）—— 请遵循 system 中的克制处理原则】
 以下为天道传入的轮回带入清单（最多 6 件）：
 ${legacyBlock}
 
 要求：
-- 在 narrative 中**自然呈现前世因果**（前面原则）
-- 至少 2-3 处与前世相关的小细节（异象/直觉/巧合/梦中声音/老物相认/老人低语）
-- legacy 在 narrative 中用暗示方式嵌入（不要罗列、不要直接说"前世"二字）
-- 每件 legacy 至少对应 1 处暗示（物品来历 / 旧主残意 / 与今生的巧合）` : ''}`;
+- 是否在 narrative 中呈现由你判断（灵根不高时 system 里的 E 型"完全不点破"是首选）
+- 呈现方式请**严格遵守 system 里的 A/B/C/D/E 五种类型**，选 1 种即可（不必 2-3 处；灵根不高时优先 E 或 C）
+- **禁止**祖父/父亲欲言又止 / 檐下风铃自鸣 / 老树重发 / 抓周独取 / 无字木牌等 system 里已列的滥调
+- 不必解释每件 legacy 的前世身份/死亡原因/残留执念——你脑内成立即可，narrative 只需自然点到 1 处` : ''}`;
 
   // AI-61: 在出生事件 user prompt 注入 L1 世界观知识
   const worldKnowledge = await loadWorldKnowledge();
@@ -1263,5 +1311,72 @@ ${legacyBlock}
       background: fallbackBackground,
       elements,
     };
+  }
+}
+
+/**
+ * 沉浸版·临终叙事（2026-07-12 用户反馈：结局太突兀）
+ *
+ * 角色本轮跨过 alive=false 时调用。生成一段 3-5 句的死亡场景描写：
+ * 承接本年 aiOutput.narrative 之后，把角色引向具体的死亡场景（不是硬编码"星辰夜凉再无来者"一句话兜底）。
+ *
+ * 短时超时（8s）——advance 主路径慢一点也接受，但不能让 settlement 之前卡死。
+ * 失败时返回 null，由调用方回退到硬编码兜底。
+ */
+export async function generateDeathNarrative(args: {
+  characterName: string;
+  age: number;
+  realmName: string;
+  causeOfDeath: string;
+  precedingNarrative?: string;
+  ascended?: boolean;
+}): Promise<string | null> {
+  const { characterName, age, realmName, causeOfDeath, precedingNarrative, ascended } = args;
+
+  const system = IDENTITY_PROMPT;
+  const scene = ascended
+    ? '【当前场景：飞升羽化】角色叩开天门、羽化登真。你要生成"羽化场景"的 3-5 句叙事。'
+    : '【当前场景：临终收局】角色本世走到尽头。你要生成"临终场景"的 3-5 句叙事。';
+
+  const user = `【角色临终状态】
+- 名讳：${characterName}
+- 年岁：${age} 岁
+- 境界：${realmName}
+- 死因/收局：${causeOfDeath}${ascended ? '（飞升）' : ''}
+
+${precedingNarrative ? `【本轮此前发生】\n${precedingNarrative}\n` : ''}
+【任务】
+承接【本轮此前发生】的余韵（若有），紧接着写角色${ascended ? '羽化登真' : '走向死亡'}的具体场景：
+- 从**一个具体动作/物件/感官**切入（枕边的旧剑、灯芯将熄、门外远处传来的钟声、他抬手却抬不动、含在嘴里的丹药）
+- 不要总结"这一世""道途""缘起缘灭"这类抽象概括——用他此刻的具体动作与念头呈现
+- 不要写"星辰夜凉""再无来者""缘尽命归"这种网文陈套
+- ${ascended ? '飞升要有仙气但落到细节：袖口翻起的风、指节泛起的莹光、被身后世界遗留下的一件小物' : '死因是「' + causeOfDeath + '」——把这个死因写成具体场景（战伤未愈、体寒不散、心魔反噬、寿元将尽、被谁一剑穿胸），不要含糊'}
+- 3-5 句，共 120-260 字之间
+- 用「\\n」分 1-2 个短自然段，每段开头「　　」（两个全角空格 U+3000）首行缩进
+- 段末以「。！？」或「」」收尾，严禁在逗号后换行断段
+- 只输出叙事文本，不要 JSON、不要标签、不要说明
+
+请直接输出叙事：`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const raw = await Promise.race([
+      callLLMText(system, user, { qualityMode: 'light' }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('death narrative timeout')), 8000)),
+    ]);
+    clearTimeout(timeoutId);
+    const text = String(raw || '').trim();
+    if (!text) return null;
+    // 兜底清洗：去掉多余的引号 / JSON 尾巴 / 说明性开场
+    const cleaned = text
+      .replace(/^["'`「『]/, '').replace(/["'`」』]$/, '')
+      .replace(/^【[^】]+】\s*/g, '')
+      .replace(/^narrative\s*[:：]\s*/i, '')
+      .trim();
+    return cleaned || null;
+  } catch (err: any) {
+    console.error('[generateDeathNarrative] failed, falling back to hardcoded:', err?.message || err);
+    return null;
   }
 }
