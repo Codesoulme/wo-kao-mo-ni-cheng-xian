@@ -527,6 +527,10 @@ export interface EngineExecutionResult {
   breakthroughReasonAccepted?: boolean;
   died: boolean;
   deathReason?: string;
+  // 2026-07-12：实际从 inventory/equipped 被移除的物品 id 列表（AI claimed + 引擎实际删的）。
+  // 用于 buildEventDisplayEffects 渲染"失去：XXX"chip —— 之前只透 appliedChanges 不透 removedItemIds，
+  // 玩家看到 narrative 写"服用丹药"但背包里丹药还在，沉浸感断。
+  removedItemIds?: string[];
 }
 
 // ==================== AI 事件执行：处理器管线 ====================
@@ -558,6 +562,8 @@ interface ExecCtx {
   died: boolean;
   deathReason?: string;
   collectItemResolve(resolved: ItemEffectResolveResult): void;
+  // 2026-07-12：收集本次实际从 inventory/equipped 被移除的物品 id，供显示层渲染"失去：XXX"chip
+  removedItemIds: string[];
 }
 
 type AIEventProcessor = (ctx: ExecCtx) => void;
@@ -714,6 +720,10 @@ const procRemovedItems: AIEventProcessor = (ctx) => {
     const rem = removeItemsByIds(ctx.next, aiOutput.removedItemIds);
     ctx.next = rem.state;
     ctx.collectItemResolve(rem);
+    // 2026-07-12：把真正删掉的 id 收进 ctx，给显示层做"失去"chip 用
+    for (const r of rem.removed || []) {
+      if (r && r.id) ctx.removedItemIds.push(r.id);
+    }
   }
 };
 
@@ -1057,6 +1067,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     breakthroughReasonAccepted: false,
     died: false,
     deathReason: undefined,
+    removedItemIds: [],
     collectItemResolve(resolved: ItemEffectResolveResult) {
       this.appliedChanges.push(...resolved.appliedChanges);
       this.rejected.push(...resolved.rejectedChanges);
@@ -1097,6 +1108,8 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     breakthroughReasonAccepted: ctx.breakthroughReasonAccepted,
     died: ctx.died,
     deathReason: ctx.deathReason,
+    // 2026-07-12：透给显示层，让"失去：XXX"chip 能正确渲染
+    removedItemIds: ctx.removedItemIds,
   };
 }
 

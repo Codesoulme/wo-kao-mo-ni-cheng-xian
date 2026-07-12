@@ -312,7 +312,7 @@ export function dbToState(c: DBCharacter): CharacterState {
   const rootInfo = SPIRITUAL_ROOTS[c.spiritualRoot as SpiritualRoot];
   const equipped = parseEquippedJson(c.equippedJson || '[]').map(normalizeCultivationBearingItem);
   const inventory = safeParse<ItemEntry[]>(c.inventoryJson, []).map(normalizeCultivationBearingItem);
-  const storageCapacity = c.storageCapacity ?? 5;
+  const storageCapacity = c.storageCapacity ?? 9; // 2026-07-12：默认 9（与 schema.prisma 的 @default(9) 对齐）
   // Task 20: 解析新字段
   const parsedPendingThreads = safeParse<PendingThread[]>(c.pendingThreadsJson || '[]', []);
   const pendingThreads = normalizeThreadsCompletion(Array.isArray(parsedPendingThreads) ? parsedPendingThreads : []);

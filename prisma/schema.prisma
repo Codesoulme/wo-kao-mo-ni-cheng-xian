@@ -109,8 +109,8 @@ model Character {
   inventoryJson   String   @default("[]")
   // JSON string of equipped items (array of ItemEntry, no slot limit — AI may equip multiples of same type)
   equippedJson    String   @default("[]")
-  // 储物袋容量上限（无袋时默认 5；获得储物袋后增加）
-  storageCapacity Int      @default(5)
+  // 储物袋容量上限（无袋时默认 9；获得储物袋后增加）——2026-07-12：玩家反馈背包太小，从 5 提到 9
+  storageCapacity Int      @default(9)
   // 修炼速度倍率（灵根 × 功法 × 其他装备），default 1.0
   cultivationMultiplier Float @default(1.0)
   // 修炼心得：AI 生成的修炼速度说明文本（描述当前影响修炼速度的种种因素）
