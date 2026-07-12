@@ -109,12 +109,33 @@ export function defaultTimeLabel(unit: TimeAdvanceUnit, amount: number) {
 
 export function inferInlineTimeAdvance(title?: string, narrative?: string): TimeAdvance | undefined {
   const text = `${title || ''} ${narrative || ''}`;
-  if (/\u5165\u591c\u540e|\u5f53\u591c|\u591c\u91cc|\u591c\u534a|\u5b50\u591c|\u661f\u5b50|\u68a6\u91cc|\u6795\u4e0b/.test(text)) return { amount: 12, unit: 'hour', label: '\u5165\u591c\u540e', reason: '\u540c\u65e5\u591c\u95f4\u4f59\u6ce2', ageDeltaYears: 0, elapsedDays: 0 };
-  if (/\u9ec4\u660f|\u508d\u665a|\u66ae\u8272|\u66ae\u9f13|\u65e5\u843d/.test(text)) return { amount: 6, unit: 'hour', label: '\u9ec4\u660f', reason: '\u540c\u65e5\u66ae\u95f4\u4f59\u6ce2', ageDeltaYears: 0, elapsedDays: 0 };
-  if (/\u5348\u540e|\u664c\u5348|\u65e5\u4e2d/.test(text)) return { amount: 4, unit: 'hour', label: '\u5348\u540e', reason: '\u540c\u65e5\u65e5\u4e2d\u4f59\u6ce2', ageDeltaYears: 0, elapsedDays: 0 };
-  if (/\u6e05\u6668|\u6668\u8d77|\u5929\u4eae|\u6668\u5149|\u6668\u949f/.test(text)) return { amount: 1, unit: 'hour', label: '\u6e05\u6668', reason: '\u540c\u65e5\u6e05\u6668\u4f59\u6ce2', ageDeltaYears: 0, elapsedDays: 0 };
-  if (/\u7fcc\u65e5|\u6b21\u65e5|\u660e\u65e5|\u7b2c\u4e8c\u65e5|\u8f6c\u65e5/.test(text)) return { amount: 1, unit: 'day', label: '\u7fcc\u65e5', reason: '\u540e\u7eed\u4f59\u6ce2', ageDeltaYears: 0, elapsedDays: 1 };
-  if (/\u6570\u65e5\u540e|\u51e0\u65e5\u540e|\u4e09\u65e5\u540e/.test(text)) return { amount: 3, unit: 'day', label: '\u6570\u65e5\u540e', reason: '\u540e\u7eed\u4f59\u6ce2', ageDeltaYears: 0, elapsedDays: 3 };
+  // 2026-07-12：扩到月级/年级关键词——AI narrative 里"三月后再次相见""半年后再来"等更常见，
+  // 旧版只识入夜/翌日/数日后，不接住玩家立刻感觉"那几个月呢凭空跳了"。
+  // 命中后回滚到对应月/年跨度，ageDeltaYears=0 表示同年不跨岁。
+  if (/数年后|几年后|三五年后|三年后|五年后/.test(text)) {
+    return { amount: 3, unit: 'year', label: '数年后', reason: 'narrative 提及数年后事件，跨年补完', ageDeltaYears: 3, elapsedDays: 365 * 3 };
+  }
+  if (/一年后|过年后|去年/.test(text)) {
+    return { amount: 1, unit: 'year', label: '一年后', reason: 'narrative 提及一年后', ageDeltaYears: 1, elapsedDays: 365 };
+  }
+  if (/数月后|几个月后|数月内|几个月内|几月后/.test(text)) {
+    return { amount: 3, unit: 'month', label: '数月后', reason: 'narrative 提及数月后事件，同年补完', ageDeltaYears: 0, elapsedDays: 90 };
+  }
+  if (/三月后|三个月后|三月内|几月后/.test(text)) {
+    return { amount: 3, unit: 'month', label: '三月后', reason: 'narrative 提及三月后，同年补完', ageDeltaYears: 0, elapsedDays: 90 };
+  }
+  if (/半年后|半年内/.test(text)) {
+    return { amount: 6, unit: 'month', label: '半年后', reason: 'narrative 提及半年后，同年补完', ageDeltaYears: 0, elapsedDays: 180 };
+  }
+  if (/半月后|十几日后/.test(text)) {
+    return { amount: 15, unit: 'day', label: '半月后', reason: 'narrative 提及半月后，同年补完', ageDeltaYears: 0, elapsedDays: 15 };
+  }
+  if (/入夜后|当夜|夜里|夜半|子夜|星嬀|梦里|枕下/.test(text)) return { amount: 12, unit: 'hour', label: '入夜后', reason: '同日夜间余波', ageDeltaYears: 0, elapsedDays: 0 };
+  if (/黄昏|傍晚|暮色|暮鼓|日落/.test(text)) return { amount: 6, unit: 'hour', label: '黄昏', reason: '同日暮间余波', ageDeltaYears: 0, elapsedDays: 0 };
+  if (/午后|晌午|日中/.test(text)) return { amount: 4, unit: 'hour', label: '午后', reason: '同日日中余波', ageDeltaYears: 0, elapsedDays: 0 };
+  if (/清晨|晨起|天亮|晨光|晨钟/.test(text)) return { amount: 1, unit: 'hour', label: '清晨', reason: '同日清晨余波', ageDeltaYears: 0, elapsedDays: 0 };
+  if (/翌日|次日|明日|第二日|转日/.test(text)) return { amount: 1, unit: 'day', label: '翌日', reason: '后续余波', ageDeltaYears: 0, elapsedDays: 1 };
+  if (/数日后|几日后|三日后/.test(text)) return { amount: 3, unit: 'day', label: '数日后', reason: '后续余波', ageDeltaYears: 0, elapsedDays: 3 };
   return undefined;
 }
 
