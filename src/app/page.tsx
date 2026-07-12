@@ -11,8 +11,7 @@ import { EventTimeline } from '@/components/xianxia/EventTimeline';
 import { StatusList } from '@/components/xianxia/StatusList';
 import { MilestonesLog } from '@/components/xianxia/MilestonesLog';
 import { SaveSlotPanel } from '@/components/xianxia/SaveSlotPanel'; // 沉浸版 Phase-Release: 单存档多周目 UI 已下线，import 保留以兼容 hooks/type 定义
-import { InheritancePoolPanel } from '@/components/xianxia/InheritancePoolPanel';
-import { DeathGuidancePanel } from '@/components/xianxia/DeathGuidancePanel';
+// 2026-07-12：死后流程移除"传承人选择"——banner 已下线，死亡引导面板与继承池面板从 page.tsx 摘除
 import { useAutoSave } from '@/lib/xianxia/useAutoSave';
 import { readSaveSlot, listSaveSlots, type SaveSlotMeta } from '@/lib/xianxia/save-slots';
 import { InterfereInput } from '@/components/xianxia/InterfereInput';
@@ -28,11 +27,10 @@ import { AscensionModal } from '@/components/xianxia/AscensionModal';
 import { RestrictionModal } from '@/components/xianxia/RestrictionModal';
 import { TribulationModal } from '@/components/xianxia/TribulationModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, ScrollText, Compass, GitBranch, Users, Sword, Globe } from 'lucide-react';
+import { BookOpen, ScrollText, Compass, Users, Sword, Globe } from 'lucide-react';
 import { ResetWorldButton } from '@/components/xianxia/ResetWorldButton';
 import { NpcGrowthPanel } from '@/components/xianxia/NpcGrowthPanel';
 import { NpcMiniBar } from '@/components/xianxia/NpcMiniBar';
-import { CrossCycleInheritancePanel } from '@/components/xianxia/CrossCycleInheritancePanel';
 import { SectStorylinePanel } from '@/components/xianxia/SectStorylinePanel';
 import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
 import { AlchemyFurnace } from '@/components/xianxia/AlchemyFurnace';
@@ -137,7 +135,7 @@ export default function Home() {
   // 手指向左滑(swipe-left) = 下一个 tab;向右滑 = 上一个。不循环。
   // 只识别水平主导且位移 > 阈值的滑动;有 pendingChoice/战斗结算时锁在 story 不切。
   // 拖动过程中滑轨实时跟手(dragOffset),松手后由 CSS transition 平滑收拢到目标 tab。
-  const MAIN_TAB_ORDER = ['story', 'xiuxing', 'mingtu', 'chuancheng', 'renqing'];
+  const MAIN_TAB_ORDER = ['story', 'xiuxing', 'mingtu', 'renqing'];
   const SWIPE_MIN_DIST = 60;      // 最小水平位移(px)才切换 tab
   const SWIPE_MAX_OFF_AXIS = 40;  // 垂直位移超过此值则视为滚动而非滑动
   const swipeStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -334,16 +332,16 @@ export default function Home() {
   // 防止 hydration mismatch：在客户端 hydration 完成前不渲染 character 相关 UI
   if (!hydrated) {
     return (
-      <div className="h-[100dvh] flex flex-col overflow-hidden bg-background paper-texture ink-wash">
+      <div className="h-[100dvh] flex flex-col overflow-hidden bg-background paper-texture ink-wash" data-realm="mortal">
         <div className="flex-1" />
       </div>
     );
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-background paper-texture ink-wash">
-      {/* 顶部装饰 */}
-      <header className="shrink-0 border-b border-border/40 bg-card/40 backdrop-blur">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-background paper-texture ink-wash" data-realm={character?.realm || 'mortal'}>
+      {/* 顶部装饰：border-bottom 由 --realm-accent 微调 */}
+      <header className="shrink-0 border-b border-border/40 bg-card/40 backdrop-blur realm-header">
         <div className="max-w-md mx-auto px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-base">⛰</span>
@@ -370,23 +368,16 @@ export default function Home() {
               <StatusPanel character={character} />
             </div>
 
-            {/* ===== DeathGuidance 触发 banner（仅 alive=false 且未触发传承结算） ===== */}
-            {/* 沉浸版：传承结算（SettlementModal）已含完整死亡叙事 + 传承选择，
-                与 DeathGuidancePanel 同时出现会重叠；settlementResult 到位时隐藏 banner。 */}
-            {!character?.alive && !(settlementResult && settlementResult.characterId === character.id) && (
-              <div className="shrink-0 px-3 pb-1" data-testid="death-guidance-banner">
-                <div data-testid="death-guidance-section">
-                  <DeathGuidancePanel character={character} defaultCollapsed={false} />
-                </div>
-              </div>
-            )}
+            {/* ===== 死后流程 (2026-07-12)：只走 SettlementModal（评价 + 传承物选择），
+                     不再自动露出「传承人选择 / 死亡引导面板 / 继承池候选人面板」。
+                     首页"传承池"按钮仍可让玩家浏览历史遗产。 ===== */}
 
             {/* 剧情节点全部下移到 story 滚动容器内（EventTimeline 后紧接内联出现）。 */}
 
-            {/* ===== 5 个主 Tab 切换 ===== */}
+            {/* ===== 4 个主 Tab 切换（2026-07-12：传承 tab 已删，其功能挪至首页传承池按钮 + 死亡引导下方继承池） ===== */}
             <div className="shrink-0 px-3 pb-2" data-testid="main-tab-list">
               <Tabs value={effectiveTab} onValueChange={setTab} className="w-full">
-                <TabsList className="grid grid-cols-5 w-full h-9 bg-muted/40">
+                <TabsList className="grid grid-cols-4 w-full h-9 bg-muted/40">
                   <TabsTrigger value="story" className="text-[10px] sm:text-xs gap-1">
                     <BookOpen className="w-3 h-3" />
                     <span>道途</span>
@@ -398,10 +389,6 @@ export default function Home() {
                   <TabsTrigger value="mingtu" className="text-[10px] sm:text-xs gap-1">
                     <Compass className="w-3 h-3" />
                     <span>命途</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="chuancheng" className="text-[10px] sm:text-xs gap-1">
-                    <GitBranch className="w-3 h-3" />
-                    <span>传承</span>
                   </TabsTrigger>
                   <TabsTrigger value="renqing" className="text-[10px] sm:text-xs gap-1">
                     <Users className="w-3 h-3" />
@@ -543,21 +530,10 @@ export default function Home() {
                     {/* YinyuanTimelinePanel 命途时间线:暴露伏笔,不展示 */}
                   </div>
 
-                  {/* 传承(chuancheng):跨周目传承 + 继承池 + 存档 */}
-                  <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2" style={{ width: `${100 / MAIN_TAB_ORDER.length}%` }}>
-                    <div data-testid="cross-cycle-section">
-                      <CrossCycleInheritancePanel
-                        character={character}
-                        defaultCollapsed={false}
-                      />
-                    </div>
-                    {character?.alive === false && (
-                      <div data-testid="inheritance-section-wrapper">
-                        <InheritancePoolPanel defaultCollapsed={false} />
-                      </div>
-                    )}
-                    {/* 沉浸版 Phase-Release: 单存档多周目游戏，不再需要"轮回手札·存档"多槽位 UI —— 已移除 SaveSlotPanel */}
-                  </div>
+                  {/* 传承 tab 已于 2026-07-12 移除：
+                      - 跨周目遗产展示跟首页"传承池"按钮/角色详情重叠，删除
+                      - 陨落后的传承人选择已从死后流程摘除；死后仅走 SettlementModal
+                      - 5 tab → 4 tab，跳过整个 slot */}
 
                   {/* 人情(renqing):故交旧雨 + 宗门剧情 */}
                   <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2" style={{ width: `${100 / MAIN_TAB_ORDER.length}%` }}>

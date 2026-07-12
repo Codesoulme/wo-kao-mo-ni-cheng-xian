@@ -2446,56 +2446,47 @@ function smokeSameYearThreadNormalizedProgress100(): void {
 }
 
 function smokeNarrativeFormatCompliant(): void {
-  // AI 已合规（多段 + 缩进）：保持原样
-  const compliant = '\u3000\u3000他站在山门之前。\n\n\u3000\u3000云雾未散，他深吸一口气。';
+  // AI 合规输出（多段 + 全角缩进）：内容一字不改，但 \n\n 归一化到 \n（段间不留空白行）
+  const compliant = '　　他站在山门之前。\n\n　　云雾未散，他深吸一口气。';
+  const expected = '　　他站在山门之前。\n　　云雾未散，他深吸一口气。';
   const r1 = formatNarrativeForDisplay(compliant);
-  assert(r1 === compliant, 'compliant narrative should be unchanged');
+  assert(r1 === expected, `compliant: multi-linebreak collapsed, got: ${JSON.stringify(r1)}`);
   log('narrative-format-compliant', { passed: true, len: r1.length });
 }
 
 function smokeNarrativeFormatShortSingle(): void {
-  // 极短（≤60字）：单段加缩进
+  // 短文本：identity——前端不再加缩进，缩进交给 AI prompt
   const short = '他环顾四周，此地灵气稀薄。';
   const r = formatNarrativeForDisplay(short);
-  assert(r.startsWith('\u3000\u3000'), 'short narrative should have indent');
-  assert(!r.includes('\n\n'), 'short narrative should not force paragraph break');
-  assert(r.includes(short), 'short narrative should preserve content');
+  assert(r === short, 'short narrative should be identity');
   log('narrative-format-short-single', { passed: true, len: r.length });
 }
 
 function smokeNarrativeFormatLongFlat(): void {
-  // 长单段（AI 未分段）：按句号切分重排；总长 150 字以上应分多段
-  const flat = '\u4ed6\u73af\u987e\u56db\u5468\uff0c\u6b64\u5730\u7075\u6c14\u7a00\u8584\uff0c\u786e\u975e\u51e1\u4eba\u957f\u4e45\u4e4b\u5730\u3002\u4ed6\u8f6c\u8eab\u6b32\u8d70\uff0c\u5374\u88ab\u4e00\u4f4d\u767d\u53d1\u8001\u8005\u53eb\u4f4f\u3002\u8001\u8005\u81ea\u79f0\u662f\u5c71\u4e2d\u4fee\u58eb\uff0c\u5df2\u5728\u6b64\u7b49\u5019\u591a\u65f6\uff0c\u4f46\u8bb0\u5f97\u4ed6\u9762\u5b54\u3002\u4ed6\u5fc3\u4e2d\u7591\u60d1\uff0c\u5374\u4e5f\u4e0d\u6562\u8f6c\u5934\u5c31\u8d70\uff0c\u53ea\u5f97\u7aef\u7740\u5fc3\u67b6\u8be2\u95ee\u8001\u8005\u6765\u610f\u3002\u8001\u8005\u5f00\u53e3\uff0c\u53d9\u8ff0\u4e00\u6bb5\u4e0a\u53e4\u4fee\u58eb\u7684\u4f20\u627f\uff0c\u8bf4\u5c71\u4e2d\u4e00\u65e6\u51fa\u73b0\u80fd\u591f\u63a5\u53d7\u4f20\u627f\u7684\u540e\u8f88\uff0c\u5fc5\u987b\u5148\u8d70\u5165\u5c71\u95e8\u3002';
+  // 长单段（AI 未分段）：identity——前端不再切段，避免"写完再跳一下"
+  const flat = '他环顾四周，此地灵气稀薄，确非凡人长久之地。他转身欲走，却被一位白发老者叫住。老者自称是山中修士，已在此等候多时，但记得他面孔。他心中疑惑，却也不敢转头就走，只得端着心架询问老者来意。老者开口，叙述一段上古修士的传承，说山中一旦出现能够接受传承的后辈，必须先走入山门。';
   const r = formatNarrativeForDisplay(flat);
-  assert(r.includes('\n\n'), 'flat long narrative should be split into paragraphs');
-  const paras = r.split('\n\n');
-  assert(paras.length >= 2, `should produce ≥2 paragraphs, got ${paras.length}`);
-  for (const p of paras) {
-    assert(p.startsWith('\u3000\u3000'), `every paragraph should have indent: ${p.slice(0, 20)}`);
-  }
-  // 字符数守恒（去掉缩进与 \n\n）
-  const sumLen = paras.reduce((s, p) => s + p.replace(/^\u3000\u3000/, '').length, 0);
-  assert(Math.abs(sumLen - flat.length) <= 2, `char count should be preserved: ${sumLen} vs ${flat.length}`);
-  log('narrative-format-long-flat', { passed: true, paragraphs: paras.length, sumLen });
+  assert(r === flat, 'flat long narrative should be identity');
+  assert(!r.includes('\n\n'), 'front-end must not insert paragraph breaks');
+  log('narrative-format-long-flat', { passed: true, len: r.length });
 }
 
 function smokeNarrativeFormatMidFlat(): void {
-  // 中等长度（70-100字）：即使分不出 ≥2 段，也必须加首行缩进
-  const mid = '\u4ed6\u73af\u987e\u56db\u5468\uff0c\u6b64\u5730\u7075\u6c14\u7a00\u8584\u3002\u4ed6\u8f6c\u8eab\u6b32\u8d70\uff0c\u5374\u88ab\u8001\u8005\u53eb\u4f4f\uff0c\u8bf4\u5df2\u7b49\u5019\u591a\u65f6\u3002';
+  // 中等长度：identity——前端不加缩进
+  const mid = '他环顾四周，此地灵气稀薄。他转身欲走，却被老者叫住，说已等候多时。';
   const r = formatNarrativeForDisplay(mid);
-  assert(r.startsWith('\u3000\u3000'), 'mid-length narrative should at least have indent');
+  assert(r === mid, 'mid-length narrative should be identity');
   log('narrative-format-mid-flat', { passed: true, len: r.length });
 }
 
 
 function smokeNarrativeFormatMixedPunct(): void {
-  // 混合问号/感叹号分句
+  // 混合问号/感叹号分句：identity——前端不再切段
   const mixed = '他惊呼：谁！他环顾四周。远处传来一声叹息。是幻觉吗？他揉了揉眼睛。远山之下老者点头微笑。随说：你我有缘。明日再来此地罢。那一夜月明如洗，众生皆有缘法。他唰地跳下老树，拍了拍身上的露水，竟听得耳后一个苍老的声音。';
   const r = formatNarrativeForDisplay(mixed);
-  assert(r.includes('\n\n'), 'mixed-punct narrative should split');
-  const paras = r.split('\n\n');
-  assert(paras.length >= 2, `should produce at least 2 paragraphs, got ${paras.length}`);
-  log('narrative-format-mixed-punct', { passed: true, paragraphs: paras.length });
+  assert(r === mixed, 'mixed-punct narrative should be identity');
+  assert(!r.includes('\n\n'), 'front-end must not insert paragraph breaks');
+  log('narrative-format-mixed-punct', { passed: true, len: r.length });
 }
 
 function smokeNarrativeFormatEmptyAndTrivial(): void {
@@ -2504,9 +2495,27 @@ function smokeNarrativeFormatEmptyAndTrivial(): void {
   assert(formatNarrativeForDisplay('   ') === '', 'whitespace becomes empty');
   const oneChar = '好';
   const r1 = formatNarrativeForDisplay(oneChar);
-  assert(r1.includes('好'), 'single char preserved');
+  assert(r1 === oneChar, 'single char returned as-is');
   log('narrative-format-trivial', { passed: true });
 }
+
+function smokeNarrativeFormatCommaLineBreakCollapse(): void {
+  // AI 偶发在逗号/顿号后打 \n\n —— 前端必须把那个换行吃掉，拼回同一段
+  const bad = '　　他推开院门，\n\n看见月光洒在青石上。';
+  const r = formatNarrativeForDisplay(bad);
+  assert(!r.includes('\n'), `comma+linebreak should be collapsed, got: ${JSON.stringify(r)}`);
+  assert(r === '　　他推开院门，看见月光洒在青石上。', `merged into one line: ${JSON.stringify(r)}`);
+  log('narrative-format-comma-linebreak-collapse', { passed: true, len: r.length });
+}
+
+function smokeNarrativeFormatMultiBlankLineCollapse(): void {
+  // 连续换行 → 单换行：段间紧邻，不留空白行
+  const bad = '　　第一段。\n\n\n\n　　第二段。';
+  const r = formatNarrativeForDisplay(bad);
+  assert(r === '　　第一段。\n　　第二段。', `\n{2,} should collapse to single \n, got: ${JSON.stringify(r)}`);
+  log('narrative-format-multi-blank-line-collapse', { passed: true, len: r.length });
+}
+
 
 function smokeNoMechanismWordsInNarrative(): void {
   // 文案过滤层验证：sanitizeNarrativeText 应移除内部机制词
@@ -3109,19 +3118,17 @@ function smokeP003EmptyPoolEmptyState(): void {
 }
 
 function smokeP004PageHasInheritanceSection(): void {
-  // phase-α：ending-section 已删除，page.tsx 只剩 inheritance-section-wrapper
+  // 2026-07-12：死后流程移除"传承人选择"——page.tsx 不再自动挂 InheritancePoolPanel
   const page = readFileSync('src/app/page.tsx', 'utf-8');
-  assert(page.includes("import { InheritancePoolPanel } from '@/components/xianxia/InheritancePoolPanel';"),
-    'page.tsx should import InheritancePoolPanel');
-  assert(page.includes('<InheritancePoolPanel'),
-    'page.tsx should render <InheritancePoolPanel>');
-  assert(page.includes('inheritance-section-wrapper') || page.includes('inheritance-section'),
-    'page.tsx should have inheritance-section testid wrapper');
-  // 反向验证：ending-section 已删
-  const idxEnd = page.indexOf('ending-section');
-  const idxInh = page.indexOf('inheritance-section-wrapper');
-  assert(idxInh > 0, 'page.tsx should contain inheritance-section-wrapper');
-  assert(idxEnd < 0, 'page.tsx should NOT contain ending-section (phase-α 5 面板减法)');
+  assert(!page.includes("import { InheritancePoolPanel } from '@/components/xianxia/InheritancePoolPanel';"),
+    'page.tsx should NOT import InheritancePoolPanel (removed from post-death flow)');
+  assert(!page.includes('<InheritancePoolPanel'),
+    'page.tsx should NOT render <InheritancePoolPanel> in death flow');
+  assert(!page.includes('inheritance-section-wrapper'),
+    'page.tsx should NOT contain inheritance-section-wrapper anymore');
+  // 组件文件本身仍保留供未来复用
+  assert(existsSync('src/components/xianxia/InheritancePoolPanel.tsx'),
+    'InheritancePoolPanel.tsx component file kept for future reuse');
   log('smoke-p-004-page-has-inheritance-section', { passed: true });
 }
 
@@ -3573,16 +3580,18 @@ function pgRunPhaseVTechniqueCreatorSmokes(): void {
 // Phase-M #2: Death Guidance Panel (Worker #2) — 死亡后引导，三个选项 + 关闭提示
 
 function smokeO001DeathGuidancePanelExists(): void {
+  // 2026-07-12：DeathGuidancePanel 组件文件保留，但从 page.tsx 死后流程摘除
   const panelPath = 'src/components/xianxia/DeathGuidancePanel.tsx';
-  assert(existsSync(panelPath), 'DeathGuidancePanel.tsx should exist');
+  assert(existsSync(panelPath), 'DeathGuidancePanel.tsx component file kept for future reuse');
   const src = readFileSync(panelPath, 'utf-8');
   assert(src.includes('data-testid="death-guidance-panel"'), 'panel should expose death-guidance-panel testid');
   assert(src.includes('isDeadLike'), 'panel should detect dead-like character via isDeadLike');
   assert(src.includes('character.alive === false') || src.includes('alive === false'), 'panel should detect character.alive === false');
   assert(src.includes('causeOfDeath'), 'panel should reference causeOfDeath');
+  // page.tsx 不应再挂载它
   const page = readFileSync('src/app/page.tsx', 'utf-8');
-  assert(page.includes('import { DeathGuidancePanel }'), 'page.tsx should import DeathGuidancePanel');
-  assert(page.includes('data-testid="death-guidance-section"'), 'page.tsx should mount death-guidance-section');
+  assert(!page.includes('import { DeathGuidancePanel }'), 'page.tsx should NOT import DeathGuidancePanel (removed from post-death flow)');
+  assert(!page.includes('data-testid="death-guidance-section"'), 'page.tsx should NOT mount death-guidance-section anymore');
   log('smoke-o-001-death-guidance-panel-exists', { passed: true });
 }
 
@@ -3684,10 +3693,11 @@ function smokeO001BDeathGuidanceExists(): void {
 }
 
 function smokeO002BPageUsesDeathGuidance(): void {
+  // 2026-07-12：死后流程移除"传承人选择"——page.tsx 不再引用 DeathGuidancePanel
   const page = readFileSync('src/app/page.tsx', 'utf-8');
-  assert(page.includes('import { DeathGuidancePanel }'), 'page.tsx should import DeathGuidancePanel');
-  assert(page.includes('death-guidance-section'), 'page.tsx should contain death-guidance-section testid');
-  assert(page.includes('<DeathGuidancePanel'), 'page.tsx should render DeathGuidancePanel component');
+  assert(!page.includes('import { DeathGuidancePanel }'), 'page.tsx should NOT import DeathGuidancePanel');
+  assert(!page.includes('data-testid="death-guidance-section"'), 'page.tsx should NOT contain death-guidance-section anymore');
+  assert(!page.includes('<DeathGuidancePanel'), 'page.tsx should NOT render DeathGuidancePanel component');
   log('smoke-o-002-page-uses-death-guidance', { passed: true });
 }
 
@@ -3793,6 +3803,8 @@ async function main(): Promise<void> {
   smokeNarrativeFormatMidFlat();
   smokeNarrativeFormatMixedPunct();
   smokeNarrativeFormatEmptyAndTrivial();
+  smokeNarrativeFormatCommaLineBreakCollapse();
+  smokeNarrativeFormatMultiBlankLineCollapse();
   smokeNoMechanismWordsInNarrative();
   smokeYoungCharacterNoAdultAction();
   smokeFallbackInfantHardGate();
@@ -6146,16 +6158,13 @@ function pgRunPhaseWCrossCycleInheritanceSmokes(): void {
 
 function smokeX001PageIntegratesAllPanels(): void {
   const src = readFileSync('src/app/page.tsx', 'utf-8');
-  // phase-α：5 面板减法（ending / yinyuan-timeline / technique-creator / pet / formation 已删），保留主流程面板
+  // 2026-07-12：死后流程移除"传承人选择"——death-guidance-section / inheritance-section-wrapper 已下线；
+  // 更早已下线：cross-cycle / save-slot（跟首页"传承池"按钮/角色详情重叠）。
   const required = [
     'world-legacy-section',
     'cycle-projection-section',
-    'save-slot-section',
     'npc-growth-section',
     'sect-storyline-section',
-    'cross-cycle-section',
-    'death-guidance-section',
-    'inheritance-section-wrapper',
     'ascension-section',
     'restriction-section',
     'tribulation-section',
@@ -6163,24 +6172,30 @@ function smokeX001PageIntegratesAllPanels(): void {
   const missing = required.filter((id) => !src.includes('data-testid="' + id + '"'));
   assert(missing.length === 0, 'missing testids in page.tsx: ' + missing.join(', '));
 
-  // 反向验证：5 面板减法的 testid 不应再出现
-  const removedTestids = ['ending-section', 'yinyuan-timeline-section', 'technique-creator-section', 'pet-section', 'formation-section'];
+  // 反向验证：已删的 testid 不应再出现
+  const removedTestids = [
+    'ending-section', 'yinyuan-timeline-section', 'technique-creator-section', 'pet-section', 'formation-section',
+    // 2026-07-12：死后传承人选择流程已移除
+    'death-guidance-section', 'inheritance-section-wrapper', 'death-guidance-banner',
+  ];
   const shouldNotExist = removedTestids.filter((id) => src.includes('data-testid="' + id + '"'));
   assert(shouldNotExist.length === 0, 'page.tsx should NOT contain removed testids: ' + shouldNotExist.join(', '));
 
-  // Required imports（phase-α 已移除 EndingPanel/YinyuanTimelinePanel/TechniqueCreatorPanel/PetPanel/FormationPanel）
+  // Required imports（phase-α 已移除 EndingPanel/YinyuanTimelinePanel/TechniqueCreatorPanel/PetPanel/FormationPanel；
+  //                  2026-07-12 死后流程移除 DeathGuidancePanel / InheritancePoolPanel）
   const requiredImports = [
     'NpcGrowthPanel',
     'SectStorylinePanel',
-    'CrossCycleInheritancePanel',
-    'DeathGuidancePanel',
-    'InheritancePoolPanel',
     'SaveSlotPanel',
   ];
   const missingImports = requiredImports.filter((name) => !src.includes(name));
   assert(missingImports.length === 0, 'missing imports in page.tsx: ' + missingImports.join(', '));
 
-  const removedImports = ['EndingPanel', 'YinyuanTimelinePanel', 'TechniqueCreatorPanel', 'PetPanel', 'FormationPanel', 'HeartIntentPanel'];
+  const removedImports = [
+    'EndingPanel', 'YinyuanTimelinePanel', 'TechniqueCreatorPanel', 'PetPanel', 'FormationPanel', 'HeartIntentPanel',
+    // 2026-07-12：死后流程移除
+    'DeathGuidancePanel', 'InheritancePoolPanel', 'CrossCycleInheritancePanel',
+  ];
   // 匹配真实 import / require 语句，过滤注释
   const importLineRe = /^\s*(?:import|const|let|var)\s+[\s\S]*?from\s+['"][^'"]+['"]/gm;
   const importBlock: string[] = [];
@@ -6226,28 +6241,25 @@ main().catch(error => {
 
 function smokeTabRestructure001PageHasFiveMainTabs(): void {
   const src = readFileSync('src/app/page.tsx', 'utf-8');
-  // 5 个新主 tab value
+  // 2026-07-12：传承 tab 已删——4 主 tab（story/xiuxing/mingtu/renqing）
   const requiredTabValues = [
     'value="story"',
     'value="mingtu"',
-    'value="chuancheng"',
     'value="renqing"',
     'value="xiuxing"',
   ];
   const missing = requiredTabValues.filter((v) => !src.includes(v));
-  assert(missing.length === 0, 'page.tsx 应包含 5 个新主 tab value，缺少: ' + missing.join(', '));
+  assert(missing.length === 0, 'page.tsx 应包含 4 个主 tab value，缺少: ' + missing.join(', '));
 
-  // TabsList 应为 grid-cols-5
-  assert(/grid-cols-5/.test(src), 'TabsList 应使用 grid-cols-5');
-  // 不应再保留旧的 grid-cols-4
-  assert(!/grid-cols-4/.test(src), '不应再保留旧的 grid-cols-4');
+  // TabsList 应为 grid-cols-4
+  assert(/grid-cols-4/.test(src), 'TabsList 应使用 grid-cols-4');
 
-  // 5 个 tab 文字标签
-  const labels = ['道途', '命途', '传承', '人情', '修行'];
+  // 4 个 tab 文字标签（传承 tab 已删）
+  const labels = ['道途', '命途', '人情', '修行'];
   const missingLabels = labels.filter((l) => !src.includes(l));
-  assert(missingLabels.length === 0, '5 个新 tab 文字标签应存在，缺少: ' + missingLabels.join(', '));
+  assert(missingLabels.length === 0, '4 个 tab 文字标签应存在，缺少: ' + missingLabels.join(', '));
 
-  log('smoke-tab-restructure-001-page-has-five-main-tabs', { passed: true, tabCount: 5 });
+  log('smoke-tab-restructure-001-page-has-five-main-tabs', { passed: true, tabCount: 4 });
 }
 
 function smokeTabRestructure002StatusPanelInTopBar(): void {
@@ -6269,33 +6281,20 @@ function smokeTabRestructure002StatusPanelInTopBar(): void {
 }
 
 function smokeTabRestructure003DeathGuidanceBanner(): void {
+  // 2026-07-12：死后流程移除"传承人选择"——death-guidance-banner 已下线
   const src = readFileSync('src/app/page.tsx', 'utf-8');
-  // DeathGuidancePanel 移到顶部 banner（仅 alive=false 条件）
-  assert(src.includes('data-testid="death-guidance-banner"'), 'page.tsx 应有 death-guidance-banner testid');
-  // 旧 testid 仍可保留作兼容（panel 组件内可能自带 death-guidance-section），但 banner 必须是新 testid
-  // 条件渲染：!character?.alive
-  const aliveFalsePattern = /!\s*character\?\.alive\s*&&/;
-  assert(aliveFalsePattern.test(src), 'death-guidance-banner 应仅在 !character?.alive 时渲染');
-  // DeathGuidancePanel 仍应被引用（import + 渲染）
-  assert(src.includes('DeathGuidancePanel'), 'page.tsx 应保留 DeathGuidancePanel 引用');
+  assert(!src.includes('data-testid="death-guidance-banner"'), 'page.tsx should NOT contain death-guidance-banner anymore');
+  assert(!src.includes('DeathGuidancePanel'), 'page.tsx should NOT reference DeathGuidancePanel anymore');
   log('smoke-tab-restructure-003-death-guidance-banner', { passed: true });
 }
 
 function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
   const src = readFileSync('src/app/page.tsx', 'utf-8');
-  // phase-α：5 面板减法后（ending/yinyuan-timeline/technique-creator/pet/formation 已删），保留 panel 分布
-  // 命途 tab：cycle-projection
-  // 传承 tab：cross-cycle / inheritance / save-slot
-  // 人情 tab：npc-growth / sect-storyline / heart-intent
-  // 修行 tab：cultivation-speed / secret-realm / inventory
-  // 世界：world-legacy / reset-world
+  // 2026-07-12：死后流程移除"传承人选择" —— DeathGuidance/InheritancePool 从 page.tsx 摘除；
+  //           更早已移除 cross-cycle / save-slot 面板挂载。
   const requiredTestids = [
     // 命途
     'cycle-projection-section',
-    // 传承
-    'cross-cycle-section',
-    'inheritance-section-wrapper',
-    'save-slot-section',
     // 人情
     'npc-growth-section',
     'sect-storyline-section',
@@ -6310,16 +6309,20 @@ function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
   const missing = requiredTestids.filter((id) => !src.includes('data-testid="' + id + '"'));
   assert(missing.length === 0, 'page.tsx 应包含保留 panel testid，缺少: ' + missing.join(', '));
 
-  // 反向验证：5 面板减法的 testid 不应出现
-  const removedTestids = ['ending-section', 'yinyuan-timeline-section', 'technique-creator-section', 'pet-section', 'formation-section'];
+  // 反向验证：已删除的 panel testid 不应出现
+  const removedTestids = [
+    'ending-section', 'yinyuan-timeline-section', 'technique-creator-section', 'pet-section', 'formation-section',
+    // 2026-07-12：死后传承人选择流程已移除
+    'death-guidance-section', 'inheritance-section-wrapper', 'death-guidance-banner',
+    // 更早已删（跟首页"传承池"按钮/角色详情重叠）
+    'cross-cycle-section', 'save-slot-section',
+  ];
   const shouldNotExist = removedTestids.filter((id) => src.includes('data-testid="' + id + '"'));
   assert(shouldNotExist.length === 0, 'page.tsx 不应包含已删除 panel testid: ' + shouldNotExist.join(', '));
 
-  // 关键 panel 必须 import（phase-α 已移除 EndingPanel/YinyuanTimelinePanel/TechniqueCreatorPanel/PetPanel/FormationPanel）
+  // 关键 panel 必须 import（2026-07-12：DeathGuidance/InheritancePool/CrossCycle 已从 page.tsx 摘除）
   const requiredImports = [
     'CycleProjectionPanel',
-    'CrossCycleInheritancePanel',
-    'InheritancePoolPanel',
     'SaveSlotPanel',
     'NpcGrowthPanel',
     'SectStorylinePanel',
@@ -6327,7 +6330,6 @@ function smokeTabRestructure004PanelDistributionAcrossTabs(): void {
     'InventoryPanel',
     'WorldLegacyPanel',
     'ResetWorldButton',
-    'DeathGuidancePanel',
     'StatusPanel',
   ];
   const missingImports = requiredImports.filter((name) => !src.includes(name));

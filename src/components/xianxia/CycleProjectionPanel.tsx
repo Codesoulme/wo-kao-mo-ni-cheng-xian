@@ -14,8 +14,9 @@ import {
   type PlayerUIProjection,
   type PlayerUISlotEntry,
 } from '@/lib/xianxia/engine';
-import { ChevronDown, ChevronUp, Users, Mountain, GitBranch, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Users, Mountain, GitBranch, Sparkles, Feather } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PendingThreadsPanel } from './PendingThreadsPanel';
 
 interface CycleProjectionPanelProps {
   className?: string;
@@ -42,6 +43,7 @@ const TONE_ICON: Record<string, string> = {
 };
 
 const TAB_DEFS = [
+  { key: 'threads', label: '伏笔', icon: Feather },
   { key: 'inheritance', label: '传承', icon: Users },
   { key: 'sect', label: '宗门', icon: Mountain },
   { key: 'fate', label: '命网', icon: GitBranch },
@@ -112,9 +114,9 @@ export function CycleProjectionPanel({
   const { character: storeCharacter } = useGameStore();
   const character = externalCharacter || storeCharacter;
   const [expanded, setExpanded] = useState(!defaultCollapsed);
-  const [tab, setTab] = useState<TabKey>('inheritance');
+  const [tab, setTab] = useState<TabKey>('threads');
 
-  const projections = useMemo<Record<TabKey, PlayerUIProjection>>(() => {
+  const projections = useMemo<Record<Exclude<TabKey, 'threads'>, PlayerUIProjection>>(() => {
     const ch = character || null;
 
     // Infer inheritance chain from character data when not provided externally.
@@ -173,6 +175,16 @@ export function CycleProjectionPanel({
     projections.fate.slots.length +
     projections.ending.slots.length;
 
+  const activeThreadCount = useMemo(() => {
+    const raw = Array.isArray(character?.pendingThreads) ? character.pendingThreads : [];
+    return raw.filter((t: any) => {
+      const status = String(t?.status || '').toLowerCase();
+      if (status === 'resolved' || status === 'failed' || status === 'completed') return false;
+      if (t?.resolved === true || t?.completed === true) return false;
+      return true;
+    }).length;
+  }, [character]);
+
   if (!character) {
     return (
       <Card className={cn('paper-texture', className)} data-testid="cycle-projection-panel">
@@ -219,16 +231,16 @@ export function CycleProjectionPanel({
       {expanded && (
         <CardContent className="pt-0">
           <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 h-8">
+            <TabsList className="grid w-full grid-cols-5 h-8">
               {TAB_DEFS.map((t) => {
                 const Icon = t.icon;
-                const count = projections[t.key].slots.length;
+                const count = t.key === 'threads' ? activeThreadCount : projections[t.key].slots.length;
                 return (
                   <TabsTrigger
                     key={t.key}
                     value={t.key}
                     className="text-[10px] gap-1 h-7"
-                    data-testid={`cycle-tab-${'$'}{t.key}`}
+                    data-testid={`cycle-tab-${t.key}`}
                   >
                     <Icon className="w-3 h-3" />
                     <span>{t.label}</span>
@@ -241,13 +253,19 @@ export function CycleProjectionPanel({
             </TabsList>
             {TAB_DEFS.map((t) => (
               <TabsContent key={t.key} value={t.key} className="mt-2">
-                <div
-                  className="text-[10px] text-muted-foreground italic font-serif-cn mb-2"
-                  data-testid={`cycle-narrative-${'$'}{t.key}`}
-                >
-                  {projections[t.key].narrative}
-                </div>
-                {renderSlots(projections[t.key].slots, true, 6)}
+                {t.key === 'threads' ? (
+                  <PendingThreadsPanel character={character} />
+                ) : (
+                  <>
+                    <div
+                      className="text-[10px] text-muted-foreground italic font-serif-cn mb-2"
+                      data-testid={`cycle-narrative-${t.key}`}
+                    >
+                      {projections[t.key].narrative}
+                    </div>
+                    {renderSlots(projections[t.key].slots, true, 6)}
+                  </>
+                )}
               </TabsContent>
             ))}
           </Tabs>
