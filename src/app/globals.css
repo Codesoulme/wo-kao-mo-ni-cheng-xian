@@ -118,6 +118,171 @@
   }
 }
 
+/* ============================================================
+ * 境界视觉演化（水墨风格随境界渐变）
+ * 每个境界一组变量，全局走 data-realm 属性驱动：
+ *   --realm-aura-color   主光晕色（HSL / rgba）
+ *   --realm-accent       强调色（边框 / 进度条渐变）
+ *   --realm-glow-strength 0-1 光晕强度（配合 aura-color 用）
+ *   --realm-bg-tint      整体背景微色偏（凡人期 transparent，境界越高越明显）
+ * 所有变量都做 3s 缓动，避免"啪"一下突变。
+ * ============================================================ */
+[data-realm] {
+  /* 默认（未指定境界）走凡人调 */
+  --realm-aura-color: rgba(107, 114, 128, 0);
+  --realm-accent: transparent;
+  --realm-glow-strength: 0;
+  --realm-bg-tint: transparent;
+  transition:
+    --realm-aura-color 3s ease,
+    --realm-accent 3s ease,
+    --realm-glow-strength 3s ease,
+    --realm-bg-tint 3s ease;
+}
+
+/* 凡人：素纸质感，无光晕 */
+[data-realm="mortal"] {
+  --realm-aura-color: rgba(107, 114, 128, 0);
+  --realm-accent: transparent;
+  --realm-glow-strength: 0;
+  --realm-bg-tint: transparent;
+}
+
+/* 炼气：一缕清气 */
+[data-realm="qi_refining"] {
+  --realm-aura-color: rgba(132, 204, 172, 0.35);
+  --realm-accent: rgba(90, 160, 130, 0.55);
+  --realm-glow-strength: 0.25;
+  --realm-bg-tint: radial-gradient(circle at 50% 20%, rgba(132, 204, 172, 0.05) 0%, transparent 55%);
+}
+
+/* 筑基（新/旧同义）：淡玉光晕 */
+[data-realm="foundation"],
+[data-realm="foundation_building"] {
+  --realm-aura-color: rgba(120, 190, 170, 0.45);
+  --realm-accent: rgba(74, 150, 130, 0.65);
+  --realm-glow-strength: 0.4;
+  --realm-bg-tint: radial-gradient(circle at 50% 25%, rgba(120, 190, 170, 0.07) 0%, transparent 60%);
+}
+
+/* 金丹：暖金内蕴 */
+[data-realm="golden_core"] {
+  --realm-aura-color: rgba(220, 170, 65, 0.55);
+  --realm-accent: rgba(200, 145, 40, 0.7);
+  --realm-glow-strength: 0.55;
+  --realm-bg-tint:
+    radial-gradient(circle at 50% 25%, rgba(220, 170, 65, 0.08) 0%, transparent 60%),
+    radial-gradient(circle at 20% 80%, rgba(200, 145, 40, 0.05) 0%, transparent 55%);
+}
+
+/* 元婴：紫气东来 */
+[data-realm="nascent_soul"] {
+  --realm-aura-color: rgba(147, 88, 200, 0.55);
+  --realm-accent: rgba(115, 65, 175, 0.7);
+  --realm-glow-strength: 0.6;
+  --realm-bg-tint:
+    radial-gradient(circle at 50% 20%, rgba(147, 88, 200, 0.09) 0%, transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(115, 65, 175, 0.05) 0%, transparent 55%);
+}
+
+/* 化神（spirit_severing / 旧称 soul_formation）：银蓝神魂微露 */
+[data-realm="spirit_severing"],
+[data-realm="soul_formation"] {
+  --realm-aura-color: rgba(140, 175, 220, 0.6);
+  --realm-accent: rgba(100, 140, 200, 0.72);
+  --realm-glow-strength: 0.65;
+  --realm-bg-tint:
+    radial-gradient(circle at 50% 20%, rgba(140, 175, 220, 0.1) 0%, transparent 60%),
+    radial-gradient(circle at 15% 75%, rgba(100, 140, 200, 0.06) 0%, transparent 55%);
+}
+
+/* 神转（deity_transformation，旧称）：幽蓝虚空感 */
+[data-realm="deity_transformation"] {
+  --realm-aura-color: rgba(85, 140, 210, 0.65);
+  --realm-accent: rgba(50, 105, 190, 0.75);
+  --realm-glow-strength: 0.7;
+  --realm-bg-tint:
+    radial-gradient(circle at 50% 22%, rgba(85, 140, 210, 0.11) 0%, transparent 62%),
+    radial-gradient(circle at 82% 78%, rgba(50, 105, 190, 0.07) 0%, transparent 58%);
+}
+
+/* 虚炼（void_refinement，旧称）：靛蓝深邃 */
+[data-realm="void_refinement"] {
+  --realm-aura-color: rgba(85, 105, 200, 0.7);
+  --realm-accent: rgba(60, 80, 180, 0.78);
+  --realm-glow-strength: 0.78;
+  --realm-bg-tint:
+    radial-gradient(circle at 50% 22%, rgba(85, 105, 200, 0.13) 0%, transparent 65%),
+    radial-gradient(circle at 20% 80%, rgba(60, 80, 180, 0.08) 0%, transparent 60%);
+}
+
+/* 大乘（great_vehicle）与旧称 mahayana、unity：皓白万法归一 */
+[data-realm="great_vehicle"],
+[data-realm="mahayana"],
+[data-realm="unity"] {
+  --realm-aura-color: rgba(240, 235, 225, 0.75);
+  --realm-accent: rgba(210, 200, 180, 0.8);
+  --realm-glow-strength: 0.82;
+  --realm-bg-tint:
+    radial-gradient(circle at 50% 20%, rgba(240, 235, 225, 0.14) 0%, transparent 68%),
+    radial-gradient(circle at 78% 78%, rgba(200, 190, 170, 0.08) 0%, transparent 62%);
+}
+
+/* 渡劫（tribulation）：雷紫赤煞 */
+[data-realm="tribulation"] {
+  --realm-aura-color: rgba(230, 90, 140, 0.75);
+  --realm-accent: rgba(200, 60, 110, 0.82);
+  --realm-glow-strength: 0.85;
+  --realm-bg-tint:
+    radial-gradient(circle at 50% 18%, rgba(230, 90, 140, 0.15) 0%, transparent 65%),
+    radial-gradient(circle at 20% 82%, rgba(160, 60, 200, 0.09) 0%, transparent 60%);
+}
+
+/* 飞升（ascension）：七彩流光，顶级境界 */
+[data-realm="ascension"] {
+  --realm-aura-color: rgba(255, 220, 130, 0.8);
+  --realm-accent: rgba(230, 190, 90, 0.85);
+  --realm-glow-strength: 0.95;
+  --realm-bg-tint:
+    radial-gradient(circle at 30% 20%, rgba(255, 220, 130, 0.14) 0%, transparent 55%),
+    radial-gradient(circle at 70% 30%, rgba(180, 220, 255, 0.10) 0%, transparent 55%),
+    radial-gradient(circle at 50% 80%, rgba(220, 180, 255, 0.10) 0%, transparent 55%);
+}
+
+/* 全局背景 tint 叠层：顶层容器铺一层非常淡的境界色偏
+   pointer-events: none 防止拦截点击；z-index: 0 沉到内容之下 */
+[data-realm]::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--realm-bg-tint);
+  transition: background 3s ease, opacity 3s ease;
+}
+
+/* header border-bottom 用 accent 染色（透明度低，避免突兀） */
+.realm-header {
+  border-bottom-color: color-mix(in srgb, var(--realm-accent) 45%, transparent) !important;
+  transition: border-bottom-color 3s ease;
+}
+
+/* 通用装饰类：给关键面板加境界 accent 边框 */
+.realm-panel {
+  border-color: color-mix(in srgb, var(--realm-accent) 40%, var(--border)) !important;
+  transition: border-color 3s ease, box-shadow 3s ease;
+}
+
+/* 灵球外圈光晕：叠一层境界 aura（不覆盖原色，仅追加层次） */
+.realm-orb-aura {
+  box-shadow:
+    0 0 calc(20px * var(--realm-glow-strength, 0)) var(--realm-aura-color, transparent),
+    0 0 calc(40px * var(--realm-glow-strength, 0)) color-mix(in srgb, var(--realm-aura-color) 60%, transparent);
+  transition: box-shadow 3s ease;
+}
+/* 无光晕境界（凡人）时该类不产生任何效果 */
+
+
 /* 水墨晕染效果 */
 .ink-wash {
   background-image:

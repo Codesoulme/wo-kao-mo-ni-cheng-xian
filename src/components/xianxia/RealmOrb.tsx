@@ -30,7 +30,7 @@ export function RealmOrb({
     <div className="flex flex-col items-center gap-1" data-testid="realm-orb" data-pct={pct.toFixed(3)} data-near-break={nearBreak ? 'true' : 'false'}>
       <div
         className={cn(
-          'relative rounded-full orb-glow flex items-center justify-center transition-all duration-700',
+          'relative rounded-full orb-glow realm-orb-aura flex items-center justify-center transition-all duration-700',
           nearBreak && 'animate-pulse',
         )}
         style={{
