@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Swords, Shield, Gem, Sparkles, BookOpen, FlaskConical, Package, Wrench,
 } from 'lucide-react';
-import { formatItemEffectLabel } from '@/lib/xianxia/display';
+import { formatItemEffectLabel, sanitizeNarrative } from '@/lib/xianxia/display';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -109,7 +109,7 @@ export function ItemDetailDialog({
           <div>
             <div className="text-[10px] text-muted-foreground mb-1">描述</div>
             <p className="text-xs leading-relaxed font-serif-cn text-foreground/90">
-              {item.description}
+              {sanitizeNarrative(item.description || '')}
             </p>
           </div>
 

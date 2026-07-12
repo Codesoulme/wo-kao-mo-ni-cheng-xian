@@ -311,8 +311,8 @@ export function StatusPanel({ character }: StatusPanelProps) {
                 {/* 灵石数值不再在身份行重复显示；已由头像下角 Coins 徽标承载 */}
               </div>
 
-              {/* 境界与修为同区展示 */}
-              <div className="mt-2 rounded-lg border border-border/50 bg-background/40 px-2 py-1.5" data-section="realm">
+              {/* 境界与修为同区展示（realm-panel 提供境界 accent 边框） */}
+              <div className="mt-2 rounded-lg border realm-panel border-border/50 bg-background/40 px-2 py-1.5" data-section="realm">
                 <div className="flex items-center gap-2 text-[10px]">
                   <span
                     style={{ color: character.realmColor }}

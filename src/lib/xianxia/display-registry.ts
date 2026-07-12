@@ -1,5 +1,9 @@
 import type { CharacterState } from './store';
 import { filterMeaningfulStatuses } from './engine';
+// 2026-07-12：在 display entry 出口处统一给 description / detail / source 跑 sanitizeNarrative，
+// 把"AI/API/引擎/cache"等黑名单词在抵达玩家可见 UI 之前洗掉。一处兜底覆盖
+// StatusPanel / CharacterDetailSheet / InventoryPanel / WorldLegacyPanel 等多处渲染。
+import { sanitizeNarrative } from './display';
 
 export type DisplaySlot = 'topTags' | 'characterDetail' | 'statusPage' | 'threadPage' | 'combatPanel' | 'inventoryPanel' | 'worldLegacy';
 export type DisplayTone = 'neutral' | 'good' | 'bad' | 'rare' | 'danger' | 'mystery';
@@ -96,13 +100,13 @@ export function statusToDisplayEntry(status: any, index = 0): DisplayEntry | nul
     displayGroup: group,
     displayLabel: label.slice(0, 18),
     shortLabel: text(status?.shortLabel || status?.shortName, label).slice(0, 8),
-    description: text(status?.visibleDescription || status?.description || status?.summary),
-    detail: text(status?.detail || status?.effectDescription || status?.description),
+    description: sanitizeNarrative(text(status?.visibleDescription || status?.description || status?.summary)),
+    detail: sanitizeNarrative(text(status?.detail || status?.effectDescription || status?.description)),
     tone,
     priority,
     displaySlots: slotsFromStatus(status, group),
     renderHint: status?.renderHint || 'badge',
-    source: text(status?.source || status?.sourceText),
+    source: sanitizeNarrative(text(status?.source || status?.sourceText)),
     sourceEventId: text(status?.sourceEventId),
     persistence: status?.persistence || (status?.duration ? 'temporary' : 'longTerm'),
     raw: status,
@@ -121,13 +125,13 @@ export function attributeToDisplayEntry(attr: any, index = 0): DisplayEntry | nu
     displayGroup: group,
     displayLabel: label.slice(0, 18),
     shortLabel: text(attr?.shortLabel || attr?.shortName, label).slice(0, 8),
-    description: text(attr?.description || attr?.summary || attr?.effect),
-    detail: text(attr?.detail || attr?.description || attr?.effect),
+    description: sanitizeNarrative(text(attr?.description || attr?.summary || attr?.effect)),
+    detail: sanitizeNarrative(text(attr?.detail || attr?.description || attr?.effect)),
     tone: /\u4f53\u8d28|\u5251\u9aa8|\u9053\u80ce|\u8840\u8109|\u795e\u8bc6|\u9b42\u9b44|\u4f53\u9b44|\u795e\u9b42/.test(group + label) ? 'rare' : 'mystery',
     priority: Number.isFinite(Number(attr?.priority ?? attr?.displayPriority)) ? Number(attr?.priority ?? attr?.displayPriority) : 88 - index * 0.01,
     displaySlots: Array.isArray(attr?.displaySlots) ? attr.displaySlots.filter((slot: any): slot is DisplaySlot => SLOT_SET.has(slot)) : defaultSlots,
     renderHint: attr?.renderHint || 'card',
-    source: text(attr?.source || attr?.sourceText),
+    source: sanitizeNarrative(text(attr?.source || attr?.sourceText)),
     sourceEventId: text(attr?.sourceEventId),
     persistence: attr?.persistence || 'longTerm',
     raw: attr,

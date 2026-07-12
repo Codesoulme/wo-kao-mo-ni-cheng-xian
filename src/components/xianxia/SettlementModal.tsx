@@ -11,6 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollText, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+// 2026-07-12：渲染前过 sanitizeNarrative——settlement 不走 display-registry，
+// LLM 偶发写的"AI 评估"等黑名单词需在这层兜底。
+import { sanitizeNarrative } from '@/lib/xianxia/display';
 
 const RARITY_LABEL: Record<string, string> = {
   common: '凡品',
@@ -95,7 +98,7 @@ export function SettlementModal() {
       <div className="space-y-1">
         <h3 className="font-serif-cn text-base font-bold text-foreground flex items-center gap-2 xianxia-readable">
           <ScrollText className="w-5 h-5 text-primary" />
-          {settlementResult.title}
+          {sanitizeNarrative(settlementResult.title)}
         </h3>
         <p className="text-xs leading-relaxed text-muted-foreground font-serif-cn xianxia-prose">
           轮回不携一世修为，只认尚未散尽的旧缘。请在天命浮现的旧物、命格、灵宠、法宝或体质中择其一，留作下一世开端。
@@ -109,8 +112,9 @@ export function SettlementModal() {
             <Badge variant="secondary" className="font-serif-cn">{settlementResult.rank}</Badge>
           </div>
           <div className="text-2xl font-bold text-primary tabular-nums">{settlementResult.score}</div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {settlementResult.summary}
+          {/* 2026-07-10：AI 生成的结局摘要放大 text-xs → text-sm，颜色也从 muted-foreground 提到 foreground/85 提升对比 */}
+          <p className="text-sm leading-7 text-foreground/85 font-serif-cn xianxia-prose">
+            {sanitizeNarrative(settlementResult.summary || '')}
           </p>
         </CardContent>
       </Card>
@@ -146,8 +150,8 @@ export function SettlementModal() {
                         {RARITY_LABEL[option.rarity] || option.rarity}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{option.description}</p>
-                    <p className="text-[10px] text-primary/80 leading-relaxed">{option.reason}</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{sanitizeNarrative(option.description || '')}</p>
+                    <p className="text-[10px] text-primary/80 leading-relaxed">{sanitizeNarrative(option.reason || '')}</p>
                   </div>
                 </div>
               </label>

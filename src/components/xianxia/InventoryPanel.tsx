@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { FormationPanel } from './FormationPanel';
 import { PetPanel } from './PetPanel';
-import { formatItemEffectLabel } from '@/lib/xianxia/display';
+import { formatItemEffectLabel, sanitizeNarrative } from '@/lib/xianxia/display';
 import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-registry';
 import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
 
@@ -198,7 +198,7 @@ export function InventoryPanel() {
       if (!data.success) throw new Error(data.error || '操作失败');
       setCharacter({ ...character, ...data.state });
       if (data.narrative) {
-        toast.success(data.message, { description: data.narrative });
+        toast.success(data.message, { description: sanitizeNarrative(data.narrative) });
       } else {
         toast.success(data.message);
       }
@@ -528,7 +528,7 @@ export function InventoryPanel() {
                                   {RARITY_LABEL[item.rarity] || item.rarity}
                                 </span>
                               </div>
-                              <p className="text-[10px] text-muted-foreground leading-relaxed mb-1">{item.description}</p>
+                              <p className="text-[10px] text-muted-foreground leading-relaxed mb-1">{sanitizeNarrative(item.description || '')}</p>
                               {item.effects && item.effects.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mb-1.5">
                                   {item.effects

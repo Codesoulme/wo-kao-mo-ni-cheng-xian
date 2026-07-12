@@ -1,12 +1,24 @@
 'use client';
 
-import { GameEvent, streamingRef } from '@/lib/xianxia/store';
+import { GameEvent, streamingRef, useGameStore } from '@/lib/xianxia/store';
 import { cn } from '@/lib/utils';
 import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect } from '@/lib/xianxia/display';
 import { Sparkles, Skull, Crown, Swords, Mountain, Zap, ChevronDown, ChevronsUpDown, Maximize2, Minimize2, Compass, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, useCallback, Fragment } from 'react';
 import { formatNarrativeForDisplay } from '@/lib/xianxia/narrative-format';
 import { XianxiaRibbon } from './XianxiaRibbon';
+import { TreasureCard } from './TreasureCard';
+import { NpcEncounterCard } from './NpcEncounterCard';
+import { SceneRevealCard } from './SceneRevealCard';
+import { BreakthroughFlashCard } from './BreakthroughFlashCard';
+
+// 场景蓝图分类 → 场景中文标签（用于 SceneRevealCard 顶栏 chip）
+const SCENE_CATEGORY_LABEL: Record<string, string> = {
+  exploration: '探幽',
+  secret_realm: '秘境',
+  travel: '游历',
+  encounter: '奇遇',
+};
 
 interface EventTimelineProps {
   events: GameEvent[];
@@ -149,7 +161,7 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
     fellbackRef.current = true;
     stopAnimation();
     if (contentRef.current && text != null) {
-      contentRef.current.innerText = text;
+      contentRef.current.innerText = formatNarrativeForDisplay(text);
     }
     textRef.current = text || '';
     // 通知上层 isStreaming = false（直接清掉共享 streamingRef）
@@ -174,7 +186,8 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
       if (state && state.eventIndex === streamingEventIdx.current) {
         const newText = state.text;
         if (newText !== textRef.current) {
-          el.innerText = newText;
+          // 流式态也走 normalize，避免"流式看到逗号断段/空白行 → 流完静态又调回来"的二次跳变
+          el.innerText = formatNarrativeForDisplay(newText);
           textRef.current = newText;
           lastRefUpdateAt.current = Date.now();
           el.scrollIntoView({ behavior: 'smooth', block: 'end' });
@@ -207,7 +220,7 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
       lastRefUpdateAt.current = Date.now();
       fellbackRef.current = false;
       if (contentRef.current) {
-        contentRef.current.innerText = streamingText;
+        contentRef.current.innerText = formatNarrativeForDisplay(streamingText);
       }
       startAnimation();
     } else {
@@ -217,10 +230,12 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
     return () => stopAnimation();
   }, [streamingText, eventIndex, startAnimation, stopAnimation]);
 
-  // 非流式模式：普通渲染（沉浸版叙事段缩进兜底）
+  // 非流式模式：普通渲染
+  // 用与流式态一致的容器与 CSS（xianxia-prose 带 white-space: pre-line），
+  // 完全信任 AI 分段——不再做任何前端切段/缩进兜底，避免"写完再跳一下"。
   if (streamingText === undefined) {
     if (!text) return null;
-    return <p>{formatNarrativeForDisplay(text)}</p>;
+    return <div className="xianxia-prose">{formatNarrativeForDisplay(text)}</div>;
   }
 
   // 流式模式：保持段落结构，避免 done 后重排
@@ -275,6 +290,7 @@ function eventTypeLabel(event: GameEvent, prevEvent?: GameEvent) {
 }
 
 export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = true, newEventRange, streamingEvent, settlingHint }: EventTimelineProps) {
+  const character = useGameStore((s) => s.character);
   const endRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // 用 Set 记录展开的事件 index（按 events 数组顺序）
@@ -565,12 +581,47 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                   {event.title}
                 </h4>
 
-                {/* 正文 - 可折叠 */}
+                {/* 正文 - 可折叠
+                    2026-07-10：正文字号从 text-xs (12px) 提到 text-sm (14px)，
+                    行距同步从 leading-relaxed 提到 leading-7，减轻长篇 AI 叙事阅读疲劳 */}
                 {isExpanded && (
                   <div className="px-3 pb-2">
-                    <div className="text-xs leading-relaxed text-foreground/90 xianxia-prose">
+                    <div className="text-sm leading-7 text-foreground/90 xianxia-prose">
                       <StreamingNarrative text={event.narrative} isNew={isNewEvent} streamingText={streamingEvent && isNewEvent ? streamingEvent.text : undefined} eventIndex={idx} />
                     </div>
+                    {/* 生成式 UI DEMO #1（2026-07-10）——本次事件获得的物品用宝物卡呈现，
+                        品阶色 + 图标 + 描述 + 属性 chip；从 event.effects 里提取 kind='item'|'equipment' 的名字 */}
+                    {(() => {
+                      const itemNames = (event.effects || [])
+                        .filter((e: any) => e && (e.kind === 'item' || e.kind === 'equipment') && typeof e.name === 'string' && e.name.trim())
+                        .map((e: any) => e.name);
+                      return itemNames.length > 0 ? <TreasureCard names={itemNames} /> : null;
+                    })()}
+                    {/* 生成式 UI DEMO #2 —— 灵宠结契卡：从 effects 里提取 kind==='pet' 的名字 */}
+                    {(() => {
+                      const petNames = (event.effects || [])
+                        .filter((e: any) => e && e.kind === 'pet' && typeof e.name === 'string' && e.name.trim())
+                        .map((e: any) => e.name);
+                      return petNames.length > 0 ? <NpcEncounterCard pets={petNames} /> : null;
+                    })()}
+                    {/* 生成式 UI DEMO #3 —— 场景现身卡：blueprint.category 命中 exploration|secret_realm|travel|encounter */}
+                    {(() => {
+                      const cat = event.blueprint?.category;
+                      if (!cat || !SCENE_CATEGORY_LABEL[cat]) return null;
+                      const location = String(character?.location || event.blueprint?.name || '').trim();
+                      if (!location) return null;
+                      return (
+                        <SceneRevealCard
+                          location={location}
+                          categoryLabel={SCENE_CATEGORY_LABEL[cat]}
+                          narrative={event.narrative}
+                        />
+                      );
+                    })()}
+                    {/* 生成式 UI DEMO #5 —— 突破闪耀卡：eventType === 'breakthrough' */}
+                    {event.eventType === 'breakthrough' && (
+                      <BreakthroughFlashCard narrative={event.narrative} />
+                    )}
                     {/* 效果 */}
                     {visibleEffects.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-1">

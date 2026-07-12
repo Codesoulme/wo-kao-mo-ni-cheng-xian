@@ -231,19 +231,21 @@ export function AIConfigDialog({ variant = 'icon' }: AIConfigDialogProps) {
   const trigger = variant === 'menu' ? (
     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setOpen(true); }} className="text-xs cursor-pointer">
       <Settings className="w-3.5 h-3.5 mr-2" />
-      <span>AI 配置</span>
+      {/* 2026-07-12：菜单层暴露给玩家——把"AI 配置"换成世界化词"灵桥"，避免 AI/API 黑名单词入眼。
+          Dialog 内部的"AI 接口配置"等仍是开发者配置 UI（豁免文件），保留原文。 */}
+      <span>灵桥设置</span>
     </DropdownMenuItem>
   ) : variant === 'start' ? (
     <Button variant={status.configured ? 'outline' : 'default'} className="w-full font-serif-cn gap-2">
       {status.configured ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <KeyRound className="w-4 h-4" />}
-      {status.configured ? 'AI 接口已配置' : '配置 AI 接口'}
+      {status.configured ? '灵桥已通' : '设灵桥'}
     </Button>
   ) : (
     <Button
       variant="ghost"
       size="icon"
       className={cn('h-8 w-8', !status.configured && 'text-amber-500')}
-      title={status.configured ? 'AI 接口已配置' : '配置 AI 接口'}
+      title={status.configured ? '灵桥已通' : '待通灵桥'}
     >
       {checking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />}
     </Button>

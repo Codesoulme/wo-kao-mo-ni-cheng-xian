@@ -9,11 +9,11 @@ import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { formatNarrativeForDisplay } from '@/lib/xianxia/narrative-format';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 import { humanizeError } from '@/lib/xianxia/error-humanize';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { FateChoiceCard } from './FateChoiceCard';
 
 export function ChoiceModal() {
   const {
@@ -114,32 +114,12 @@ export function ChoiceModal() {
             {formattedPrompt}
           </p>
 
-          {/* 选项按钮——宽度对齐正文 */}
-          <div className="space-y-2 mt-3">
-            {pendingChoice.options.map((opt, i) => (
-              <button
-                key={i}
-                onClick={() => choose(i)}
-                disabled={busy}
-                className={cn(
-                  'w-full text-left p-3 rounded-lg border transition-all min-w-0',
-                  'hover:border-primary hover:bg-primary/5 active:scale-[0.99]',
-                  'border-border/60 bg-background/60',
-                  busy && 'opacity-50 cursor-not-allowed'
-                )}
-              >
-                <div className="flex items-start gap-2">
-                  <span className="seal shrink-0 mt-0.5">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold font-serif-cn xianxia-readable">{opt.text}</div>
-                    {opt.hint && (
-                      <div className="text-[11px] text-muted-foreground mt-0.5 xianxia-readable">{opt.hint}</div>
-                    )}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+          {/* 选项列表——用 FateChoiceCard 呈现（图标 + 大字选项 + 小字 hint） */}
+          <FateChoiceCard
+            options={pendingChoice.options}
+            onChooseIndex={choose}
+            busy={busy}
+          />
         </div>
       </div>
 

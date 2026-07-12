@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { SlidersHorizontal, X } from 'lucide-react';
+// 2026-07-12：渲染 player 可见的 description 前过 sanitize，把 AI/API 等黑名单词兜底洗掉。
+import { sanitizeNarrative } from '@/lib/xianxia/display';
 
 const CATEGORY_LABEL: Record<HeritageCategory, string> = {
   scripture: '\u529f\u6cd5',
@@ -160,7 +162,7 @@ export function CustomSimulationDialog() {
                           <Badge variant="secondary" className="text-[10px] shrink-0">{CATEGORY_LABEL[item.category]}</Badge>
                           <Badge variant="outline" className="text-[10px] shrink-0">{RARITY_LABEL[item.rarity] || item.rarity}</Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{item.description}</p>
+                        <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">{sanitizeNarrative(item.description || '')}</p>
                         <p className="text-[10px] text-muted-foreground/80">{'\u6765\u6e90\uff1a'}{item.source}</p>
                       </div>
                     </div>

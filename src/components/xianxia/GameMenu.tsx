@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useGameStore } from '@/lib/xianxia/store';
 import {
   AlertDialog,
@@ -20,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Home, RotateCcw, ScrollText, Info, Settings } from 'lucide-react';
+import { Home, RotateCcw, ScrollText, Info, Settings, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
 
@@ -28,6 +29,8 @@ export function GameMenu() {
   const { character, events, choices, setSettlementResult } = useGameStore();
   const [resetOpen, setResetOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  // 2026-07-09：结算此世要走后端 AI 评估（最长约 20 秒），前端加锁避免玩家以为卡死。
+  const [settling, setSettling] = useState(false);
 
 
   const handleReturnHome = () => {
@@ -39,8 +42,9 @@ export function GameMenu() {
   };
 
   const handleReset = async () => {
-    if (!character) return;
+    if (!character || settling) return;
     setResetOpen(false);
+    setSettling(true);
     try {
       const res = await fetch('/api/game/settlement', {
         method: 'POST',
@@ -53,6 +57,8 @@ export function GameMenu() {
       toast('此世已入轮回结算', { description: '请从浮现的旧缘中择一带入下一世。' });
     } catch (err: any) {
       toast.error('结算此世失败', { description: err?.message || '请稍后再试。' });
+    } finally {
+      setSettling(false);
     }
   };
 
@@ -196,6 +202,32 @@ export function GameMenu() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>}
+
+      {/* 2026-07-09：结算此世全屏锁定 + 中央悬浮提示 —— 结算走后端 AI 评估最长约 20 秒
+          Portal 挂到 document.body：GameMenu 被 <header> 的 backdrop-blur 包裹，
+          backdrop-filter 会让子元素的 position:fixed 参照系变为父级 header，
+          不 Portal 出来 overlay 会锁死在顶部 header 那条。 */}
+      {settling && typeof document !== 'undefined' && createPortal(
+        <div
+          data-testid="settling-overlay"
+          aria-live="polite"
+          aria-busy="true"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/70 backdrop-blur-sm"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.preventDefault()}
+        >
+          <div className="paper-texture rounded-xl border border-primary/30 shadow-2xl px-6 py-5 flex flex-col items-center gap-3 max-w-[280px]">
+            <Sparkles className="w-8 h-8 text-primary" style={{ animation: 'spin 3s linear infinite' }} />
+            <div className="font-serif-cn text-base font-bold text-foreground tracking-wider">
+              此世结算中
+            </div>
+            <div className="text-[11px] text-muted-foreground leading-relaxed text-center font-serif-cn">
+              轮回天秤正衡量此世因果<br />请稍候片刻
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </>
   );
 }

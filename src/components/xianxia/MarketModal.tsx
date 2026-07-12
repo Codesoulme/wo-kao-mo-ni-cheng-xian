@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { formatItemEffectLabel } from '@/lib/xianxia/display';
+import { formatItemEffectLabel, sanitizeNarrative } from '@/lib/xianxia/display';
 import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 // 稀有度配色（与 InventoryPanel 保持一致）
@@ -350,7 +350,7 @@ export function MarketModal() {
                         {/* 描述 */}
                         {item.description && (
                           <p className="px-3 pb-1.5 text-[11px] text-muted-foreground font-serif-cn leading-relaxed">
-                            {item.description}
+                            {sanitizeNarrative(item.description || '')}
                           </p>
                         )}
                         {/* 效果 chips */}
@@ -448,7 +448,7 @@ export function MarketModal() {
                         </div>
                         {item.description && (
                           <p className="px-3 pb-1.5 text-[11px] text-muted-foreground font-serif-cn leading-relaxed">
-                            {item.description}
+                            {sanitizeNarrative(item.description || '')}
                           </p>
                         )}
                         {item.effects && item.effects.length > 0 && (

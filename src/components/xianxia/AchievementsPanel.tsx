@@ -17,6 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, Trophy, Sparkles, Mountain, Star, Sword, Crown, Users, BookOpen, Baby, ScrollText } from 'lucide-react';
+// 2026-07-12：record.hint 是 LLM 输出，渲染前过 sanitize。
+import { sanitizeNarrative } from '@/lib/xianxia/display';
 import { cn } from '@/lib/utils';
 import { useGameStore } from '@/lib/xianxia/store';
 import {
@@ -273,7 +275,7 @@ export function AchievementsPanel() {
                           {def?.name || record.name || record.id}
                         </div>
                         <p className="text-[11px] text-foreground/80 leading-relaxed xianxia-prose">
-                          {record.hint || def?.hint || ''}
+                          {sanitizeNarrative(record.hint || def?.hint || '')}
                         </p>
                         <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-muted-foreground">
                           <span className="font-serif-cn">印记之物</span>
