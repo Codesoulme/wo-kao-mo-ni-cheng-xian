@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Store, Compass, ScrollText } from 'lucide-react';
+import { Play, SkipForward, RotateCcw, Loader2, FastForward, Square, Swords, Store, Compass, ScrollText, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { REALMS } from '@/lib/xianxia/types';
@@ -151,7 +151,7 @@ export function ActionButtons() {
     });
   };
 
-  const advance = async () => {
+  const advance = async (forceTimeAdvance?: { amount: number; unit: string; label: string; ageDeltaYears: number; elapsedDays: number; reason: string }) => {
     if (advancingRef.current || atChoice || isDead || isAscended || inCombat) return;
     advancingRef.current = true;
     setLoading(true);
@@ -190,7 +190,7 @@ export function ActionButtons() {
       const response = await fetch('/api/game/advance-sse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies }),
+        body: JSON.stringify({ characterId: character.id, worldCalendar, previousWorldLegacies: worldLegacies, forceTimeAdvance }),
         signal: abortCtrl.signal,
       });
 
@@ -362,6 +362,21 @@ export function ActionButtons() {
             : e
         ));
         setPlaceholder(null);
+      }
+
+      // 2026-07-12：临终追加事件——若本轮跨过 alive=false，服务端会返回 deathEvent，
+      // 前端把它追加到事件流末尾，作为独立一条剧情气泡显示（避免死亡突兀）。
+      if (doneData.deathEvent) {
+        const de = doneData.deathEvent;
+        addEvent({
+          id: de.id || `death-${Date.now()}`,
+          age: de.age,
+          title: de.title,
+          narrative: de.narrative,
+          eventType: 'death',
+          effects: [],
+          createdAt: de.createdAt || new Date().toISOString(),
+        });
       }
 
       finishStreamingNarrative();
@@ -602,16 +617,38 @@ export function ActionButtons() {
               <span className="text-xs">停</span>
             </Button>
           ) : (
-            <Button
-              onClick={() => autoAdvance(10)}
-              disabled={loading || atChoice}
-              variant="outline"
-              className="h-10 px-3 shrink-0 border-accent/40 text-accent hover:bg-accent/10"
-              title="一键推进十载"
-            >
-              <FastForward className="w-4 h-4 mr-1" />
-              <span className="text-xs font-serif-cn">十载</span>
-            </Button>
+            <>
+              <Button
+                onClick={() => {
+                  const forceMonths = 3;
+                  advance({
+                    amount: forceMonths,
+                    unit: 'month',
+                    label: `${forceMonths} 月后`,
+                    ageDeltaYears: 0,
+                    elapsedDays: forceMonths * 30,
+                    reason: '玩家按月推进',
+                  });
+                }}
+                disabled={loading || atChoice}
+                variant="outline"
+                className="h-10 px-2.5 shrink-0 border-primary/30 text-primary hover:bg-primary/10"
+                title="推进数月（age 不变，同年内流转）"
+              >
+                <Clock className="w-3.5 h-3.5 mr-1" />
+                <span className="text-xs font-serif-cn">数月</span>
+              </Button>
+              <Button
+                onClick={() => autoAdvance(10)}
+                disabled={loading || atChoice}
+                variant="outline"
+                className="h-10 px-3 shrink-0 border-accent/40 text-accent hover:bg-accent/10"
+                title="一键推进十载"
+              >
+                <FastForward className="w-4 h-4 mr-1" />
+                <span className="text-xs font-serif-cn">十载</span>
+              </Button>
+            </>
           )
         )}
 

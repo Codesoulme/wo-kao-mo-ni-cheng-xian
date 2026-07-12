@@ -18,6 +18,8 @@ import { advanceWorldCalendar, clampTimeAdvance, deriveActionProjections, format
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import { appendEvent } from '@/lib/xianxia/events/store';
 import { getCurrentUser } from '@/lib/auth-helpers';
+// 2026-07-12：临终 LLM 叙事——避免死亡兜底只有一句"星辰夜凉，再无来者"
+import { generateDeathNarrative } from '@/lib/xianxia/llm';
 // 批 20: ECS 集成 advance —— 让 AgingSystem / CultivationSystem 在 advance 路径上额外跑一次 world.tick()
 // Phase 5 #2: 抽 helper 后用 tickEcsForCharacter / applyEcsTickToState
 import { tickEcsForCharacter, applyEcsTickToState } from '@/lib/xianxia/ecs/tick-helper';
@@ -44,6 +46,10 @@ export async function POST(req: NextRequest) {
     const skipPreload = Boolean(body?.skipPreload);
     const inputWorldCalendar = body?.worldCalendar;
     const previousWorldLegacies = Array.isArray(body?.previousWorldLegacies) ? body.previousWorldLegacies.slice(0, 8) : [];
+    // 2026-07-12：玩家通过 UI 强制按月推进——把 forceTimeAdvance 透传给引擎，
+    // 引擎把 state.age 预增量严格按 forceTimeAdvance（通常 ageDeltaYears=0）。
+    const forceTimeAdvance = body?.forceTimeAdvance && typeof body.forceTimeAdvance === 'object'
+      ? body.forceTimeAdvance : null;
     if (!characterId) {
       return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
     }
@@ -92,6 +98,10 @@ export async function POST(req: NextRequest) {
     const blueprint = candidate.blueprint;
     const aiOutput = candidate.aiOutput;
     let timeAdvance = clampTimeAdvance(aiOutput?.timeAdvance, candidate.aiOutput?.timeAdvance);
+    // 2026-07-12：玩家按月推进入参优先——强制覆盖引擎根据 narrative 推断出的跨度。
+    if (forceTimeAdvance) {
+      timeAdvance = clampTimeAdvance(forceTimeAdvance, timeAdvance);
+    }
     let worldCalendar = advanceWorldCalendar(inputWorldCalendar, timeAdvance);
     const worldTime = worldTimeStamp(worldCalendar);
     const isFateNode = candidate.isFateNode;
@@ -500,15 +510,36 @@ ${narrative || ''}`);
     }
 
     // 沉浸版·生命终结叙事：若这一轮角色因 ECS aging / 战斗 / 寿元等任何原因跨过了 alive=false，
-    // 单独追加一条"身殒道消"独立事件，避免玩家看到主事件叙事却在角色死亡时毫无征兆。
+    // 单独追加一条"临终"独立事件，避免玩家看到主事件叙事却在角色死亡时毫无征兆。
+    //
+    // 2026-07-12 用户反馈"结局突兀"：这里从"硬编码一句'星辰夜凉再无来者'"改成"先调 LLM 生成 3-5 句
+    // 死亡场景（8s 上限），失败才落到硬编码兜底"。当年的主事件叙事保留，死亡叙事**追加**在其后作独立事件。
     if (char.alive !== finalState.alive && finalState.alive === false) {
       const deathCause = finalState.causeOfDeath || '寿元已尽，身隳道消';
       const deathTitles = ['身殒道消', '身隳道消', '道途已尽', '尘世收局'];
       const seedStr = `${characterId}|${finalState.age}`;
       let seed = 0; for (let si = 0; si < seedStr.length; si++) seed = (seed * 31 + seedStr.charCodeAt(si)) >>> 0;
+
+      // 先尝试 LLM 生成临终叙事
+      let deathNarrative: string | null = null;
+      try {
+        deathNarrative = await generateDeathNarrative({
+          characterName: finalState.name || char.name || '此人',
+          age: finalState.age,
+          realmName: finalState.realmName || finalState.realm || '凡身',
+          causeOfDeath: deathCause,
+          precedingNarrative: aiOutput.narrative || '',
+          ascended: false,
+        });
+      } catch (e) {
+        console.error('[advance] death narrative gen failed (non-fatal):', e);
+      }
+      // 兜底：LLM 失败才用硬编码那一句
+      const fallbackNarrative = `${aiOutput.title ? `${aiOutput.title}之后，` : ''}他的一生走到了尽头。${deathCause}。`;
+
       eventDrafts.push({
         title: deathTitles[seed % deathTitles.length],
-        narrative: `${aiOutput.title ? `${aiOutput.title}之后，` : ''}他的一生走到了尽头。${deathCause}。星辰夜凉，再无来者。`,
+        narrative: deathNarrative || fallbackNarrative,
         eventType: 'death',
         effects: [],
       });

@@ -21,6 +21,8 @@ import {
   parseJSON,
   sanitizeEventOutput,
   cleanNarrativeAge,
+  // 2026-07-12：临终 LLM 叙事——避免死亡兜底突兀
+  generateDeathNarrative,
 } from '@/lib/xianxia/llm';
 import { getCurrentUser } from '@/lib/auth-helpers';
 // 修仙界感改进 - 任务 D：寿元压力
@@ -173,6 +175,9 @@ export async function POST(req: NextRequest) {
         const characterId: string | undefined = body?.characterId;
         const qualityMode: 'full' | 'light' = body?.qualityMode === 'light' ? 'light' : 'full';
         const inputWorldCalendar = body?.worldCalendar;
+        // 2026-07-12：玩家按月推进——SSE 路径也透传 forceTimeAdvance。
+        const forceTimeAdvance = body?.forceTimeAdvance && typeof body.forceTimeAdvance === 'object'
+          ? body.forceTimeAdvance : null;
 
         if (!characterId) {
           send('error', { error: 'characterId required' });
@@ -218,7 +223,10 @@ export async function POST(req: NextRequest) {
         const isFateNode = candidate.isFateNode;
         const recentEvents = candidate.recentEvents || [];
         const narrativeContractFeedback = candidate.narrativeContractFeedback || [];
-        const timeAdvance = clampTimeAdvance(candidate.timeAdvance);
+        const timeAdvance = clampTimeAdvance(
+          forceTimeAdvance || candidate.timeAdvance,
+          candidate.timeAdvance
+        );
 
         // 构建 worldCalendar
         let worldCalendar = char.worldCalendarJson ? JSON.parse(char.worldCalendarJson) : null;
@@ -416,6 +424,8 @@ export async function POST(req: NextRequest) {
 
         // 6) executeAIEvent + 写库
         let finalState: any;
+        // 临终追加事件（若本轮死亡才写；提升到外层作用域，让 done 里能带上）
+        let deathEvent: any = null;
         let displayEffects: any[] = [];
         let createdEvent: any = null;
         try {
@@ -481,6 +491,8 @@ displayEffects = buildEventDisplayEffects({
             before: state,
             after: finalState,
             changes: execResult.appliedChanges || [],
+            // 2026-07-12：把引擎真正删的物品 id 透出来，让"失去：XXX"chip 正确显示
+            removedItemIds: execResult.removedItemIds || [],
           });
 
           // executeAIEvent 之前已经 advance 过 worldCalendar，直接使用
@@ -502,6 +514,44 @@ displayEffects = buildEventDisplayEffects({
               effects: JSON.stringify(eventEffects),
             },
           });
+
+          // 沉浸版·临终追加事件（2026-07-12 用户反馈"结局突兀"）：
+          // 若本轮跨过 alive=false，紧跟主 event 再多写一条"临终"独立事件（LLM 优先，硬编码兜底），
+          // 让当年推进的主叙事保留 + 尾部补上真正的死亡场景。
+          if (char.alive === true && finalState.alive === false) {
+            const deathCause = (finalState as any).causeOfDeath || (finalState as any).deathReason || '寿元已尽，身隳道消';
+            const deathTitles = ['身殒道消', '身隳道消', '道途已尽', '尘世收局'];
+            const seedStr = `${characterId}|${finalState.age}`;
+            let seed = 0; for (let si = 0; si < seedStr.length; si++) seed = (seed * 31 + seedStr.charCodeAt(si)) >>> 0;
+            let deathNarrative: string | null = null;
+            try {
+              deathNarrative = await generateDeathNarrative({
+                characterName: finalState.name || char.name || '此人',
+                age: finalState.age,
+                realmName: finalState.realmName || finalState.realm || '凡身',
+                causeOfDeath: deathCause,
+                precedingNarrative: aiOutput.narrative || '',
+                ascended: false,
+              });
+            } catch (e) {
+              console.error('[advance-sse] death narrative gen failed (non-fatal):', e);
+            }
+            const fallbackNarrative = `${aiOutput.title ? `${aiOutput.title}之后，` : ''}他的一生走到了尽头。${deathCause}。`;
+            try {
+              deathEvent = await db.eventLog.create({
+                data: {
+                  characterId,
+                  age: finalState.age,
+                  title: deathTitles[seed % deathTitles.length],
+                  narrative: deathNarrative || fallbackNarrative,
+                  eventType: 'death',
+                  effects: '[]',
+                },
+              });
+            } catch (e) {
+              console.error('[advance-sse] death event insert failed (non-fatal):', e);
+            }
+          }
 
           // 持久化 pendingChoice（让页面刷新后可恢复）
           const pendingChoiceJson = (aiOutput.hasChoice && aiOutput.choice)
@@ -923,6 +973,15 @@ displayEffects = buildEventDisplayEffects({
           eventId: createdEvent?.id,
           eventAge: createdEvent?.age,
           eventCreatedAt: createdEvent?.createdAt,
+          // 临终追加事件（若本轮死亡才有；前端可像普通 event 一样气泡显示）
+          deathEvent: deathEvent ? {
+            id: deathEvent.id,
+            age: deathEvent.age,
+            title: deathEvent.title,
+            narrative: deathEvent.narrative,
+            eventType: 'death',
+            createdAt: deathEvent.createdAt,
+          } : null,
           state: stateToResponse(finalState),
           changes: displayEffects,
           breakthrough: null, // simplified for now

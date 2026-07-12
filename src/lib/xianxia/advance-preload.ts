@@ -153,18 +153,10 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     sameYearThread,
     blueprint,
   });
-  const suggestedTimeAdvance = hasRepeatedEvents && !sameYearThread
-    ? {
-      ...rawSuggestedTimeAdvance,
-      unit: 'year' as const,
-      amount: 1,
-      ageDeltaYears: Math.max(1, rawSuggestedTimeAdvance.ageDeltaYears || 1),
-      elapsedDays: Math.max(365, rawSuggestedTimeAdvance.elapsedDays || 365),
-      label: '\u4e00\u5e74\u540e',
-      reason: '\u56e0\u7f18\u81ea\u7136\u6d41\u8f6c\uff0c\u4e0d\u518d\u505c\u7559\u4e8e\u65e7\u4e8b',
-    }
-    : rawSuggestedTimeAdvance;
-  const timeAdvance = clampTimeAdvance(suggestedTimeAdvance);
+  // 2026-07-12\uff1a\u53bb\u6389\u201c\u6709\u91cd\u590d\u4e8b\u4ef6\u5c31\u5f3a\u5236\u8986\u76d6\u4e3a 1 \u5e74\u201d\u7684\u903b\u8f91\u2014\u2014\u4e4b\u524d dedup \u68c0\u6d4b\u628a\u65f6\u95f4\u8de8\u5ea6\u4e5f\u4e00\u8d77\u6539\uff0c
+  // \u662f\u201c\u90a3\u51e0\u4e2a\u6708\u5462\u5e73\u4f9d\u8df3\u4e86\u201d\u7684\u5143\u51f6\u4e4b\u4e00\u3002\u65f6\u95f4\u8de8\u5ea6\u7531 suggestTimeAdvance / blueprint / sameYearThread 
+  // \u51b3\u5b9a\uff1b\u4e8b\u4ef6\u53bb\u91cd\u8ba9 AI \u81ea\u5df1\u5904\u7406\uff08\u901a\u8fc7 sameYearThread \u7b49\u673a\u5236\uff09\uff0c\u4e0d\u5e94\u7eb1\u67b6\u65f6\u95f4\u3002
+  const timeAdvance = clampTimeAdvance(rawSuggestedTimeAdvance);
 
   if (!sameYearThread) {
     state.age += timeAdvance.ageDeltaYears;

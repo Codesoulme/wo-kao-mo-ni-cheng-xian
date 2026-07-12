@@ -6,11 +6,11 @@ import { POST as advanceOne } from '../advance/route';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-function makeAdvanceRequest(characterId: string, qualityMode: 'full' | 'light', worldCalendar?: any, previousWorldLegacies?: any[]) {
+function makeAdvanceRequest(characterId: string, qualityMode: 'full' | 'light', worldCalendar?: any, previousWorldLegacies?: any[], forceTimeAdvance?: { amount: number; unit: any; label: string; ageDeltaYears: number; elapsedDays: number; reason: string }) {
   return new Request('http://localhost/api/game/advance', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ characterId, qualityMode, skipPreload: true, worldCalendar, previousWorldLegacies }),
+    body: JSON.stringify({ characterId, qualityMode, skipPreload: true, worldCalendar, previousWorldLegacies, forceTimeAdvance }),
   }) as NextRequest;
 }
 
@@ -20,6 +20,24 @@ export async function POST(req: NextRequest) {
     const characterId: string | undefined = body?.characterId;
     let worldCalendar = body?.worldCalendar;
     const previousWorldLegacies = Array.isArray(body?.previousWorldLegacies) ? body.previousWorldLegacies.slice(0, 8) : [];
+    // 2026-07-12：支持"按月推进"——前端发 forceMonths=3 表示强制走 3 月跨度（ageDeltaYears=0）。
+    const requestedMonths = Number(body?.forceMonths || 0);
+    if (requestedMonths > 0) {
+      const months = Math.max(1, Math.min(24, Math.floor(requestedMonths)));
+      const elapsedDays = months * 30;
+      const forceTimeAdvance = {
+        amount: months,
+        unit: 'month' as const,
+        label: `${months} 月后`,
+        ageDeltaYears: 0,
+        elapsedDays,
+        reason: '玩家按月推进',
+      };
+      if (!characterId) return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
+      const res = await advanceOne(makeAdvanceRequest(characterId, 'full', worldCalendar, previousWorldLegacies, forceTimeAdvance));
+      const data = await res.json();
+      return NextResponse.json({ ...data, requestedMonths: months });
+    }
     const requested = Number(body?.years || body?.count || 1);
     const years = Math.max(1, Math.min(10, Number.isFinite(requested) ? Math.floor(requested) : 1));
     if (!characterId) return NextResponse.json({ success: false, error: 'characterId required' }, { status: 400 });
