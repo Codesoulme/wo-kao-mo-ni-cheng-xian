@@ -438,13 +438,33 @@ export function upsertNpcs(state: CharacterState, npcs: WorldNpc[]): CharacterSt
   if (!npcs.length) return state;
   const current = Array.isArray(state.npcs) ? state.npcs : [];
   const byId = new Map<string, WorldNpc>();
+  // 2026-07-12：按 name → existing NPC 的兜底映射。AI 续写老 NPC 时常常不填 id，
+  // 于是走时间戳分支变成"全新 NPC"。这里先按 id 走合并，没命中再按 name 兜底，
+  // 把同人合并到老 NPC（保留 firstMetAge/lastSeenAge 等真实历史）。
+  const byName = new Map<string, WorldNpc>();
   for (const npc of current) {
-    if (npc?.id) byId.set(npc.id, npc);
+    if (!npc || typeof npc !== 'object' || !npc.id) continue;
+    byId.set(npc.id, npc);
+    if (typeof npc.name === 'string' && npc.name.trim()) {
+      byName.set(npc.name.trim(), npc);
+    }
   }
   for (const npc of npcs) {
     if (!npc?.id) continue;
-    const existing = byId.get(npc.id);
-    byId.set(npc.id, existing ? mergeNpc(existing, npc) : npc);
+    const existing = byId.get(npc.id)
+      || (typeof npc.name === 'string' && npc.name.trim()
+            ? byName.get(npc.name.trim())
+            : undefined);
+    if (existing) {
+      const merged = mergeNpc(existing, npc);
+      // 把 name 索引更新到合并后的最终名（AI 可能改名/补全）
+      if (existing.name) byName.delete(existing.name.trim());
+      if (merged.name) byName.set(merged.name.trim(), merged);
+      byId.set(existing.id, merged);
+    } else {
+      byId.set(npc.id, npc);
+      if (npc.name) byName.set(npc.name.trim(), npc);
+    }
   }
   const next = { ...state, npcs: Array.from(byId.values()).slice(-80) };
   return refreshWorldFacts(next, 'npc-registry');

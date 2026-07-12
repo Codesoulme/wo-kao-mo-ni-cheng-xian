@@ -472,7 +472,9 @@ function sanitizeNpcs(raw: any, currentAge: number): any[] {
       role: n.role ? String(n.role).slice(0, 40) : undefined,
       realm: n.realm ? String(n.realm).slice(0, 40) : undefined,
       faction: n.faction ? String(n.faction).slice(0, 60) : undefined,
-      attitude: ['ally','friendly','neutral','hostile','enemy','unknown'].includes(n.attitude) ? n.attitude : 'unknown',
+      // 2026-07-12：AI 没明确写 attitude 时不再默认 unknown（会让人情面板误标"已故/未知"）
+      // 改默认 neutral（中立），由 NPC 年度推进按概率自然衰减至 unknown
+      attitude: ['ally','friendly','neutral','hostile','enemy','unknown'].includes(n.attitude) ? n.attitude : 'neutral',
       relationshipScore: Math.max(-100, Math.min(100, Number(n.relationshipScore) || 0)),
       firstMetAge: Math.max(0, Number(n.firstMetAge) || currentAge),
       lastSeenAge: Math.max(0, Number(n.lastSeenAge) || currentAge),

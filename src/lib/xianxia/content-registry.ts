@@ -9,6 +9,32 @@ import {
   WorldNpc,
 } from './types';
 
+// 2026-07-12：NPC realm 标准化——AI 偶发写中文境界名（"凡人"/"炼气期"）落库后与英文 enum key 不匹配，
+// 这里做双向归一：英文 key 直接放行；中文标签 / 别名映射回标准 enum key。
+const REALM_NORMALIZE: Record<string, string> = {
+  // 中文 → 英文 enum key
+  '凡人': 'mortal',
+  '炼气期': 'qi_refining', '炼气': 'qi_refining',
+  '筑基期': 'foundation', '筑基': 'foundation',
+  '金丹期': 'golden_core', '金丹': 'golden_core',
+  '元婴期': 'nascent_soul', '元婴': 'nascent_soul',
+  '化神期': 'spirit_severing', '化神': 'spirit_severing',
+  '大乘期': 'great_vehicle', '大乘': 'great_vehicle',
+  '渡劫期': 'tribulation', '渡劫': 'tribulation',
+  '飞升': 'ascension', '飞升期': 'ascension', '登仙': 'ascension',
+};
+function normalizeRealm(input: string | undefined | null): string | undefined {
+  if (!input) return undefined;
+  const trimmed = String(input).trim();
+  if (!trimmed) return undefined;
+  if (REALM_NORMALIZE[trimmed]) return REALM_NORMALIZE[trimmed];
+  // 已经是英文 enum key 形式（mortal / qi_refining 等）直接放行
+  if (/^(mortal|qi_refining|foundation|golden_core|nascent_soul|spirit_severing|great_vehicle|tribulation|ascension)$/.test(trimmed)) {
+    return trimmed;
+  }
+  return undefined; // 未知/脏值归 undefined，前端按凡人渲染
+}
+
 export type RegisteredContentType = 'item' | 'status' | 'thread' | 'realm' | 'npc' | 'event';
 export type ValidationSeverity = 'info' | 'warning' | 'error';
 export type ValidationTraceCode =
@@ -313,14 +339,16 @@ export function registerNpc(raw: Partial<WorldNpc> | any, context: RegistryConte
     name,
     description: asText(raw.description, name, 400),
     role: raw.role ? asText(raw.role, '', 40) : undefined,
-    realm: raw.realm ? asText(raw.realm, '', 40) : undefined,
+    realm: normalizeRealm(asText(raw.realm, '', 40)),
     faction: raw.faction ? asText(raw.faction, '', 60) : undefined,
     attitude,
     relationshipScore: Math.round(safeNumber(raw.relationshipScore, 0, -100, 100, trace, 'relationshipScore')),
     firstMetAge: Math.round(safeNumber(raw.firstMetAge, age, 0, 99999, trace, 'firstMetAge')),
     lastSeenAge: Math.round(safeNumber(raw.lastSeenAge, age, 0, 99999, trace, 'lastSeenAge')),
     lastKnownLocation: raw.lastKnownLocation ? asText(raw.lastKnownLocation, '', 80) : undefined,
-    source: asText(raw.source, context.source || 'content-registry', 80),
+    // 2026-07-12：AI 偶发在 NPC 条目里手填 source（schema 没列该字段），导致详情显示"初逢：11m"等乱码。
+    // 强制忽略 raw.source，回落到 context.source（事件标题），避免面板出现不可读字符串。
+    source: context.source || 'content-registry',
     memory: raw.memory ? asText(raw.memory, '', 300) : undefined,
     relatedThreadIds: Array.isArray(raw.relatedThreadIds) ? raw.relatedThreadIds.map((x: unknown) => asText(x, '', 80)).filter(Boolean) : undefined,
     tags: Array.isArray(raw.tags) ? raw.tags.map((x: unknown) => asText(x, '', 40)).filter(Boolean).slice(0, 8) : undefined,

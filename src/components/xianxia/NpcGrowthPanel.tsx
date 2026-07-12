@@ -12,6 +12,16 @@ interface NpcGrowthPanelProps {
   character?: any;
 }
 
+// 2026-07-12：修真境界白名单——只有这些 key 才算"修行中人"。
+// 与 npc-growth.ts 的 REALM_LABEL 表保持一致；其它脏数据（中文/乱码）一律视为凡人。
+const CULTIVATOR_REALMS = new Set<string>([
+  'qi_refining', 'foundation', 'golden_core', 'nascent_soul',
+  'spirit_severing', 'great_vehicle', 'tribulation', 'ascension',
+]);
+function isCultivatorRealm(realm: unknown): boolean {
+  return typeof realm === 'string' && CULTIVATOR_REALMS.has(realm.trim());
+}
+
 function testid(prefix, id) {
   return prefix + '-' + id;
 }
@@ -27,11 +37,15 @@ export function NpcGrowthPanel({ className, defaultCollapsed = true }: NpcGrowth
   }, [character]);
 
   // sorted 必须在所有早返之前调用，否则 npcs 由空变非空时 hook 数量会变，触发 React 报错
+  // 2026-07-12：判定"已故"只看 memory 关键字（仙逝|陨落|归道|坐化|寿终），
+  // 不再用 attitude==='unknown'——AI 偶发拼错 attitude 被归一为 unknown 时会误标活人"已故"
   const sorted = useMemo(() => {
     const list = [...npcs];
+    const isDeadByMemory = (n: any): boolean =>
+      typeof n.memory === 'string' && /仙逝|陨落|归道|坐化|寿终/.test(n.memory);
     list.sort((a, b) => {
-      const aDead = a.attitude === 'unknown';
-      const bDead = b.attitude === 'unknown';
+      const aDead = isDeadByMemory(a);
+      const bDead = isDeadByMemory(b);
       if (aDead !== bDead) return aDead ? -1 : 1;
       const relA = typeof a.relationshipScore === 'number' ? a.relationshipScore : 0;
       const relB = typeof b.relationshipScore === 'number' ? b.relationshipScore : 0;
@@ -176,7 +190,9 @@ export function NpcGrowthPanel({ className, defaultCollapsed = true }: NpcGrowth
                             ✗ 仙逝
                           </span>
                         )}
-                        {!isDead && npc.realm && npc.realm !== 'mortal' && String(npc.realm).trim() !== '' && (
+                        {/* 2026-07-12：修行中人判定只用 REALM_LABEL 白名单（修真境界 key 集），
+                            避免脏数据（中文境界名/乱码/undefined）误标"修行中人" */}
+                        {!isDead && isCultivatorRealm(npc.realm) && (
                           <span
                             data-testid={testid('npc-growth-realm', npc.id)}
                             className="text-[10px] px-1.5 py-0.5 rounded border border-primary/30 bg-primary/10 text-primary"
@@ -208,12 +224,24 @@ export function NpcGrowthPanel({ className, defaultCollapsed = true }: NpcGrowth
                               {npc.lastKnownLocation}
                             </div>
                           )}
-                          {npc.source && (
-                            <div>
-                              <span className="text-stone-500">初逢：</span>
-                              {npc.source}
-                            </div>
-                          )}
+                          {(() => {
+                            // 2026-07-12：AI 偶发返回"11m / 12m"这种短串当 source，
+                            // 检测"全是数字+长度极短"时回退到根据 firstMetAge 生成可读描述，
+                            // 避免详情里出现莫名其妙的"11m"。
+                            const src = typeof npc.source === 'string' ? npc.source.trim() : '';
+                            const looksLikeGarbage = /^\d+\s*[a-zA-Z]*$/.test(src) && src.length <= 8;
+                            const readable = !looksLikeGarbage && src && src !== 'llm';
+                            return (
+                              <div>
+                                <span className="text-stone-500">初逢：</span>
+                                {readable ? src : (() => {
+                                  const fAge = typeof npc.firstMetAge === 'number' ? npc.firstMetAge : null;
+                                  if (fAge !== null && fAge > 0) return `你 ${fAge} 岁时结识`;
+                                  return '昔日旧识';
+                                })()}
+                              </div>
+                            );
+                          })()}
                           {npc.memory && (
                             <div className="italic text-stone-600 border-l-2 border-stone-300 pl-2">
                               {npc.memory}
