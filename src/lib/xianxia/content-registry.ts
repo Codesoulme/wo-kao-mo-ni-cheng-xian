@@ -86,7 +86,10 @@ export interface RegistryContext {
 }
 
 const ITEM_TYPES = new Set<ItemType>(['weapon', 'armor', 'accessory', 'artifact', 'consumable', 'material', 'tool', 'scripture']);
-const STATUS_CATEGORIES = new Set<StatusCategory>(['attribute', 'skill', 'buff', 'debuff', 'special', 'identity', 'quest', 'environment']);
+// 'constitution' 原先漏在此集合外，导致体质类状态被静默归一成 'special'——
+// 而槽位推断层（engine/validation.ts 的 tizhi|jiangu|daotai 规则）本就会产出 'constitution'，
+// 显示层也认这个分组。补齐后三层一致。
+const STATUS_CATEGORIES = new Set<StatusCategory>(['attribute', 'skill', 'buff', 'debuff', 'special', 'constitution', 'identity', 'quest', 'environment']);
 const THREAD_CATEGORIES = new Set<PendingThread['category']>(['competition', 'enemy', 'quest', 'promise', 'mystery', 'romance', 'debt', 'inheritance', 'exploration']);
 const RARITIES = new Set(['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']);
 const EFFECT_OPERATIONS = new Set(['add', 'multiply', 'override', 'cap', 'floor', 'trigger']);
