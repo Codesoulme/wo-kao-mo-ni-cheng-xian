@@ -809,6 +809,8 @@ ${(ctx as any).worldEventAvailablePrompt ? `\n${(ctx as any).worldEventAvailable
 
 ${(ctx as any).achievementPromptHint ? `\n${(ctx as any).achievementPromptHint}\n` : ''}
 
+${(ctx as any).riskAdvisoryPrompt ? `\n${(ctx as any).riskAdvisoryPrompt}\n` : ''}
+
 【角色牵挂与主动意图区】（这是 AI 的提示池：高优先级必须承接；低优先级应在合适时自然回响）
 ${ctx.characterIntents && ctx.characterIntents.length
   ? ctx.characterIntents.map(i => `- [优先级${i.priority}] ${i.title}：${i.description}${i.relatedThreadId ? `（关联线索 ${i.relatedThreadId}）` : ''}`).join('\n')

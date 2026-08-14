@@ -401,6 +401,53 @@ export async function POST(req: NextRequest) {
         }
         if (!aiOutput.narrative) aiOutput.narrative = stripInfluenceMarkers(prevNarrative || rawText);
 
+        // 3.5) 行动前影子试算 + 高风险单轮自我纠偏
+        //   系统 1：拿 aiOutput 在 state 的离线副本上跑一遍 executeAIEvent，把散落的险情原料
+        //           （陨落 / 气血 / 心魔 / 寿元 / 边界告警）汇成 0..1 分数。0 次 LLM，个位数毫秒。
+        //   系统 2：分数越阈值时，把只讲叙事约束的 advisory 注入 ctx，用轻量档小模型重生成一次，
+        //           再试算一次——只在新方案分数确实更低时才采纳，避免修正反噬。
+        //   单轮，不递归，不重试；全程 try/catch，任何异常一律沿用原 aiOutput，绝不阻断主流程。
+        try {
+          const { assessAdvanceRisk, DEFAULT_RISK_THRESHOLD } = await import('@/lib/xianxia/advance-risk');
+          const baseline = assessAdvanceRisk(state, aiOutput);
+          if (baseline) {
+            console.log(`[advance-sse] 风险试算 score=${baseline.score.toFixed(3)} level=${baseline.level} ${baseline.durationMs}ms factors=[${baseline.factors.map((f: any) => f.code).join(',')}]`);
+          }
+          if (baseline && baseline.score > DEFAULT_RISK_THRESHOLD && baseline.advisoryPrompt) {
+            const { callLLMText } = await import('@/lib/xianxia/llm');
+            const prevAdvisory = ctx.riskAdvisoryPrompt;
+            ctx.riskAdvisoryPrompt = baseline.advisoryPrompt;
+            try {
+              const revisedPrompt = buildAdvancePrompt(ctx, isFateNode, 'light');
+              const revisedRaw = await callLLMText(fullSystem, revisedPrompt, { qualityMode: 'light' });
+              let revised: any = sanitizeEventOutput(parseJSON(revisedRaw), ctx.character.age);
+              revised.narrative = stripInfluenceMarkers(
+                cleanNarrativeAge(revised.narrative, ctx.character.age, ctx.character.name),
+              );
+              if (Array.isArray(revised.extraEvents)) {
+                revised.extraEvents = revised.extraEvents.map((e: any) => ({
+                  ...e,
+                  narrative: stripInfluenceMarkers(cleanNarrativeAge(String(e?.narrative || ''), ctx.character.age, ctx.character.name)),
+                }));
+              }
+              if (!revised.narrative) throw new Error('修正稿无 narrative，弃用');
+              const after = assessAdvanceRisk(state, revised);
+              if (after && after.score < baseline.score) {
+                console.log(`[advance-sse] 采纳修正稿 ${baseline.score.toFixed(3)} → ${after.score.toFixed(3)}（${baseline.level} → ${after.level}）`);
+                aiOutput = revised;
+                // 修正稿的 narrative 与流式已推给前端的不同，补推一次让前端覆盖显示。
+                send('narrative_complete', { type: 'narrative_complete', narrative: aiOutput.narrative });
+              } else {
+                console.log(`[advance-sse] 弃用修正稿（未降险 ${baseline.score.toFixed(3)} → ${after ? after.score.toFixed(3) : 'n/a'}），沿用原输出`);
+              }
+            } finally {
+              ctx.riskAdvisoryPrompt = prevAdvisory;
+            }
+          }
+        } catch (e: any) {
+          console.warn('[advance-sse] 风险纠偏失败（非致命，沿用原输出）:', e?.message || e);
+        }
+
         // 4) 若 AI 输出包含选择，进入选择状态（和 non-SSE advance 保持一致）
         if (aiOutput.hasChoice) {
           state.isAtChoice = true;

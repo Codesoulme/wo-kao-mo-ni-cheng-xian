@@ -880,7 +880,7 @@ const procBreakthrough: AIEventProcessor = (ctx) => {
           karmaDelta: tribKarmaDelta.karma - next.karma,
           reason: tribulationResult.outcome === 'success' ? '渡过天劫善缘有感' : (tribulationResult.outcome === 'severe' ? '天劫重创业火缠身' : '天劫之下罪业浮现'),
         } : undefined;
-        appendEvent({
+        if (!(next as any).__shadowRun) appendEvent({
           characterId: next.id,
           type: 'character.tribulation.attempted',
           data: {
