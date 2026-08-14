@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useGameStore } from '@/lib/xianxia/store';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -55,7 +55,6 @@ export function ActionButtons() {
   const [autoTotal, setAutoTotal] = useState(0);
   const [restartOpen, setRestartOpen] = useState(false);
   const autoCancelRef = useRef(false);
-  const preloadRef = useRef<{ key: string | null; inFlight: boolean }>({ key: null, inFlight: false });
 
   // ★ 流式叙事占位事件 ID 状态（之前用 (store as any)._placeholderId 是 hack）
   const { setPlaceholder, placeholderIdRef } = useStreamingPlaceholder();
@@ -76,46 +75,10 @@ export function ActionButtons() {
     return data.character;
   };
 
-  const prepareNextTurn = (characterId: string, preloadKey?: string) => {
-    const key = preloadKey || characterId;
-    if (preloadRef.current.inFlight && preloadRef.current.key === key) return;
-    if (preloadRef.current.key === key) return;
-    preloadRef.current = { key, inFlight: true };
-    fetch('/api/game/preload-advance', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ characterId }),
-    })
-      .then((res) => res.json().catch(() => null))
-      .then((data) => {
-        if (!data?.success) preloadRef.current.key = null;
-      })
-      .catch(() => {
-        preloadRef.current.key = null;
-      })
-      .finally(() => {
-        preloadRef.current.inFlight = false;
-      });
-  };
-
-  useEffect(() => {
-    if (!character?.id) return;
-    const blocked = loading || pendingChoice || !character.alive || character.ascended || character.isAtChoice || (character as any).pendingChoice || (character.combatSession?.status === 'ongoing');
-    if (blocked) return;
-    const key = [
-      character.id,
-      character.age,
-      character.realm,
-      character.realmLevel,
-      character.cultivationExp,
-      character.hp,
-      character.mp,
-      character.spiritStones,
-      events.length,
-    ].join(':');
-    const timer = window.setTimeout(() => prepareNextTurn(character.id, key), 900);
-    return () => window.clearTimeout(timer);
-  }, [character?.id, character?.age, character?.realm, character?.realmLevel, character?.cultivationExp, character?.hp, character?.mp, character?.spiritStones, character?.alive, character?.ascended, character?.isAtChoice, (character as any)?.pendingChoice, character?.combatSession?.status, pendingChoice, loading, events.length]);
+  // 2026-08-14：撤掉「下一回合预热」——玩家实际走 /api/game/advance-sse，该路由传 skipLlm: true
+  // 并自己完整重建 ctx（世事流转 + 成就种子 + 真流式 callLLMStream），从不读 AdvancePreload 表。
+  // 预热产物落库后无任何消费者，等于每回合白烧一次 full 档天机推演。故此处不再发预热请求。
+  // 唯一读该表的是 /api/game/advance（前端不走），它内部仍带自己的后台预热，功能不受影响。
 
   const advanceAbortRef = useRef<AbortController | null>(null);
 
@@ -424,10 +387,6 @@ export function ActionButtons() {
       if (doneData.fallbackGenerated) {
         toast.warning('灵机未通', { description: '天道推演暂歇，已依天机本相续接。' });
       }
-      if (!doneData.hasChoice && doneData.state && doneData.state.alive) {
-        preloadRef.current.key = null;
-        prepareNextTurn(latestCharacter?.id || '');
-      }
     } catch (err: any) {
       // 主动取消（刷新/离开页面/重复点击）不显示错误提示
       if (err?.name === 'AbortError' || err?.message?.includes('aborted') || err?.message?.includes('AbortError')) {
@@ -538,10 +497,6 @@ export function ActionButtons() {
         toast.success('飞升仙界！', { description: '超脱凡俗，与天地同寿' });
         autoCancelRef.current = true;
       }
-      if (!data.hasChoice && !data.triggeredCombat && !data.died && !data.ascended && character.id) {
-        preloadRef.current.key = null;
-        prepareNextTurn(character.id);
-      }
     } catch (err: any) {
       setError(humanizeError(err));
       toast.error('推进失败', { description: humanizeError(err) });
@@ -577,7 +532,7 @@ export function ActionButtons() {
       {/* 主推进按钮 + 一键十载 */}
       <div className="flex items-center gap-2">
         <Button
-          onClick={advance}
+          onClick={() => advance()}
           disabled={loading || atChoice || isDead || isAscended || isAutoRunning || inCombat}
           className={cn(
             "flex-1 h-10 font-serif-cn tracking-wider transition-all",
