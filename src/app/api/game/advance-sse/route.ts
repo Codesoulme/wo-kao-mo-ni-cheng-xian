@@ -600,6 +600,47 @@ displayEffects = buildEventDisplayEffects({
             }
           }
 
+          // 6.5) 逆向因果解释器：只圆「引擎判定拆了账面一致性」那一小类
+          //   executeAIEvent 之后才跑，因为要读 execResult.aiBoundaryTrace + removedItemIds
+          //   复核「这次操作确实被引擎静默吞掉了」，光看告警不够。
+          //   圈定范围只有两个 code（removed_unknown_item / closed_thread_referenced），
+          //   「玩家没预料到」的意外一概不碰 —— 那是本作的卖点，圆掉就废了。
+          //   产出物只有 title/narrative 两个字符串，另起一条 EventLog 行反指原事件，
+          //   原事件一字不改；每岁一条的闸门就是库里同岁同 eventType 的行数。
+          //   全程 try/catch，失败/超时/垃圾一律静默放弃，绝不阻断主流程。
+          try {
+            const { explainRetroCausally, RETRO_CAUSAL_EVENT_TYPE } = await import('@/lib/xianxia/retro-causal-explain');
+            const priorCountThisAge = await db.eventLog.count({
+              where: { characterId, age: finalState.age, eventType: RETRO_CAUSAL_EVENT_TYPE },
+            });
+            const draft = await explainRetroCausally({
+              state: finalState,
+              aiOutput,
+              exec: execResult,
+              refEventId: createdEvent?.id || '',
+              priorCountThisAge,
+              generate: async (system, user) => {
+                const { callLLMText } = await import('@/lib/xianxia/llm');
+                return callLLMText(system, user, { qualityMode: 'light' });
+              },
+            });
+            if (draft) {
+              await db.eventLog.create({
+                data: {
+                  characterId,
+                  age: finalState.age,
+                  title: draft.title,
+                  narrative: draft.narrative,
+                  eventType: draft.eventType,
+                  effects: JSON.stringify(draft.effects),
+                },
+              });
+              console.log(`[advance-sse] 逆向因果补叙已落库（code=${draft.code}，反指 ${draft.refEventId}）`);
+            }
+          } catch (e: any) {
+            console.warn('[advance-sse] 逆向因果补叙失败（非致命，跳过）:', e?.message || e);
+          }
+
           // 持久化 pendingChoice（让页面刷新后可恢复）
           const pendingChoiceJson = (aiOutput.hasChoice && aiOutput.choice)
             ? JSON.stringify({
