@@ -47,3 +47,7 @@ dev-server.log.err
 *.bak2
 logs/bench/
 *.apk
+
+# 一次性审查产物 / 乱码快照备份（2026-08-29 清理后禁止再入库）
+review_results.txt
+*.mojibake-snapshot.bak
