@@ -18,7 +18,7 @@
 ::   taskkill /F 也无效），修仙 dev 起在 3000 会 EADDRINUSE 卡死。
 ::   修仙浏览器预览、dev 脚本、launcher 探活都同步切到 3100。
 :: ============================================================================
-setlocal
+setlocal enabledelayedexpansion
 chcp 65001 >nul
 
 set "PROJECT=E:\aigame2_publish"
