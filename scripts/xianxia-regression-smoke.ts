@@ -648,6 +648,10 @@ import type { CombatStance, CombatResourceType, CombatResourceUsage, Breakthroug
 import { FateEchoKind } from '../src/lib/xianxia/types';
 import { appendNarrativeContractAuditEffect, appendStateChangeAuditEffect, extractNarrativeContractFeedback } from '../src/lib/xianxia/state-change-log';
 import { registerItem } from '../src/lib/xianxia/content-registry';
+// [ANCHOR-DEF-W7] 投影槽位接线测例所需
+import { registerStatus as w7RegisterStatus } from '../src/lib/xianxia/content-registry';
+import { isMeaningfulStatus as w7IsMeaningfulStatus } from '../src/lib/xianxia/engine';
+import { assembleZonePrompt as w7AssembleZonePrompt } from '../src/lib/xianxia/llm';
 import { formatNarrativeForDisplay } from '../src/lib/xianxia/narrative-format';
 import { advanceWorldCalendar, extractEventMeta, formatWorldTimeDisplay, hiddenEventMeta, inferInlineTimeAdvance, phaseHintForTime, worldTimeStamp } from '../src/lib/xianxia/world-time';
 import { characterDisplayEntries, entriesForSlot } from '../src/lib/xianxia/display-registry';
@@ -6089,6 +6093,9 @@ function smokeBlueprintDocsCoverage(): void {
       // [ANCHOR-CALL-W6] 逆向因果解释器测例组调用插此行下方
       // 逆向因果解释器（只圆引擎判定拆了账面一致性那一小类）— 7 个静态 smoke，全程 mock 不真调模型
       pgRunPhaseW6RetroCausalSmokes();
+      // [ANCHOR-CALL-W7] 投影槽位接线测例组调用插此行下方
+      // 生成侧→注册器→噪声过滤→投影→取槽 全链路真实数据流 — 6 个 smoke，只验数据流不 grep 源码
+      pgRunPhaseW7SlotWireSmokes();
       // ===== Phase-Z (TechDoc 18.6.7): 测试策略改进（属性测试 + AI 回归 fixture）=====
       // 独立 console.log，不计入主 smoke 计数（不破 430 pass）。
       // 同步 require + try/catch：smoke 同步执行流，不引入 async 改动。
@@ -16250,6 +16257,118 @@ function pgRunPhaseW6RetroCausalSmokes(): void {
       c.fn();
     } catch (e) {
       log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ============================================================
+// [ANCHOR-DEF-W7] 投影槽位接线（2026-08-29）
+//
+// 为什么要这一批：仓里原有 smokeInventoryPanelConsumesDisplayRegistry 等五条
+// "*-consumes-display-registry" 测例长期全绿，但它们只 readFileSync + 正则查源码里
+// 有没有那句消费调用，**不验证有没有东西真的到达**。于是四段断裂
+// （提示词无生产调用点 / StatusEntry 缺字段 / registerStatus 抹字段 /
+//  isMeaningfulStatus 滤掉无数值效果标签）同时存在了很久，测例一条都没红。
+//
+// 所以这一批的硬约束：**只断言真实数据流，不 grep 源码文本**。
+// 每条都从 registerStatus 真实入参出发，走到 entriesForSlot 真实返回值为止。
+// ============================================================
+
+function smokeW7001RegisterStatusKeepsDisplaySlots(): void {
+  const r = w7RegisterStatus({
+    name: '灵犀玉佩·温养',
+    description: '玉佩贴身温养，神识略清。',
+    category: 'buff',
+    displaySlots: ['inventoryPanel', 'topTags', 'nonsenseSlot'],
+  });
+  assert(r.ok, '注册应通过');
+  const st: any = r.content;
+  assert(Array.isArray(st.displaySlots), 'displaySlots 应留在产出对象上（曾被整段丢弃）');
+  assert(st.displaySlots.includes('inventoryPanel'), '合法槽位应保住');
+  assert(st.displaySlots.includes('topTags'), '合法槽位应保住');
+  assert(!st.displaySlots.includes('nonsenseSlot'), '越界槽位应被剥离（strip 而非 clamp）');
+  log('smoke-w7-001-register-status-keeps-display-slots', { passed: true });
+}
+
+function smokeW7002ToneAndRenderHintClamped(): void {
+  const good: any = w7RegisterStatus({ name: '甲', description: '甲', category: 'buff', tone: 'rare', renderHint: 'card' }).content;
+  assert(good.tone === 'rare', `合法 tone 应保住，got ${good.tone}`);
+  assert(good.renderHint === 'card', `合法 renderHint 应保住，got ${good.renderHint}`);
+  const bad: any = w7RegisterStatus({ name: '乙', description: '乙', category: 'buff', tone: 'wat', renderHint: 'wat' }).content;
+  assert(bad.tone === 'neutral', `越界 tone 应钳到 neutral，got ${bad.tone}`);
+  assert(bad.renderHint === 'badge', `越界 renderHint 应钳到 badge，got ${bad.renderHint}`);
+  const none: any = w7RegisterStatus({ name: '丙', description: '丙', category: 'buff' }).content;
+  assert(none.displaySlots === undefined, '不填就不该凭空造字段');
+  assert(none.tone === undefined, '不填就不该凭空造字段');
+  log('smoke-w7-002-tone-render-hint-clamped', { passed: true });
+}
+
+function smokeW7003ExplicitSlotSurvivesNoiseFilter(): void {
+  // 无数值效果 + category=buff：旧行为被 isMeaningfulStatus 当噪声滤掉，
+  // 于是纯叙事的物品标签永远到不了投影层。显式点名槽位即投影意图，不是噪声。
+  const tagged: any = w7RegisterStatus({
+    name: '玉佩微光', description: '贴身处泛起一点暖意。', category: 'buff',
+    displaySlots: ['inventoryPanel'],
+  }).content;
+  assert(w7IsMeaningfulStatus(tagged), '显式点名槽位的标签不该被当噪声滤掉');
+  const untagged: any = w7RegisterStatus({ name: '玉佩微光', description: '贴身处泛起一点暖意。', category: 'buff' }).content;
+  assert(!w7IsMeaningfulStatus(untagged), '既有噪声判定不该被这条放宽（无效果无槽位仍应滤掉）');
+  log('smoke-w7-003-explicit-slot-survives-noise-filter', { passed: true });
+}
+
+function smokeW7004DarkSlotsLightUpEndToEnd(): void {
+  // inventoryPanel / combatPanel / worldLegacy 三个槽在 slotsFromStatus 的默认推断里
+  // 永远不会出现，只能靠显式 displaySlots 点亮。逐个验到 entriesForSlot 真实返回值。
+  for (const slot of ['inventoryPanel', 'combatPanel', 'worldLegacy'] as const) {
+    const st = w7RegisterStatus({
+      name: `试${slot}`, description: '探针', category: 'buff',
+      displaySlots: [slot], tone: 'rare',
+    }).content;
+    const entries = characterDisplayEntries({ activeStatuses: [st] } as any);
+    const got = entriesForSlot(entries, slot, 8);
+    assert(got.length === 1, `${slot} 槽应被点亮，got ${got.length}`);
+    assert(got[0].tone === 'rare', `${slot} 色调应透到投影，got ${got[0].tone}`);
+  }
+  log('smoke-w7-004-dark-slots-light-up-end-to-end', { passed: true });
+}
+
+function smokeW7005DefaultInferenceUnchanged(): void {
+  // 不填 displaySlots 时，既有按归组推断的行为必须一字不变。
+  const st = w7RegisterStatus({
+    name: '经脉受损', description: '筑基失手留下的暗伤', category: 'debuff',
+    effects: [{ target_attribute: 'health', operation: 'add', value: -5 }],
+  }).content;
+  const entries = characterDisplayEntries({ activeStatuses: [st] } as any);
+  assert(entriesForSlot(entries, 'statusPage').length === 1, '推断槽位仍应工作');
+  assert(entriesForSlot(entries, 'inventoryPanel').length === 0, '未点名的槽位不该被默认推断点亮');
+  log('smoke-w7-005-default-inference-unchanged', { passed: true });
+}
+
+function smokeW7006PromptCarriesSlotVocabulary(): void {
+  // 生成侧此前从不知道 displaySlots 存在：Phase-K 的注册表与施加器零生产调用点。
+  const { systemPrompt } = w7AssembleZonePrompt({ systemIdentity: 'BASE_IDENTITY', includeFewShot: false });
+  assert(systemPrompt.includes('BASE_IDENTITY'), '原有身份段不该被增强器吃掉');
+  assert(systemPrompt.includes('Phase-K:slotMapping'), '系统提示词应带上槽位段（曾完全没接）');
+  for (const slot of ['topTags', 'inventoryPanel', 'combatPanel', 'worldLegacy']) {
+    assert(systemPrompt.includes(slot), `提示词应列出槽位名 ${slot}`);
+  }
+  log('smoke-w7-006-prompt-carries-slot-vocabulary', { passed: true });
+}
+
+function pgRunPhaseW7SlotWireSmokes(): void {
+  const cases = [
+    { name: 'smoke-w7-001-register-status-keeps-display-slots', fn: smokeW7001RegisterStatusKeepsDisplaySlots },
+    { name: 'smoke-w7-002-tone-render-hint-clamped', fn: smokeW7002ToneAndRenderHintClamped },
+    { name: 'smoke-w7-003-explicit-slot-survives-noise-filter', fn: smokeW7003ExplicitSlotSurvivesNoiseFilter },
+    { name: 'smoke-w7-004-dark-slots-light-up-end-to-end', fn: smokeW7004DarkSlotsLightUpEndToEnd },
+    { name: 'smoke-w7-005-default-inference-unchanged', fn: smokeW7005DefaultInferenceUnchanged },
+    { name: 'smoke-w7-006-prompt-carries-slot-vocabulary', fn: smokeW7006PromptCarriesSlotVocabulary },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && (e as any).message) || String(e) });
     }
   }
 }

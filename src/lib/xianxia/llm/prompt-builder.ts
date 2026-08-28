@@ -9,6 +9,34 @@ import {
 import { deriveWorldFactStateProfile } from '../event-scheduler';
 import { renderFewShotExamples } from '../prompt-examples';
 import { karmaNarrativeTone } from '../karma';
+// 2026-08-29 接线：Phase-K 造好了 snippet 注册表与施加器，却没有任何生产调用点去用
+// （phase-k-augmentation.ts 头注原话："were not actually wired into the live system prompt...
+// the call sites can use"）。结果生成侧从不知道 displaySlots 这个字段存在，
+// inventoryPanel / combatPanel / worldLegacy 三个槽位永久熄灭。
+// assembleZonePrompt 是 client.ts 与 generators.ts 唯一共同咽喉，接这一处即全线覆盖。
+// 方向安全：engine/ 从不 import llm/，故 llm → engine/validation 不成环。
+import { wireSlotMappingToLLMPrompt } from '../engine/validation';
+import { UI_SLOT_NAMES, UI_SLOT_TONES, UI_SLOT_RENDER_HINTS } from '../rules/ui-slot-rules';
+import { applyPhaseKLLMPromptAugmentation, registerPhaseKSlotMappingSnippet } from './phase-k-augmentation';
+
+// 词表来自规则表本身，不另造。每个槽位名给一条描述，
+// summarizeSlotMappingForPrompt 才能把七个槽位都列进 "registered displaySlots"。
+let slotVocabularyRegistered = false;
+function ensureSlotVocabularyRegistered() {
+  if (slotVocabularyRegistered) return;
+  slotVocabularyRegistered = true;
+  try {
+    const vocabulary = UI_SLOT_NAMES.map((slot, index) => ({
+      category: 'status',
+      displaySlots: [slot],
+      tone: UI_SLOT_TONES[index % UI_SLOT_TONES.length],
+      renderHint: UI_SLOT_RENDER_HINTS[index % UI_SLOT_RENDER_HINTS.length],
+    }));
+    registerPhaseKSlotMappingSnippet(wireSlotMappingToLLMPrompt(vocabulary));
+  } catch {
+    // 注册失败不该拖垮一次生成——退回未增强的提示词即可
+  }
+}
 
 // AI-61: L1 世界观文档注入 — 9 个 docs/world/*.md 读入并拼成 worldKnowledge 段
 // 2026-07-02: 新增 xianxia-common-sense.md 作为常识底色，每场剧情必加载
@@ -90,6 +118,7 @@ export interface ZonePromptParts {
 }
 
 export function assembleZonePrompt(parts: ZonePromptParts): { systemPrompt: string; userPrompt: string } {
+  ensureSlotVocabularyRegistered();
   const idBlock = parts.systemIdentity ?? IDENTITY_PROMPT;
   const sceneBlock = parts.sceneBehavior ?? '';
   const clsBlock = parts.inputClassification ?? '';
@@ -112,7 +141,7 @@ export function assembleZonePrompt(parts: ZonePromptParts): { systemPrompt: stri
   ] as (string | undefined)[]).filter(Boolean) as string[];
 
   return {
-    systemPrompt: systemChunks.join('\n\n'),
+    systemPrompt: applyPhaseKLLMPromptAugmentation(systemChunks.join('\n\n')),
     userPrompt: userChunks.join('\n\n'),
   };
 }

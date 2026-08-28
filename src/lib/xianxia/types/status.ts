@@ -97,6 +97,25 @@ export interface StatusEntry {
 
   constitution?: ConstitutionProfile;
 
+  // ==== 投影字段（2026-08-29 接线）====
+  // 生成侧可指定这条状态落到哪些界面槽位、用什么色调与形制呈现。
+  // 不填则由 display-registry.ts 的 slotsFromStatus / toneFromStatus 按归组推断，
+  // 那套推断只会产出 topTags / characterDetail / statusPage / threadPage 四种，
+  // 所以 inventoryPanel / combatPanel / worldLegacy 三个槽**只能靠这里显式点亮**。
+  //
+  // 词表边界：这三个字段的合法值与 rules/ui-slot-rules.ts 的
+  // UI_SLOT_NAMES / UI_SLOT_TONES / UI_SLOT_RENDER_HINTS 逐字相同，
+  // 由 registerStatus 在注册时按 UI_SLOT_RULES 剥离越界项 / 钳制到落点。
+  //
+  // 有意不含 displayGroup：ui-slot-rules 的归组词表是英文（identity/constitution/...），
+  // 而 display-registry 的 groupFromStatus 产出汉文（身份/体质/...），两套尚未合流
+  // （见 ui-slot-rules.ts 头注"批次二再收成一处"）。贸然接上会把汉文归组钳成 misc。
+  displaySlots?: string[];
+
+  tone?: string;
+
+  renderHint?: string;
+
 }
 
 

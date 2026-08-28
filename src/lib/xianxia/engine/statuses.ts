@@ -229,6 +229,13 @@ export function isMeaningfulStatus(status: Partial<StatusEntry> | null | undefin
   ) : [];
   if (effects.length > 0) return true;
 
+  // 2026-08-29 接线：生成侧显式点名了投影槽位，就是明确的呈现意图，按定义不是噪声。
+  // 少了这一条，无数值效果的纯叙事标签会在这里被滤掉，永远到不了 display-registry，
+  // 于是 InventoryPanel 注释里说的"物品 effect tag"根本没有活路——
+  // 那正是 inventoryPanel 槽位长期空白的最后一段成因。
+  // 注意这条只放行"进得了投影"，越界槽位名早在 registerStatus 就被剥离过了。
+  if (Array.isArray((status as any).displaySlots) && (status as any).displaySlots.length > 0) return true;
+
   // 少数标志性状态允许无数值效果：身份、命格、线索、重大奇缘等，供 AI 后续判断使用。
   const category = status.category;
   const text = `${status.name || ''} ${status.description || ''} ${status.source || ''}`;

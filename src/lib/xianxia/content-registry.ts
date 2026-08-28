@@ -9,6 +9,45 @@ import {
   WorldNpc,
 } from './types';
 
+// 2026-08-29 接线：状态的投影字段（displaySlots / tone / renderHint）此前在 registerStatus
+// 重建对象时被整段丢弃，导致 inventoryPanel / combatPanel / worldLegacy 三个槽位永久熄灭。
+// 这里按既有规则表处置越界值，不新造词表。
+// 只 import 这两个**叶子**模块：它们内部仅有 import type，编译后零运行时依赖，
+// 不会把 rules barrel（进而 hard-rules.ts）拉进来形成环。
+import { isWhitelisted } from './rules/whitelist';
+import { UI_SLOT_RULES, UI_SLOT_CLAMP_FALLBACK } from './rules/ui-slot-rules';
+
+// displaySlots 的处置是 strip：剥离越界项，其余照旧；全被剥掉则不落这个字段，
+// 交回 display-registry.ts 的 slotsFromStatus 按归组推断默认槽位。
+function normalizeDisplaySlots(raw: any, trace: ValidationTrace[]): string[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw)) {
+    trace.push({ severity: 'warning', code: 'invalid_type', field: 'displaySlots', message: 'displaySlots is not an array, dropped' });
+    return undefined;
+  }
+  const kept: string[] = [];
+  const dropped: string[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'string') { dropped.push(String(entry)); continue; }
+    if (!isWhitelisted(UI_SLOT_RULES.displaySlot, entry)) { dropped.push(entry); continue; }
+    if (!kept.includes(entry)) kept.push(entry);
+  }
+  if (dropped.length) {
+    trace.push({ severity: 'warning', code: 'invalid_type', field: 'displaySlots', message: `unknown displaySlots stripped: ${dropped.join(', ')}` });
+  }
+  return kept.length ? kept : undefined;
+}
+
+// tone / renderHint 的处置是 clamp：越界归一到落点，不丢字段。
+function clampToRule(raw: any, rule: typeof UI_SLOT_RULES.tone, fallback: string, field: string, trace: ValidationTrace[]): string | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const value = String(raw).trim();
+  if (!value) return undefined;
+  if (isWhitelisted(rule, value)) return value;
+  trace.push({ severity: 'warning', code: 'field_normalized', field, message: `invalid ${field} ${value}, normalized to ${fallback}` });
+  return fallback;
+}
+
 // 2026-07-12：NPC realm 标准化——AI 偶发写中文境界名（"凡人"/"炼气期"）落库后与英文 enum key 不匹配，
 // 这里做双向归一：英文 key 直接放行；中文标签 / 别名映射回标准 enum key。
 const REALM_NORMALIZE: Record<string, string> = {
@@ -243,6 +282,13 @@ export function registerStatus(raw: Partial<StatusEntry> | any, context: Registr
     source: asText(raw.source, context.source || 'content-registry', 80),
     effects: normalizeEffects(raw.effects, trace),
   };
+  // 投影字段：只在生成侧确实给了值时才落，不给就留空交给 display-registry 推断
+  const displaySlots = normalizeDisplaySlots(raw.displaySlots, trace);
+  if (displaySlots) status.displaySlots = displaySlots;
+  const tone = clampToRule(raw.tone, UI_SLOT_RULES.tone, UI_SLOT_CLAMP_FALLBACK.tone, 'tone', trace);
+  if (tone) status.tone = tone;
+  const renderHint = clampToRule(raw.renderHint, UI_SLOT_RULES.renderHint, UI_SLOT_CLAMP_FALLBACK.renderHint, 'renderHint', trace);
+  if (renderHint) status.renderHint = renderHint;
   return accept('status', status, trace);
 }
 
