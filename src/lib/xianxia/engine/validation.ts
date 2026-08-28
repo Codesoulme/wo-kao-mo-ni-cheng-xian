@@ -228,6 +228,19 @@ import {
   triggerEndingEvaluation,
 } from './ending-inheritance-fate';
 
+// 五层规则体系接线（第一层 whitelist 类）。
+// 只准 import 这两个**叶子**模块：它们内部仅有 import type，编译后零运行时依赖。
+// 不可改成 import from '../rules'（barrel）—— barrel 会拉起 rules/hard-rules.ts，
+// 而它在模块初始化期就读 engine/attributes 的 ATTRIBUTE_BOUNDS，
+// 与既存链 attributes → shared → ending-inheritance-fate → validation 成环，
+// 初始化期取值会拿到 undefined 并当场抛。详见 rules/whitelist.ts 顶注。
+import { checkWhitelist, isWhitelisted } from '../rules/whitelist';
+import {
+  UI_SLOT_RULES,
+  UI_SLOT_CATEGORIES,
+  UI_SLOT_CLAMP_FALLBACK,
+} from '../rules/ui-slot-rules';
+
 export function validateCrossSystemContinuity(
   character: any,
   inheritanceChain: InheritanceChain | null,
@@ -486,68 +499,18 @@ export function summarizeContinuityForPrompt(
 // summary that can be injected into the LLM system prompt.
 
 // Canonical sets - must stay in sync with display-registry.ts.
-const SLOT_BOUNDARY_KNOWN_SLOTS: ReadonlyArray<string> = [
-  "topTags",
-  "characterDetail",
-  "statusPage",
-  "threadPage",
-  "combatPanel",
-  "inventoryPanel",
-  "worldLegacy",
-];
-const SLOT_BOUNDARY_KNOWN_TONES: ReadonlyArray<string> = [
-  "neutral",
-  "good",
-  "bad",
-  "rare",
-  "danger",
-  "mystery",
-];
-const SLOT_BOUNDARY_KNOWN_RENDER_HINTS: ReadonlyArray<string> = [
-  "badge",
-  "card",
-  "meter",
-  "timeline",
-  "action",
-  "detail",
-];
-// Whitelisted display groups (matches groupFromStatus in display-registry.ts).
-const SLOT_BOUNDARY_KNOWN_GROUPS: ReadonlyArray<string> = [
-  "identity",
-  "constitution",
-  "attribute",
-  "fate",
-  "debuff",
-  "buff",
-  "misc",
-];
-// Whitelisted categories (the engine creates these; AI should pick from this
-// list or rely on inference / clamping).
-const SLOT_BOUNDARY_KNOWN_CATEGORIES: ReadonlyArray<string> = [
-  "attribute",
-  "status",
-  "special",
-  "identity",
-  "quest",
-  "thread",
-  "fate",
-  "injury",
-  "buff",
-  "debuff",
-  "constitution",
-  "item",
-  "technique",
-  "realm",
-  "misc",
-  "uncategorized",
-];
-
-// Quick-lookup sets (built once at module load).
-const SLOT_BOUNDARY_SLOT_SET: Set<string> = new Set(SLOT_BOUNDARY_KNOWN_SLOTS);
-const SLOT_BOUNDARY_TONE_SET: Set<string> = new Set(SLOT_BOUNDARY_KNOWN_TONES);
-const SLOT_BOUNDARY_RENDER_HINT_SET: Set<string> = new Set(SLOT_BOUNDARY_KNOWN_RENDER_HINTS);
-const SLOT_BOUNDARY_GROUP_SET: Set<string> = new Set(SLOT_BOUNDARY_KNOWN_GROUPS);
-const SLOT_BOUNDARY_CATEGORY_SET: Set<string> = new Set(SLOT_BOUNDARY_KNOWN_CATEGORIES);
+//
+// 【规则表接线】这五张词表的正本已迁到 src/lib/xianxia/rules/ui-slot-rules.ts，
+// 表达为五条第一层 whitelist 硬规则：
+//   UI_SLOT_RULES.category / displayGroup / displaySlot / tone / renderHint
+// 词表内容与顺序与迁移前逐字一致 —— 顺序要紧，clampCategoryToKnownSlot 有
+// Array.from(known)[0] 这条顺序敏感的落点。
+// 收益：这批判定从此可查询（哪些值在册 / 处置是钳还是剥 / 可否被局部覆盖），
+// 经 rules/registry.ts 的 queryRule 一次问清，不必读本文件的函数体。
+//
+// 判定一律走 checkWhitelist / isWhitelisted，本文件不再各自建 Set。
+// 每处替换都发生在**值已被 typeof 收窄为 string** 之后，
+// 故与原先的 Set.has 逐字等价（差分对照见 smoke-w4 用例）。
 
 // 1) validateUISlotMapping
 //  - slot: a partial slot mapping that AI / pipeline produced
@@ -575,10 +538,14 @@ export function validateUISlotMapping(slot: UISlotMappingInput | null | undefine
   let valid = true;
 
   // category: required, must be in whitelist
+  // 【规则表接线点】membership 判定改走第一层规则 UI_SLOT_RULES.category。
+  // checkWhitelist 返回判词表示不在册、返回 null 表示在册；
+  // 此处 slot.category 已被上一分支收窄为非空 string，故与原 Set.has 等价。
+  // 告警字面量一字未改 —— 这是重构，不是玩法改动。
   if (typeof slot.category !== "string" || slot.category.length === 0) {
     warnings.push("category_missing");
     valid = false;
-  } else if (!SLOT_BOUNDARY_CATEGORY_SET.has(slot.category)) {
+  } else if (checkWhitelist(UI_SLOT_RULES.category, slot.category) !== null) {
     warnings.push("category_unknown:" + slot.category);
     valid = false;
   }
@@ -586,7 +553,7 @@ export function validateUISlotMapping(slot: UISlotMappingInput | null | undefine
   // displayGroup: recommended, must be in whitelist when present
   if (slot.displayGroup === undefined || slot.displayGroup === null || slot.displayGroup === "") {
     warnings.push("displayGroup_missing");
-  } else if (typeof slot.displayGroup !== "string" || !SLOT_BOUNDARY_GROUP_SET.has(slot.displayGroup)) {
+  } else if (typeof slot.displayGroup !== "string" || !isWhitelisted(UI_SLOT_RULES.displayGroup, slot.displayGroup)) {
     warnings.push("displayGroup_unknown:" + String(slot.displayGroup));
   }
 
@@ -607,7 +574,7 @@ export function validateUISlotMapping(slot: UISlotMappingInput | null | undefine
         valid = false;
         continue;
       }
-      if (!SLOT_BOUNDARY_SLOT_SET.has(s)) {
+      if (!isWhitelisted(UI_SLOT_RULES.displaySlot, s)) {
         warnings.push("displaySlots_unknown:" + s);
         valid = false;
       }
@@ -621,14 +588,14 @@ export function validateUISlotMapping(slot: UISlotMappingInput | null | undefine
   // tone: must be in whitelist when present
   if (slot.tone === undefined || slot.tone === null) {
     warnings.push("tone_missing");
-  } else if (typeof slot.tone !== "string" || !SLOT_BOUNDARY_TONE_SET.has(slot.tone)) {
+  } else if (typeof slot.tone !== "string" || !isWhitelisted(UI_SLOT_RULES.tone, slot.tone)) {
     warnings.push("tone_unknown:" + String(slot.tone));
   }
 
   // renderHint: must be in whitelist when present
   if (slot.renderHint === undefined || slot.renderHint === null) {
     warnings.push("renderHint_missing");
-  } else if (typeof slot.renderHint !== "string" || !SLOT_BOUNDARY_RENDER_HINT_SET.has(slot.renderHint)) {
+  } else if (typeof slot.renderHint !== "string" || !isWhitelisted(UI_SLOT_RULES.renderHint, slot.renderHint)) {
     warnings.push("renderHint_unknown:" + String(slot.renderHint));
   }
 
@@ -653,42 +620,45 @@ export function clampCategoryToKnownSlot(
   const base: UISlotMappingInput = slot && typeof slot === "object" ? { ...slot } : {};
   const known: Set<string> = knownCategories instanceof Set
     ? knownCategories
-    : (Array.isArray(knownCategories) ? new Set(knownCategories) : new Set(SLOT_BOUNDARY_KNOWN_CATEGORIES));
+    : (Array.isArray(knownCategories) ? new Set(knownCategories) : new Set(UI_SLOT_CATEGORIES));
 
   const original = typeof base.category === "string" ? base.category : "";
   let fallbackUsed = false;
   if (!original || !known.has(original)) {
     // Pick the best fallback the caller is willing to accept.
-    if (known.has("misc")) {
-      base.category = "misc";
-    } else if (known.has("uncategorized")) {
-      base.category = "uncategorized";
+    // 落点字面量取自规则表 UI_SLOT_CLAMP_FALLBACK，值与迁移前完全相同。
+    if (known.has(UI_SLOT_CLAMP_FALLBACK.category)) {
+      base.category = UI_SLOT_CLAMP_FALLBACK.category;
+    } else if (known.has(UI_SLOT_CLAMP_FALLBACK.categorySecondary)) {
+      base.category = UI_SLOT_CLAMP_FALLBACK.categorySecondary;
     } else if (known.size > 0) {
       base.category = Array.from(known)[0]!;
     } else {
-      base.category = "misc";
+      base.category = UI_SLOT_CLAMP_FALLBACK.category;
     }
     fallbackUsed = true;
   }
 
   // Also clamp displayGroup if it is not in the global group set, but DO NOT
   // drop it - fall back to "misc" so the slot is still renderable.
-  if (base.displayGroup && !SLOT_BOUNDARY_GROUP_SET.has(base.displayGroup)) {
-    base.displayGroup = "misc";
+  if (base.displayGroup && !isWhitelisted(UI_SLOT_RULES.displayGroup, base.displayGroup)) {
+    base.displayGroup = UI_SLOT_CLAMP_FALLBACK.displayGroup;
   }
 
   // Filter displaySlots to known slots; if everything is filtered out, leave
   // an empty array (the caller is responsible for picking a default).
+  // 这里的处置是 strip（剥离越界项，其余照旧），与 UI_SLOT_RULES.displaySlot
+  // 声明的 disposition='strip' 对应；上面几处是 clamp（归一到落点）。
   if (Array.isArray(base.displaySlots)) {
-    base.displaySlots = base.displaySlots.filter((s) => typeof s === "string" && SLOT_BOUNDARY_SLOT_SET.has(s));
+    base.displaySlots = base.displaySlots.filter((s) => typeof s === "string" && isWhitelisted(UI_SLOT_RULES.displaySlot, s));
   }
 
   // Clamp tone / renderHint to the global whitelists.
-  if (base.tone && !SLOT_BOUNDARY_TONE_SET.has(base.tone)) {
-    base.tone = "neutral";
+  if (base.tone && !isWhitelisted(UI_SLOT_RULES.tone, base.tone)) {
+    base.tone = UI_SLOT_CLAMP_FALLBACK.tone;
   }
-  if (base.renderHint && !SLOT_BOUNDARY_RENDER_HINT_SET.has(base.renderHint)) {
-    base.renderHint = "badge";
+  if (base.renderHint && !isWhitelisted(UI_SLOT_RULES.renderHint, base.renderHint)) {
+    base.renderHint = UI_SLOT_CLAMP_FALLBACK.renderHint;
   }
 
   return { clampedSlot: base, fallbackUsed };
