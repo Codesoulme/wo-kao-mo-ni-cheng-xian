@@ -461,10 +461,15 @@ function smokeT025DeriveLifespanMortal(): void {
   // computed = 80 × 1.0 × (1 + 100/100*0.5) × (1 + 0.15 + 0.10) = 80 × 1.5 × 1.25 = 150
   const highMul = mod.deriveLifespanFromState({ realm: 'mortal', rootMultiplier: 1.0, physicalFoundation: 100 }, { lineageBoost: 0.15, ethnicityBoost: 0.10 });
   assert(highMul > 80, `sect_heir mortal should be > 80, got ${highMul}`);
-  // 体魄 200 + bodyMul 2.0 + 灵根 0.5 → 80 × 0.5 × 2.0 × 1.0 = 80，与 lowMul 相等（公式正确）
-  // 改测：体魄 200 + 灵根 0.7 → 80 × 0.7 × 2.0 = 112
+  // 凡人 80 是硬顶：体魄再高也不抬寿元。见 realm-lifespan.ts:150-152 的 Phase-Release 决定——
+  // 旧断言要的"体魄 200 → 112"正是被刻意废掉的行为（体魄从 5 涨到 200 曾把凡人寿命推到 160-240）。
   const bodyBoost = mod.deriveLifespanFromState({ realm: 'mortal', rootMultiplier: 0.7, physicalFoundation: 200, lifespan: 80 });
-  assert(bodyBoost > lowMul, `body boost should raise lifespan: ${lowMul} → ${bodyBoost}`);
+  assert(bodyBoost === lowMul, `凡人体魄不该抬寿元，应恒为 ${lowMul}，got ${bodyBoost}`);
+  // 凡人破 80 只剩三条明路：血脉软加成(上面 highMul 已验)、传承池、延寿物品
+  const heritage = mod.deriveLifespanFromState({ realm: 'mortal', rootMultiplier: 0.3, physicalFoundation: 0, lifespan: 80 }, { heritageBonus: 20 });
+  assert(heritage === 100, `传承池 +20 应到 100，got ${heritage}`);
+  const itemBoost = mod.deriveLifespanFromState({ realm: 'mortal', rootMultiplier: 0.3, physicalFoundation: 0, lifespan: 80 }, { itemsDelta: 30 });
+  assert(itemBoost === 110, `延寿物品 +30 应到 110，got ${itemBoost}`);
   log('smoke-t-025-derive-lifespan-mortal', { passed: true });
 }
 
@@ -14744,8 +14749,11 @@ function smokeEcsAdvance003WorldTick(): void {
   // applyEcsTickToState 必须把 ECS 结果合并回 state（等价 advance 旧的"覆盖 finalState.age/cultivationExp"逻辑）
   assert(/state\.age\s*=\s*result\.age/.test(helperSrc) || /\(state\s+as\s+T\)\.age\s*=\s*result\.age/.test(helperSrc), 'applyEcsTickToState should set state.age = result.age');
   assert(/state\.cultivationExp\s*=\s*result\.cultivationExp/.test(helperSrc) || /\(state\s+as\s+T\)\.cultivationExp\s*=\s*result\.cultivationExp/.test(helperSrc), 'applyEcsTickToState should set state.cultivationExp = result.cultivationExp');
-  // ECS 死亡兜底
-  assert(/'ecs-aging-natural'/.test(helperSrc), 'applyEcsTickToState should default causeOfDeath=ecs-aging-natural on ECS death');
+  // ECS 死亡兜底：只验"有兜底"，不锁字面量。
+  // causeOfDeath 直接渲染给玩家（GameMenu.tsx「已陨落 · {causeOfDeath}」、DeathGuidancePanel），
+  // 按项目约束必须是叙事中文。旧断言锁的 'ecs-aging-natural' 是内部代号，会漏到玩家眼前，已随实现改正。
+  assert(/state\.causeOfDeath\s*=\s*state\.causeOfDeath\s*\|\|/.test(helperSrc), 'applyEcsTickToState should keep a causeOfDeath fallback on ECS death');
+  assert(!/['"]ecs-[a-z-]+['"]/.test(helperSrc), 'causeOfDeath 兜底不许把内部代号投给玩家');
   // advance 路由必须把 helper 结果合并回 finalState
   assert(/applyEcsTickToState\(finalState/.test(advanceSrc), 'advance route should call applyEcsTickToState(finalState, ...)');
 
