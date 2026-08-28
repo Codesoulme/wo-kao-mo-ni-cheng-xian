@@ -23,7 +23,9 @@ export type EventType =
   | 'character.settlement-result.set'
   | 'character.streaming-narrative.started'
   // Phase-α 批 1 α-1: 沉浸版 PoC——雷劫判定事件
-  | 'character.tribulation.attempted';
+  | 'character.tribulation.attempted'
+  // Phase-α 批 1 α-2: 善恶轴事件——事件结算时命中善举/杀业词条产生的一笔功过
+  | 'character.karma.shifted';
 
 // EventData 是 discriminated union——`type` 字段做判别式。
 // 命名规则：所有 event data 字段都用 `newValue`/`to` 表示"终态"，`delta`/`from` 表示"变化量"。
@@ -47,7 +49,9 @@ export type EventData =
   | { type: 'character.settlement-result.set'; settlement: any }
   | { type: 'character.streaming-narrative.started'; eventIndex: number; placeholderId: string }
   // Phase-α 批 1 α-1: 沉浸版 PoC——雷劫判定事件 payload
-  | { type: 'character.tribulation.attempted'; fromRealm: string; toRealm: string; outcome: 'success' | 'fall_realm' | 'severe' | 'fatal'; kind: string; difficulty: number; hpDelta: number; cause: string; karmaShift?: KarmaShiftPayload };
+  | { type: 'character.tribulation.attempted'; fromRealm: string; toRealm: string; outcome: 'success' | 'fall_realm' | 'severe' | 'fatal'; kind: string; difficulty: number; hpDelta: number; cause: string; karmaShift?: KarmaShiftPayload }
+  // Phase-α 批 1 α-2: 善恶轴事件 payload——newValue 语义（karma/merit/sin 为落地终态）
+  | { type: 'character.karma.shifted'; karmaShift: KarmaShiftPayload; newKarma: number; newMerit: number; newSin: number; eventTitle?: string };
 
 // ==================== Phase-α 批 1 α-2: 因果业力事件 payload ====================
 

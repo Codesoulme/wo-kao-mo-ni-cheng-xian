@@ -561,6 +561,11 @@ interface ExecCtx {
   breakthroughReasonAccepted: boolean;
   died: boolean;
   deathReason?: string;
+  /**
+   * 本次结算里「渡劫」那条支路是否已经记过一笔功过。
+   * 记过就不再让 procKarmaShift 二次落账——同一件事不能被算两遍善恶。
+   */
+  karmaShiftedByTribulation: boolean;
   collectItemResolve(resolved: ItemEffectResolveResult): void;
   // 2026-07-12：收集本次实际从 inventory/equipped 被移除的物品 id，供显示层渲染"失去：XXX"chip
   removedItemIds: string[];
@@ -880,6 +885,8 @@ const procBreakthrough: AIEventProcessor = (ctx) => {
           karmaDelta: tribKarmaDelta.karma - next.karma,
           reason: tribulationResult.outcome === 'success' ? '渡过天劫善缘有感' : (tribulationResult.outcome === 'severe' ? '天劫重创业火缠身' : '天劫之下罪业浮现'),
         } : undefined;
+        // 渡劫这笔功过已入账（进事件流），标记之，procKarmaShift 见此即让位，避免同事件双记。
+        if (karmaShiftPayload) ctx.karmaShiftedByTribulation = true;
         if (!(next as any).__shadowRun) appendEvent({
           characterId: next.id,
           type: 'character.tribulation.attempted',
@@ -1013,6 +1020,94 @@ const procPets: AIEventProcessor = (ctx) => {
   }
 };
 
+// α-2 善恶轴接线：本次事件里角色做了什么，决定功过如何走。
+// 位置说明（为何排在线索/战斗/灵宠之后、procFinalize 之前）：
+//   - 要等 procThreadProgress 把「完成 / 失败」的线索结算完，才能拿到本次真正了结的旧因缘标题；
+//   - 又必须早于 procFinalize，让 refreshWorldFacts / 因果打点看到的是已落账的善恶轴。
+// 判定输入从哪来：AIEventOutput 没有专门的 tags 字段，故按 recordEventCausality 的既有做法就地拼装——
+//   tags  ← 新线索标题+类别 / 新状态名 / 本次了结或失手的旧线索标题
+//   aiTag ← eventType
+//   cause ← 标题 + 记忆 + 因果摘要 + 叙事（玩家实际做的事都写在这里）
+// 全部可能为空：拼不出任何词条时 computeKarmaShiftFromEvent 返回 null，本处直接零变化返回（兜底）。
+// 上下界不自己写：merit/sin 单调与 karma 的 -1..+1 钳制一律走 applyKarmaDelta。
+const procKarmaShift: AIEventProcessor = (ctx) => {
+  // 渡劫已在本次结算里记过一笔，不重复累加
+  if (ctx.karmaShiftedByTribulation) return;
+  const { aiOutput } = ctx;
+  const tags: string[] = [];
+  for (const t of aiOutput.newThreads || []) {
+    if (t?.title) tags.push(String(t.title));
+    if (t?.category) tags.push(String(t.category));
+  }
+  for (const s of aiOutput.newStatuses || []) {
+    if (s?.name) tags.push(String(s.name));
+  }
+  const settledIds = [...(aiOutput.completeThreadIds || []), ...(aiOutput.failThreadIds || [])];
+  if (settledIds.length) {
+    for (const thread of ctx.state.pendingThreads || []) {
+      if (thread?.id && settledIds.includes(thread.id) && thread.title) tags.push(String(thread.title));
+    }
+  }
+  const cause = [aiOutput.title, aiOutput.memory, aiOutput.causalSummary, aiOutput.narrative]
+    .filter((v): v is string => typeof v === 'string' && v.length > 0)
+    .join('；')
+    .slice(0, 2000);
+
+  const shift = computeKarmaShiftFromEvent({
+    type: aiOutput.eventType,
+    tags,
+    aiTag: aiOutput.eventType,
+    cause,
+  });
+  if (!shift) return;
+
+  const before = {
+    karma: Number(ctx.next.karma || 0),
+    merit: Number(ctx.next.merit || 0),
+    sin: Number(ctx.next.sin || 0),
+  };
+  const applied = applyKarmaDelta(before, { meritDelta: shift.meritDelta, sinDelta: shift.sinDelta });
+  if (!applied.applied) return;
+  ctx.next = { ...ctx.next, karma: applied.karma, merit: applied.merit, sin: applied.sin };
+
+  ctx.effectResolveTrace.push({
+    severity: 'info',
+    code: 'karma_shift_from_event',
+    attribute: '*',
+    message: `Karma shift from event: merit ${before.merit}->${applied.merit}, sin ${before.sin}->${applied.sin}, karma ${before.karma.toFixed(3)}->${applied.karma.toFixed(3)} (${shift.reason})`,
+    source: aiOutput.title || 'karma-shift',
+  });
+
+  // 落库副作用：与雷劫那处同规矩——影子试算期一律不写，免得试算污染真实事件流。
+  const nextState = ctx.next;
+  if (!(nextState as any).__shadowRun && nextState.id) {
+    const payload: KarmaShiftPayload = {
+      meritDelta: Number(shift.meritDelta || 0),
+      sinDelta: Number(shift.sinDelta || 0),
+      karmaDelta: applied.karma - before.karma,
+      reason: shift.reason,
+    };
+    appendEvent({
+      characterId: nextState.id,
+      type: 'character.karma.shifted',
+      data: {
+        type: 'character.karma.shifted',
+        karmaShift: payload,
+        newKarma: applied.karma,
+        newMerit: applied.merit,
+        newSin: applied.sin,
+        eventTitle: aiOutput.title || undefined,
+      },
+      source: 'ai-output',
+      triggerActor: 'player',
+      createdAtAge: nextState.age,
+    }).catch((e: unknown) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[karma α-2] appendEvent failed (non-fatal): ${msg}`);
+    });
+  }
+};
+
 // 8. 角色主动意图重新生成（每岁重算）+ 世界事实刷新 + 因果打点
 const procFinalize: AIEventProcessor = (ctx) => {
   ctx.next.pendingThreads = normalizeThreadsCompletion(ctx.next.pendingThreads || []);
@@ -1045,6 +1140,7 @@ const AI_EVENT_PROCESSORS: AIEventProcessor[] = [
   procThreadProgress,
   procCombatTrigger,
   procPets,
+  procKarmaShift,
   procFinalize,
 ];
 
@@ -1067,6 +1163,7 @@ export function executeAIEvent(state: CharacterState, aiOutput: AIEventOutput): 
     breakthroughReasonAccepted: false,
     died: false,
     deathReason: undefined,
+    karmaShiftedByTribulation: false,
     removedItemIds: [],
     collectItemResolve(resolved: ItemEffectResolveResult) {
       this.appliedChanges.push(...resolved.appliedChanges);

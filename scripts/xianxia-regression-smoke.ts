@@ -6075,6 +6075,15 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseEsIntegrationSmokes();
       // 批 22: page.tsx 主 tab 重构（5 个新 tab：道途/命途/传承/人情/修行）— 5 个静态 smoke
       pgRunPhaseTabRestructureSmokes();
+      // ===== 分层架构改造批 · 调用锚点（各 worker 只准动自己那一行下方）=====
+      // [ANCHOR-CALL-W3] 死码接线（业力 / 命理回响）测例组调用插此行下方
+      pgRunW3DeadCodeWiringSmokes();
+      // [ANCHOR-CALL-W4] 五层规则体系测例组调用插此行下方
+      // 五层规则体系（元元 / 硬 / 软 / 覆盖 / 兜底）+ UI 槽位词表接线等价性 — 16 个静态 smoke
+      pgRunW4RuleLayersSmokes();
+      // [ANCHOR-CALL-W6] 逆向因果解释器测例组调用插此行下方
+      // 逆向因果解释器（只圆引擎判定拆了账面一致性那一小类）— 7 个静态 smoke，全程 mock 不真调模型
+      pgRunPhaseW6RetroCausalSmokes();
       // ===== Phase-Z (TechDoc 18.6.7): 测试策略改进（属性测试 + AI 回归 fixture）=====
       // 独立 console.log，不计入主 smoke 计数（不破 430 pass）。
       // 同步 require + try/catch：smoke 同步执行流，不引入 async 改动。
@@ -15259,6 +15268,978 @@ function pgRunPhaseAlphaTribulationSmokes(): void {
     try {
       c.fn();
       log(c.name, { passed: true });
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ============================================================================
+// 分层架构改造批 · 测例定义锚点
+// 三个区块各由一个 worker 独占，函数定义与 runner 都写在自己区块内，勿越界。
+// ============================================================================
+
+// ===== [ANCHOR-DEF-W3] 死码接线（业力 / 命理回响）测例定义写此行下方 =====
+
+// W3 公用：造一份最小可用角色状态。
+// 一律不给 id（除专门验闸门那条），executeAIEvent 里的 appendEvent 需要 id，缺 id 即不落库，
+// 免得 smoke 往共享 SQLite 里写事件。
+function w3MakeState(overrides: Record<string, unknown> = {}): any {
+  return {
+    name: '朱玩',
+    age: 20,
+    lifespan: 80,
+    realm: 'qi_refining',
+    realmLevel: 2,
+    spiritualRoot: 'common',
+    rootDetail: '双灵根',
+    cultivationExp: 10,
+    expToBreak: 100,
+    hp: 100, maxHp: 100, mp: 50, maxMp: 50,
+    attack: 10, defense: 5, speed: 10,
+    luck: 50, comprehension: 50,
+    spiritStones: 0, reputation: 0,
+    alive: true, ascended: false,
+    causeOfDeath: '', faction: '', master: '', location: '槐树村',
+    fateNodes: [], isAtChoice: false,
+    activeStatuses: [], inventory: [], equipped: [], storageCapacity: 5,
+    elements: { metal: 20, wood: 20, water: 20, fire: 20, earth: 20 },
+    pendingThreads: [], characterIntents: [],
+    heartDemon: 0,
+    karma: 0, merit: 0, sin: 0,
+    longTermMemory: [],
+    ...overrides,
+  };
+}
+
+function w3MakeOutput(overrides: Record<string, unknown> = {}): any {
+  return {
+    title: '无名事',
+    narrative: '这一年平平淡淡，无甚可记。',
+    eventType: 'normal',
+    changes: [],
+    newStatuses: [],
+    newItems: [],
+    memory: '',
+    hasChoice: false,
+    newThreads: [],
+    advanceThreads: [],
+    completeThreadIds: [],
+    failThreadIds: [],
+    ...overrides,
+  };
+}
+
+function w3KarmaTrace(result: any): any[] {
+  return (result.effectResolveTrace || []).filter((t: any) => t && t.code === 'karma_shift_from_event');
+}
+
+// 善举叙事 → 功过真落账（接线核心断言）
+function smokeW3KarmaMeritWired(): void {
+  const result = executeAIEvent(w3MakeState(), w3MakeOutput({
+    title: '救人于野',
+    narrative: '朱玩在山道上救人一命，又以余粮济世，未取分毫报偿。',
+    memory: '救人一命',
+  }));
+  const s: any = result.state;
+  assert(s.merit === 1, `善举应 merit=1，got=${s.merit}`);
+  assert(s.sin === 0, `善举不应加 sin，got=${s.sin}`);
+  assert(s.karma > 0, `善举应 karma>0，got=${s.karma}`);
+  assert(w3KarmaTrace(result).length === 1, `应留一条内部 trace，got=${w3KarmaTrace(result).length}`);
+  log('smoke-w3-001-karma-merit-wired', { passed: true, karma: s.karma, merit: s.merit });
+}
+
+// 杀业叙事 → 罪业落账，且 karma 走负
+function smokeW3KarmaSinWired(): void {
+  const result = executeAIEvent(w3MakeState({ karma: 0, merit: 0, sin: 4 }), w3MakeOutput({
+    title: '血洗别院',
+    narrative: '朱玩率众灭门别院，屠戮满庭，血气三日不散。',
+    eventType: 'combat',
+  }));
+  const s: any = result.state;
+  assert(s.sin === 5, `杀业应 sin=5，got=${s.sin}`);
+  assert(s.merit === 0, `杀业不应加 merit，got=${s.merit}`);
+  assert(s.karma < 0, `杀业应 karma<0，got=${s.karma}`);
+  log('smoke-w3-002-karma-sin-wired', { passed: true, karma: s.karma, sin: s.sin });
+}
+
+// 无词条命中 → 零变化兜底（tags 空 / 叙事无善恶）
+function smokeW3KarmaNoHitFallback(): void {
+  const before = w3MakeState({ karma: 0.3, merit: 6, sin: 2 });
+  const result = executeAIEvent(before, w3MakeOutput({
+    title: '路过市集',
+    narrative: '朱玩路过市集，看了一场杂耍，买了两个炊饼便回。',
+  }));
+  const s: any = result.state;
+  assert(s.karma === 0.3 && s.merit === 6 && s.sin === 2,
+    `无命中应原样不动，got karma=${s.karma} merit=${s.merit} sin=${s.sin}`);
+  assert(w3KarmaTrace(result).length === 0, '无命中不应留 trace');
+  log('smoke-w3-003-karma-no-hit-fallback', { passed: true });
+}
+
+// 功过相抵（大义灭亲）+ 上下界一律走 applyKarmaDelta：外部脏值也被收进 -1..+1
+function smokeW3KarmaRedeemAndClamp(): void {
+  const result = executeAIEvent(w3MakeState({ karma: 9, merit: 0, sin: 0 }), w3MakeOutput({
+    title: '大义灭亲',
+    narrative: '朱玩亲手了结叛出师门的族兄，正道伏魔，心中却空落一片。',
+    eventType: 'combat',
+  }));
+  const s: any = result.state;
+  assert(s.merit === 1 && s.sin === 1, `相抵应 merit=1 sin=1，got=${s.merit}/${s.sin}`);
+  assert(s.karma >= -1 && s.karma <= 1, `karma 必须落在 -1..1，got=${s.karma}`);
+  assert(Math.abs(s.karma) < 1e-9, `功过相抵后应回中性，got=${s.karma}`);
+
+  // 单次事件最多记一笔：连跑 12 次善举，merit 应线性 12 且 karma 不越界
+  let st: any = w3MakeState();
+  for (let i = 0; i < 12; i++) {
+    st = executeAIEvent(st, w3MakeOutput({ title: '渡化路人', narrative: '朱玩沿途渡化迷途之人，传法不倦。' })).state;
+  }
+  assert(st.merit === 12, `12 次善举应 merit=12，got=${st.merit}`);
+  assert(st.karma > 0 && st.karma <= 1, `累积 karma 应在 0..1，got=${st.karma}`);
+  log('smoke-w3-004-karma-redeem-and-clamp', { passed: true, karma: st.karma, merit: st.merit });
+}
+
+// 影子试算：状态照算（试算要如实反映后果），落库副作用被 __shadowRun 挡住
+function smokeW3KarmaShadowRunGate(): void {
+  const shadow = w3MakeState({ id: 'char_w3_shadow', __shadowRun: true });
+  const result = executeAIEvent(shadow, w3MakeOutput({
+    title: '救人于野',
+    narrative: '朱玩救人一命，未取报偿。',
+  }));
+  const s: any = result.state;
+  assert(s.merit === 1, `影子试算里状态仍应照算，got merit=${s.merit}`);
+  assert((shadow as any).merit === 0, '影子试算不得改写传入 state');
+
+  const src = readModuleSource('src/lib/xianxia/engine.ts');
+  const idx = src.indexOf("type: 'character.karma.shifted'");
+  assert(idx > 0, 'engine 里应有 character.karma.shifted 落库调用');
+  const guardWindow = src.slice(Math.max(0, idx - 900), idx);
+  assert(/__shadowRun/.test(guardWindow), 'karma 落库前必须有 __shadowRun 闸门');
+  log('smoke-w3-005-karma-shadow-run-gate', { passed: true });
+}
+
+// 与渡劫那笔不重复累加 + 处理器排位（procPets → procKarmaShift → procFinalize）
+function smokeW3KarmaNoDoubleCountWithTribulation(): void {
+  const src = readModuleSource('src/lib/xianxia/engine.ts');
+  assert(/karmaShiftedByTribulation/.test(src), '应有渡劫记账标记');
+  assert(/if \(ctx\.karmaShiftedByTribulation\) return;/.test(src), 'procKarmaShift 应在渡劫已记账时让位');
+  const order = /procPets,\s*procKarmaShift,\s*procFinalize,/.test(src);
+  assert(order, 'procKarmaShift 应排在 procPets 之后、procFinalize 之前');
+
+  // 同一事件里既有杀业词又触发突破：仍只记一笔（此处未成真突破，故走 procKarmaShift 这一笔）
+  const result = executeAIEvent(w3MakeState(), w3MakeOutput({
+    title: '灭门之后',
+    narrative: '朱玩灭门归来，一夜之间气机暴涨。',
+    eventType: 'breakthrough',
+  }));
+  const s: any = result.state;
+  assert(s.sin === 1, `同一事件只应记一笔罪业，got sin=${s.sin}`);
+  assert(w3KarmaTrace(result).length === 1, `同一事件只应留一条 trace，got=${w3KarmaTrace(result).length}`);
+  log('smoke-w3-006-karma-no-double-count', { passed: true, sin: s.sin });
+}
+
+// 命理回响两函数：本批判定为「不具备接线条件」，此测例把理由钉成回归护栏——
+// 一旦有人给 FateWeb 补了持久化通道（DB 列 / JSON 字段 / state 字段），这条会失败，提醒重开接线。
+function smokeW3FateEchoNotWirableYet(): void {
+  const fateSrc = readFileSync('src/lib/xianxia/engine/ending-inheritance-fate.ts', 'utf-8');
+  assert(/export function resolveFateEcho\(/.test(fateSrc), 'resolveFateEcho 应仍在');
+  assert(/export function propagateFateConsequences\(/.test(fateSrc), 'propagateFateConsequences 应仍在');
+
+  // 理由 1：FateWeb 没有任何持久化落点（schema 无列、无 JSON 字段）
+  const schema = readFileSync('prisma/schema.prisma', 'utf-8');
+  assert(!/fateWebJson|fateEchoJson|fateResolutionsJson/.test(schema),
+    'schema 已有命运网落点 → 应重启 propagateFateConsequences 接线');
+
+  // 理由 2：CharacterState 上也没有承载字段
+  const charTypes = readFileSync('src/lib/xianxia/types/character.ts', 'utf-8');
+  assert(!/\bfateWeb\b/.test(charTypes), 'CharacterState 已有 fateWeb → 应重启接线');
+
+  // 理由 3：resolveFateEcho 的结果没有任何会改写状态的消费方（唯一 echo 生产者只喂一个停用面板）
+  const timeline = readFileSync('src/lib/xianxia/yinyuan-timeline.ts', 'utf-8');
+  assert(/detectFateEchoes/.test(timeline), '唯一 echo 生产链应仍在 yinyuan-timeline');
+  log('smoke-w3-007-fate-echo-not-wirable-yet', { passed: true });
+}
+
+function pgRunW3DeadCodeWiringSmokes(): void {
+  const cases = [
+    { name: 'smoke-w3-001-karma-merit-wired', fn: smokeW3KarmaMeritWired },
+    { name: 'smoke-w3-002-karma-sin-wired', fn: smokeW3KarmaSinWired },
+    { name: 'smoke-w3-003-karma-no-hit-fallback', fn: smokeW3KarmaNoHitFallback },
+    { name: 'smoke-w3-004-karma-redeem-and-clamp', fn: smokeW3KarmaRedeemAndClamp },
+    { name: 'smoke-w3-005-karma-shadow-run-gate', fn: smokeW3KarmaShadowRunGate },
+    { name: 'smoke-w3-006-karma-no-double-count', fn: smokeW3KarmaNoDoubleCountWithTribulation },
+    { name: 'smoke-w3-007-fate-echo-not-wirable-yet', fn: smokeW3FateEchoNotWirableYet },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+    } catch (e: any) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ===== [ANCHOR-DEF-W4] 五层规则体系测例定义写此行下方 =====
+
+function w4Rules() { return require('../src/lib/xianxia/rules'); }
+
+/** 一份最小上下文：什么都没提供 —— 各层「宁放行不误伤」的默认路径 */
+function w4EmptyCtx(): any { return { character: {}, output: {}, world: {} }; }
+
+function smokeW4001ConditionBridgeUsesDsl(): void {
+  const m = w4Rules();
+  const ok = m.compileCondition({ op: 'gt', args: [{ op: 'var', name: 'age' }, { op: 'const', value: 5 }] });
+  assert(ok.ok === true && ok.node, '合法条件应能编译');
+  // 未注册 op：不得抛，要返回可读原因（这是第四层 escalate 的触发源）
+  const bad = m.compileCondition({ op: 'summon_dragon', args: [] });
+  assert(bad.ok === false && typeof bad.reason === 'string' && bad.reason.length > 0, '非法 op 应返回原因而非抛出');
+  // arity 也由 rules-dsl 自己管，规则层不重写校验
+  const arity = m.compileCondition({ op: 'gt', args: [{ op: 'const', value: 1 }] });
+  assert(arity.ok === false, 'arity 不符应编译失败');
+  // 求值走 evalDSL；算不出来的一律当条件不成立（保守：例外绝不放宽世界法度）
+  assert(m.conditionHolds(ok.node, { age: 9 }) === true, 'age=9 应 > 5');
+  assert(m.conditionHolds(ok.node, { age: 2 }) === false, 'age=2 不应 > 5');
+  assert(m.conditionHolds(ok.node, {}) === false, '取不到值时应判不成立');
+  log('smoke-w4-001-condition-bridge-uses-dsl', { passed: true });
+}
+
+function smokeW4002SoftRuleExceptionEvaluated(): void {
+  const m = w4Rules();
+  const rule = m.getSoftRule('soft.npc.hostile_to_friendly');
+  assert(rule && rule.exceptions && rule.exceptions.length === 1, '该软规则应带一条例外');
+  const rng = m.SHADOW_MODE_RNG; // 恒 0：概率闸门必过，便于隔离其它三道闸门
+  // 四道闸门逐一验：延迟 → 例外 → 命中 → 概率
+  const young = m.evaluateSoftRule(rule, { age: 3, world: { hasHostileToFriendlyShift: true } }, rng);
+  assert(young.flagged === false && young.skipReason === 'delay_age', '未到龄应跳过');
+  const excepted = m.evaluateSoftRule(
+    rule, { age: 20, world: { hasHostileToFriendlyShift: true, hasRelationshipCause: true } }, rng);
+  assert(excepted.flagged === false && excepted.skipReason === 'exception', '例外成立应跳过');
+  assert(typeof excepted.exceptionDescription === 'string' && excepted.exceptionDescription.length > 0,
+    '应交代是哪条例外');
+  const untouched = m.evaluateSoftRule(rule, { age: 20, world: {} }, rng);
+  assert(untouched.flagged === false && untouched.skipReason === 'not_triggered', '没碰到就不该标记');
+  const hit = m.evaluateSoftRule(rule, { age: 20, world: { hasHostileToFriendlyShift: true } }, rng);
+  assert(hit.flagged === true && hit.roll === 0, '四闸全过应标记审查');
+  // 概率闸门：roll 恒 1 时永不标记 —— 低概率越界是世界的常态
+  const lucky = m.evaluateSoftRule(rule, { age: 20, world: { hasHostileToFriendlyShift: true } }, () => 1);
+  assert(lucky.flagged === false && lucky.skipReason === 'probability', 'roll 未中应放行');
+  log('smoke-w4-002-soft-rule-exception-evaluated', { passed: true });
+}
+
+function smokeW4003DescribeConditionReadable(): void {
+  const m = w4Rules();
+  const text = m.describeCondition(m.DESIGN_CASE_SECRET_REALM_EXP.condition);
+  assert(typeof text === 'string' && text.length > 0, '覆盖条件应能渲染成文');
+  assert(text.indexOf('realm_example') >= 0, '条件文里应含所指秘境');
+  assert(!/\bop\b|args|\{/.test(text), '条件文不该漏出 DSL 结构');
+  const vars = m.collectConditionVars(m.DESIGN_CASE_SECRET_REALM_EXP.condition);
+  assert(vars.indexOf('secretRealmId') >= 0, '应能列出条件读了哪些上下文字段');
+  log('smoke-w4-003-describe-condition-readable', { passed: true });
+}
+
+function smokeW4004FallbackEscalateStrategy(): void {
+  const m = w4Rules();
+  // 情形一：条件解析不了 → 交回基石（本层连这条规矩说的是什么都不知道）
+  const malformed = m.resolveFallbacks({
+    age: 20,
+    output: { ruleRegistrations: [{ id: 'x', condition: { op: 'summon_dragon', args: [] } }] },
+  });
+  const a = malformed.find((d: any) => d.ruleId === 'fallback.escalate.malformed_rule_condition');
+  assert(a, '无法解析的条件应被兜住');
+  assert(a.strategy === 'escalate' && a.escalateTo === 'meta', '应向基石求助');
+  assert(a.allowedProvisionally === false, 'escalate 不得本轮放行');
+  // 情形二：话说得通但所指之规不存在 → 交引擎既有权威
+  const unknown = m.resolveFallbacks({
+    age: 20,
+    output: { overrideRegistrations: [{ targetRuleId: 'hard.bounds.nonexistent_thing' }] },
+  });
+  const b = unknown.find((d: any) => d.ruleId === 'fallback.escalate.override_target_unknown');
+  assert(b && b.escalateTo === 'engine', '目标不在册应转交引擎');
+  // 在册的目标不该被误判
+  const fine = m.resolveFallbacks({
+    age: 20,
+    output: { overrideRegistrations: [{ targetRuleId: 'hard.bounds.maxHp' }] },
+  });
+  assert(!fine.some((d: any) => d.ruleId === 'fallback.escalate.override_target_unknown'),
+    '在册目标不应触发求助');
+  log('smoke-w4-004-fallback-escalate-strategy', { passed: true });
+}
+
+function smokeW4005FallbackAllowThenFix(): void {
+  const m = w4Rules();
+  const out = m.resolveFallbacks({ age: 12, undefinedFields: ['heartDemonWhisper'] });
+  const d = out.find((x: any) => x.ruleId === 'fallback.allow_then_fix.undeclared_output_field');
+  assert(d, '未覆盖字段应被记下');
+  assert(d.strategy === 'allow_then_fix', '策略应为默认允许+事后修正');
+  assert(d.allowedProvisionally === true, '本轮必须放行 —— 剪掉新枝违背本项目意图');
+  assert(typeof d.fixHint === 'string' && d.fixHint.length > 0, '「事后修正」必须交代从哪儿修');
+  assert(String(d.field).indexOf('heartDemonWhisper') >= 0, '应指名是哪个字段');
+  // 没塞 undefinedFields 就不判（宁放行不误伤）
+  assert(!m.resolveFallbacks(w4EmptyCtx()).some(
+    (x: any) => x.ruleId === 'fallback.allow_then_fix.undeclared_output_field'), '无输入不该凭空判定');
+  log('smoke-w4-005-fallback-allow-then-fix', { passed: true });
+}
+
+function smokeW4006FallbackMarkPending(): void {
+  const m = w4Rules();
+  // 形制完好的新规矩：不动基石、条件能解析、目标存在 → 收不收待裁
+  const proposal = m.resolveFallbacks({
+    age: 30,
+    output: {
+      ruleRegistrations: [{
+        id: 'proposed.rule.x', layer: 1, targetRuleId: 'hard.bounds.maxHp',
+        condition: { op: 'eq', args: [{ op: 'var', name: 'sectId' }, { op: 'const', value: 's1' }] },
+      }],
+    },
+  });
+  const p = proposal.find((d: any) => d.ruleId === 'fallback.mark_pending.new_rule_proposal');
+  assert(p && p.strategy === 'mark_pending', '形制完好的新规矩应挂起');
+  assert(p.allowedProvisionally === false, 'mark_pending 不是放行');
+  assert(!p.escalateTo, '挂起时连该问谁都还没定，不该指定去处');
+  // 动基石的交第零层，不在第四层挂起
+  const bedrock = m.resolveFallbacks({ age: 30, output: { ruleRegistrations: [{ id: 'y', layer: 0 }] } });
+  assert(!bedrock.some((d: any) => d.ruleId === 'fallback.mark_pending.new_rule_proposal'),
+    '动基石的不该在第四层挂起');
+  // 引用无处对应之物 —— 形状对齐 findBrokenCrossRefs 的返回值
+  const refs = m.resolveFallbacks({
+    age: 30,
+    unresolvedRefs: [{ refId: 'npc_nowhere', expectedSystem: 'npc', actualSystem: null }],
+  });
+  const r = refs.find((d: any) => d.ruleId === 'fallback.mark_pending.unresolved_reference');
+  assert(r && r.strategy === 'mark_pending' && r.code === 'missing_id', '无处对应的引用应挂起');
+  log('smoke-w4-006-fallback-mark-pending', { passed: true });
+}
+
+function smokeW4007FallbackThreeStrategiesAndDeterminism(): void {
+  const m = w4Rules();
+  // 三种策略都必须有实现 —— 缺一种就等于第四层少一条出路
+  for (const s of ['escalate', 'allow_then_fix', 'mark_pending']) {
+    assert(m.getFallbackRulesByStrategy(s).length > 0, '策略 ' + s + ' 应有实现');
+  }
+  // escalate 必须交代去处，其余策略不许带去处
+  for (const r of m.FALLBACK_RULES) {
+    if (r.strategy === 'escalate') assert(Boolean(r.escalateTo), r.id + ' 应交代求助去处');
+    else assert(!r.escalateTo, r.id + ' 非求助策略不该带去处');
+    assert(m.isKnownTraceCode(r.code), r.id + ' 的 code 必须是既有 trace code');
+  }
+  // 悬置 id 确定性：同一输入两轮必须逐字相同（影子比对的前提）
+  const ctx = { age: 44, undefinedFields: ['aField'], unresolvedRefs: ['ghost_id'] };
+  const one = m.resolveFallbacks(ctx).map((d: any) => d.id).join(',');
+  const two = m.resolveFallbacks(ctx).map((d: any) => d.id).join(',');
+  assert(one === two && one.indexOf('44') >= 0, '悬置 id 应确定性生成且带岁数');
+  // 兜底规则自己抛错时当未命中 —— 兜底之上不再兜底，否则递归无底
+  const boom = [{
+    id: 'fallback.test.boom', layer: 4, description: 'x', strategy: 'mark_pending',
+    code: 'missing_id', matches: () => { throw new Error('boom'); },
+  }];
+  assert(m.resolveFallbacks(ctx, boom).length === 0, '兜底规则抛错应当未命中');
+  log('smoke-w4-007-fallback-three-strategies-and-determinism', { passed: true });
+}
+
+function smokeW4008QueryRuleEntry(): void {
+  const m = w4Rules();
+  const q = m.queryRule('hard.whitelist.ui_slot_category');
+  assert(q.found === true && q.layer === 1, '统一入口应查到这条 UI 词表规则');
+  assert(q.allowedValues.length === 16, '类别册应是十六项');
+  assert(q.disposition === 'clamp' && q.overridable === false, '处置应是钳制，且不许局部覆盖');
+  assert(q.active === true && q.overriddenBy.length === 0, '无覆盖时应生效');
+  // 查不到必须显式说查不到 —— 静默返回「无判词」等于全放行，那是最坏的一种坏
+  const miss = m.queryRule('hard.bounds.no_such_rule');
+  assert(miss.found === false, '不在册应显式报不在册');
+  assert(m.isRuleActive('hard.bounds.no_such_rule') === false, '不在册不该算生效');
+  assert(m.hasRule('meta.causality.effect_needs_cause') === true, '基石应在册');
+  // 五层都要能列
+  for (const layer of [0, 1, 2, 4]) {
+    assert(m.listRules(layer).length > 0, '第 ' + layer + ' 层应有规则');
+  }
+  assert(m.listRules().length === m.RULE_INDEX.length, '不给层号应全列');
+  log('smoke-w4-008-query-rule-entry', { passed: true });
+}
+
+function smokeW4009QueryWhoOverridesAndCondition(): void {
+  const m = w4Rules();
+  const stack = [m.DESIGN_CASE_SECRET_REALM_EXP];
+  const inRealm = { age: 30, secretRealmId: 'realm_example' };
+  const outside = { age: 30, secretRealmId: undefined };
+  // 「被谁覆盖」
+  const who = m.whoOverrides('hard.bounds.cultivationExp', inRealm, stack);
+  assert(who.length === 1, '在秘境中应查到一条生效覆盖');
+  assert(who[0].overrideId === 'design.override.secret_realm_exp_boost', '应报出覆盖 id');
+  assert(who[0].mode === 'shift_bounds' && who[0].scope === 'secret_realm', '应报出方式与作用域');
+  // 「覆盖条件是什么」
+  assert(who[0].conditionText.indexOf('realm_example') >= 0, '应答得出覆盖条件');
+  assert(typeof who[0].playerFacing === 'string' && who[0].playerFacing.length > 0, '应带世界内说法');
+  // 出了秘境：自动回落，且要说得出为什么没生效
+  assert(m.whoOverrides('hard.bounds.cultivationExp', outside, stack).length === 0, '出秘境应无生效覆盖');
+  const q = m.queryRule('hard.bounds.cultivationExp', outside, stack);
+  assert(q.overriddenBy.length === 1 && q.overriddenBy[0].active === false, '已回落的覆盖也要查得到');
+  assert(q.overriddenBy[0].inactiveReason === 'scope_mismatch', '应说得出为什么没生效');
+  log('smoke-w4-009-query-who-overrides-and-condition', { passed: true });
+}
+
+function smokeW4010OverrideNotViolationAutoRestore(): void {
+  const m = w4Rules();
+  const stack = [m.DESIGN_CASE_SECRET_REALM_EXP];
+  const base = m.queryRule('hard.bounds.cultivationExp', { age: 30 }, stack);
+  const inside = m.queryRule('hard.bounds.cultivationExp', { age: 30, secretRealmId: 'realm_example' }, stack);
+  // 覆盖不是让规则失效：基准仍在，只是有效值不同
+  assert(base.baseBounds && inside.baseBounds, '基准区间应始终在');
+  assert(inside.baseBounds.max === base.baseBounds.max, '基准不因覆盖而改');
+  assert(inside.effectiveBounds.max > base.effectiveBounds.max, '秘境内有效上限应抬高');
+  assert(inside.active === true, '被抬高上限的规则仍参与裁决 —— 反重力不让引力失效');
+  // 条件失效即自动回落，无需任何回收动作
+  const after = m.queryRule('hard.bounds.cultivationExp', { age: 30 }, stack);
+  assert(after.effectiveBounds.max === base.baseBounds.max, '出秘境应自动回到基准');
+  // suspend 是唯一让规则本轮不参与的方式，但规则对象仍在栈里
+  const suspend = Object.assign({}, m.DESIGN_CASE_SECRET_REALM_EXP, {
+    id: 'design.override.test_suspend', mode: 'suspend',
+  });
+  const sus = m.queryRule('hard.bounds.cultivationExp', { age: 30, secretRealmId: 'realm_example' }, [suspend]);
+  assert(sus.active === false && String(sus.inactiveReason).indexOf('suspend') >= 0, 'suspend 应使本轮不参与');
+  assert(sus.baseBounds, '被 suspend 也不该丢基准');
+  // 汉文解释里要说得出处境
+  const text = m.explainRule('hard.bounds.cultivationExp', { age: 30, secretRealmId: 'realm_example' });
+  assert(typeof text === 'string' && text.indexOf('hard.bounds.cultivationExp') >= 0, '应能解释一条规则的处境');
+  log('smoke-w4-010-override-not-violation-auto-restore', { passed: true });
+}
+
+function smokeW4011SeveritySpellingStaysSplit(): void {
+  const m = w4Rules();
+  // 全仓两套 severity 拼写各自自洽：boundary/registry/effect 用 'warning'，
+  // validateCrossSystemContinuity 用 'warn'。两只适配器故意不合并。
+  assert(m.dispositionToBoundarySeverity('clamp') === 'warning', 'boundary 侧应拼 warning');
+  assert(m.dispositionToContinuitySeverity('clamp') === 'warn', 'continuity 侧应拼 warn');
+  assert(m.dispositionToBoundarySeverity('reject') === 'error', 'reject 两侧都是 error');
+  assert(m.dispositionToContinuitySeverity('reject') === 'error', 'reject 两侧都是 error');
+  assert(m.dispositionToBoundarySeverity('inject_context') === 'info', '注入约束不算告警');
+  assert(m.dispositionToContinuitySeverity('accept') === 'info', '放行不算告警');
+  log('smoke-w4-011-severity-spelling-stays-split', { passed: true });
+}
+
+function smokeW4012EvaluateFiveLayersDefaultInert(): void {
+  const m = w4Rules();
+  const clean = m.evaluateRules(w4EmptyCtx(), { rng: m.SHADOW_MODE_RNG });
+  assert(clean.blocked === false, '空上下文不该阻断');
+  assert(clean.failures.length === 0, '空上下文不该有求值异常：' + JSON.stringify(clean.failures));
+  assert(clean.verdicts.every((v: any) => v.enforced === false), '默认不执行：所有判词 enforced 必须为 false');
+  // 基石被违反：出判词，但默认不阻断（开关全关）
+  const violating = m.evaluateRules({
+    character: { age: 30 },
+    output: { changes: [{ attribute: 'spiritStones', delta: 50000 }] },
+    world: {},
+  }, { rng: m.SHADOW_MODE_RNG });
+  const meta = violating.verdicts.find((v: any) => v.layer === 0);
+  assert(meta && meta.disposition === 'reject', '凭空大额进项应被基石判拒');
+  assert(meta.enforced === false && violating.blocked === false, '默认关闭时不得真阻断');
+  assert(typeof meta.playerFacing === 'string' && !/系统|引擎|字段|校验/.test(meta.playerFacing),
+    '拒绝话术须是世界内说法');
+  // 只有第零层敢 reject
+  for (const v of violating.verdicts) {
+    if (v.disposition === 'reject') assert(v.layer === 0, '只有基石敢拒：' + v.ruleId);
+  }
+  // 逐层隔离求值
+  const only4 = m.evaluateRules({ age: 20, undefinedFields: ['zzz'] }, { onlyLayers: [4] });
+  assert(only4.verdicts.every((v: any) => v.layer === 4), 'onlyLayers 应能隔离到单层');
+  assert(only4.deferred.length === 1, '第四层应产出一条悬置');
+  // 合并取最强
+  assert(m.mergeDispositions([{ disposition: 'accept' }, { disposition: 'clamp' }]) === 'clamp', '合并应取最强');
+  assert(m.mergeDispositions([]) === 'accept', '无判词即放行');
+  log('smoke-w4-012-evaluate-five-layers-default-inert', { passed: true });
+}
+
+function smokeW4013RuleTableCodesAreKnown(): void {
+  const m = w4Rules();
+  // 规则层不许发明新 trace code —— 发明了就等于新开一条没人消费的通路
+  for (const r of [...m.META_RULES, ...m.HARD_RULES, ...m.UI_SLOT_HARD_RULES, ...m.SOFT_RULES, ...m.FALLBACK_RULES]) {
+    assert(m.isKnownTraceCode(r.code), r.id + ' 用了不在册的 code: ' + r.code);
+  }
+  for (const o of m.DESIGN_VALIDATION_CASES) {
+    assert(m.isKnownTraceCode(o.code), o.id + ' 用了不在册的 code');
+  }
+  // 规则 id 不许重号（重号会让统一入口查错规则）
+  const ids = m.RULE_INDEX.map((s: any) => s.ruleId);
+  assert(new Set(ids).size === ids.length, '规则 id 不得重号');
+  log('smoke-w4-013-rule-table-codes-are-known', { passed: true });
+}
+
+// ---------- 接线等价性差分对照 ----------
+//
+// validation.ts 的 UI 槽位词表判定已改走规则表。这是重构不是玩法改动，
+// 所以下面把**改动前的原实现**逐字重写一份（含硬编码词表），
+// 对同一批输入比对两者输出必须完全一致。
+
+const W4_LEGACY_SLOTS = ['topTags', 'characterDetail', 'statusPage', 'threadPage', 'combatPanel', 'inventoryPanel', 'worldLegacy'];
+const W4_LEGACY_TONES = ['neutral', 'good', 'bad', 'rare', 'danger', 'mystery'];
+const W4_LEGACY_HINTS = ['badge', 'card', 'meter', 'timeline', 'action', 'detail'];
+const W4_LEGACY_GROUPS = ['identity', 'constitution', 'attribute', 'fate', 'debuff', 'buff', 'misc'];
+const W4_LEGACY_CATEGORIES = ['attribute', 'status', 'special', 'identity', 'quest', 'thread', 'fate', 'injury', 'buff', 'debuff', 'constitution', 'item', 'technique', 'realm', 'misc', 'uncategorized'];
+
+/** 改动前的 validateUISlotMapping 原样重写（词表硬编码在此，与规则表无关） */
+function w4LegacyValidateUISlotMapping(slot: any): any {
+  const SLOT_SET = new Set(W4_LEGACY_SLOTS);
+  const TONE_SET = new Set(W4_LEGACY_TONES);
+  const HINT_SET = new Set(W4_LEGACY_HINTS);
+  const GROUP_SET = new Set(W4_LEGACY_GROUPS);
+  const CAT_SET = new Set(W4_LEGACY_CATEGORIES);
+  const warnings: string[] = [];
+  if (!slot || typeof slot !== 'object') return { valid: false, warnings: ['slot_missing'] };
+  let valid = true;
+  if (typeof slot.category !== 'string' || slot.category.length === 0) {
+    warnings.push('category_missing'); valid = false;
+  } else if (!CAT_SET.has(slot.category)) {
+    warnings.push('category_unknown:' + slot.category); valid = false;
+  }
+  if (slot.displayGroup === undefined || slot.displayGroup === null || slot.displayGroup === '') {
+    warnings.push('displayGroup_missing');
+  } else if (typeof slot.displayGroup !== 'string' || !GROUP_SET.has(slot.displayGroup)) {
+    warnings.push('displayGroup_unknown:' + String(slot.displayGroup));
+  }
+  if (slot.displaySlots === undefined || slot.displaySlots === null) {
+    warnings.push('displaySlots_missing');
+  } else if (!Array.isArray(slot.displaySlots)) {
+    warnings.push('displaySlots_not_array'); valid = false;
+  } else {
+    if (slot.displaySlots.length === 0) warnings.push('displaySlots_empty');
+    const seen = new Set();
+    for (const s of slot.displaySlots) {
+      if (typeof s !== 'string') { warnings.push('displaySlots_non_string_entry'); valid = false; continue; }
+      if (!SLOT_SET.has(s)) { warnings.push('displaySlots_unknown:' + s); valid = false; }
+      if (seen.has(s)) warnings.push('displaySlots_duplicate:' + s);
+      seen.add(s);
+    }
+  }
+  if (slot.tone === undefined || slot.tone === null) {
+    warnings.push('tone_missing');
+  } else if (typeof slot.tone !== 'string' || !TONE_SET.has(slot.tone)) {
+    warnings.push('tone_unknown:' + String(slot.tone));
+  }
+  if (slot.renderHint === undefined || slot.renderHint === null) {
+    warnings.push('renderHint_missing');
+  } else if (typeof slot.renderHint !== 'string' || !HINT_SET.has(slot.renderHint)) {
+    warnings.push('renderHint_unknown:' + String(slot.renderHint));
+  }
+  return { valid, warnings };
+}
+
+/** 改动前的 clampCategoryToKnownSlot 原样重写 */
+function w4LegacyClampCategoryToKnownSlot(slot: any, knownCategories: any): any {
+  const SLOT_SET = new Set(W4_LEGACY_SLOTS);
+  const TONE_SET = new Set(W4_LEGACY_TONES);
+  const HINT_SET = new Set(W4_LEGACY_HINTS);
+  const GROUP_SET = new Set(W4_LEGACY_GROUPS);
+  const base = slot && typeof slot === 'object' ? { ...slot } : {};
+  const known = knownCategories instanceof Set
+    ? knownCategories
+    : (Array.isArray(knownCategories) ? new Set(knownCategories) : new Set(W4_LEGACY_CATEGORIES));
+  const original = typeof base.category === 'string' ? base.category : '';
+  let fallbackUsed = false;
+  if (!original || !known.has(original)) {
+    if (known.has('misc')) base.category = 'misc';
+    else if (known.has('uncategorized')) base.category = 'uncategorized';
+    else if (known.size > 0) base.category = Array.from(known)[0];
+    else base.category = 'misc';
+    fallbackUsed = true;
+  }
+  if (base.displayGroup && !GROUP_SET.has(base.displayGroup)) base.displayGroup = 'misc';
+  if (Array.isArray(base.displaySlots)) {
+    base.displaySlots = base.displaySlots.filter((s: any) => typeof s === 'string' && SLOT_SET.has(s));
+  }
+  if (base.tone && !TONE_SET.has(base.tone)) base.tone = 'neutral';
+  if (base.renderHint && !HINT_SET.has(base.renderHint)) base.renderHint = 'badge';
+  return { clampedSlot: base, fallbackUsed };
+}
+
+/** 差分用例矩阵：含缺项 / 越界 / 重复 / 非串 / 空表 / 顺序敏感落点 */
+function w4SlotCases(): any[] {
+  return [
+    null, undefined, {}, 'not-an-object',
+    { category: 'attribute', displayGroup: 'attribute', displaySlots: ['topTags'], tone: 'good', renderHint: 'badge' },
+    { category: '', displayGroup: '', displaySlots: [], tone: null, renderHint: null },
+    { category: '天机', displayGroup: '天机', displaySlots: ['天机阁'], tone: '玄', renderHint: '卷轴' },
+    { category: 'uncategorized', displayGroup: 'misc', displaySlots: ['topTags', 'topTags'], tone: 'rare', renderHint: 'card' },
+    { category: 'realm', displaySlots: ['statusPage', 'unknownSlot'], tone: 'mystery' },
+    { category: 'item', displayGroup: 'buff', displaySlots: 'not-array', renderHint: 'detail' },
+    { category: 'quest', displayGroup: 'fate', displaySlots: ['threadPage', 123, null], tone: 'danger', renderHint: 'timeline' },
+    { category: 'constitution', displayGroup: 'constitution', displaySlots: ['characterDetail'], tone: 'bad', renderHint: 'meter' },
+    { category: 'misc', displayGroup: 'identity', displaySlots: ['worldLegacy', 'combatPanel'], tone: 'neutral', renderHint: 'action' },
+    { category: 'technique', displayGroup: 'debuff', displaySlots: ['inventoryPanel'], tone: 'good', renderHint: 'badge' },
+  ];
+}
+
+function smokeW4014WiringEquivalentValidateUiSlot(): void {
+  const v = require('../src/lib/xianxia/engine/validation.ts');
+  let n = 0;
+  for (const c of w4SlotCases()) {
+    const now = v.validateUISlotMapping(c as any);
+    const before = w4LegacyValidateUISlotMapping(c);
+    assert(now.valid === before.valid,
+      'valid 不一致 @' + JSON.stringify(c) + ' 新=' + now.valid + ' 旧=' + before.valid);
+    assert(JSON.stringify(now.warnings) === JSON.stringify(before.warnings),
+      'warnings 不一致 @' + JSON.stringify(c) + ' 新=' + JSON.stringify(now.warnings) + ' 旧=' + JSON.stringify(before.warnings));
+    n++;
+  }
+  assert(n >= 14, '差分用例应覆盖足够形态，实为 ' + n);
+  log('smoke-w4-014-wiring-equivalent-validate-ui-slot', { passed: true });
+}
+
+function smokeW4015WiringEquivalentClampCategory(): void {
+  const v = require('../src/lib/xianxia/engine/validation.ts');
+  // 第二参数四种形态都要比：默认（不给）/ Set / 数组 / 空集
+  // 空集与「misc 不在许可集合」两种是顺序敏感路径（Array.from(known)[0]），
+  // 正是词表顺序不许动的原因。
+  const knowns: any[] = [
+    undefined, null,
+    new Set(['attribute', 'misc']),
+    new Set(['uncategorized', 'status']),
+    new Set(['status', 'quest']),
+    new Set(),
+    ['thread', 'fate', 'misc'],
+    ['injury'],
+  ];
+  let n = 0;
+  for (const c of w4SlotCases()) {
+    for (const k of knowns) {
+      const now = v.clampCategoryToKnownSlot(c as any, k);
+      const before = w4LegacyClampCategoryToKnownSlot(c, k);
+      assert(now.fallbackUsed === before.fallbackUsed,
+        'fallbackUsed 不一致 @' + JSON.stringify(c) + ' known=' + JSON.stringify(Array.from(k || [])));
+      assert(JSON.stringify(now.clampedSlot) === JSON.stringify(before.clampedSlot),
+        'clampedSlot 不一致 @' + JSON.stringify(c) + ' 新=' + JSON.stringify(now.clampedSlot) + ' 旧=' + JSON.stringify(before.clampedSlot));
+      n++;
+    }
+  }
+  assert(n >= 100, '差分组合应足够多，实为 ' + n);
+  log('smoke-w4-015-wiring-equivalent-clamp-category', { passed: true });
+}
+
+function smokeW4016WiringSingleSourceOfTruth(): void {
+  const m = w4Rules();
+  const v = require('../src/lib/xianxia/engine/validation.ts');
+  // 词表正本已迁到规则表：validation.ts 里不该再留私有副本
+  const src = readFileSync('src/lib/xianxia/engine/validation.ts', 'utf-8');
+  assert(!/SLOT_BOUNDARY_CATEGORY_SET|SLOT_BOUNDARY_KNOWN_CATEGORIES/.test(src),
+    'validation.ts 不该再留词表副本');
+  assert(/UI_SLOT_RULES/.test(src), 'validation.ts 应改走规则表');
+  // 只准 import 叶子模块 —— import barrel 会与 engine/attributes 成初始化期环
+  assert(!/from\s+'\.\.\/rules';/.test(src), 'validation.ts 不得 import rules barrel（会成环）');
+  // 规则表的册与实际判定必须同源：册内每一项都要判在册，册外要判越界
+  for (const cat of m.UI_SLOT_CATEGORIES) {
+    assert(v.validateUISlotMapping({ category: cat }).warnings.indexOf('category_unknown:' + cat) < 0,
+      '册内类别 ' + cat + ' 不该被判越界');
+  }
+  assert(v.validateUISlotMapping({ category: '不在册' }).warnings.indexOf('category_unknown:不在册') >= 0,
+    '册外类别应被判越界');
+  // 钳制落点也取自规则表
+  assert(m.UI_SLOT_CLAMP_FALLBACK.category === 'misc' && m.UI_SLOT_CLAMP_FALLBACK.tone === 'neutral',
+    '钳制落点值不得改动');
+  log('smoke-w4-016-wiring-single-source-of-truth', { passed: true });
+}
+
+function pgRunW4RuleLayersSmokes(): void {
+  const cases = [
+    { name: 'smoke-w4-001-condition-bridge-uses-dsl', fn: smokeW4001ConditionBridgeUsesDsl },
+    { name: 'smoke-w4-002-soft-rule-exception-evaluated', fn: smokeW4002SoftRuleExceptionEvaluated },
+    { name: 'smoke-w4-003-describe-condition-readable', fn: smokeW4003DescribeConditionReadable },
+    { name: 'smoke-w4-004-fallback-escalate-strategy', fn: smokeW4004FallbackEscalateStrategy },
+    { name: 'smoke-w4-005-fallback-allow-then-fix', fn: smokeW4005FallbackAllowThenFix },
+    { name: 'smoke-w4-006-fallback-mark-pending', fn: smokeW4006FallbackMarkPending },
+    { name: 'smoke-w4-007-fallback-three-strategies-and-determinism', fn: smokeW4007FallbackThreeStrategiesAndDeterminism },
+    { name: 'smoke-w4-008-query-rule-entry', fn: smokeW4008QueryRuleEntry },
+    { name: 'smoke-w4-009-query-who-overrides-and-condition', fn: smokeW4009QueryWhoOverridesAndCondition },
+    { name: 'smoke-w4-010-override-not-violation-auto-restore', fn: smokeW4010OverrideNotViolationAutoRestore },
+    { name: 'smoke-w4-011-severity-spelling-stays-split', fn: smokeW4011SeveritySpellingStaysSplit },
+    { name: 'smoke-w4-012-evaluate-five-layers-default-inert', fn: smokeW4012EvaluateFiveLayersDefaultInert },
+    { name: 'smoke-w4-013-rule-table-codes-are-known', fn: smokeW4013RuleTableCodesAreKnown },
+    { name: 'smoke-w4-014-wiring-equivalent-validate-ui-slot', fn: smokeW4014WiringEquivalentValidateUiSlot },
+    { name: 'smoke-w4-015-wiring-equivalent-clamp-category', fn: smokeW4015WiringEquivalentClampCategory },
+    { name: 'smoke-w4-016-wiring-single-source-of-truth', fn: smokeW4016WiringSingleSourceOfTruth },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+    } catch (e: any) {
+      log(c.name, { passed: false, error: (e && e.message) || String(e) });
+    }
+  }
+}
+
+// ===== [ANCHOR-DEF-W6] 逆向因果解释器测例定义写此行下方 =====
+
+function w6Mod() {
+  return require('../src/lib/xianxia/retro-causal-explain');
+}
+
+/** 造一份最小可用 state，只带本模块真正读到的字段。 */
+function w6State(overrides: any = {}): any {
+  return {
+    name: '沈砚', age: 23, lifespan: 80, realm: 'qi_refining', realmLevel: 2,
+    location: '青芦渡', hp: 80, maxHp: 100, mp: 30, maxMp: 50, spiritStones: 10,
+    inventory: [{ id: 'itm-a', name: '青芦短剑' }], equipped: [],
+    pendingThreads: [], npcs: [], worldFacts: [], questEntries: [], statuses: [],
+    ...overrides,
+  };
+}
+
+function w6ExecItemGap(): any {
+  return {
+    aiBoundaryTrace: [{ severity: 'warning', code: 'removed_unknown_item', message: 'x', refId: 'itm-ghost', field: 'removedItemIds' }],
+    removedItemIds: [],
+    state: w6State(),
+    died: false,
+  };
+}
+
+function w6ClosedThreadState(): any {
+  return w6State({
+    pendingThreads: [{ id: 'th-1', title: '追讨旧债', status: 'resolved', description: '', progress: 100, deadlineAge: 30, sourceEventTitle: '' }],
+  });
+}
+
+function w6ExecThreadGap(state: any): any {
+  return {
+    aiBoundaryTrace: [{ severity: 'warning', code: 'closed_thread_referenced', message: 'x', refId: 'th-1', field: 'threads' }],
+    removedItemIds: [],
+    state,
+    died: false,
+  };
+}
+
+/** 一段合格的物件补叙（够长、纯白话、无后台口吻）。 */
+const W6_TEXT_ITEM = '事后青芦渡上有人提起，那日他手中那枚丹丸原是同行的老药师临时递过去的，用完便由老药师收了瓷瓶回去，从来不曾算在他的行囊里。旁人只看见他仰头服下，却没留意那只递药的手。';
+/** 一段合格的旧事补叙（带余波口吻）。 */
+const W6_TEXT_THREAD = '追讨旧债那桩事的定论早已下了，这回收束的其实只是它留下的余波：当年经手的几个人陆续离了渡口，剩下些零碎物件与口信没人接手。他顺手收拢，外人便当作旧账重提。';
+
+function smokeW6001OnlyTwoConsistencyCodes(): void {
+  const m = w6Mod();
+  // 圈定范围必须收得住 —— 恰两个 code，且都是纯 id 比对得出的那类
+  assert(Array.isArray(m.CONSISTENCY_BREAK_CODES), 'CONSISTENCY_BREAK_CODES 应导出');
+  assert(m.CONSISTENCY_BREAK_CODES.length === 2, `圈定 code 应恰为 2 个，实为 ${m.CONSISTENCY_BREAK_CODES.length}`);
+  assert(m.CONSISTENCY_BREAK_CODES.includes('removed_unknown_item'), '应圈 removed_unknown_item');
+  assert(m.CONSISTENCY_BREAK_CODES.includes('closed_thread_referenced'), '应圈 closed_thread_referenced');
+
+  // 「玩家没预料到」与「交代不足」两类一律不碰 —— 意外是本作卖点
+  const offLimits = [
+    'npc_friendly_to_hostile_without_cause',
+    'npc_hostile_to_friendly_without_cause',
+    'npc_relationship_jump_without_cause',
+    'friendly_npc_used_as_enemy_without_cause',
+    'unaddressed_high_priority_quest',
+    'closed_thread_reopened_as_new',
+    'unknown_thread_reference',
+    'extreme_attribute_delta',
+    'excessive_item_rewards',
+    'missing_narrative_contract',
+  ];
+  for (const code of offLimits) {
+    assert(!m.CONSISTENCY_BREAK_CODES.includes(code), `${code} 不该被圈进来`);
+    const got = m.detectConsistencyBreak(w6State(), {}, {
+      aiBoundaryTrace: [{ severity: 'warning', code, refId: 'ref-x' }],
+      removedItemIds: [], state: w6State(), died: false,
+    });
+    assert(got === null, `${code} 不该被侦测为可圆裂缝`);
+  }
+  log('smoke-w6-001-only-two-consistency-break-codes', { passed: true });
+}
+
+function smokeW6002GateOncePerAge(): void {
+  const m = w6Mod();
+  // 闸门读数来自库里同岁同 eventType 的行数：0 开，非 0 一律闭
+  assert(m.isRetroCausalGateOpen(0) === true, '本岁 0 条时闸门应开');
+  assert(m.isRetroCausalGateOpen(1) === false, '本岁已有 1 条时闸门应闭');
+  assert(m.isRetroCausalGateOpen(2) === false, '本岁已有 2 条时闸门应闭');
+  assert(m.RETRO_CAUSAL_EVENT_TYPE === 'retro_causal', 'eventType 常量应为 retro_causal');
+
+  // 接线处必须真按 characterId + age + eventType 计数，否则闸门不持久
+  const src = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  assert(/eventLog\.count\(/.test(src), 'route 应对 eventLog 计数做闸门');
+  assert(/RETRO_CAUSAL_EVENT_TYPE/.test(src), 'route 闸门应用 RETRO_CAUSAL_EVENT_TYPE 常量');
+  assert(/priorCountThisAge/.test(src), 'route 应把本岁读数传进解释器');
+  const countArgs = src.slice(src.indexOf('eventLog.count('), src.indexOf('eventLog.count(') + 260);
+  assert(/characterId/.test(countArgs) && /age:\s*finalState\.age/.test(countArgs), '闸门计数条件应含 characterId + 当岁 age');
+
+  // 闸门先行：读数非 0 时连生成函数都不该被碰
+  let called = 0;
+  const p = m.explainRetroCausally({
+    state: w6State(), aiOutput: {}, exec: w6ExecItemGap(), refEventId: 'evt-1',
+    priorCountThisAge: 1, generate: async () => { called++; return W6_TEXT_ITEM; },
+  });
+  assert(p && typeof p.then === 'function', 'explainRetroCausally 应返回 promise');
+  assert(called === 0, '闸门已闭时不该调用生成函数');
+  log('smoke-w6-002-gate-once-per-age', { passed: true });
+}
+
+function smokeW6003NarrativeOnlyNoStateMutation(): void {
+  const m = w6Mod();
+  const state = w6State();
+  const before = JSON.stringify(state);
+  const cand = m.detectConsistencyBreak(state, {}, w6ExecItemGap());
+  assert(cand && cand.code === 'removed_unknown_item', '应侦测到物件裂缝');
+
+  const draft = m.finalizeRetroCausalDraft(W6_TEXT_ITEM, state, cand, 'evt-origin-1');
+  assert(draft, '合格文本应产出 draft');
+
+  // 产出物只有叙事字段 + 反向指针，键集合钉死
+  const keys = Object.keys(draft).sort().join(',');
+  assert(keys === 'code,effects,eventType,narrative,refEventId,title', `draft 键集合不符：${keys}`);
+  assert(typeof draft.title === 'string' && typeof draft.narrative === 'string', 'title/narrative 应为字符串');
+
+  // 任何数值 / 库存 / 线索载荷字段都不许出现在产出物上
+  for (const f of ['changes', 'newItems', 'removedItemIds', 'newStatuses', 'newNpcs', 'newThreads',
+    'completeThreadIds', 'failThreadIds', 'equipItemIds', 'unequipItemIds', 'newEquippedItems',
+    'triggerCombat', 'hasChoice', 'timeAdvance', 'spiritStones', 'hp', 'state']) {
+    assert(!(f in draft), `draft 不该带载荷字段 ${f}`);
+  }
+  // effects 里只有一条隐藏 meta，不是任何会渲染成数值变动的 chip
+  assert(Array.isArray(draft.effects) && draft.effects.length === 1, 'effects 应只有一条隐藏 meta');
+  assert(draft.effects[0].kind === 'eventMeta', 'effects 唯一条目应是 eventMeta');
+  const effJson = JSON.stringify(draft.effects);
+  assert(!/"delta"|"attribute"|"value"/.test(effJson), 'effects 不该含任何数值字段');
+
+  // 全程不得改动传入 state
+  assert(JSON.stringify(state) === before, 'finalizeRetroCausalDraft 不该改动传入 state');
+  log('smoke-w6-003-narrative-only-no-state-mutation', { passed: true });
+}
+
+function smokeW6004AppendsNewEventRefsOriginal(): void {
+  const m = w6Mod();
+  const state = w6State();
+  const cand = m.detectConsistencyBreak(state, {}, w6ExecItemGap());
+  const draft = m.finalizeRetroCausalDraft(W6_TEXT_ITEM, state, cand, 'evt-origin-7');
+
+  // 新事件反指原事件，而不是改写原事件
+  assert(draft.refEventId === 'evt-origin-7', 'draft 应记住被反指的原事件 id');
+  assert(draft.effects[0].meta[m.RETRO_CAUSAL_META_KEY] === 'evt-origin-7', 'hiddenEventMeta 应反指原事件 id');
+  assert(draft.effects[0].meta.retroCausalCode === 'removed_unknown_item', 'meta 应记下裂缝种类');
+  assert(draft.effects[0].meta.retroCausalRefId === 'itm-ghost', 'meta 应记下冲突指向的 id');
+  assert(draft.eventType === m.RETRO_CAUSAL_EVENT_TYPE, '新事件应打 retro_causal 标');
+
+  // 没有原事件可指就不写 —— 免得落一条无主补叙
+  assert(m.finalizeRetroCausalDraft(W6_TEXT_ITEM, state, cand, '') === null, '缺原事件 id 应放弃');
+
+  // 接线处必须是 append 而非改写既有行
+  const src = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  const seg = src.slice(src.indexOf('explainRetroCausally'), src.indexOf('explainRetroCausally') + 1400);
+  assert(/eventLog\.create\(/.test(seg), '补叙应以 eventLog.create 追加新行');
+  assert(!/eventLog\.update\(|eventLog\.delete\(/.test(seg), '不得改写或删除既有事件行');
+  assert(/draft\.title/.test(seg) && /draft\.narrative/.test(seg), '落库应只取 draft 的叙事字段');
+  log('smoke-w6-004-appends-new-event-refs-original', { passed: true });
+}
+
+function smokeW6005LlmGarbageSilentlyDropped(): void {
+  const m = w6Mod();
+  const state = w6State();
+  const cand = m.detectConsistencyBreak(state, {}, w6ExecItemGap());
+
+  // 生成失败 / 返回垃圾 → 一律 null，不抛错、不产半成品
+  const garbage: any[] = [
+    null, undefined, '', '   ', '短', 42, {}, [], true,
+    new Error('llm timeout'),
+    '{"narrative":"其实是替身"}',
+    '```这段被 code fence 裹住了所以不能用作正文内容啊啊啊啊啊啊啊啊```',
+    'x'.repeat(5000),
+    '这段文字里出现了引擎校验一致性回滚等后台字样，所以必须判为垃圾直接丢弃，不能落库给玩家看到。',
+  ];
+  for (const bad of garbage) {
+    const got = m.finalizeRetroCausalDraft(bad, state, cand, 'evt-1');
+    assert(got === null, `垃圾输入应被静默丢弃：${String(bad).slice(0, 24)}`);
+    assert(m.coerceGeneratedExplanation(bad) === null || typeof m.coerceGeneratedExplanation(bad) === 'string', 'coerce 只应返回 string|null');
+  }
+
+  // 编排层：生成函数缺失 / 抛错都不许把异常抛出去
+  const p1 = m.explainRetroCausally({ state, aiOutput: {}, exec: w6ExecItemGap(), refEventId: 'e1', priorCountThisAge: 0, generate: null });
+  assert(p1 && typeof p1.then === 'function', '缺生成函数时也应返回 promise 而非抛错');
+  const p2 = m.explainRetroCausally({ state, aiOutput: {}, exec: w6ExecItemGap(), refEventId: 'e1', priorCountThisAge: 0, generate: async () => { throw new Error('boom'); } });
+  assert(p2 && typeof p2.then === 'function', '生成抛错时也应返回 promise 而非抛错');
+  p1.catch((err: any) => log('smoke-w6-005-llm-garbage-silently-dropped', { passed: false, error: `explainRetroCausally 不该 reject: ${err}` }));
+  p2.catch((err: any) => log('smoke-w6-005-llm-garbage-silently-dropped', { passed: false, error: `explainRetroCausally 不该 reject: ${err}` }));
+
+  // 接线处必须整段包在 try/catch 里，失败沿用原输出
+  const src = readFileSync('src/app/api/game/advance-sse/route.ts', 'utf-8');
+  const at = src.indexOf('explainRetroCausally');
+  const seg = src.slice(Math.max(0, at - 900), at + 1600);
+  assert(/try\s*\{/.test(seg) && /catch\s*\(/.test(seg), '接线处应有 try/catch 兜住');
+  assert(/\[advance-sse\]/.test(seg), '接线日志应带 [advance-sse] 前缀');
+  assert(/超时|失败|非致命/.test(seg), 'catch 分支应记非致命失败');
+  log('smoke-w6-005-llm-garbage-silently-dropped', { passed: true });
+}
+
+function smokeW6006DetectRequiresEngineActuallyDropped(): void {
+  const m = w6Mod();
+  // 复核 1：引擎其实把物件删掉了 → 账面与叙事本就吻合，无须动笔
+  const exec1 = w6ExecItemGap();
+  exec1.removedItemIds = ['itm-ghost'];
+  assert(m.detectConsistencyBreak(w6State(), {}, exec1) === null, '引擎已真删时不该圆');
+
+  // 复核 2：那物件其实还在身上 → 属别的岔子，不在管辖内
+  const exec2 = w6ExecItemGap();
+  exec2.state = w6State({ inventory: [{ id: 'itm-ghost', name: '无名丹丸' }] });
+  assert(m.detectConsistencyBreak(exec2.state, {}, exec2) === null, '物件仍在身上时不该圆');
+
+  // 复核 3：线索执行完已不是已闭态 → 引擎受理了，不算被吞
+  const st3 = w6ClosedThreadState();
+  const exec3 = w6ExecThreadGap(w6State({
+    pendingThreads: [{ id: 'th-1', title: '追讨旧债', status: 'active', description: '', progress: 40, deadlineAge: 30, sourceEventTitle: '' }],
+  }));
+  assert(m.detectConsistencyBreak(st3, {}, exec3) === null, '线索已被受理时不该圆');
+
+  // 本轮陨落不圆 —— 临终事件之后再补考据读着极别扭
+  const exec4 = w6ExecItemGap();
+  exec4.died = true;
+  assert(m.detectConsistencyBreak(w6State(), {}, exec4) === null, '本轮陨落时不该圆');
+
+  // 无 trace / 无 refId 都不该命中
+  assert(m.detectConsistencyBreak(w6State(), {}, { aiBoundaryTrace: [], removedItemIds: [], state: w6State() }) === null, '空 trace 不该命中');
+  assert(m.detectConsistencyBreak(w6State(), {}, {
+    aiBoundaryTrace: [{ severity: 'warning', code: 'removed_unknown_item' }], removedItemIds: [], state: w6State(),
+  }) === null, '缺 refId 不该命中');
+
+  // 正常路径仍要能命中，避免上面几条把功能整体判死
+  const ok = m.detectConsistencyBreak(w6ClosedThreadState(), {}, w6ExecThreadGap(w6ClosedThreadState()));
+  assert(ok && ok.code === 'closed_thread_referenced' && ok.subject === '追讨旧债', '已闭线索裂缝应能正常命中');
+  log('smoke-w6-006-detect-requires-engine-actually-dropped', { passed: true });
+}
+
+function smokeW6007ReflowValidationAndAftermathFrame(): void {
+  const m = w6Mod();
+  const state = w6ClosedThreadState();
+  const cand = m.detectConsistencyBreak(state, {}, w6ExecThreadGap(state));
+
+  // 带余波口吻 → 过；推翻定论的写法 → 拦
+  const okDraft = m.finalizeRetroCausalDraft(W6_TEXT_THREAD, state, cand, 'evt-2');
+  assert(okDraft && okDraft.title === '旧事余波', '带余波口吻的补叙应通过');
+  const bad = m.finalizeRetroCausalDraft(
+    '追讨旧债这件事其实从头到尾都没有真正定下来，他这回才算把话说清楚，从此再无人提起此节，渡口内外一片安静无声。',
+    state, cand, 'evt-2');
+  assert(bad === null, '推翻定论、无余波口吻的写法应被拦下');
+
+  // prompt 不许漏后台口吻 —— 它会原样进模型，露出来玩家立刻看穿是补丁
+  const p = m.buildRetroCausalPrompt(cand, state);
+  assert(typeof p.system === 'string' && typeof p.user === 'string', 'prompt 应含 system/user');
+  assert(!/引擎|校验|一致性|回滚|阈值|trace|字段|数值/.test(p.system + p.user), 'prompt 不得出现任何后台用语');
+  assert(/不要否认|不是把定论推翻|余波/.test(p.user), 'prompt 应明令不得推翻既有事实');
+  assert(/不要写出新的悬案|不要写他因此得了新东西/.test(p.user), 'prompt 应明令不得凭空给新东西');
+
+  // 模块自身必须回流引擎既有净化与边界校验，不得另开小灶
+  const src = readFileSync('src/lib/xianxia/retro-causal-explain.ts', 'utf-8');
+  assert(/sanitizeEventOutput/.test(src), '应回流 sanitizeEventOutput');
+  assert(/sanitizeNarrativeText/.test(src), '应回流 sanitizeNarrativeText');
+  assert(/validateAIBoundary/.test(src), '应回流 validateAIBoundary');
+  log('smoke-w6-007-reflow-validation-and-aftermath-frame', { passed: true });
+}
+
+function pgRunPhaseW6RetroCausalSmokes(): void {
+  const cases = [
+    { name: 'smoke-w6-001-only-two-consistency-break-codes', fn: smokeW6001OnlyTwoConsistencyCodes },
+    { name: 'smoke-w6-002-gate-once-per-age', fn: smokeW6002GateOncePerAge },
+    { name: 'smoke-w6-003-narrative-only-no-state-mutation', fn: smokeW6003NarrativeOnlyNoStateMutation },
+    { name: 'smoke-w6-004-appends-new-event-refs-original', fn: smokeW6004AppendsNewEventRefsOriginal },
+    { name: 'smoke-w6-005-llm-garbage-silently-dropped', fn: smokeW6005LlmGarbageSilentlyDropped },
+    { name: 'smoke-w6-006-detect-requires-engine-actually-dropped', fn: smokeW6006DetectRequiresEngineActuallyDropped },
+    { name: 'smoke-w6-007-reflow-validation-and-aftermath-frame', fn: smokeW6007ReflowValidationAndAftermathFrame },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
     } catch (e) {
       log(c.name, { passed: false, error: (e && e.message) || String(e) });
     }
