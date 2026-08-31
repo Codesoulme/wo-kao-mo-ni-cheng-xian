@@ -51,7 +51,9 @@ function _tryAppendEvent(
 export type HeritageCategory = 'scripture' | 'fate' | 'pet' | 'artifact' | 'constitution' | 'treasure';
 export type HeritageRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' | 'mythic';
 
-export type TimeAdvanceUnit = 'moment' | 'hour' | 'day' | 'month' | 'season' | 'year' | 'decade' | 'century';
+// 2026-08-31 时序改制：与 world-time.ts 对齐，补连续态。
+// 连续态 = 紧接上一幕，label 恒为空串，前端据此不渲染任何时间元素。
+export type TimeAdvanceUnit = 'continuous' | 'moment' | 'hour' | 'day' | 'month' | 'season' | 'year' | 'decade' | 'century';
 
 export interface TimeAdvance {
   amount: number;
@@ -60,12 +62,18 @@ export interface TimeAdvance {
   reason: string;
   ageDeltaYears: number;
   elapsedDays: number;
+  /** 日内推进量（小时，可含小数）。 */
+  elapsedHours?: number;
+  /** 0..24 绝对时点，语义为"跳到同一天的那个时点"，优先于 elapsedHours。 */
+  setDayHour?: number;
 }
 
 export interface WorldCalendarState {
   eraName: string;
   calendarYear: number;
   elapsedDays: number;
+  /** 0..24 日内游标；旧存档缺此字段时回落到默认晨起时点。 */
+  dayHour?: number;
 }
 
 export interface ActionProjection {

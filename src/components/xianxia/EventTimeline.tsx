@@ -77,10 +77,6 @@ function hasInternalVisibleText(text?: string) {
   return /\u6d41\u5e74\u56e0|\u540c\u5e74\u7eed\u7bc7|\u547d\u8282\u70b9|\u7eed\u7bc7/.test(String(text || ''));
 }
 
-function isActionLikeTimeSegment(text?: string) {
-  return /\u53ef\u5411|\u6253\u542c|\u8be2\u95ee|\u524d\u5f80|\u6267\u884c\u7ea6\u5b9a|\u8ffd\u67e5|\u8ffd\u5bfb|\u63a2\u5165|\u5165\u5e02|\u8d74\u7ea6|\u5bfb\u8bbf|\u62dc\u8bbf|\u4fee\u58eb/.test(String(text || ''));
-}
-
 function cleanVisibleNarrativeText(text?: string) {
   return String(text || '')
     .replace(/\u6d41\u5e74\u56e0[\uff1a:]?/g, '')
@@ -89,23 +85,6 @@ function cleanVisibleNarrativeText(text?: string) {
     .replace(/^[\u002c\uff0c\u003b\uff1b\u3002\s]+/, '')
     .trim();
 }
-
-function cleanVisibleTimeLabel(label?: string) {
-  const raw = String(label || '').trim();
-  if (!raw) return '';
-  const bracketIndex = raw.indexOf('\u3010');
-  if (bracketIndex >= 0) {
-    const before = raw.slice(0, bracketIndex).trim();
-    const world = raw.slice(bracketIndex).trim();
-    const ageMatch = before.match(/^(\d+\u5c81)/);
-    const segment = before.replace(/^(\d+\u5c81)(\s*\u00b7\s*)?/, '').trim();
-    if (hasInternalVisibleText(segment) || isActionLikeTimeSegment(segment)) {
-      return `${ageMatch?.[1] || ''}${world}`;
-    }
-  }
-  return hasInternalVisibleText(raw) || isActionLikeTimeSegment(raw) ? '' : raw;
-}
-
 
 function BlueprintChip({ blueprint, eventType }: { blueprint?: { category: string; name: string }; eventType?: string }) {
   if (!blueprint) return null;
@@ -244,41 +223,141 @@ function StreamingNarrative({ text, isNew, streamingText, eventIndex }: { text?:
   );
 }
 
-function eventTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }, prevEvent?: GameEvent) {
-  // 优先用完整 displayLabel（通常含世界历），没有则用 label
-  const displayLabel = cleanVisibleTimeLabel(event.worldTime?.displayLabel || event.worldTime?.label);
-  const worldLabel = event.worldTime?.label;
-  const segmentLabel = cleanVisibleTimeLabel(event.timeAdvance?.label);
-  // \u540c\u5e74\u53d9\u4e8b\u7684\u989d\u5916/\u7eed\u5199\u4e8b\u4ef6\uff1a\u672c\u4e3b\u6307\u793a\u540c\u5e74\u5185\u4e0d\u518d\u663e\u793a\u65f6\u95f4/\u5b63\u8282
-  if (ageMeta.isContinuation) return '';
-  const ageText = `${event.age}\u5c81`;
-  const open = '\u3010';
-  const close = '\u3011';
+/**
+ * 2026-08-31 时序改制：外部时间标注从"条条盖戳"改成聊天软件式的日期分隔条。
+ *
+ * 旧版给每条事件顶上都挂一整串「23岁 · 一年后【青岚仙历5001年 · 孟春 · 7日 · 晨钟后】」。
+ * 条条都标，等于没标——网文里"三个月后"一眼就懂，恰恰因为前后几十段都没写时间。
+ * 现在只在真的跨了时段 / 日 / 月 / 年的那一条前面插一条分隔条，写"到达"的绝对节点；
+ * 同一场戏里的连续几条之间一个字都不出，相对说法交给正文去写。
+ */
+export type TimeDividerScale = 'phase' | 'day' | 'month' | 'year';
 
-  // 如果 worldTime/displayLabel 已包含岁数，避免重复拼接
-  const displayLabelHasAge = displayLabel && displayLabel.includes(`${event.age}\u5c81`);
-
-  // 普通事件：有 displayLabel 则用
-  if (displayLabel) return ageText && !displayLabelHasAge ? `${ageText} · ${displayLabel}` : displayLabel;
-  // 兜底：用 worldLabel + segmentLabel 组装
-  if (worldLabel && segmentLabel) return `${ageText} · ${segmentLabel}${open}${worldLabel}${close}`;
-  if (worldLabel) return `${ageText}${open}${worldLabel}${close}`;
-  if (segmentLabel) return `${ageText} · ${segmentLabel}`;
-  return ageText || '';
+export interface TimeDivider {
+  /** 玩家可见文案，只写绝对节点，不重复正文里的相对说法 */
+  text: string;
+  /** 跨度档位，决定分隔条的视觉轻重 */
+  scale: TimeDividerScale;
 }
 
-function buildFallbackTimeLabel(event: GameEvent, ageMeta: { isContinuation: boolean }) {
-  const worldLabel = event.worldTime?.label;
-  const segmentLabel = cleanVisibleTimeLabel(event.timeAdvance?.label);
-  // \u540c\u5e74\u53d9\u4e8b\u7684\u989d\u5916/\u7eed\u5199\u4e8b\u4ef6\uff1a\u672c\u4e3b\u6307\u793a\u540c\u5e74\u5185\u4e0d\u518d\u663e\u793a\u65f6\u95f4/\u5b63\u8282
-  if (ageMeta.isContinuation) return '';
-  const ageText = `${event.age}\u5c81`;
-  const open = '\u3010';
-  const close = '\u3011';
-  if (worldLabel && segmentLabel) return `${ageText} · ${segmentLabel}${open}${worldLabel}${close}`;
-  if (worldLabel) return `${ageText}${open}${worldLabel}${close}`;
-  if (segmentLabel) return `${ageText} · ${segmentLabel}`;
-  return ageText || '';
+interface TimeAnchor {
+  eraName: string;
+  calendarYear: number;
+  dayCount: number;
+  monthName: string;
+  day: number;
+  phase: string;
+  age: number;
+  /** 世界历字段是否齐备；老存档缺字段时为 false，只能退化成按岁数比 */
+  hasCalendar: boolean;
+}
+
+function readTimeAnchor(event?: GameEvent): TimeAnchor | undefined {
+  if (!event) return undefined;
+  const w = event.worldTime as Partial<NonNullable<GameEvent['worldTime']>> | undefined;
+  const rawDays = Number(w?.elapsedDays);
+  const rawYear = Number(w?.calendarYear);
+  const hasCalendar = Number.isFinite(rawDays) && Number.isFinite(rawYear);
+  const rawAge = Number(event.age);
+  const rawDay = Number(w?.day);
+  return {
+    eraName: String(w?.eraName || '').trim(),
+    calendarYear: hasCalendar ? Math.round(rawYear) : 0,
+    dayCount: hasCalendar ? Math.round(rawDays) : 0,
+    monthName: String(w?.monthName || '').trim(),
+    day: Number.isFinite(rawDay) ? Math.round(rawDay) : 0,
+    phase: String(w?.phase || '').trim(),
+    age: Number.isFinite(rawAge) ? rawAge : NaN,
+    hasCalendar,
+  };
+}
+
+/**
+ * 连续态判定：这一条是"接着刚才"，一个时间元素都不渲染。
+ * 三种信号任一命中即算：新契约的连续档、题签被清成空串、成品串被清成空串。
+ */
+export function isContinuousScene(event?: GameEvent): boolean {
+  if (!event) return false;
+  if (event.timeAdvance?.unit === 'continuous') return true;
+  if (event.timeAdvance && typeof event.timeAdvance.label === 'string' && !event.timeAdvance.label.trim()) return true;
+  if (event.worldTime && event.worldTime.displayLabel === '') return true;
+  return false;
+}
+
+/**
+ * 算这一条相对上一条该不该插分隔条，插的话写什么。
+ * 抽成纯函数是为了能脱开 JSX 单独验：给一串事件就能核对读感。
+ */
+export function computeTimeDivider(event?: GameEvent, prevEvent?: GameEvent): TimeDivider | null {
+  if (!event) return null;
+  // 甲：连续态与上一条黏成同一场戏，不插分隔，也不回落成"N岁"
+  if (isContinuousScene(event)) return null;
+
+  const cur = readTimeAnchor(event);
+  if (!cur) return null;
+  const prev = readTimeAnchor(prevEvent);
+  const ageText = Number.isFinite(cur.age) ? `${cur.age}岁` : '';
+
+  // 老数据没有世界历：退化成"岁数一变就插一条"，不崩，也不装作知道具体日子
+  if (!cur.hasCalendar) {
+    if (!ageText) return null;
+    if (!prev) return { text: ageText, scale: 'year' };
+    const bothAges = Number.isFinite(prev.age) && Number.isFinite(cur.age);
+    return bothAges && prev.age === cur.age ? null : { text: ageText, scale: 'year' };
+  }
+
+  const yearText = [
+    cur.eraName ? `${cur.eraName}${cur.calendarYear}年` : `${cur.calendarYear}年`,
+    cur.monthName,
+    ageText,
+  ].filter(Boolean).join(' · ');
+
+  // 开篇，或上一条根本没有世界历可比：先立一个完整锚点，
+  // 让玩家从第一屏起就答得出"现在是什么时候"——旧版只有相对量，这一点始终做不到
+  if (!prev || !prev.hasCalendar) return { text: yearText, scale: 'year' };
+
+  // 跨年 / 跨岁：写满纪年 + 月令 + 岁数
+  const ageMoved = Number.isFinite(prev.age) && Number.isFinite(cur.age) && prev.age !== cur.age;
+  if (prev.calendarYear !== cur.calendarYear || ageMoved) return { text: yearText, scale: 'year' };
+
+  // 跨月 / 跨季：同年之内，写到月令就够定位
+  if (cur.monthName && prev.monthName !== cur.monthName) {
+    return { text: cur.day > 0 ? `${cur.monthName} · ${cur.day}日` : cur.monthName, scale: 'month' };
+  }
+
+  // 跨日：隔一天写"次日"，隔更久写落到哪一日
+  const dayGap = cur.dayCount - prev.dayCount;
+  if (dayGap !== 0) {
+    const phaseSuffix = cur.phase ? ` · ${cur.phase}` : '';
+    if (dayGap === 1) return { text: `次日${phaseSuffix}`, scale: 'day' };
+    const absolute = cur.monthName && cur.day > 0 ? `${cur.monthName} · ${cur.day}日` : '数日之后';
+    return { text: `${absolute}${phaseSuffix}`, scale: 'day' };
+  }
+
+  // 同日之内换了时段：只写时段，白天走到入夜也该让玩家察觉
+  if (cur.phase && prev.phase && prev.phase !== cur.phase) return { text: cur.phase, scale: 'phase' };
+
+  return null;
+}
+
+const DIVIDER_STYLE: Record<TimeDividerScale, string> = {
+  year:  'text-[11px] tracking-[0.08em] border-primary/35 bg-primary/10 text-primary font-semibold',
+  month: 'text-[10px] border-border/70 bg-muted/60 text-foreground/75',
+  day:   'text-[10px] border-border/60 bg-muted/45 text-muted-foreground',
+  phase: 'text-[9px] border-border/40 bg-muted/30 text-muted-foreground/80',
+};
+
+/** 日期分隔条：两侧细线 + 中间一枚绝对时间节点。 */
+function TimeDividerRow({ divider }: { divider: TimeDivider }) {
+  return (
+    <div className="relative my-3 flex items-center gap-2 px-2 pointer-events-none select-none">
+      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/70 to-transparent" />
+      <span className={cn('font-serif-cn rounded-full border px-2.5 py-0.5 whitespace-nowrap', DIVIDER_STYLE[divider.scale])}>
+        {divider.text}
+      </span>
+      <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/70 to-transparent" />
+    </div>
+  );
 }
 
 function eventTypeLabel(event: GameEvent, prevEvent?: GameEvent) {
@@ -480,14 +559,18 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
           const visibleEffects = (event.effects || []).filter(isVisibleEffect);
           const ageMeta = sameAgeMeta[idx] || { count: 1, index: 1, isContinuation: false };
           const prevEvent = idx > 0 ? events[idx - 1] : undefined;
-          // 节起始：fate_node / breakthrough / death / ascension / 同年首条 加弱化细线
-          const isSectionStart = isFate || isBreakthrough || isDeath || isAscension ||
-            (idx === 0) || (prevEvent && prevEvent.age !== event.age);
-          const timeText = eventTimeLabel(event, ageMeta, prevEvent);
+          // 2026-08-31：日期分隔条取代原先"每条卡片顶上一串时间"。
+          const divider = computeTimeDivider(event, prevEvent);
+          // 破境 / 因缘转折 / 陨落 / 飞升 自带节点语义，保留原来那道弱化细线；
+          // 但"同年首条 / 开篇"这两个触发条件已被分隔条覆盖，撤掉免得两层分隔叠着出现。
+          const showMilestoneRule = (isFate || isBreakthrough || isDeath || isAscension) && !divider;
+          // 连续态与同年续写一样走紧凑排版，视觉上黏在上一条下面
+          const isTightScene = ageMeta.isContinuation || isContinuousScene(event);
           const typeText = eventTypeLabel(event, prevEvent);
           return (
             <Fragment key={event.id || idx}>
-            {isSectionStart && (
+            {divider && <TimeDividerRow divider={divider} />}
+            {showMilestoneRule && (
               <div className="relative my-3 flex items-center gap-2 px-2 pointer-events-none">
                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/60 to-transparent" />
                 <span className="text-[9px] tracking-[0.3em] text-muted-foreground/50 font-serif-cn">·</span>
@@ -497,7 +580,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
             <div
               className={cn(
                 "relative pl-10 scroll-reveal",
-                ageMeta.isContinuation && "-mt-1 pl-14",
+                isTightScene && "-mt-1 pl-14",
                 (isFate || isBreakthrough) && "scale-100"
               )}
             >
@@ -527,24 +610,18 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                   isDeath ? "border-destructive/40 bg-destructive/5" :
                   isAscension ? "border-yellow-400/40 bg-yellow-400/5" :
                   isExploration ? "border-emerald-500/40 bg-emerald-500/5" :
-                  ageMeta.isContinuation ? "border-border/50 bg-card/55 border-l-4 border-l-amber-500/35 shadow-none" :
+                  isTightScene ? "border-border/50 bg-card/55 border-l-4 border-l-amber-500/35 shadow-none" :
                   "border-border/60 bg-card/80",
                   "hover:shadow-md hover:border-primary/40",
                   !isExpanded && "py-2"
                 )}
                 onClick={() => toggle(idx)}
               >
-                {/* 头部 - 始终可见 */}
+                {/* 头部 - 始终可见
+                    2026-08-31：原来这里挂的整串时间已撤走。时间节点统一由上方的日期分隔条承担，
+                    卡片顶上不再逐条重复，"没提到时间就是现在进行"才立得住。 */}
                 <div className="flex items-center justify-between mb-0.5 px-3 pt-2">
                   <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    {timeText && (
-                      <span className={cn(
-                        "text-xs font-bold font-serif-cn",
-                        ageMeta.isContinuation ? "text-amber-600 dark:text-amber-300" : "text-primary"
-                      )}>
-                        {timeText}
-                      </span>
-                    )}
                     {isFate && (
                       <span className="seal text-[9px]">命</span>
                     )}
@@ -575,7 +652,7 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                 {/* 标题 - 始终可见 */}
                 <h4 className={cn(
                   "font-semibold font-serif-cn px-3 xianxia-readable",
-                  ageMeta.isContinuation ? "text-xs text-foreground/85" : "text-sm",
+                  isTightScene ? "text-xs text-foreground/85" : "text-sm",
                   isExpanded ? "pb-1" : "pb-2"
                 )}>
                   {event.title}

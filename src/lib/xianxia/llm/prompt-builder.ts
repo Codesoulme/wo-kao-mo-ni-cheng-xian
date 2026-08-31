@@ -291,10 +291,11 @@ export const SCENE_PROMPTS: Record<string, string> = {
   即便本轮主线简短，也可以在结尾追加一个轻量 choice（例如"当晚回房时"层面的选择），只要不生硬即可。**不要**因为"这年很平"就一律略过——这是玩家参与感的核心。
 - choice 结构必须为：{"prompt":"抉择问题","options":[{"text":"选项文字（必填，勿留空）","hint":"选后可能的叙事倾向（可选）"}]}，2-4 个选项；hasChoice=true 时 options 每项必须有非空 text。
 - 【拍卖会入场规则】若蓝图/情境是拍卖大会、拍卖行、黑市大拍、交易大会等大型拍卖，不要在本轮直接生成完整拍卖长剧情；只能写轻量入场邀请/场外见闻，并设置 hasChoice=true，choice 让玩家确认是否进入（如「入场竞拍」「只在外场观望」「转身离去」）。未确认进入前，不生成逐件拍品、竞拍者资产心理和大段竞价流程，避免无谓消耗。
-- 普通年份主 narrative **150-250 字**，这是单气泡舒适上限；若叙事完整写完会超过 250 字，或同一岁发生多个关键片段（如先童年趣事、后灵气初触、再破境），**必须用 extraEvents 拆成多条短事件**，每条 60-150 字，依次排好时间戳（timeAdvance.label 写"数日后"/"数月后"等），让前端逐条分气泡显示。**严禁在中途硬切**：单条 narrative 必须是一个动作或场景的完整闭环，不要在"手指还没碰到鸡尾巴，那鸡"这种半截动作上停住。如果写到 250 字发现故事还没讲完，不要继续硬塞在本条里，立刻用 extraEvents 续写。 narrative 字段**绝对禁止**以冒号、引号开头但未闭合的对话结尾，必须在完整句子上结束。
+- 普通年份主 narrative **150-250 字**，这是单气泡舒适上限；若叙事完整写完会超过 250 字，或同一岁发生多个关键片段（如先童年趣事、后灵气初触、再破境），**必须用 extraEvents 拆成多条短事件**，每条 60-150 字，逐条给 timeAdvance（2026-08-31 改口径：同一场戏往下续写的用连续态 unit="continuous"、label 留空串、正文不写时间词；真隔了一段光景才另起的那条，才报时并把时间词写进正文开头，详见下方「本轮报时约定」），让前端逐条分气泡显示。**严禁在中途硬切**：单条 narrative 必须是一个动作或场景的完整闭环，不要在"手指还没碰到鸡尾巴，那鸡"这种半截动作上停住。如果写到 250 字发现故事还没讲完，不要继续硬塞在本条里，立刻用 extraEvents 续写。 narrative 字段**绝对禁止**以冒号、引号开头但未闭合的对话结尾，必须在完整句子上结束。
 - 【作家工作流】写之前先在脑里走这五步，缺一不可：
 
-一、选切口（最重要）。不写「暮春三月将尽/时光荏苒/岁月如梭/且说那/话说/数年后/某日」这种抽象时间框。
+一、选切口（最重要）。不写「暮春三月将尽/时光荏苒/岁月如梭/且说那/话说/某日」这种抽象时间框。
+（2026-08-31 例外：本段真跨了时间时，开头可以先用一个明确的时间短语报时，如「当晚，」「三月后，」；但报完必须立刻落到具体动作、物件或感官上，不许停在时间框里空转。没跨时间就别写任何时间词。）
 从一个具体动作/物件/感官切入：
   - 手里在做什么（用刀尖挑灯芯、把茶盏搁在膝头、蹲下摸牛背）
   - 看到了什么（一线光从门缝漏进、墙根苔痕新绿了一层、远处炊烟三两处）
@@ -672,12 +673,21 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
 
   // 2026-07-12：本轮时间范围——把引擎推断出的 timeAdvance 显式告诉 AI，避免 AI
   // 在主 narrative 里写"三个月后"导致下一帧引擎又跳一年。
-  // 优先级：sameYearThread → 月内；urgency → 1 月；category 暗示 → 月/日/年；兜底 1 年。
-  // AI 必须按本范围写；要承接 X 月后/X 年后事件，必须额外用 extraEvents 写并附 timeAdvance。
-  const ta = (ctx as any).suggestedTimeAdvance || { amount: 1, unit: 'year', label: '一年后', ageDeltaYears: 1, elapsedDays: 365 };
-  const taUnitCn = ({ moment: '一瞬', hour: '一时辰', day: '一日', month: '一月', season: '一季', year: '一年', decade: '十年', century: '百年' } as Record<string, string>)[ta.unit] || ta.unit;
+  // 优先级：sameYearThread → 月内；urgency → 1 月；category 暗示 → 月/日/年。
+  // 2026-08-31 时序改制：兜底从「一年后」翻成连续态，报时口径改成网文调式。
+  // 旧版把 label 当作"每条都要挂的题签"，于是条条都标 = 等于没标；信息不足又兜底跳一年，
+  // 正是玩家说的"上一条还说很要紧，下一条就一年后了"。新口径：没提时间就是接着刚才，
+  // 真动了时间才在正文开头报一句，并让 timeAdvance 与正文严格对上。
+  const ta = (ctx as any).suggestedTimeAdvance || { amount: 1, unit: 'continuous', label: '', reason: '紧接上一幕', ageDeltaYears: 0, elapsedDays: 0, elapsedHours: 0 };
+  const taIsContinuous = ta.unit === 'continuous';
+  // continuous 必须在表里，否则 || ta.unit 会把英文单词直接吐给模型。
+  // 顺手把量词从"一月/一时辰"改成裸单位，旧写法拼出来是"3 一月""1 一时辰"。
+  const taUnitCn = ({ continuous: '（接着刚才）', moment: '瞬', hour: '个时辰', day: '日', month: '个月', season: '季', year: '年', decade: '十年', century: '百年' } as Record<string, string>)[ta.unit] || ta.unit;
   const taSpanDesc = ta.ageDeltaYears === 0 ? '（同年补完，不跨岁）' : `（跨 ${ta.ageDeltaYears} 岁 / 约 ${ta.elapsedDays} 日）`;
-  const timeRangeHint = `[本轮时间范围·硬约束]\n本轮叙事覆盖 ${ta.amount} ${taUnitCn}，${taSpanDesc}——\n- narrative 描述的事件必须在 [${ta.label}] 之内；\n- 若承接"三月后"/"半年后"/"数月后"等年内后续，必须用 extraEvents（附 timeAdvance={amount, unit, label, ageDeltaYears:0, elapsedDays}）；\n- 若承接跨年后续（如"一年后"/"三年后"），优先 newThreads(deadlineAge) 或 dueInSameYear=true，让下次推进自动承接；\n- narrative 里出现"X 月后"/"X 年后"必须与 timeAdvance 同步，否则玩家会感觉"那几个月凭空跳了"。\n`;
+  const taHead = taIsContinuous
+    ? '引擎给本轮的缺省是【连续态】：紧接上一幕，不另起时点，正文里不要出现任何时间词。'
+    : `引擎给本轮的跨度是 ${ta.amount} ${taUnitCn}${taSpanDesc}，可用的时间词是「${ta.label}」。`;
+  const timeRangeHint = `[本轮报时约定]\n${taHead}\n报时分三档，按本段实际需要挑一档，不要每条都报——像网络小说那样：没提时间，读者就默认是现在正在发生；提了时间，读者才知道跳到了哪里。\n\n一、连续态（缺省，最常用）。本段紧接上一幕，narrative 一个时间词都不写，直接从动作、对白或感官切入。timeAdvance 给 {"amount":1,"unit":"continuous","label":"","ageDeltaYears":0,"elapsedDays":0}。前端拿到空 label 就不画时间元素，相邻两条黏成同一场戏。\n\n二、日内小跳：当晚 / 入夜后 / 次日清晨 / 午后 / 凌晨。这个词必须写进 narrative 开头分句，例：「当晚，柴门被人叩响。」timeAdvance 给 unit:"hour" 并附 setDayHour——它是同一天里的绝对时点，常用取值：凌晨 3、拂晓 5.5、清晨 7、日中 12、午后 14.5、黄昏 18.5、入夜 20.5、夜半 0.5。示例：{"amount":1,"unit":"hour","label":"当晚","ageDeltaYears":0,"elapsedDays":0,"setDayHour":20.5}。留意「当晚」说的是同一天的夜里，不是往后推十二个时辰。\n\n三、大跨越：三月后 / 闭关五年后。同样把这个词写进 narrative 开头分句，timeAdvance 用 month / season / year 级 unit，配齐 ageDeltaYears 与 elapsedDays（一月约 30 日、一季 90 日、一年 365 日）。大跨越还必须在正文里交代过渡：这段光景角色靠什么过活、做成了什么、身上留下什么变化；只贴一句"三月后"就跳过去，玩家会觉得那段日子凭空蒸发。\n\n[对齐硬规矩]\n- 正文与 timeAdvance 必须说同一件事：开头写了时间词，unit 就不能是 continuous；unit 报了跨度，正文就必须把这个词写出来。一边写"一年后"一边给连续态，或者反过来，都算违规。\n- 同一场戏往下续写，用 extraEvents 配连续态；真的隔了一段光景才另起的那条，才在它自己的 timeAdvance 上报时。\n- 跨年的后续（一年后再赴约、三年后重回旧地）不要在本轮硬写完，用 newThreads(deadlineAge) 或 dueInSameYear=true 交给下次推进承接。\n`;
 
   return `${cultivationCriticalAlert}${choiceIntervalNotice}${timeRangeHint}
 【状态快照区】
@@ -871,9 +881,9 @@ ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx
   "breakthroughTargetRealm": null,
   "breakthroughTargetLevel": null,
   "realmProfilePatch": null,
-  "extraEvents": [{"title":"\u540c\u5c81\u7eed\u7f18","narrative":"\u4e09\u6708\u4e4b\u540e\uff0c\u524d\u4e8b\u81ea\u7136\u56de\u54cd\u3002","eventType":"normal","timeAdvance":{"amount":3,"unit":"month","label":"\u4e09\u6708\u540e","reason":"\u627f\u63a5\u540c\u5e74\u56e0\u7f18","ageDeltaYears":0,"elapsedDays":90},"actionProjections":[]}],
-\u65f6\u95f4\u9898\u7b7e\u89c4\u5219\uff1atimeAdvance.label \u662f\u73a9\u5bb6\u53ef\u89c1\u7684\u672c\u6bb5\u65f6\u95f4\u9898\u7b7e\uff0c\u53ea\u5199\u201c\u4e00\u5e74\u540e\u201d\u201c\u4e09\u6708\u540e\u201d\u201c\u7fcc\u65e5\u201d\u201c\u534a\u65e5\u540e\u201d\u201c\u95ed\u5173\u6570\u8f7d\u540e\u201d\u8fd9\u7c7b\u65f6\u95f4\u8868\u8fbe\uff1b\u4e0d\u5f97\u5199\u201c\u524d\u5f80\u67d0\u5730\u201d\u201c\u6267\u884c\u7ea6\u5b9a\u201d\u201c\u8ffd\u67e5\u56e0\u7f18\u201d\u7b49\u884c\u52a8\u53e5\u3002
-\u5f15\u64ce\u4f1a\u628a timeAdvance.label \u4e0e\u771f\u5b9e\u4ed9\u5386\u7ec4\u6210 worldTime.displayLabel\uff0c\u524d\u7aef\u53ea\u5c55\u793a displayLabel\u3002\u540c\u5e74/\u540c\u5c81\u8ffd\u52a0\u4e8b\u4ef6\u7684 narrative \u4e0d\u8981\u53cd\u590d\u5199\u5e74\u9f84\uff0c\u4e0d\u8981\u7528\u201cX\u5c81\u7684\u67d0\u67d0\u201d\u5f00\u5934\u3002
+  "extraEvents": [{"title":"\u7076\u95f4\u4f59\u8bdd","narrative":"\u4ed6\u628a\u7897\u63a8\u5230\u4e00\u8fb9\uff0c\u6ca1\u559d\u3002","eventType":"normal","timeAdvance":{"amount":1,"unit":"continuous","label":"","reason":"\u7d27\u63a5\u4e0a\u4e00\u5e55","ageDeltaYears":0,"elapsedDays":0},"actionProjections":[]},{"title":"\u53e9\u95e8\u4eba","narrative":"\u5f53\u665a\uff0c\u67f4\u95e8\u88ab\u4eba\u53e9\u54cd\u3002","eventType":"normal","timeAdvance":{"amount":1,"unit":"hour","label":"\u5f53\u665a","reason":"\u540c\u65e5\u591c\u95f4","ageDeltaYears":0,"elapsedDays":0,"setDayHour":20.5},"actionProjections":[]},{"title":"\u540c\u5c81\u7eed\u7f18","narrative":"\u4e09\u6708\u540e\uff0c\u524d\u4e8b\u81ea\u7136\u56de\u54cd\u3002","eventType":"normal","timeAdvance":{"amount":3,"unit":"month","label":"\u4e09\u6708\u540e","reason":"\u627f\u63a5\u540c\u5e74\u56e0\u7f18","ageDeltaYears":0,"elapsedDays":90},"actionProjections":[]}],
+\u62a5\u65f6\u89c4\u5219\uff082026-08-31 \u6539\u53e3\u5f84\uff09\uff1atimeAdvance.label \u9000\u5c45\u4e3a\u5f15\u64ce\u5206\u6bb5\u7528\u7684\u5185\u90e8\u6807\u8bb0\uff0c\u73a9\u5bb6\u4e3b\u8981\u4ece narrative \u6b63\u6587\u8bfb\u5230\u65f6\u95f4\u2014\u2014\u6240\u4ee5\u6b63\u6587\u52a8\u4e86\u65f6\u95f4\u5c31\u5fc5\u987b\u5728\u5f00\u5934\u5206\u53e5\u5199\u51fa\u6765\uff0c\u6ca1\u52a8\u5c31\u4e00\u4e2a\u65f6\u95f4\u8bcd\u90fd\u4e0d\u8bb8\u5199\u3002label \u53ea\u5199\u65f6\u95f4\u8868\u8fbe\uff08\u7fcc\u65e5 / \u4e09\u6708\u540e / \u5f53\u665a / \u95ed\u5173\u4e94\u5e74\u540e\uff09\uff0c\u4e0d\u5199"\u524d\u5f80\u67d0\u5730""\u6267\u884c\u7ea6\u5b9a""\u8ffd\u67e5\u56e0\u7f18"\u8fd9\u7c7b\u884c\u52a8\u53e5\uff0c\u5199\u4e86\u4f1a\u88ab\u8fc7\u6ee4\u6210\u7a7a\u4e32\u3002\u8fde\u7eed\u6001\uff08unit="continuous"\uff09\u7684 label \u4e00\u5f8b\u7559\u7a7a\u4e32\uff0c\u524d\u7aef\u6574\u5757\u4e0d\u753b\u65f6\u95f4\u5143\u7d20\uff0c\u4e24\u6761\u4e8b\u4ef6\u5728\u89c6\u89c9\u4e0a\u9ecf\u6210\u540c\u4e00\u573a\u620f\u3002
+\u4e25\u7981\u6b63\u6587\u4e0e timeAdvance \u6253\u67b6\uff1a\u5199\u4e86"\u4e00\u5e74\u540e"\u5374\u7ed9\u8fde\u7eed\u6001\uff0c\u6216\u7ed9\u4e86\u6708\u7ea7\u8de8\u5ea6\u5374\u5728\u6b63\u6587\u91cc\u53ea\u5b57\u4e0d\u63d0\uff0c\u90fd\u4f1a\u8ba9\u73a9\u5bb6\u89c9\u5f97\u90a3\u6bb5\u5149\u666f\u51ed\u7a7a\u84b8\u53d1\u3002\u540c\u4e00\u573a\u620f\u91cc\u8ffd\u52a0\u7684\u4e8b\u4ef6\u4e0d\u8981\u53cd\u590d\u5199\u5e74\u9f84\uff0c\u4e5f\u4e0d\u8981\u7528"X\u5c81\u7684\u67d0\u67d0"\u5f00\u5934\u3002
   "causedDeath": false,
   "causedAscension": false,
   "newNpcs": [],
@@ -927,7 +937,7 @@ narrativeContract 必须声明本轮主要承接对象：
 - \u51e1\u4eba\u3001\u5e7c\u7ae5\u3001\u91cd\u4f24\u3001\u53d7\u56f0\u3001\u8d2b\u5f31\u3001\u4f4e\u5883\u754c\u3001\u5fc3\u9b54\u70bd\u76db\u7b49\u72b6\u6001\u90fd\u5e94\u9650\u5236\u884c\u52a8\u80fd\u529b\uff1b\u4e0d\u8981\u53ea\u6309\u201c\u7ebf\u7d22\u9700\u8981\u63a8\u8fdb\u201d\u8ba9\u89d2\u8272\u505a\u8d85\u51fa\u5f53\u4e0b\u80fd\u529b\u7684\u4e8b\u3002
 - \u7ebf\u7d22\u6458\u8981\u53ef\u4ee5\u5199\u7ed9 AI/\u5f15\u64ce\u8ffd\u8e2a\uff0c\u4f46\u73a9\u5bb6\u53ef\u89c1\u6b63\u6587\u5fc5\u987b\u6539\u5199\u6210\u89d2\u8272\u5f53\u4e0b\u771f\u5b9e\u80fd\u505a\u3001\u80fd\u611f\u53d7\u5230\u3001\u80fd\u88ab\u5377\u5165\u7684\u5177\u4f53\u4e16\u754c\u5185\u4e8b\u4ef6\u3002
 - \u82e5\u5f53\u524d\u72b6\u6001\u4e0d\u8db3\u4ee5\u6267\u884c\u67d0\u4e2a\u627f\u8bfa\u6216\u7ebf\u7d22\uff0c\u5e94\u5199\u201c\u6682\u7f13\u3001\u88ab\u5e26\u53bb\u3001\u542c\u95fb\u3001\u9519\u8fc7\u3001\u7b49\u5f85\u65f6\u673a\u3001\u7531\u4ed6\u4eba\u4ee3\u884c\u3001\u7559\u4e0b\u7275\u6302\u201d\u7b49\u5408\u7406\u627f\u63a5\uff0c\u800c\u4e0d\u662f\u786c\u8ba9\u89d2\u8272\u5b8c\u6210\u3002
-- \u540c\u5e74/\u540c\u5c81\u8ffd\u52a0\u4e8b\u4ef6\u7684 narrative \u4e0d\u8981\u53cd\u590d\u5199\u201c\u51e0\u5c81\u7684\u67d0\u67d0\u201d\u3001\u201cX\u5c81\u65f6\u201d\u3001\u201cX\u5c81\u90a3\u5e74\u201d\u7b49\u5e74\u9f84\u53e5\u5f0f\uff1b\u5e74\u9f84\u5df2\u7531\u4e8b\u4ef6\u65f6\u95f4\u6807\u7b7e\u627f\u62c5\uff0c\u6b63\u6587\u5e94\u76f4\u63a5\u5199\u5f53\u4e0b\u52a8\u4f5c\u3001\u611f\u53d7\u3001\u73af\u5883\u548c\u56e0\u679c\u3002
+- \u540c\u5e74/\u540c\u5c81\u8ffd\u52a0\u4e8b\u4ef6\u7684 narrative \u4e0d\u8981\u53cd\u590d\u5199\u201c\u51e0\u5c81\u7684\u67d0\u67d0\u201d\u3001\u201cX\u5c81\u65f6\u201d\u3001\u201cX\u5c81\u90a3\u5e74\u201d\u7b49\u5e74\u9f84\u53e5\u5f0f\uff1b\u5e74\u9f84\u7531\u754c\u9762\u81ea\u8eab\u627f\u62c5\uff082026-08-31\uff1a\u8fde\u7eed\u6001\u7684\u65f6\u95f4\u6807\u8bb0\u662f\u7a7a\u7684\uff0c\u522b\u6307\u671b\u5b83\u66ff\u4f60\u4ea4\u4ee3\uff09\uff0c\u6b63\u6587\u5e94\u76f4\u63a5\u5199\u5f53\u4e0b\u52a8\u4f5c\u3001\u611f\u53d7\u3001\u73af\u5883\u548c\u56e0\u679c\u3002
 \u4e25\u7981\u4fee\u6539 age\uff08\u5e74\u9f84\u7531\u5929\u9053\u63a8\u8fdb\uff0cAI \u4e0d\u5f97\u5728 changes \u4e2d\u5305\u542b age\uff09\u3002
 
 【Task 22 心魔值机制——参考《凡人修仙传》走火入魔设定】

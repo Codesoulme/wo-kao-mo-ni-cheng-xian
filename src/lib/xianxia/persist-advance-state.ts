@@ -46,7 +46,7 @@ export function buildAdvanceStateData(state: any, opts?: {
     ascended: state.ascended ?? false,
     isAtChoice: state.isAtChoice ?? false,
     pendingChoiceJson,
-    worldCalendarJson: worldCalendar ? JSON.stringify(worldCalendar) : '{"eraName":"青岚仙历","calendarYear":5000,"elapsedDays":0}',
+    worldCalendarJson: worldCalendar ? JSON.stringify(worldCalendar) : '{"eraName":"青岚仙历","calendarYear":5000,"elapsedDays":0,"dayHour":7}',
     causeOfDeath: opts?.causeOfDeath ?? state.causeOfDeath ?? null,
     // realmProfile: state.realmProfile ?? Prisma.JsonNull,  // Prisma schema 没此字段
     cultivationMultiplier: state.cultivationMultiplier,

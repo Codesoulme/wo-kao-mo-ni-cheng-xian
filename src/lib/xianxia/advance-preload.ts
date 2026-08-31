@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { dbToState, buildStateContext, tickStatusDurations, tickNaturalRecovery, checkFateNode, pickEventBlueprint, tickFormations, tickHeartDemon, tickPets, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES, EventBlueprint } from '@/lib/xianxia/types';
-import { clampTimeAdvance, suggestTimeAdvance } from '@/lib/xianxia/world-time';
+import { clampTimeAdvance, suggestTimeAdvance, extractEventMeta } from '@/lib/xianxia/world-time';
 import { buildFallbackAgeEvent } from '@/lib/xianxia/advance-fallback';
 import { extractNarrativeContractFeedback } from '@/lib/xianxia/state-change-log';
 
@@ -100,7 +100,30 @@ async function getRecentEvents(characterId: string) {
     title: e.title,
     narrative: e.narrative,
     eventType: e.eventType,
+    // 2026-08-31：带上 effects，供连续态计数用（时间元信息藏在 hiddenEventMeta 里）。
+    effects: e.effects,
   }));
+}
+
+/**
+ * 数一数末尾连着几条是连续态。
+ * 时序改制后缺省是「接着刚才」，若一直没人报时，角色会永远停在同一天；
+ * 这个计数喂给 suggestTimeAdvance 的防冻结闸门。
+ */
+function countTrailingContinuous(events: Array<{ effects?: string }>): number {
+  let n = 0;
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    let unit: string | undefined;
+    try {
+      unit = extractEventMeta(JSON.parse(events[i]?.effects || '[]'))?.timeAdvance?.unit;
+    } catch {
+      // 老数据/脏 JSON 不算连续态，就此打住——宁可少推，不要误推。
+      break;
+    }
+    if (unit === 'continuous') n += 1;
+    else break;
+  }
+  return n;
 }
 
 async function getNarrativeContractFeedback(characterId: string) {
@@ -152,6 +175,8 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     pendingThreads: state.pendingThreads || [],
     sameYearThread,
     blueprint,
+    // 2026-08-31：连续态防冻结闸门的入参。
+    consecutiveContinuous: countTrailingContinuous(recentEvents),
   });
   // 2026-07-12\uff1a\u53bb\u6389\u201c\u6709\u91cd\u590d\u4e8b\u4ef6\u5c31\u5f3a\u5236\u8986\u76d6\u4e3a 1 \u5e74\u201d\u7684\u903b\u8f91\u2014\u2014\u4e4b\u524d dedup \u68c0\u6d4b\u628a\u65f6\u95f4\u8de8\u5ea6\u4e5f\u4e00\u8d77\u6539\uff0c
   // \u662f\u201c\u90a3\u51e0\u4e2a\u6708\u5462\u5e73\u4f9d\u8df3\u4e86\u201d\u7684\u5143\u51f6\u4e4b\u4e00\u3002\u65f6\u95f4\u8de8\u5ea6\u7531 suggestTimeAdvance / blueprint / sameYearThread 

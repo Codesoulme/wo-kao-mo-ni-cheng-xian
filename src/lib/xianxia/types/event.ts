@@ -327,8 +327,10 @@ export interface TimeAdvance {
 
   amount: number;
 
-  unit: 'moment' | 'hour' | 'day' | 'month' | 'season' | 'year' | 'decade' | 'century';
+  // 2026-08-31：与 world-time.ts 的 TimeAdvanceUnit 保持一致，新增连续态。
+  unit: 'continuous' | 'moment' | 'hour' | 'day' | 'month' | 'season' | 'year' | 'decade' | 'century';
 
+  /** 玩家可见的相对时间题签；空串表示连续态，前端不渲染。 */
   label: string;
 
   reason: string;
@@ -336,6 +338,12 @@ export interface TimeAdvance {
   ageDeltaYears: number;
 
   elapsedDays: number;
+
+  /** 日内推进量（小时，可含小数）。 */
+  elapsedHours?: number;
+
+  /** 0..24 绝对时点，语义为"跳到同一天的那个时点"，优先于 elapsedHours。 */
+  setDayHour?: number;
 
 }
 

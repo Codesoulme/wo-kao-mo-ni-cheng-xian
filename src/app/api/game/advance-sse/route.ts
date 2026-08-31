@@ -9,7 +9,7 @@ import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { buildStateContext, executeAIEvent, stateToResponse, applyAnnualAttributeGrowth } from '@/lib/xianxia/engine';
 import { parseAchievementMarkers, applyAchievements } from '@/lib/xianxia/achievements';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay } from '@/lib/xianxia/world-time';
+import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, inferDayHourFromText, hourNameOf, phaseOf } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import { truncateNarrativeAtSentence } from '@/lib/xianxia/display';
 import { appendEvent } from '@/lib/xianxia/events/store';
@@ -226,7 +226,9 @@ export async function POST(req: NextRequest) {
         const isFateNode = candidate.isFateNode;
         const recentEvents = candidate.recentEvents || [];
         const narrativeContractFeedback = candidate.narrativeContractFeedback || [];
-        const timeAdvance = clampTimeAdvance(
+        // 2026-08-31：改 let。正文写完后要按行文里的报时词回校一次日内时点
+        //（详见下方「按正文回校日内时点」），所以这里不能锁死。
+        let timeAdvance = clampTimeAdvance(
           forceTimeAdvance || candidate.timeAdvance,
           candidate.timeAdvance
         );
@@ -246,7 +248,15 @@ export async function POST(req: NextRequest) {
           age: char.age,
           characterId,
           timeAdvance: { label: timeAdvance.label, ageDeltaYears: timeAdvance.ageDeltaYears, elapsedDays: timeAdvance.elapsedDays },
-          worldTime: { label: ws.label, displayLabel: ws.label, monthName: ws.monthName, day: ws.day, phase: ws.phase },
+          // 2026-08-31：displayLabel 原先直接抄 ws.label，绕开了连续态抑制，
+          // 于是"接着刚才"的那一条照样盖一枚全戳。改走同一个格式化口子。
+          worldTime: {
+            label: ws.label,
+            displayLabel: formatWorldTimeDisplay({ age: char.age, timeAdvance, worldTime: ws, includeAge: true }),
+            monthName: ws.monthName,
+            day: ws.day,
+            phase: ws.phase,
+          },
         });
 
         // ★ 心跳：每 3 秒推一个 comment 行（防止 Trae IDE 浏览器 30 秒无数据断开）
@@ -403,6 +413,41 @@ export async function POST(req: NextRequest) {
           }));
         }
         if (!aiOutput.narrative) aiOutput.narrative = stripInfluenceMarkers(prevNarrative || rawText);
+
+        // 3.4) 按正文回校日内时点
+        //   引擎在正文写出来之前就把日历推走了（上面第 239 行附近），那时还不知道
+        //   这段会写成"当晚"还是"翌日清晨"。于是过去会出现：正文说入夜，戳上写晨。
+        //   这里拿写完的开头分句反查一次绝对时点，只改 setDayHour，不碰
+        //   elapsedDays / ageDeltaYears——跨度归引擎，时点归行文，两边不打架。
+        try {
+          // 只看标题 + 正文开头分句。按报时约定，时间词落在首句才算报时；
+          // 扫全篇会把"他想起那年黄昏"这类回忆误当成当下时点。
+          const firstClause = String(aiOutput.narrative || '').split(/[，。！？；\n]/)[0] || '';
+          const opening = `${aiOutput.title || ''}\n${firstClause.slice(0, 24)}`;
+          const proseHour = inferDayHourFromText(opening);
+          if (proseHour !== undefined && proseHour !== timeAdvance.setDayHour) {
+            const HOUR_LABELS: Record<string, string> = {
+              '0.5': '夜半', '3': '凌晨', '5.5': '拂晓', '7': '清晨',
+              '12': '日中', '14.5': '午后', '18.5': '黄昏', '20.5': '入夜后',
+            };
+            const isContinuous = timeAdvance.unit === 'continuous';
+            timeAdvance = {
+              ...timeAdvance,
+              // 连续态被行文改口了：正文既然报了时点，它就不再是"接着刚才"。
+              unit: isContinuous ? 'hour' : timeAdvance.unit,
+              label: isContinuous ? (HOUR_LABELS[String(proseHour)] || phaseOf(proseHour)) : timeAdvance.label,
+              elapsedHours: 0,
+              setDayHour: proseHour,
+            };
+            if (worldCalendarBefore) {
+              worldCalendar = advanceWorldCalendar(worldCalendarBefore, timeAdvance);
+              console.log('[SSE] 日内时点按正文回校:', timeAdvance.label, hourNameOf(proseHour));
+            }
+          }
+        } catch (e: any) {
+          // 回校失败一律沿用引擎原值，绝不阻断主流程。
+          console.warn('[SSE] 日内时点回校跳过:', e?.message);
+        }
 
         // 3.5) 行动前影子试算 + 高风险单轮自我纠偏
         //   系统 1：拿 aiOutput 在 state 的离线副本上跑一遍 executeAIEvent，把散落的险情原料
