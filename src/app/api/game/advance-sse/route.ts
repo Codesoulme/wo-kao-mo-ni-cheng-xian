@@ -13,6 +13,9 @@ import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import { truncateNarrativeAtSentence } from '@/lib/xianxia/display';
 import { appendEvent } from '@/lib/xianxia/events/store';
+// 摘要层接线 · 甲步：纪要生成排在响应关闭之后，不进 prompt、不改模型输入。
+// scheduleDigestRefresh 同步返回且不返回 promise，签名上就堵死了 await。
+import { scheduleDigestRefresh } from '@/lib/xianxia/memory/digest-refresh';
 import {
   callLLMStream,
   buildAdvancePrompt,
@@ -1082,6 +1085,18 @@ displayEffects = buildEventDisplayEffects({
         });
 
         close();
+
+        // 8) 响应已关闭之后才排纪要——旁路派生物，绝不让玩家为它多等。
+        //    内部自带 try/catch + 宏任务，此处再兜一层，任何异常都不影响已发出的内容。
+        try {
+          scheduleDigestRefresh({
+            characterId,
+            currentRealm: finalState?.realm,
+            currentAge: finalState?.age,
+          });
+        } catch (e: any) {
+          console.warn('[advance-sse] 纪要排期失败（非致命，玩家侧无影响）:', e?.message || e);
+        }
         } catch (err: any) {
           console.error('[SSE] executeAIEvent error:', err?.message, err?.stack);
           // 兜底：仍然推送 done 事件 + close（不阻断客户端收尾）
