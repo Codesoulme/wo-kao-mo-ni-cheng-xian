@@ -51,3 +51,6 @@ logs/bench/
 # 一次性审查产物 / 乱码快照备份（2026-08-29 清理后禁止再入库）
 review_results.txt
 *.mojibake-snapshot.bak
+
+# 调用观测层落盘目录（append-only，不入库）
+.xianxia-usage/

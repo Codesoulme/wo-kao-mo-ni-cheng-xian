@@ -1,0 +1,37 @@
+{
+  "id": "replay-breakthrough-04-境界突破桥市换符",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "breakthrough",
+  "stratumLabel": "突破",
+  "prompt": "真实产出重放 · 突破 · eventType=breakthrough · age=29 · title=境界突破·桥市换符",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "境界突破·桥市换符",
+    "narrative": "沈清萝自知灵息只差一线，未敢贸然冲关。她先在芦屋中静坐半月，压住肩臂旧痛，随后携水獾獠牙往桥头坊市。摊贩嫌獠牙腥气未净，只愿出三枚碎灵钱；她不急售，转至符摊前细看青纹走向。摊主见她身无灵石，便以獠牙折价，换给她一张旧护身符。归途江雾渐起，她把符收入怀中，仍回柳溪村畔调息，借坊市所见符纹收束丹田气机，关前心绪更稳。"
+  },
+  "gateOptions": {
+    "scope": "breakthrough"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "breakthrough",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqjx4vpq001fafcoreh38xlj",
+    "createdAt": 1781812463246,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

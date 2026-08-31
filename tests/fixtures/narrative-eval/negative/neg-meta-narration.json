@@ -1,0 +1,54 @@
+{
+  "id": "neg-meta-narration",
+  "route": "丙",
+  "kind": "negative",
+  "label": "元叙事旁白",
+  "prompt": "反面样本 · 元叙事旁白",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "降生",
+    "narrative": "李青云在柳溪村李家院出生。他还不明白这意味着什么，只是被抱起来时哭了两声。这一刻他还不懂，院里那株老槐无风自动是为了谁。母亲把他裹进旧布里，年纪尚小的他对身外的动静还只是懵懂的喜悦。"
+  },
+  "gateOptions": {
+    "scope": "birth",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G3"
+    ]
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "「他还不明白这意味着什么」「这一刻他还不懂」是上帝视角替玩家解读心理"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [
+      "metacog-notyet:他还不明白这意味",
+      "metacog-moment:这一刻他还不懂",
+      "metacog-tooyoung:年纪尚小的他对身外的动静还只是懵懂",
+      "metacog-innocent:懵懂的喜悦"
+    ],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "meta-narration"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "prompt-builder.ts:276 元叙述禁令（原 :339）",
+    "mustFailGates": [
+      "G3"
+    ]
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：「他还不明白这意味着什么」「这一刻他还不懂」是上帝视角替玩家解读心理"
+}

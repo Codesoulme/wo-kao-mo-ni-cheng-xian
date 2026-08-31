@@ -1,0 +1,47 @@
+{
+  "id": "neg-empty-cliche",
+  "route": "丙",
+  "kind": "negative",
+  "label": "空转套话（一年白过）",
+  "prompt": "反面样本 · 空转套话（一年白过）",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "平淡的一年",
+    "narrative": "这一年就这样平淡地过去了。沈砚舟依旧每天在药圃里忙碌，日子波澜不惊。时间一天天流逝，转眼又是一年。没有发生什么特别的事情，一切照旧。他的修行也在稳步推进，未来还有很长的路要走。"
+  },
+  "gateOptions": {
+    "scope": "advance",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "全篇套话，无任何具体事件、人物、地点变化",
+    "「时间一天天流逝」「未来还有很长的路要走」是填字，不是叙事",
+    "与「一年只发生一件事」的反面——这里是一年什么都没发生"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "empty-cliche"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "prompt-builder.ts:184 年度多段叙事要求的反面",
+    "mustFailGates": []
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：全篇套话，无任何具体事件、人物、地点变化；「时间一天天流逝」「未来还有很长的路要走」是填字，不是叙事；与「一年只发生一件事」的反面——这里是一年什么都没发生"
+}

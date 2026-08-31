@@ -1,0 +1,37 @@
+{
+  "id": "replay-interference-03-干扰天道回响",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "interference",
+  "stratumLabel": "天道回响",
+  "prompt": "真实产出重放 · 天道回响 · eventType=interference · age=24 · title=干扰·天道回响",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "干扰·天道回响",
+    "narrative": "沈清澜趁退潮背网出村，沿白潮渔村外的礁线搜寻水妖踪迹。沈家网法收放细密，临潮斗息使她在浪声间稳住气机，腰间水锈短刃贴着潮痕微凉。行至一处覆满青苔的暗礁时，海水忽地翻浊，数道细鳞影子绕礁游动，似被生人气血惊起，正朝浅滩逼近。"
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "interference",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk8z8ou008xafpk3xlu1qc4",
+    "createdAt": 1781832355518,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

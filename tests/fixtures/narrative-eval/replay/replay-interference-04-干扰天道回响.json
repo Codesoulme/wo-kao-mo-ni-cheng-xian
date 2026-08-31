@@ -1,0 +1,37 @@
+{
+  "id": "replay-interference-04-干扰天道回响",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "interference",
+  "stratumLabel": "天道回响",
+  "prompt": "真实产出重放 · 天道回响 · eventType=interference · age=45 · title=干扰·天道回响",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "干扰·天道回响",
+    "narrative": "沈清萝收拾木杖与符箓，沿青岚江畔打听延年益寿、调养凡躯之丹。村中药铺只识凡药，坊间偶闻小宗收筑基散修供奉，却多需根脚清白、丹符技艺或缴纳灵石。她未立刻远行，只先记下附近青桑门、听潮观两处招纳消息，并以水木灵力为父母调理气血，暂稳寒湿旧疾。"
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "interference",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk15hqu0015afi0rwz6qqhc",
+    "createdAt": 1781819210262,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

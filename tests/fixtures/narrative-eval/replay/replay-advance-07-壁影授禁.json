@@ -1,0 +1,39 @@
+{
+  "id": "replay-advance-07-壁影授禁",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "advance",
+  "stratumLabel": "年岁推进",
+  "prompt": "真实产出重放 · 年岁推进 · eventType=normal · age=77 · title=壁影授禁",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "壁影授禁",
+    "narrative": "这一年，沈清萝未急着再入深水。她伤势尚未全复，便在柳溪村临江旧屋闭门养息，将潮禁玉片、青江沉砂与水纹残简一并铺开，日日以余脉辨禁之法摹写半潮门影。入秋一夜，江雾倒灌窗棂，残简中浮出半幅潮壁旧影，似有前辈遗留神念顺水纹而现，只点出一句潮不争门，门自随息。她循此调息，胸腹旧创少痛，半截潮门的断纹也终于连上两处浅脉。\n\n【天道感应】修为圆满，水到渠成，你气脉更进一步，晋至4层。"
+  },
+  "gateOptions": {
+    "scope": "advance"
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G2"
+    ]
+  },
+  "tags": [
+    "real-replay",
+    "advance",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk5esll001lafpkw42azipn",
+    "createdAt": 1781826362698,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": true
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

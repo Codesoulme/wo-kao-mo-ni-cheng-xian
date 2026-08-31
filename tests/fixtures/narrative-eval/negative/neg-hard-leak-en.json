@@ -1,0 +1,54 @@
+{
+  "id": "neg-hard-leak-en",
+  "route": "丙",
+  "kind": "negative",
+  "label": "英文技术词泄漏",
+  "prompt": "反面样本 · 英文技术词泄漏",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "闭关三月",
+    "narrative": "孟寒山在丹房里坐了三个月。schema 校验没通过，这一段 narrative 只好重新生成，好在 cache 里还留着上次的 prompt，token 没白花。他推开门，外面的雪已经积到膝盖。丹炉底下的火早就熄了，他伸手摸了摸炉壁，还有一点余温。"
+  },
+  "gateOptions": {
+    "scope": "advance",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G1"
+    ]
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "schema / narrative / cache / prompt / token 全是技术词，零容忍"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [
+      "leak-en:schema",
+      "leak-en:cache",
+      "leak-en:prompt",
+      "leak-en:token"
+    ],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "hard-leak-en"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "ai-output-regression.ts:41-49 BANNED_TERMS",
+    "mustFailGates": [
+      "G1"
+    ]
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：schema / narrative / cache / prompt / token 全是技术词，零容忍"
+}

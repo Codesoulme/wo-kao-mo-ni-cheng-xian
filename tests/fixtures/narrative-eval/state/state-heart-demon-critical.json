@@ -1,0 +1,261 @@
+{
+  "id": "state-heart-demon-critical",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "心魔临界",
+  "prompt": "状态快照 · 心魔临界 · 心魔近满，叙事应让判断失准、走火风险真实参与，而不是只挂个标签",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "孟寒山",
+      "age": 58,
+      "lifespan": 200,
+      "gender": "男",
+      "spiritualRoot": "pure",
+      "rootDetail": "火单灵根",
+      "realm": "foundation",
+      "realmName": "筑基期",
+      "realmLevel": 7,
+      "realmMaxLevel": 9,
+      "cultivationExp": 4200,
+      "expToBreak": 5000,
+      "elements": {
+        "metal": 10,
+        "wood": 40,
+        "water": 55,
+        "fire": 5,
+        "earth": 15
+      },
+      "hp": 300,
+      "maxHp": 620,
+      "mp": 410,
+      "maxMp": 500,
+      "attack": 96,
+      "defense": 60,
+      "speed": 70,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 119,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 76,
+          "description": "当前神魂境界：神魂稳固（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 130,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 119,
+      "soulStrength": 76,
+      "physicalFoundation": 130,
+      "combatProjection": {
+        "force": 116,
+        "guard": 85,
+        "agility": 83,
+        "spiritualAwareness": 119,
+        "soulStability": 76,
+        "bodyTenacity": 130,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "御器斗法：破势116、护持85、机变83",
+        "advantages": [
+          "破势偏盛"
+        ],
+        "vulnerabilities": [
+          "神识锐而魂魄承载不足",
+          "攻锋过盛，护持偏薄",
+          "心魔牵动神魂"
+        ]
+      },
+      "soulRealmName": "神魂稳固",
+      "soulRealmRank": 3,
+      "soulRealmGap": "身神相称",
+      "luck": 22,
+      "comprehension": 66,
+      "spiritStones": 90,
+      "reputation": -30,
+      "faction": "",
+      "master": "",
+      "location": "赤石岭废弃丹房",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 92
+    },
+    "activeStatuses": [
+      {
+        "rarity": "epic",
+        "duration": -1,
+        "effects": [],
+        "id": "st-heart-demon",
+        "name": "心火焚神",
+        "description": "入定就见旧人，手心常有黑纹浮出，夜里听得见有人叫他名字。",
+        "category": "debuff",
+        "source": "杀业积压"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 1.9,
+    "cultivationInsight": "火灵根催丹快，也催心火。近半年一坐下来，眼前就烧起旧事。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "师兄的丹方是他抢的，抢完那晚师兄跳了崖。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 58,
+      "hints": [],
+      "pressureMap": {
+        "likelyEventTypes": [],
+        "summary": "事件倾向：日常推进"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "道基初成，法力凝实，以稳固道基、神识初放和洞府经营为要",
+      "bottleneck": "道基稳固度、功法后续与结丹资源缺口",
+      "breakthroughTrial": "需结丹因缘、丹药、心性与道基成色相合",
+      "capabilities": [
+        "稳定御器远行",
+        "神识探查周身",
+        "开辟或经营洞府"
+      ],
+      "limitations": [
+        "难驾驭本命法宝",
+        "金丹禁制仍难硬破",
+        "长途斗法耗损明显"
+      ],
+      "worldAccess": [
+        "宗门核心外围",
+        "洞府经营",
+        "秘境外层",
+        "筑基坊市"
+      ],
+      "socialWeight": "已算低阶骨干，炼气修士多有忌惮，小宗门开始重视",
+      "combatStyle": [
+        "御器斗法",
+        "神识预判",
+        "护体灵光维持"
+      ],
+      "resourceNeeds": [
+        "结丹灵物",
+        "高阶功法后续",
+        "洞府灵脉",
+        "稳固道基的丹药"
+      ],
+      "riskTags": [
+        "道基受损",
+        "神识反噬",
+        "结丹失败"
+      ]
+    },
+    "pendingThreads": [],
+    "questEntries": [],
+    "characterIntents": [
+      {
+        "id": "intent_break_58",
+        "type": "breakthrough",
+        "title": "酝酿突破",
+        "description": "修为将满，应闭关参悟、稳固道心、准备突破。若有突破辅助丹药应及早服用。",
+        "priority": 7
+      },
+      {
+        "id": "intent_weapon_58",
+        "type": "gather_resources",
+        "title": "寻觅兵器",
+        "description": "已入修行却无趁手兵器，应主动寻一把剑/刀/杖/法宝防身。",
+        "priority": 6
+      }
+    ],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "heart-demon-critical"
+  ],
+  "expectedNarrativeTraits": [
+    "心魔真实影响判断",
+    "走火/失控的具体表现",
+    "不得只作背景标签"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库心魔值都在低位"
+  },
+  "notes": "乙路极端态：心魔近满，叙事应让判断失准、走火风险真实参与，而不是只挂个标签"
+}

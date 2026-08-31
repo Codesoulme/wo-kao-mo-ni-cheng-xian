@@ -1,0 +1,37 @@
+{
+  "id": "replay-breakthrough-06-境界突破寒苇采珠",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "breakthrough",
+  "stratumLabel": "突破",
+  "prompt": "真实产出重放 · 突破 · eventType=breakthrough · age=53 · title=境界突破·寒苇采珠",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "境界突破·寒苇采珠",
+    "narrative": "沈清萝知江底再探只余一年，未再远行，只在青岚江下游寒苇滩闭关数旬，待心神稳住后，携沉水木杖按水脉残图寻入一处暗涡。滩底淤泥间生着数茎水灵苇，根旁凝有米粒青珠，正可作破水禁时定息之物。她以护身符压住暗流寒劲，耗去大半灵力才采下一枚，又借珠中水木清气冲开关口，气息一度越过筑基壁障，却仍未完全破境，只得收势温养经脉。"
+  },
+  "gateOptions": {
+    "scope": "breakthrough"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "breakthrough",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk2szlg0003afbwtxf2odpk",
+    "createdAt": 1781821986100,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "replay-interference-07-干扰天道回响",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "interference",
+  "stratumLabel": "天道回响",
+  "prompt": "真实产出重放 · 天道回响 · eventType=interference · age=61 · title=干扰·天道回响",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "干扰·天道回响",
+    "narrative": "沈清萝收拾木杖与粗布衣，沿青岚山旧路上行。山门外松风仍冷，执事验过她当年候选木牌，又看她已筑基一层，言小试尚有补录，散修亦可入列，只是需三日后随众登试心石阶、辨灵植、受同阶切磋。她在外院暂记名，得一枚试牌，候试期间不得擅闯内山。"
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "interference",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk4bbqc000daf4g9a0kmali",
+    "createdAt": 1781824521252,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

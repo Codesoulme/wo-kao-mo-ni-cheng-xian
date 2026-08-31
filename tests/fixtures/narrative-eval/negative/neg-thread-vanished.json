@@ -1,0 +1,47 @@
+{
+  "id": "neg-thread-vanished",
+  "route": "丙",
+  "kind": "negative",
+  "label": "线索凭空消失",
+  "prompt": "反面样本 · 线索凭空消失",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "秋末",
+    "narrative": "秋末的风把坊市的幡子吹得直响。沈清澜在潮候看了半天云，回头去铁砧门取了把新刀。晚上她在客栈算了算灵石，还剩一百八十块，够撑到明年春天。第二天她往北走了，路上遇见一队运货的散修，跟着走了三日。"
+  },
+  "gateOptions": {
+    "scope": "advance",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "入参里「药债压门」已到期（deadlineAge=31，age=31），本轮完全没被承接",
+    "「半潮门影」标记 urgent 也未出现",
+    "另起了无关的北行事件，等于线索凭空消失"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "thread-vanished"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "prompt-builder.ts 未决线索连续性禁令 + 乙路 state-many-threads 快照",
+    "mustFailGates": []
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：入参里「药债压门」已到期（deadlineAge=31，age=31），本轮完全没被承接；「半潮门影」标记 urgent 也未出现；另起了无关的北行事件，等于线索凭空消失"
+}

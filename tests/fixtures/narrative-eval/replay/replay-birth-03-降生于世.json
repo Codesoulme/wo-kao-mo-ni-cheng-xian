@@ -1,0 +1,37 @@
+{
+  "id": "replay-birth-03-降生于世",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "birth",
+  "stratumLabel": "出生",
+  "prompt": "真实产出重放 · 出生 · eventType=normal · age=0 · title=降生于世",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "降生于世",
+    "narrative": "沈清砚生于暮春雨夜，青云山雾气低垂，溪水涨过石阶。其父夜归未久，屋中灯火忽明忽暗，窗外草木沾雨，泥土、柴火与铁锈般的气息交杂。邻里只道山雨寻常，唯接生老妪见婴儿啼哭时，掌心微有五色淡纹一闪即逝，旋即隐没。沈家家贫而守礼，只愿此子平安长成，不知命数已在幽微处落下一笔。"
+  },
+  "gateOptions": {
+    "scope": "birth"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "birth",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqjug9zo000mafr0i6okajbv",
+    "createdAt": 1781807956116,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

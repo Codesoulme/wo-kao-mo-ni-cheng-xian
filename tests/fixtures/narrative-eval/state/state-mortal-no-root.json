@@ -1,0 +1,249 @@
+{
+  "id": "state-mortal-no-root",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "无灵根凡人 · 凡路完整",
+  "prompt": "状态快照 · 无灵根凡人 · 凡路完整 · 无灵根不等于失败人生，叙事要写谋生、手艺、乡里人情而不是硬推修为",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "宣大江",
+      "age": 33,
+      "lifespan": 76,
+      "gender": "男",
+      "spiritualRoot": "none",
+      "rootDetail": "无灵根，测灵石毫无反应",
+      "realm": "mortal",
+      "realmName": "凡人",
+      "realmLevel": 0,
+      "realmMaxLevel": 0,
+      "cultivationExp": 0,
+      "expToBreak": 0,
+      "elements": {
+        "metal": 0,
+        "wood": 0,
+        "water": 0,
+        "fire": 0,
+        "earth": 0
+      },
+      "hp": 110,
+      "maxHp": 110,
+      "mp": 0,
+      "maxMp": 0,
+      "attack": 16,
+      "defense": 14,
+      "speed": 13,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 23,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 22,
+          "description": "当前神魂境界：未凝神（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 33,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 23,
+      "soulStrength": 22,
+      "physicalFoundation": 33,
+      "combatProjection": {
+        "force": 22,
+        "guard": 21,
+        "agility": 16,
+        "spiritualAwareness": 23,
+        "soulStability": 22,
+        "bodyTenacity": 33,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "体力搏杀：破势22、护持21、机变16",
+        "advantages": [
+          "破势偏盛"
+        ],
+        "vulnerabilities": []
+      },
+      "soulRealmName": "未凝神",
+      "soulRealmRank": 0,
+      "soulRealmGap": "身神相称",
+      "luck": 26,
+      "comprehension": 38,
+      "spiritStones": 3,
+      "reputation": 8,
+      "faction": "",
+      "master": "",
+      "location": "柳溪村渡口",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 0
+    },
+    "activeStatuses": [
+      {
+        "rarity": "common",
+        "duration": -1,
+        "effects": [],
+        "id": "st-boatman",
+        "name": "撐船桩功",
+        "description": "家传的粗浅桩功，腰腿比同龄人稳，扛得住风浪。",
+        "category": "buff",
+        "source": "父亲所传"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 0,
+    "cultivationInsight": "无灵根，谈不上修炼速度。练的是家传的一套撑船桩功，只管腰腿。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "十二岁测灵，灵石没亮，测灵人把手抽回去就走了。",
+      "接了父亲的渡船，一年能攒下三十文。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 33,
+      "hints": [],
+      "pressureMap": {
+        "likelyEventTypes": [],
+        "summary": "事件倾向：日常推进"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "尚未引气，以生计、根骨打磨和寻觅仙缘为主",
+      "bottleneck": "不识灵机，难辨仙物真价，受凡俗病痛与生计所困",
+      "breakthroughTrial": "需得灵根显化、引路之人或真正入道机缘",
+      "capabilities": [
+        "凡俗谋生",
+        "江湖武艺",
+        "辨识粗浅仙缘"
+      ],
+      "limitations": [
+        "不能自主驱使法器",
+        "难以辨识高阶灵物",
+        "寿元与疾病束缚明显"
+      ],
+      "worldAccess": [
+        "凡俗村镇",
+        "江湖门派",
+        "低频仙缘传闻"
+      ],
+      "socialWeight": "在修士眼中近乎凡尘，但奇根骨或奇物可引来关注",
+      "combatStyle": [
+        "体力搏杀",
+        "借物脱身",
+        "依靠他人庇护"
+      ],
+      "resourceNeeds": [
+        "入道功法",
+        "启灵之物",
+        "安身之所"
+      ],
+      "riskTags": [
+        "疾病",
+        "饥寒",
+        "被修士波及"
+      ]
+    },
+    "pendingThreads": [],
+    "questEntries": [],
+    "characterIntents": [
+      {
+        "id": "intent_break_33",
+        "type": "breakthrough",
+        "title": "酝酿突破",
+        "description": "修为将满，应闭关参悟、稳固道心、准备突破。若有突破辅助丹药应及早服用。",
+        "priority": 7
+      }
+    ],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "mortal-no-root"
+  ],
+  "expectedNarrativeTraits": [
+    "不硬推修为增长",
+    "写具体谋生手艺",
+    "不写成怨天悲叹"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库角色都测出了灵根，没有纯凡人样本"
+  },
+  "notes": "乙路极端态：无灵根不等于失败人生，叙事要写谋生、手艺、乡里人情而不是硬推修为"
+}

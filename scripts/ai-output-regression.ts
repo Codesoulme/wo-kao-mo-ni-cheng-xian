@@ -32,14 +32,14 @@ const FIXTURES_DIR = path.join(__dirname_esm, '..', 'tests', 'fixtures', 'ai-out
 // ==================== 合规词（面向玩家可见文本） ====================
 // 这些词出现在 expectedOutput 里就是 PoC 失败。
 // 涵盖中英文，避免 AI 把内部机制暴露给玩家。
-const BANNED_TERMS = [
-  // 中文
-  '引擎', '缓存', '命节点', '天道干预', '预演', '预加载', '节点', '配置',
-  'LLM', '大模型', '接口', '请求', '后端', '服务端', '数据库',
-  // 英文
-  'engine', 'cache', 'node', 'config', 'render', 'backend', 'server',
-  'api', 'json', 'http', 'fetch', 'pipeline',
-];
+//
+// 【升格 · 单一词表来源】原先此处硬编码 25 词，现已收归
+//   src/lib/xianxia/eval/rules.ts 的 BANNED_TERMS_LEGACY（逐字保留，未增未删）。
+// 该文件同时是门禁层（checkGates/G1-G4）的词表总处，从此改词只改一个地方。
+// 本脚本被主回归 smoke 同步 require，故此处**只换来源不改行为**：
+//   词表内容、比对方式、输出格式、退出码全部与升格前一致。
+import { BANNED_TERMS_LEGACY } from '../src/lib/xianxia/eval/rules';
+const BANNED_TERMS = BANNED_TERMS_LEGACY;
 
 // ==================== Fixture Loader ====================
 function loadFixtures(): AITestCase[] {

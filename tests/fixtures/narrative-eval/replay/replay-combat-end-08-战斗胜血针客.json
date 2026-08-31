@@ -1,0 +1,37 @@
+{
+  "id": "replay-combat-end-08-战斗胜血针客",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "combat-end",
+  "stratumLabel": "战斗终局",
+  "prompt": "真实产出重放 · 战斗终局 · eventType=combat · age=87 · title=战斗·胜·血针客",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "战斗·胜·血针客",
+    "narrative": "江畔血雾渐散，柳溪村外只余断幡伏泥。沈清萝稳住翻涌气血，虽灵力耗损不浅，终将血针客、幡影修与夺印女修尽数压下。凝血针、血纹短刃、残血小幡及数只储物袋俱被收起，另得回元丹、血雾符与残缺血煞诀。此战动静已入乡野耳目，血幡余孽之名或将随江风传远。"
+  },
+  "gateOptions": {
+    "scope": "combat-end"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "combat-end",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk79qik003jafpkpptit80n",
+    "createdAt": 1781829485948,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

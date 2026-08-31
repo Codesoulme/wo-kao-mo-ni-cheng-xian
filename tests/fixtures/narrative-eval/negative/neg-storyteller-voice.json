@@ -1,0 +1,55 @@
+{
+  "id": "neg-storyteller-voice",
+  "route": "丙",
+  "kind": "negative",
+  "label": "说书体局外词",
+  "prompt": "反面样本 · 说书体局外词",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "上回说到那桩旧事",
+    "narrative": "上回说到沈清澜欠了孙掌柜三十块灵石。话说回来，这债到了秋末就得还。她在坊市门口站了一会儿，终究还是推门进去了。孙掌柜正在拨算盘，抬眼看了她一下，没说话。至于这三十块灵石最后是怎么了的，且听下回分解。"
+  },
+  "gateOptions": {
+    "scope": "choice",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G3"
+    ]
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "「上回说到」「话说回来」「且听下回分解」是说书人腔，不是修仙世界内语言"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [
+      "outworld-storyteller:上回说到",
+      "outworld-storyteller:上回",
+      "outworld-storyteller:话说回来",
+      "outworld-storyteller:话说",
+      "outworld-storyteller:且听下回分解"
+    ],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "storyteller-voice"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "prompt-builder.ts:410 局外词禁令",
+    "mustFailGates": [
+      "G3"
+    ]
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：「上回说到」「话说回来」「且听下回分解」是说书人腔，不是修仙世界内语言"
+}

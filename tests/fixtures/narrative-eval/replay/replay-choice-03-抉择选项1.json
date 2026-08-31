@@ -1,0 +1,37 @@
+{
+  "id": "replay-choice-03-抉择选项1",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "choice",
+  "stratumLabel": "抉择",
+  "prompt": "真实产出重放 · 抉择 · eventType=choice · age=6 · title=抉择：选项1",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "抉择：选项1",
+    "narrative": "你攥着沾了灶灰的衣角，攥得指节发白。母亲已经挎上布篮，鞋尖已经沾了村口的泥星子。你咬着下唇说出想去青云山碰碰运气的话，母亲愣了愣，伸手摸了摸你的头顶，转身取了家中仅有的半袋糙米塞给你——那是全家留着过冬的口粮。你揣着糙米，踩着被晨露打湿的田埂往青云山方向走，溪面的晨雾裹着草木香气，你第一次觉得，那些听来的仙人传说，或许真的能拉父亲一把。"
+  },
+  "gateOptions": {
+    "scope": "choice"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "choice",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqjukt1u000fafs4uk3grnae",
+    "createdAt": 1781808167443,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

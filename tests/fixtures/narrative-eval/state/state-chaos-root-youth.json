@@ -1,0 +1,240 @@
+{
+  "id": "state-chaos-root-youth",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "混沌灵根 · 幼龄",
+  "prompt": "状态快照 · 混沌灵根 · 幼龄 · 混沌灵根既是绝品也是隐患，叙事需同时写出宗门争抢与不可控风险",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "陆无咎",
+      "age": 7,
+      "lifespan": 82,
+      "gender": "男",
+      "spiritualRoot": "chaos",
+      "rootDetail": "五行俱全的混沌灵根，五气互冲",
+      "realm": "mortal",
+      "realmName": "凡人",
+      "realmLevel": 0,
+      "realmMaxLevel": 0,
+      "cultivationExp": 0,
+      "expToBreak": 100,
+      "elements": {
+        "metal": 60,
+        "wood": 60,
+        "water": 60,
+        "fire": 60,
+        "earth": 60
+      },
+      "hp": 40,
+      "maxHp": 40,
+      "mp": 30,
+      "maxMp": 30,
+      "attack": 4,
+      "defense": 3,
+      "speed": 6,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 34,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 30,
+          "description": "当前神魂境界：灵感初萌（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 24,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 34,
+      "soulStrength": 30,
+      "physicalFoundation": 24,
+      "combatProjection": {
+        "force": 13,
+        "guard": 9,
+        "agility": 12,
+        "spiritualAwareness": 34,
+        "soulStability": 30,
+        "bodyTenacity": 24,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "体力搏杀：破势13、护持9、机变12",
+        "advantages": [
+          "破势偏盛"
+        ],
+        "vulnerabilities": []
+      },
+      "soulRealmName": "灵感初萌",
+      "soulRealmRank": 1,
+      "soulRealmGap": "身神相称",
+      "luck": 70,
+      "comprehension": 62,
+      "spiritStones": 0,
+      "reputation": 0,
+      "faction": "",
+      "master": "",
+      "location": "柳溪村外的老槐树下",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 0
+    },
+    "activeStatuses": [
+      {
+        "rarity": "legendary",
+        "duration": -1,
+        "effects": [],
+        "id": "st-chaos-conflict",
+        "name": "五气互冲",
+        "description": "五行灵气在体内彼此顶撞，行气时经脉隐痛，稍不留神就走岔。",
+        "category": "constitution",
+        "source": "混沌灵根天生"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 2.6,
+    "cultivationInsight": "五气俱全却互相顶撞，行气一次要歇三日。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "测灵那天，游方道士捏着灵石看了很久，最后什么也没说就走了。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 7,
+      "hints": [],
+      "pressureMap": {
+        "likelyEventTypes": [],
+        "summary": "事件倾向：日常推进"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "尚未引气，以生计、根骨打磨和寻觅仙缘为主",
+      "bottleneck": "不识灵机，难辨仙物真价，受凡俗病痛与生计所困",
+      "breakthroughTrial": "需得灵根显化、引路之人或真正入道机缘",
+      "capabilities": [
+        "凡俗谋生",
+        "江湖武艺",
+        "辨识粗浅仙缘"
+      ],
+      "limitations": [
+        "不能自主驱使法器",
+        "难以辨识高阶灵物",
+        "寿元与疾病束缚明显"
+      ],
+      "worldAccess": [
+        "凡俗村镇",
+        "江湖门派",
+        "低频仙缘传闻"
+      ],
+      "socialWeight": "在修士眼中近乎凡尘，但奇根骨或奇物可引来关注",
+      "combatStyle": [
+        "体力搏杀",
+        "借物脱身",
+        "依靠他人庇护"
+      ],
+      "resourceNeeds": [
+        "入道功法",
+        "启灵之物",
+        "安身之所"
+      ],
+      "riskTags": [
+        "疾病",
+        "饥寒",
+        "被修士波及"
+      ]
+    },
+    "pendingThreads": [],
+    "questEntries": [],
+    "characterIntents": [],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "chaos-root-youth"
+  ],
+  "expectedNarrativeTraits": [
+    "宗门/散修抢夺反应",
+    "不可写成村民失望",
+    "灵根不稳的具体代价"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库 12 个角色灵根为水真/普通，无混沌灵根"
+  },
+  "notes": "乙路极端态：混沌灵根既是绝品也是隐患，叙事需同时写出宗门争抢与不可控风险"
+}

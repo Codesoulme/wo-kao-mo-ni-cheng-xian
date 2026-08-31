@@ -1,0 +1,37 @@
+{
+  "id": "replay-choice-08-抉择冒险出海采珠",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "choice",
+  "stratumLabel": "抉择",
+  "prompt": "真实产出重放 · 抉择 · eventType=choice · age=16 · title=抉择：冒险出海采珠",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "抉择：冒险出海采珠",
+    "narrative": "天未亮，沈清澜便抱着旧竹篓随两名老渔出海。白潮外礁水急，暗流像藏在海底的绳，几次扯得小舟斜倾。她记着父亲教过的潮声轻重，避开翻白的涡眼，咬牙潜入冰冷海水。礁缝里有蚌群，最深处一枚青壳老蚌紧闭，水纹在壳边微微回旋。她屏息探手，被锋利礁石划破小臂，却终究撬下三枚可售海珠与一枚带淡青灵光的小珠。返航时风浪骤起，旧伤遇寒发麻，她仍死攥竹篓不放。回村后，药债的日子仍近在眼前，但账房那张冷脸，似乎已不再全无转圜。"
+  },
+  "gateOptions": {
+    "scope": "choice"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "choice",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk8puo3007lafpkmq4ahqe6",
+    "createdAt": 1781831917443,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

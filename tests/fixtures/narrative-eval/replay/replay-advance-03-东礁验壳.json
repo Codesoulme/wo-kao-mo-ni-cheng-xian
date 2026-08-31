@@ -1,0 +1,39 @@
+{
+  "id": "replay-advance-03-东礁验壳",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "advance",
+  "stratumLabel": "年岁推进",
+  "prompt": "真实产出重放 · 年岁推进 · eventType=normal · age=25 · title=东礁验壳",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "东礁验壳",
+    "narrative": "沈清澜记着潮牙集老贩所言，又承接前番浅礁妖影余波，便趁大退潮将青壳蟹妖余下碎壳与近月拾得的水属贝甲收妥，独自循东礁潮路而去。礁道暗流盘绕，她以沈家网法试潮，数次避开没脚旋涡。至东礁外棚，收壳人验过壳纹，只收妖气未散之材，虽嫌蟹壳不全，仍按高于散摊的价给了灵石，并告知近海浊鳞影多半逐潮南迁，若再猎妖须防夜潮反扑。她心头那点因迟疑而生的郁结，随潮声淡了几分。\n\n【天道感应】修为圆满，水到渠成，你气脉更进一步，晋至2层。"
+  },
+  "gateOptions": {
+    "scope": "advance"
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G2"
+    ]
+  },
+  "tags": [
+    "real-replay",
+    "advance",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk8zswn008zafpk4lsj6rrt",
+    "createdAt": 1781832381719,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": true
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

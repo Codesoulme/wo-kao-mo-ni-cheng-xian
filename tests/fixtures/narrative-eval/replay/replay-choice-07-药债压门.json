@@ -1,0 +1,37 @@
+{
+  "id": "replay-choice-07-药债压门",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "choice",
+  "stratumLabel": "抉择",
+  "prompt": "真实产出重放 · 抉择 · eventType=choice · age=16 · title=药债压门",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "药债压门",
+    "narrative": "这一年，父亲旧寒缠肺，入冬后咳血更频。沈清澜主动替母亲收网卖鱼，又去邻村药铺赊来温肺草药，却被账房记下高息药债。夜里她守着炉火熬药，听父亲断续说起祖上传下的辨潮手艺：看三重浪花，可知暗礁与回流。她依言去礁湾试辨，虽未得仙法，却在潮声里把心神磨得更静；只是看着母亲鬓边白发，她胸中护亲之念愈发沉重。"
+  },
+  "gateOptions": {
+    "scope": "choice"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "choice",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk8oz61007hafpk6erw9ozj",
+    "createdAt": 1781831876618,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

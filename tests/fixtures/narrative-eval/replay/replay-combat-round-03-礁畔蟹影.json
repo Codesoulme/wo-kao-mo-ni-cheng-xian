@@ -1,0 +1,37 @@
+{
+  "id": "replay-combat-round-03-礁畔蟹影",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "combat-round",
+  "stratumLabel": "战斗回合",
+  "prompt": "真实产出重放 · 战斗回合 · eventType=combat · age=23 · title=礁畔蟹影",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "礁畔蟹影",
+    "narrative": "沈清澜念着旧刃虽得，未曾真正试过锋芒，便趁退潮往村东黑礁滩采拾蚌壳与药贝，顺道磨练水灵护脉之法。潮沟深处忽有青壳蟹妖翻泥而出，双螯夹碎礁石，腥气扑面。她不再似往年只知奔逃，拔出水锈短刃，以潮水掩步，先退至浅滩避开正面冲撞，再借水灵缠腕寻其腹甲薄处。此妖不强，却已沾了灵性，若放入村边网场，必伤渔人。"
+  },
+  "gateOptions": {
+    "scope": "combat-round"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "combat-round",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk8vlln008lafpkdml1vtge",
+    "createdAt": 1781832185627,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

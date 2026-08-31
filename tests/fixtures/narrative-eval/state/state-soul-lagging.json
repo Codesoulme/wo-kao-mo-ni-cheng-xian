@@ -1,0 +1,253 @@
+{
+  "id": "state-soul-lagging",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "神魂严重落后于法力",
+  "prompt": "状态快照 · 神魂严重落后于法力 · 身神分化：法力已筑基，神魂却还是凡俗，突破与神识压制都该有明显风险",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "田七",
+      "age": 40,
+      "lifespan": 150,
+      "gender": "男",
+      "spiritualRoot": "common",
+      "rootDetail": "土金双灵根",
+      "realm": "foundation",
+      "realmName": "筑基期",
+      "realmLevel": 5,
+      "realmMaxLevel": 9,
+      "cultivationExp": 3000,
+      "expToBreak": 4500,
+      "elements": {
+        "metal": 10,
+        "wood": 40,
+        "water": 55,
+        "fire": 5,
+        "earth": 15
+      },
+      "hp": 700,
+      "maxHp": 700,
+      "mp": 120,
+      "maxMp": 200,
+      "attack": 110,
+      "defense": 130,
+      "speed": 40,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 6,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 5,
+          "description": "当前神魂境界：未凝神（神魂落后），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 88,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 6,
+      "soulStrength": 5,
+      "physicalFoundation": 88,
+      "combatProjection": {
+        "force": 112,
+        "guard": 144,
+        "agility": 42,
+        "spiritualAwareness": 6,
+        "soulStability": 5,
+        "bodyTenacity": 88,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "御器斗法：破势112、护持144、机变42",
+        "advantages": [
+          "护持稳厚",
+          "体魄承压强"
+        ],
+        "vulnerabilities": [
+          "承压有余，转挪偏慢"
+        ]
+      },
+      "soulRealmName": "未凝神",
+      "soulRealmRank": 0,
+      "soulRealmGap": "神魂落后",
+      "luck": 30,
+      "comprehension": 14,
+      "spiritStones": 40,
+      "reputation": 20,
+      "faction": "铁砧门",
+      "master": "钟九",
+      "location": "铁砧门锻房",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 12
+    },
+    "activeStatuses": [
+      {
+        "rarity": "rare",
+        "duration": -1,
+        "effects": [],
+        "id": "st-soul-thin",
+        "name": "神魂薄弱",
+        "description": "神识出体不过三尺，被人一压就头痛欲裂。",
+        "category": "debuff",
+        "source": "以丹药强堆境界"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 1.35,
+    "cultivationInsight": "靠丹药和苦力把肉身堆上来的筑基，神识却薄得像纸，隔着墙都听不出人声。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "师父说过：你这身板是好的，脑子跟不上，别学神识那一路。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 40,
+      "hints": [],
+      "pressureMap": {
+        "likelyEventTypes": [],
+        "summary": "事件倾向：日常推进"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "道基初成，法力凝实，以稳固道基、神识初放和洞府经营为要",
+      "bottleneck": "道基稳固度、功法后续与结丹资源缺口",
+      "breakthroughTrial": "需结丹因缘、丹药、心性与道基成色相合",
+      "capabilities": [
+        "稳定御器远行",
+        "神识探查周身",
+        "开辟或经营洞府"
+      ],
+      "limitations": [
+        "难驾驭本命法宝",
+        "金丹禁制仍难硬破",
+        "长途斗法耗损明显"
+      ],
+      "worldAccess": [
+        "宗门核心外围",
+        "洞府经营",
+        "秘境外层",
+        "筑基坊市"
+      ],
+      "socialWeight": "已算低阶骨干，炼气修士多有忌惮，小宗门开始重视",
+      "combatStyle": [
+        "御器斗法",
+        "神识预判",
+        "护体灵光维持"
+      ],
+      "resourceNeeds": [
+        "结丹灵物",
+        "高阶功法后续",
+        "洞府灵脉",
+        "稳固道基的丹药"
+      ],
+      "riskTags": [
+        "道基受损",
+        "神识反噬",
+        "结丹失败"
+      ]
+    },
+    "pendingThreads": [],
+    "questEntries": [],
+    "characterIntents": [
+      {
+        "id": "intent_weapon_40",
+        "type": "gather_resources",
+        "title": "寻觅兵器",
+        "description": "已入修行却无趁手兵器，应主动寻一把剑/刀/杖/法宝防身。",
+        "priority": 6
+      }
+    ],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "soul-lagging"
+  ],
+  "expectedNarrativeTraits": [
+    "神魂落后的具体后果",
+    "不得轻易承受高阶神识压制",
+    "突破风险要写实"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库角色神魂与法力基本同步，压不出分化分支"
+  },
+  "notes": "乙路极端态：身神分化：法力已筑基，神魂却还是凡俗，突破与神识压制都该有明显风险"
+}

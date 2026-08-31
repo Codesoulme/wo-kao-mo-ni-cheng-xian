@@ -1,0 +1,37 @@
+{
+  "id": "replay-combat-round-04-芦滩獠影",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "combat-round",
+  "stratumLabel": "战斗回合",
+  "prompt": "真实产出重放 · 战斗回合 · eventType=combat · age=27 · title=芦滩獠影",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "芦滩獠影",
+    "narrative": "这一年，沈清萝觉修为已近关隘，便少入村中，常在青岚江芦滩结草为圈，夜里闭目调息，白日以沉水木杖演练引气入杖之法，欲先稳住道心再求破境。入秋后江水退浅，她采露洗脉时，芦丛忽裂，一头瘦骨嶙峋的獠牙水獾妖循灵息扑出。它腹下带伤，眼中凶光却盛，显是被江中大物逐来浅滩。沈清萝退至湿泥处，杖尖点水，水木灵息沿杖而起，回春符藏于袖中未曾轻用，只在獾妖扑近时横杖格挡，肩臂被爪风擦破，胸中杀意一瞬浮动。"
+  },
+  "gateOptions": {
+    "scope": "combat-round"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "combat-round",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqjww0ms0019afco0df9q2k1",
+    "createdAt": 1781812049717,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

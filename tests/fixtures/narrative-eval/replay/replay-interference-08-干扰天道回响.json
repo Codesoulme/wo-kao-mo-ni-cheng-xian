@@ -1,0 +1,37 @@
+{
+  "id": "replay-interference-08-干扰天道回响",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "interference",
+  "stratumLabel": "天道回响",
+  "prompt": "真实产出重放 · 天道回响 · eventType=interference · age=61 · title=干扰·天道回响",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "干扰·天道回响",
+    "narrative": "三日调息既毕，沈清萝持青岚试牌随众入外院。山门钟声沉沉，试心石阶自云雾中显出青痕，她以沉水木杖点地，先随执事验明名册，又被引至阶前候试。潮纹润脉与青萤芝气尚存，湿瘴入肺未尽，呼吸间仍有滞意，只得按避瘴清息之法缓缓压住。"
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "interference",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk4cxj3000laf4gwaygt0tx",
+    "createdAt": 1781824596159,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "replay-fate-node-02-家堂惊闻父疾",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "fate-node",
+  "stratumLabel": "命理回响",
+  "prompt": "真实产出重放 · 命理回响 · eventType=fate_node · age=6 · title=家堂惊闻父疾",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "家堂惊闻父疾",
+    "narrative": "这年沈清砚刚满六岁，清晨正蹲在溪畔捡光滑的鹅卵石，忽然听见村头传来急促的呼喊——父亲在山间砍柴时不慎失足跌落土坡，虽未重伤却高烧不退，卧床不起。母亲红着眼眶收拾了竹篮要去镇上求医，沈清砚攥着母亲的衣角不肯松手，却被邻村的阿婆牵去灶下帮忙熬药。他看着灶膛里跳动的火苗，第一次觉得那些平日里听来的仙人传说，或许能帮衬家中渡过难关。"
+  },
+  "gateOptions": {
+    "scope": "advance"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "fate-node",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqjuk8bg000bafs44qcmwgl0",
+    "createdAt": 1781808140572,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

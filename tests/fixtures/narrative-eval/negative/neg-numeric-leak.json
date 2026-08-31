@@ -1,0 +1,57 @@
+{
+  "id": "neg-numeric-leak",
+  "route": "丙",
+  "kind": "negative",
+  "label": "数值泄漏（战报体）",
+  "prompt": "反面样本 · 数值泄漏（战报体）",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "礁上交手",
+    "narrative": "沈清澜侧身避开蟹钳，反手一刀划在关节上。攻击+12，防御-3，对方气血-45。她后撤两步，修为+50，悟性提升 12 点，随后再进一刀。第三回合结束，双方各自退开，浪打在礁石上，声音盖过了呼吸。"
+  },
+  "gateOptions": {
+    "scope": "combat-round",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G2"
+    ]
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "把属性增减、修为数值直接写进叙事，等于把后台面板贴到玩家眼前"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [
+      "numeric-bare-delta:+12",
+      "numeric-bare-delta:-3",
+      "numeric-attr-delta:气血-45",
+      "numeric-bare-delta:-45",
+      "numeric-attr-delta:修为+50",
+      "numeric-bare-delta:+50",
+      "numeric-unit:12 点"
+    ],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "numeric-leak"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "prompt-builder.ts:1135 经验值禁令 + generators.ts:781 战报数值禁令",
+    "mustFailGates": [
+      "G2"
+    ]
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：把属性增减、修为数值直接写进叙事，等于把后台面板贴到玩家眼前"
+}

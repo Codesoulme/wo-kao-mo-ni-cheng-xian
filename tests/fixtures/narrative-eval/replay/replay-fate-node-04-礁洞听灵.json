@@ -1,0 +1,37 @@
+{
+  "id": "replay-fate-node-04-礁洞听灵",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "fate-node",
+  "stratumLabel": "命理回响",
+  "prompt": "真实产出重放 · 命理回响 · eventType=fate_node · age=9 · title=礁洞听灵",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "礁洞听灵",
+    "narrative": "这一年，沈清澜主动随父母到潮退后的礁滩拾螺补家用。暮色压海时，她听见礁洞深处有细细水声，不似浪拍，倒像有人在暗处轻叩玉盏。她抱着木鱼玩具探近，掌心忽被一缕凉意裹住，眼前潮纹层层展开，仿佛能辨出哪一道水流将先回湾。父亲唤她归家，那凉意便散入指尖，只余心口清明，往日盐税旧恨也被潮声压低了几分。"
+  },
+  "gateOptions": {
+    "scope": "advance"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "fate-node",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk8jiwm006nafpk1cgirl5w",
+    "createdAt": 1781831622262,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

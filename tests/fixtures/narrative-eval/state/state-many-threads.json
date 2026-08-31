@@ -1,0 +1,533 @@
+{
+  "id": "state-many-threads",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "多条未决线索并存",
+  "prompt": "状态快照 · 多条未决线索并存 · 五条线索同时压顶（两条已到期），叙事必须承接而不是另起无关事件",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "沈清澜",
+      "age": 31,
+      "lifespan": 120,
+      "gender": "男",
+      "spiritualRoot": "pure",
+      "rootDetail": "水真灵根",
+      "realm": "foundation",
+      "realmName": "筑基期",
+      "realmLevel": 1,
+      "realmMaxLevel": 9,
+      "cultivationExp": 1200,
+      "expToBreak": 2000,
+      "elements": {
+        "metal": 10,
+        "wood": 40,
+        "water": 55,
+        "fire": 5,
+        "earth": 15
+      },
+      "hp": 420,
+      "maxHp": 500,
+      "mp": 300,
+      "maxMp": 380,
+      "attack": 62,
+      "defense": 48,
+      "speed": 55,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 98,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 71,
+          "description": "当前神魂境界：神识初成（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 108,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 98,
+      "soulStrength": 71,
+      "physicalFoundation": 108,
+      "combatProjection": {
+        "force": 78,
+        "guard": 70,
+        "agility": 66,
+        "spiritualAwareness": 98,
+        "soulStability": 71,
+        "bodyTenacity": 108,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "御器斗法：破势78、护持70、机变66",
+        "advantages": [
+          "破势偏盛"
+        ],
+        "vulnerabilities": [
+          "神识锐而魂魄承载不足"
+        ]
+      },
+      "soulRealmName": "神识初成",
+      "soulRealmRank": 2,
+      "soulRealmGap": "身神相称",
+      "luck": 40,
+      "comprehension": 58,
+      "spiritStones": 180,
+      "reputation": 46,
+      "faction": "",
+      "master": "",
+      "location": "白潮渔村南侧浅礁",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 26
+    },
+    "activeStatuses": [
+      {
+        "rarity": "common",
+        "duration": 2,
+        "effects": [],
+        "id": "st-claw-bruise",
+        "name": "钳震瘀伤",
+        "description": "腕臂受妖蟹钳风震荡，运刃与行气皆有隐痛。",
+        "category": "debuff",
+        "source": "铁背潮蟹妖搏杀"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 2.55,
+    "cultivationInsight": "水真灵根临潮纳灵，顺水行气；夺来的护身法器护脉助息不散。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "三十二岁巡白潮南礁，遭铁背潮蟹妖伏击，负轻伤而磨炼实战。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 31,
+      "focus": {
+        "id": "seh_thread_th-debt",
+        "kind": "deadline",
+        "priority": 80,
+        "title": "药债压门",
+        "reason": "欠青岚坊市孙掌柜三十块灵石的丹药钱，说好今年秋末还。",
+        "sourceThreadId": "th-debt",
+        "dueAge": 31,
+        "relatedFactIds": [],
+        "requiredAction": "resolve_or_fail",
+        "resolutionStage": "escalating",
+        "resolutionHint": "已到关键关口，本轮应推进到完成、失败、战斗、选择或明确解释无法执行。"
+      },
+      "hints": [
+        {
+          "id": "seh_thread_th-debt",
+          "kind": "deadline",
+          "priority": 80,
+          "title": "药债压门",
+          "reason": "欠青岚坊市孙掌柜三十块灵石的丹药钱，说好今年秋末还。",
+          "sourceThreadId": "th-debt",
+          "dueAge": 31,
+          "relatedFactIds": [],
+          "requiredAction": "resolve_or_fail",
+          "resolutionStage": "escalating",
+          "resolutionHint": "已到关键关口，本轮应推进到完成、失败、战斗、选择或明确解释无法执行。"
+        },
+        {
+          "id": "seh_thread_th-enemy",
+          "kind": "deadline",
+          "priority": 80,
+          "title": "半潮门影",
+          "reason": "被截住或先下手",
+          "sourceThreadId": "th-enemy",
+          "dueAge": 31,
+          "relatedFactIds": [],
+          "requiredAction": "resolve_or_fail",
+          "resolutionStage": "escalating",
+          "resolutionHint": "已到关键关口，本轮应推进到完成、失败、战斗、选择或明确解释无法执行。"
+        },
+        {
+          "id": "seh_thread_th-promise",
+          "kind": "quest",
+          "priority": 65,
+          "title": "渡口寒誓",
+          "reason": "答应过渔村老姚，等他孙子满十岁就带他去测灵。",
+          "sourceThreadId": "th-promise",
+          "dueAge": 34,
+          "relatedFactIds": [],
+          "requiredAction": "advance",
+          "resolutionStage": "open",
+          "resolutionHint": "仍是未了因果，可自然推进、试探、铺垫或留下下一步结构化痕迹。"
+        },
+        {
+          "id": "seh_quest_quest_th-mystery",
+          "kind": "quest",
+          "priority": 5,
+          "title": "水脉残图",
+          "reason": "从蟹妖巢里翻出半张水脉图，缺了东南一角。",
+          "sourceThreadId": "th-mystery",
+          "dueAge": 38,
+          "relatedFactIds": [],
+          "requiredAction": "advance",
+          "resolutionStage": "background",
+          "resolutionHint": "只作世界背景或低频传闻，除非与主事件自然相合。"
+        },
+        {
+          "id": "seh_quest_quest_th-exploration",
+          "kind": "quest",
+          "priority": 3,
+          "title": "潮隙浮阁",
+          "reason": "潮湿玉片指向一处只在大潮时露头的浮阁，下次大潮在明年。",
+          "sourceThreadId": "th-exploration",
+          "dueAge": 40,
+          "relatedFactIds": [],
+          "requiredAction": "advance",
+          "resolutionStage": "background",
+          "resolutionHint": "只作世界背景或低频传闻，除非与主事件自然相合。"
+        }
+      ],
+      "pressureMap": {
+        "topThreat": "药债压门",
+        "topOpportunity": "药债压门",
+        "likelyEventTypes": [
+          "威胁回响",
+          "机缘推进",
+          "限期了结"
+        ],
+        "summary": "最大威胁：药债压门；最大机会：药债压门；事件倾向：威胁回响、机缘推进、限期了结"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "道基初成，法力凝实，以稳固道基、神识初放和洞府经营为要",
+      "bottleneck": "道基稳固度、功法后续与结丹资源缺口",
+      "breakthroughTrial": "需结丹因缘、丹药、心性与道基成色相合",
+      "capabilities": [
+        "稳定御器远行",
+        "神识探查周身",
+        "开辟或经营洞府"
+      ],
+      "limitations": [
+        "难驾驭本命法宝",
+        "金丹禁制仍难硬破",
+        "长途斗法耗损明显"
+      ],
+      "worldAccess": [
+        "宗门核心外围",
+        "洞府经营",
+        "秘境外层",
+        "筑基坊市"
+      ],
+      "socialWeight": "已算低阶骨干，炼气修士多有忌惮，小宗门开始重视",
+      "combatStyle": [
+        "御器斗法",
+        "神识预判",
+        "护体灵光维持"
+      ],
+      "resourceNeeds": [
+        "结丹灵物",
+        "高阶功法后续",
+        "洞府灵脉",
+        "稳固道基的丹药"
+      ],
+      "riskTags": [
+        "道基受损",
+        "神识反噬",
+        "结丹失败"
+      ]
+    },
+    "pendingThreads": [
+      {
+        "status": "urgent",
+        "progress": 20,
+        "id": "th-debt",
+        "title": "药债压门",
+        "description": "欠青岚坊市孙掌柜三十块灵石的丹药钱，说好今年秋末还。",
+        "category": "debt",
+        "startAge": 29,
+        "deadlineAge": 31,
+        "failureCost": "孙掌柜会把欠据转给催债的散修"
+      },
+      {
+        "status": "urgent",
+        "progress": 55,
+        "id": "th-enemy",
+        "title": "半潮门影",
+        "description": "半潮门的人去年在深水见过她，一直在打听护身法器的来处。",
+        "category": "enemy",
+        "startAge": 30,
+        "deadlineAge": 31,
+        "followUpHint": "被截住或先下手"
+      },
+      {
+        "status": "urgent",
+        "progress": 10,
+        "id": "th-promise",
+        "title": "渡口寒誓",
+        "description": "答应过渔村老姚，等他孙子满十岁就带他去测灵。",
+        "category": "promise",
+        "startAge": 26,
+        "deadlineAge": 34
+      },
+      {
+        "status": "pending",
+        "progress": 30,
+        "id": "th-mystery",
+        "title": "水脉残图",
+        "description": "从蟹妖巢里翻出半张水脉图，缺了东南一角。",
+        "category": "mystery",
+        "startAge": 30,
+        "deadlineAge": 38
+      },
+      {
+        "status": "pending",
+        "progress": 5,
+        "id": "th-exploration",
+        "title": "潮隙浮阁",
+        "description": "潮湿玉片指向一处只在大潮时露头的浮阁，下次大潮在明年。",
+        "category": "exploration",
+        "startAge": 31,
+        "deadlineAge": 40,
+        "dueInSameYear": false
+      }
+    ],
+    "questEntries": [
+      {
+        "id": "quest_th-debt",
+        "title": "药债压门",
+        "summary": "欠青岚坊市孙掌柜三十块灵石的丹药钱，说好今年秋末还。",
+        "kind": "debt",
+        "stage": "urgent",
+        "progress": 20,
+        "startedAtAge": 29,
+        "dueAge": 31,
+        "urgency": 10,
+        "sourceThreadId": "th-debt",
+        "failureHint": "孙掌柜会把欠据转给催债的散修",
+        "tags": [
+          "debt",
+          "urgent"
+        ]
+      },
+      {
+        "id": "quest_th-enemy",
+        "title": "半潮门影",
+        "summary": "半潮门的人去年在深水见过她，一直在打听护身法器的来处。",
+        "kind": "enemy",
+        "stage": "urgent",
+        "progress": 55,
+        "startedAtAge": 30,
+        "dueAge": 31,
+        "urgency": 10,
+        "sourceThreadId": "th-enemy",
+        "currentHook": "被截住或先下手",
+        "tags": [
+          "enemy",
+          "urgent"
+        ]
+      },
+      {
+        "id": "quest_th-promise",
+        "title": "渡口寒誓",
+        "summary": "答应过渔村老姚，等他孙子满十岁就带他去测灵。",
+        "kind": "promise",
+        "stage": "urgent",
+        "progress": 10,
+        "startedAtAge": 26,
+        "dueAge": 34,
+        "urgency": 10,
+        "sourceThreadId": "th-promise",
+        "tags": [
+          "promise",
+          "urgent"
+        ]
+      },
+      {
+        "id": "quest_th-mystery",
+        "title": "水脉残图",
+        "summary": "从蟹妖巢里翻出半张水脉图，缺了东南一角。",
+        "kind": "mystery",
+        "stage": "open",
+        "progress": 30,
+        "startedAtAge": 30,
+        "dueAge": 38,
+        "urgency": 5,
+        "sourceThreadId": "th-mystery",
+        "tags": [
+          "mystery",
+          "pending"
+        ]
+      },
+      {
+        "id": "quest_th-exploration",
+        "title": "潮隙浮阁",
+        "summary": "潮湿玉片指向一处只在大潮时露头的浮阁，下次大潮在明年。",
+        "kind": "exploration",
+        "stage": "open",
+        "progress": 5,
+        "startedAtAge": 31,
+        "dueAge": 40,
+        "urgency": 3,
+        "sourceThreadId": "th-exploration",
+        "tags": [
+          "exploration",
+          "pending"
+        ]
+      }
+    ],
+    "characterIntents": [
+      {
+        "id": "intent_due_th-debt",
+        "type": "resolve_thread",
+        "title": "应约·药债压门",
+        "description": "「药债压门」已到约期。此事压在心头，须去赴约、入境、应试或还愿；若一时不能成行，也该给自己一个交代。",
+        "priority": 10,
+        "relatedThreadId": "th-debt"
+      },
+      {
+        "id": "intent_due_th-enemy",
+        "type": "resolve_thread",
+        "title": "应约·半潮门影",
+        "description": "「半潮门影」已到约期。此事压在心头，须去赴约、入境、应试或还愿；若一时不能成行，也该给自己一个交代。关窍：被截住或先下手",
+        "priority": 10,
+        "relatedThreadId": "th-enemy"
+      },
+      {
+        "id": "intent_promise_th-promise",
+        "type": "socialize",
+        "title": "守约·渡口寒誓",
+        "description": "「渡口寒誓」渐近，旧约旧人萦绕心间。或赴约，或传信，或亲自探望；若终究失约，也该有一番缘由。",
+        "priority": 8,
+        "relatedThreadId": "th-promise"
+      },
+      {
+        "id": "intent_weapon_31",
+        "type": "gather_resources",
+        "title": "寻觅兵器",
+        "description": "已入修行却无趁手兵器，应主动寻一把剑/刀/杖/法宝防身。",
+        "priority": 6
+      }
+    ],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": [
+      {
+        "id": "story_story_eok326",
+        "name": "潮隙浮阁",
+        "description": "潮隙浮阁 潮湿玉片指向一处只在大潮时露头的浮阁，下次大潮在明年。  ",
+        "tier": "common",
+        "minRealm": 2,
+        "minAge": 30,
+        "spiritStoneCost": 0,
+        "discoveredByThreadId": "th-exploration",
+        "entryRequirement": "潮湿玉片",
+        "entryAlternatives": [
+          "参悟信物中的禁制手法",
+          "循原先残图与地势另觅侧径",
+          "等待潮汐/地脉再次开合"
+        ],
+        "isStoryRealm": true,
+        "dangerLevel": 3,
+        "rewardMultiplier": 1.1,
+        "cooldownYears": 3,
+        "themeTags": [
+          "water",
+          "treasure",
+          "story"
+        ],
+        "elementAffinity": "water",
+        "encounterHints": [
+          "凭潮湿玉片试探门户",
+          "沿旧日痕迹复探外围",
+          "另寻破禁之法",
+          "避开内禁杀机"
+        ],
+        "color": "#0ea5e9",
+        "icon": "🌊"
+      }
+    ]
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "many-threads"
+  ],
+  "expectedNarrativeTraits": [
+    "到期线索必须被承接",
+    "线索不得凭空消失",
+    "不得另起无关主线"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库单角色最多一两条线索，压不出连续性问题"
+  },
+  "notes": "乙路极端态：五条线索同时压顶（两条已到期），叙事必须承接而不是另起无关事件"
+}

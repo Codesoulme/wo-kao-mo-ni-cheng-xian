@@ -1,0 +1,37 @@
+{
+  "id": "replay-combat-round-10-芦湾蟹影",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "combat-round",
+  "stratumLabel": "战斗回合",
+  "prompt": "真实产出重放 · 战斗回合 · eventType=combat · age=93 · title=芦湾蟹影",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "芦湾蟹影",
+    "narrative": "这一年，沈清萝未急着再入水殿，而是携殿门残拓往柳溪回湾复勘碑座外环，顺道采冷潮苔以备护脉。午后潮退，芦根下忽有青黑巨蟹破泥而出，双钳缠着冷白水纹，似被雾楼余禁惊动。她先以稳魂护脉压住潮钟余韵，退至浅滩石脊，借沉水木杖引水木灵息牵偏蟹钳，又凭倒纹辨潮看出其腹甲旧裂。此妖守在回湾门脉附近，若不驱走，来日复核水殿碑座必受扰。"
+  },
+  "gateOptions": {
+    "scope": "combat-round"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "combat-round",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk80lly004hafpk23tusdfy",
+    "createdAt": 1781830739303,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

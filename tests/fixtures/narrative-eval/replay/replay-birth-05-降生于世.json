@@ -1,0 +1,37 @@
+{
+  "id": "replay-birth-05-降生于世",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "birth",
+  "stratumLabel": "出生",
+  "prompt": "真实产出重放 · 出生 · eventType=normal · age=0 · title=降生于世",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "降生于世",
+    "narrative": "陆青岚生于暮春雨夜，村外田垄新翻，溪水涨声不绝，屋后老槐一夜抽出细芽。其父以薄田供家，其母粗通诗书，家中清贫却尚安稳。她落地时无惊天异象，唯窗下泥土湿润，草根含露，灶旁一盆清水微泛涟漪。村中老人只道此女命气温和，近水木而不离厚土。"
+  },
+  "gateOptions": {
+    "scope": "birth"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "birth",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk8dv0k005mafpkdxw5zc72",
+    "createdAt": 1781831358021,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

@@ -150,7 +150,7 @@ export async function generateChoiceResult(
   } catch (err: any) {
     console.error('Choice generation failed, using fallback:', err?.message || err);
     return sanitizeChoiceOutput({
-      narrative: `${ctx.character.name}选择「${chosenText}」，顺势应下这一段因果。局势暂且平稳，后续变化仍待天机显现。`,
+      narrative: `${ctx.character.name}选择了「${chosenText}」，把这件事应了下来。眼下局面还算平稳，后面会有什么变化，现在还看不出来。`,
       changes: [],
       newStatuses: [],
       newItems: [],
@@ -184,7 +184,7 @@ export async function generateInterfereResponse(
     return sanitizeInterfereOutput({
       accepted: false,
       classification: 'dialogue',
-      narrative: `天机沉寂，${ctx.character.name}心中闪过「${playerInput}」之念，却暂未掀起可见波澜。`,
+      narrative: `${ctx.character.name}心里转过「${playerInput}」这个念头，四下没有半点回应，什么也没发生。`,
       changes: [],
       newStatuses: [],
       newItems: [],
@@ -238,7 +238,7 @@ export async function generateItemActionNarrative(
 
 【当前场景：物品操作叙事】
 玩家在「宝」页对物品进行了操作。你需要：
-1. 生成一段 30-80 字的简短叙事，描述动作过程（用修仙口吻，融入角色当前处境）
+1. 生成一段 30-80 字的简短叙事，描述动作过程（用白话修仙口吻，融入角色当前处境）
 2. 更新 cultivationInsight（60-150 字，规则同 advance 场景：必须引用引擎提供的准确来源名称与数字）
 来源条目由引擎权威计算，你不可输出 cultivationFactors 字段（已从 schema 移除）。
 
@@ -269,7 +269,7 @@ ${item.equipNote ? '装备位置：' + item.equipNote : ''}
 
 请生成 JSON：
 {
-  "narrative": "${actionZh}过程叙事（30-80字，修仙口吻，融入角色处境）",
+  "narrative": "${actionZh}过程叙事（30-80字，白话修仙口吻，融入角色处境）",
   "cultivationInsight": "更新后的修炼心得（60-150字，必须引用引擎提供的准确来源名称与数字，反映本次操作对修炼的影响）"
 }
 
@@ -342,11 +342,11 @@ ${matList}
 {
   "success": true 或 false,
   "pillName": "自拟丹名（2-6字，勿照搬材料名）",
-  "pillDescription": "丹药说明（20-60字，沉浸式修仙口吻）",
+  "pillDescription": "丹药说明（20-60字，沉浸式白话修仙口吻）",
   "rarity": "common|uncommon|rare|epic|legendary|mythic 之一",
   "mainElement": "fire|water|wood|metal|earth|none 之一",
   "effects": [{ "target_attribute": "属性名", "operation": "add 或 multiply", "value": 数字, "description": "效果说明" }],
-  "narrative": "开炉过程叙事（40-100字，修仙口吻，体现成败与火候）",
+  "narrative": "开炉过程叙事（40-100字，白话修仙口吻，体现成败与火候）",
   "accident": "可选：若炸炉/异变/反噬，简述意外；正常成丹可省略"
 }
 
@@ -880,7 +880,7 @@ ${rawSummary}
 
 请输出 JSON：
 {
-  "narrative": "80-180字，修仙小说口吻，画面感强；将伤害和气血变化转写为伤势、气机、护光、步伐和环境反应；不要堆数字，不要改变事实。"
+  "narrative": "80-180字，白话修仙小说口吻，画面感强；将伤害和气血变化转写为伤势、气机、护光、步伐和环境反应；不要堆数字，不要改变事实。"
 }`;
 
   try {
@@ -942,7 +942,7 @@ ${ctx.pendingThreads?.length ? ctx.pendingThreads.map(t => `- ${t.title}（截�
 
 请生成 JSON：
 {
-  "narrative": "战后叙事(80-200字，修仙口吻)",
+  "narrative": "战后叙事(80-200字，白话修仙口吻)",
   "newThreads": [],
   "completeThreadIds": [],
   "newItems": []

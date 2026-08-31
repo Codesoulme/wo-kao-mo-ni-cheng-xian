@@ -1,0 +1,37 @@
+{
+  "id": "replay-fate-node-01-家族变故流年",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "fate-node",
+  "stratumLabel": "命理回响",
+  "prompt": "真实产出重放 · 命理回响 · eventType=fate_node · age=6 · title=家族变故·流年",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "家族变故·流年",
+    "narrative": "6岁，李青云于青云山下一处凡人村落度日。天道示现\"家族变故\"之象。岁月流转，未有大事。"
+  },
+  "gateOptions": {
+    "scope": "advance"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "fate-node",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqjt7f5z000kafk8ogomferk",
+    "createdAt": 1781805863304,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

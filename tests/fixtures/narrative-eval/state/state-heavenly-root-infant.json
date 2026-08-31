@@ -1,0 +1,238 @@
+{
+  "id": "state-heavenly-root-infant",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "天灵根降生 · 凡人村镇",
+  "prompt": "状态快照 · 天灵根降生 · 凡人村镇 · 专测题材违和：天灵根降生在凡人村镇，绝不能有人「失望」",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "李青云",
+      "age": 0,
+      "lifespan": 100,
+      "gender": "男",
+      "spiritualRoot": "heavenly",
+      "rootDetail": "单属性天灵根（雷）",
+      "realm": "mortal",
+      "realmName": "凡人",
+      "realmLevel": 0,
+      "realmMaxLevel": 0,
+      "cultivationExp": 0,
+      "expToBreak": 100,
+      "elements": {
+        "metal": 20,
+        "wood": 10,
+        "water": 10,
+        "fire": 30,
+        "earth": 10
+      },
+      "hp": 12,
+      "maxHp": 12,
+      "mp": 8,
+      "maxMp": 8,
+      "attack": 1,
+      "defense": 1,
+      "speed": 2,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 41,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 36,
+          "description": "当前神魂境界：灵感初萌（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 21,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 41,
+      "soulStrength": 36,
+      "physicalFoundation": 21,
+      "combatProjection": {
+        "force": 12,
+        "guard": 7,
+        "agility": 10,
+        "spiritualAwareness": 41,
+        "soulStability": 36,
+        "bodyTenacity": 21,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "体力搏杀：破势12、护持7、机变10",
+        "advantages": [
+          "破势偏盛"
+        ],
+        "vulnerabilities": []
+      },
+      "soulRealmName": "灵感初萌",
+      "soulRealmRank": 1,
+      "soulRealmGap": "身神相称",
+      "luck": 88,
+      "comprehension": 80,
+      "spiritStones": 0,
+      "reputation": 0,
+      "faction": "",
+      "master": "",
+      "location": "柳溪村李家院",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 0
+    },
+    "activeStatuses": [
+      {
+        "rarity": "legendary",
+        "duration": -1,
+        "effects": [],
+        "id": "st-birth-omen",
+        "name": "降生异象",
+        "description": "生他那夜院里的老槐无风自动，井水翻了半尺。",
+        "category": "special",
+        "source": "天灵根降生"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 3,
+    "cultivationInsight": "天灵根，尚在襁褓，谈不上修炼。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 0,
+      "hints": [],
+      "pressureMap": {
+        "likelyEventTypes": [],
+        "summary": "事件倾向：日常推进"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "尚未引气，以生计、根骨打磨和寻觅仙缘为主",
+      "bottleneck": "不识灵机，难辨仙物真价，受凡俗病痛与生计所困",
+      "breakthroughTrial": "需得灵根显化、引路之人或真正入道机缘",
+      "capabilities": [
+        "凡俗谋生",
+        "江湖武艺",
+        "辨识粗浅仙缘"
+      ],
+      "limitations": [
+        "不能自主驱使法器",
+        "难以辨识高阶灵物",
+        "寿元与疾病束缚明显"
+      ],
+      "worldAccess": [
+        "凡俗村镇",
+        "江湖门派",
+        "低频仙缘传闻"
+      ],
+      "socialWeight": "在修士眼中近乎凡尘，但奇根骨或奇物可引来关注",
+      "combatStyle": [
+        "体力搏杀",
+        "借物脱身",
+        "依靠他人庇护"
+      ],
+      "resourceNeeds": [
+        "入道功法",
+        "启灵之物",
+        "安身之所"
+      ],
+      "riskTags": [
+        "疾病",
+        "饥寒",
+        "被修士波及"
+      ]
+    },
+    "pendingThreads": [],
+    "questEntries": [],
+    "characterIntents": [],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "heavenly-root-infant"
+  ],
+  "expectedNarrativeTraits": [
+    "邻里叩拜/道士登门",
+    "严禁失望或不过如此",
+    "不得写元叙事旁白"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库出生事件全是兜底文案，未覆盖天灵根异象"
+  },
+  "notes": "乙路极端态：专测题材违和：天灵根降生在凡人村镇，绝不能有人「失望」"
+}

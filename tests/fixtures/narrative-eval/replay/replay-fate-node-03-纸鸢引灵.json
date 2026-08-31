@@ -1,0 +1,37 @@
+{
+  "id": "replay-fate-node-03-纸鸢引灵",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "fate-node",
+  "stratumLabel": "命理回响",
+  "prompt": "真实产出重放 · 命理回响 · eventType=fate_node · age=6 · title=纸鸢引灵",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "纸鸢引灵",
+    "narrative": "这一年春风沿青岚江吹入柳溪村，沈清萝与邻家孩童在田埂上放纸鸢。纸鸢缠上河柳，她挽起裤脚去解，指尖碰到新芽与湿绳时，江水忽泛细纹，柳叶无风自颤。村口路过一名灰袍测灵人，原是往邻县宗族验童，见此停步，取出一枚温润青石。青石贴近她掌心，先映水色，后浮木纹，虽光芒不盛，却清清楚楚。父母闻讯赶来，喜忧交杂；凡人家有灵根，是福也是远路。灰袍人只言附近青竹观收幼童打杂听经，亦可等她年长自行寻仙，或留在村中护养根骨。江风吹落纸鸢，落在她脚边，像把童年的笑声与陌生山门一并递到眼前。"
+  },
+  "gateOptions": {
+    "scope": "advance"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "fate-node",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqjuvge6000bafi4jkv0plxx",
+    "createdAt": 1781808664255,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

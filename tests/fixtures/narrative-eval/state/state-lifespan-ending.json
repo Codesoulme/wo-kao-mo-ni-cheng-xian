@@ -1,0 +1,316 @@
+{
+  "id": "state-lifespan-ending",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "寿元将尽 · 无路可进",
+  "prompt": "状态快照 · 寿元将尽 · 无路可进 · 寿元只剩三年、境界卡死，叙事必须给出凡人式的收束而不是硬塞机缘",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "周阿满",
+      "age": 77,
+      "lifespan": 80,
+      "gender": "男",
+      "spiritualRoot": "mixed",
+      "rootDetail": "五行杂灵根，样样不通",
+      "realm": "qi_refining",
+      "realmName": "炼气期",
+      "realmLevel": 2,
+      "realmMaxLevel": 9,
+      "cultivationExp": 140,
+      "expToBreak": 400,
+      "elements": {
+        "metal": 10,
+        "wood": 40,
+        "water": 55,
+        "fire": 5,
+        "earth": 15
+      },
+      "hp": 62,
+      "maxHp": 90,
+      "mp": 30,
+      "maxMp": 60,
+      "attack": 12,
+      "defense": 10,
+      "speed": 8,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 48,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 41,
+          "description": "当前神魂境界：灵感初萌（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 53,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 48,
+      "soulStrength": 41,
+      "physicalFoundation": 53,
+      "combatProjection": {
+        "force": 20,
+        "guard": 21,
+        "agility": 14,
+        "spiritualAwareness": 48,
+        "soulStability": 41,
+        "bodyTenacity": 53,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "符箓试探：破势20、护持21、机变14",
+        "advantages": [
+          "护持稳厚"
+        ],
+        "vulnerabilities": []
+      },
+      "soulRealmName": "灵感初萌",
+      "soulRealmRank": 1,
+      "soulRealmGap": "身神相称",
+      "luck": 18,
+      "comprehension": 22,
+      "spiritStones": 7,
+      "reputation": 4,
+      "faction": "",
+      "master": "",
+      "location": "青岚坊市西头的旧药铺",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 22
+    },
+    "activeStatuses": [
+      {
+        "rarity": "rare",
+        "duration": 3,
+        "effects": [],
+        "id": "st-lifespan-fading",
+        "name": "油尽灯枯",
+        "description": "气血一天薄一天，早上起身要扶着柜台歇一会儿。",
+        "category": "debuff",
+        "source": "寿元将尽"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 0.8,
+    "cultivationInsight": "杂灵根行气如筛子盛水，六十年只挪了两层。近两年连药铺的活都做不利索了。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "三十岁那年把攒了十年的灵石全买了一炉丹，炸了。",
+      "收养的哑女如今能自己看铺子了。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 77,
+      "focus": {
+        "id": "seh_thread_th-legacy",
+        "kind": "quest",
+        "priority": 65,
+        "title": "药铺托付",
+        "reason": "教她认灵药或直接立据过契",
+        "sourceThreadId": "th-legacy",
+        "dueAge": 79,
+        "relatedFactIds": [],
+        "requiredAction": "advance",
+        "resolutionStage": "open",
+        "resolutionHint": "仍是未了因果，可自然推进、试探、铺垫或留下下一步结构化痕迹。"
+      },
+      "hints": [
+        {
+          "id": "seh_thread_th-legacy",
+          "kind": "quest",
+          "priority": 65,
+          "title": "药铺托付",
+          "reason": "教她认灵药或直接立据过契",
+          "sourceThreadId": "th-legacy",
+          "dueAge": 79,
+          "relatedFactIds": [],
+          "requiredAction": "advance",
+          "resolutionStage": "open",
+          "resolutionHint": "仍是未了因果，可自然推进、试探、铺垫或留下下一步结构化痕迹。"
+        }
+      ],
+      "pressureMap": {
+        "likelyEventTypes": [],
+        "summary": "事件倾向：日常推进"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "引气入体，稳定法力循环，以低阶功法、灵石、符箓和丹药为要",
+      "bottleneck": "法力浅薄，神识初萌且难长时间外放",
+      "breakthroughTrial": "需打通周天、得合适功法后续与筑基机缘",
+      "capabilities": [
+        "使用低阶符箓",
+        "短时驱使低阶法器",
+        "辨识常见灵物"
+      ],
+      "limitations": [
+        "不宜长途御器横行",
+        "难破高阶禁制",
+        "易受筑基以上神识压制"
+      ],
+      "worldAccess": [
+        "低阶坊市",
+        "宗门外门",
+        "小型灵地",
+        "凡俗与修行边界"
+      ],
+      "socialWeight": "初入修行者，凡人眼中已有仙家威仪，高阶修士眼中仍属后辈",
+      "combatStyle": [
+        "符箓试探",
+        "低阶法器护身",
+        "借地形退避"
+      ],
+      "resourceNeeds": [
+        "灵石",
+        "聚气丹",
+        "入门功法后续",
+        "筑基丹线索"
+      ],
+      "riskTags": [
+        "灵力枯竭",
+        "功法不合",
+        "被高阶神识锁定"
+      ]
+    },
+    "pendingThreads": [
+      {
+        "status": "urgent",
+        "progress": 40,
+        "id": "th-legacy",
+        "title": "药铺托付",
+        "description": "要把西头药铺和一册手抄药记交给收养的哑女，但她还不会认灵药成色。",
+        "category": "promise",
+        "startAge": 75,
+        "deadlineAge": 79,
+        "followUpHint": "教她认灵药或直接立据过契"
+      }
+    ],
+    "questEntries": [
+      {
+        "id": "quest_th-legacy",
+        "title": "药铺托付",
+        "summary": "要把西头药铺和一册手抄药记交给收养的哑女，但她还不会认灵药成色。",
+        "kind": "promise",
+        "stage": "urgent",
+        "progress": 40,
+        "startedAtAge": 75,
+        "dueAge": 79,
+        "urgency": 10,
+        "sourceThreadId": "th-legacy",
+        "currentHook": "教她认灵药或直接立据过契",
+        "tags": [
+          "promise",
+          "urgent"
+        ]
+      }
+    ],
+    "characterIntents": [
+      {
+        "id": "intent_promise_th-legacy",
+        "type": "socialize",
+        "title": "守约·药铺托付",
+        "description": "「药铺托付」渐近，旧约旧人萦绕心间。或赴约，或传信，或亲自探望；若终究失约，也该有一番缘由。",
+        "priority": 8,
+        "relatedThreadId": "th-legacy"
+      },
+      {
+        "id": "intent_weapon_77",
+        "type": "gather_resources",
+        "title": "寻觅兵器",
+        "description": "已入修行却无趁手兵器，应主动寻一把剑/刀/杖/法宝防身。",
+        "priority": 6
+      }
+    ],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "lifespan-ending"
+  ],
+  "expectedNarrativeTraits": [
+    "不硬塞延寿机缘",
+    "交代身后事的具体动作",
+    "不写成失败判词"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库无角色接近寿元上限"
+  },
+  "notes": "乙路极端态：寿元只剩三年、境界卡死，叙事必须给出凡人式的收束而不是硬塞机缘"
+}

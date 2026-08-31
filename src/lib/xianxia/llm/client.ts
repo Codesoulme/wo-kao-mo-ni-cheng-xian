@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { assembleZonePrompt } from './prompt-builder';
 import { parseJSON } from './response-parser';
+import { recordOpenAIUsage, recordAnthropicUsage, type LLMScene } from './usage-tracker';
 
 type RuntimeAIConfig = {
   baseUrl: string;
@@ -146,7 +147,7 @@ function aiErrorMessage(body: any, status: number) {
 }
 // ==================== LLM 调用 ====================
 
-export async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: string, options: { qualityMode?: 'full' | 'light' } = {}): Promise<any> {
+export async function callLLM(systemPrompt: string, userPrompt: string, scenePrompt: string, options: { qualityMode?: 'full' | 'light'; scene?: LLMScene } = {}): Promise<any> {
   // TechDoc 18.6.5：6 区架构——把 scene 拼到 system 区，user 不变
   // 借助 assembleZonePrompt 把 scene 归为 Scene 区（input classification 由调用方按需附加）
   const { systemPrompt: fullSystem, userPrompt: fullUser } = assembleZonePrompt({
@@ -158,7 +159,7 @@ export async function callLLM(systemPrompt: string, userPrompt: string, scenePro
   return parseJSON(content);
 }
 
-export async function callLLMText(systemPrompt: string, userPrompt: string, options: { qualityMode?: 'full' | 'light' } = {}): Promise<string> {
+export async function callLLMText(systemPrompt: string, userPrompt: string, options: { qualityMode?: 'full' | 'light'; scene?: LLMScene } = {}): Promise<string> {
   // 缓存命中：避免重复请求
   const cacheKey = hashCacheKey(`${options.qualityMode || 'full'}|${systemPrompt.slice(0, 200)}|${userPrompt}`);
   const cached = getCachedLLM(cacheKey);
@@ -226,6 +227,8 @@ export async function callLLMText(systemPrompt: string, userPrompt: string, opti
     let content = '';
     let stopReason = '';
     if (isAnthropic) {
+      // 埋点 1/3：Anthropic 分支 usage（input_tokens 已排除缓存，cache_read_input_tokens 单列）
+      recordAnthropicUsage(model, data?.usage, options.scene || 'aux');
       // Anthropic 响应：content 是数组，type=text
       const contentBlocks = data?.content || [];
       content = contentBlocks
@@ -237,6 +240,8 @@ export async function callLLMText(systemPrompt: string, userPrompt: string, opti
         console.warn(`[LLM] Anthropic 响应因 max_tokens 被截断（实际输出 ${data?.usage?.output_tokens || '?'} tokens）。考虑降低 narrative 字数或拆分请求。`);
       }
     } else {
+      // 埋点 2/3：OpenAI 兼容分支 usage（方舟 prompt_tokens 含命中缓存，tracker 内部减掉 cached_tokens）
+      recordOpenAIUsage(model, data?.usage, options.scene || 'aux');
       content = data?.choices?.[0]?.message?.content || '';
       stopReason = data?.choices?.[0]?.finish_reason || '';
     }
@@ -267,7 +272,7 @@ export async function callLLMStream(
   systemPrompt: string,
   userPrompt: string,
   onDelta: (delta: string) => void | Promise<void>,
-  options: { qualityMode?: 'full' | 'light' } = {},
+  options: { qualityMode?: 'full' | 'light'; scene?: LLMScene } = {},
 ): Promise<string> {
   const cfg = await loadAIConfig();
   const isLite = options.qualityMode === 'light';
@@ -296,6 +301,9 @@ export async function callLLMStream(
     : JSON.stringify({
           model,
           stream: true,
+          // 观测层：OpenAI 兼容流式默认不回传 usage，须显式要末帧统计帧。
+          // 该帧 choices 为空数组，下方 delta 解析天然跳过，不影响正文。
+          stream_options: { include_usage: true },
           max_tokens: 16384,
           temperature: 0.7,
           top_p: 0.9,
@@ -328,6 +336,14 @@ export async function callLLMStream(
   let buffer = '';
   let total = '';
   let chunkCount = 0;
+  // 埋点 3/3 准备：流式 usage 不在正文帧里。
+  //   OpenAI 兼容：末帧（choices 空）带完整 usage，整体覆盖即可
+  //   Anthropic：message_start 给输入侧，message_delta 给输出侧，要分别攒
+  let streamUsage: any = null;
+  let anthropicInput = 0;
+  let anthropicCacheRead = 0;
+  let anthropicCacheWrite = 0;
+  let anthropicOutput = 0;
   console.log('[LLM Stream] Started reading response stream');
   while (true) {
     const { done, value } = await reader.read();
@@ -357,6 +373,18 @@ export async function callLLMStream(
       if (!data || data === '[DONE]') continue;
       try {
         const json = JSON.parse(data);
+        // 埋点 3/3 采集：统计帧不带正文，采完照常往下走 delta 解析（会天然跳过）
+        if (isAnthropic) {
+          if (json.type === 'message_start' && json.message?.usage) {
+            anthropicInput = json.message.usage.input_tokens || 0;
+            anthropicCacheRead = json.message.usage.cache_read_input_tokens || 0;
+            anthropicCacheWrite = json.message.usage.cache_creation_input_tokens || 0;
+          } else if (json.type === 'message_delta' && json.usage) {
+            anthropicOutput = json.usage.output_tokens || anthropicOutput;
+          }
+        } else if (json.usage) {
+          streamUsage = json.usage;
+        }
         let delta = '';
         if (isAnthropic) {
           if (json.type === 'content_block_delta' && json.delta?.type === 'text_delta') {
@@ -374,6 +402,29 @@ export async function callLLMStream(
         // 忽略单行解析错误
       }
     }
+  }
+  // 埋点 3/3 落账：读完整个流才拿得到完整 usage。
+  // 全零一律视作 provider 没回传，宁可不记也不写假数据——记 0 会把命中率算高。
+  const streamScene = options.scene || 'aux';
+  if (isAnthropic) {
+    if (anthropicInput || anthropicOutput || anthropicCacheRead) {
+      recordAnthropicUsage(
+        model,
+        {
+          input_tokens: anthropicInput,
+          output_tokens: anthropicOutput,
+          cache_read_input_tokens: anthropicCacheRead,
+          cache_creation_input_tokens: anthropicCacheWrite,
+        },
+        streamScene,
+      );
+    } else {
+      console.warn('[usage] 流式未取到 usage（Anthropic 分支），本次不记账');
+    }
+  } else if (streamUsage) {
+    recordOpenAIUsage(model, streamUsage, streamScene);
+  } else {
+    console.warn('[usage] 流式未取到 usage（OpenAI 兼容分支），本次不记账');
   }
   return total;
 }

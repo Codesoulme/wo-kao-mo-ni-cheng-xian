@@ -1,0 +1,37 @@
+{
+  "id": "replay-interference-06-干扰天道回响",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "interference",
+  "stratumLabel": "天道回响",
+  "prompt": "真实产出重放 · 天道回响 · eventType=interference · age=58 · title=干扰·天道回响",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "干扰·天道回响",
+    "narrative": "沈清萝收起破血幡角，沿青岚江下游旧路入小坊市。此物阴寒未散，寻常铺面多避而不收，唯有一名灰袍杂货修士愿以低价收去，说是可拆作辨邪祭器的边料。木气养脉压住余寒，交割时血幡阴意未再反扑。她换得几枚灵石，随即离开坊市。"
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "interference",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk3c9xk0011afbwzbcf87ks",
+    "createdAt": 1781822885961,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

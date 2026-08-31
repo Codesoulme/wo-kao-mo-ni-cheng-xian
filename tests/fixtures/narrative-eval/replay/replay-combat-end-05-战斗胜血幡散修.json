@@ -1,0 +1,37 @@
+{
+  "id": "replay-combat-end-05-战斗胜血幡散修",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "combat-end",
+  "stratumLabel": "战斗终局",
+  "prompt": "真实产出重放 · 战斗终局 · eventType=combat · age=57 · title=战斗·胜·血幡散修",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "战斗·胜·血幡散修",
+    "narrative": "血幡散修终被你逼至江畔败亡，残幡染血，阴煞之气随江风渐散。你气息紊乱，伤势未轻，灵力亦损去大半，只得暂压经脉翻涌。尸旁仅余一截破血幡角，煞纹虽残，仍透几分邪性。柳溪村人遥遥窥见此战，畏惧中多了几分敬意；只是江雾深处水声沉沉，旧日未了之事似仍在暗处回响。"
+  },
+  "gateOptions": {
+    "scope": "combat-end"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "combat-end",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk30b8o000tafbwphkiksly",
+    "createdAt": 1781822327784,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

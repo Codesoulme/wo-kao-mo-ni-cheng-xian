@@ -671,7 +671,21 @@ function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
 }
 
+// 计数口径（全局唯一，不得再加第二套）：
+//   1. 同一个测例名的「通过」只落一行 —— 先落地者胜。
+//      测例函数体内自己的 log 带着 count/id 等细节字段，先执行先落地；
+//      各 pgRun* 包装器随后补的那条纯 { passed: true } 被静默丢弃。
+//      于是「包装器兜底记录 + 函数体内细节记录」两套写法可以共存，
+//      既不丢细节，也不会把一个测例记成两三行。
+//   2. 「失败」永远落地，绝不因为去重被吞掉 —— 哪怕同名已经报过通过。
+//      漏报失败的代价远大于多出一行。
+const loggedPassNames = new Set<string>();
+
 function log(name: string, data: Record<string, unknown>): void {
+  if (data && data.passed === true) {
+    if (loggedPassNames.has(name)) return;
+    loggedPassNames.add(name);
+  }
   console.log(JSON.stringify({ smoke: name, ...data }));
 }
 
@@ -1740,7 +1754,9 @@ function smokeSameYearContinuationDedup(): void {
 }
 function smokeAnnualNarrativePrompt(): void {
   const source = readModuleSource('src/lib/xianxia/llm.ts');
-  assert(source.includes('年龄推进不是“一年只发生一件事”'), 'advance prompt should require annual multi-part narration');
+  // 判据不含引号字形：prompt-builder.ts 全文以 ASCII 直引号为惯例，
+  // 把全角弯引号写进 includes 会因为一次字形抖动就假红。拆成两段实词匹配。
+  assert(source.includes('年龄推进不是') && source.includes('一年只发生一件事'), 'advance prompt should require annual multi-part narration');
   assert(source.includes('dueInSameYear=true 表示下一次岁月流转会优先处理同岁后续'), 'advance prompt should explain same-year continuation behavior');
   assert(source.includes('必须用 extraEvents 拆成多条短事件'), 'advance prompt should require extraEvents for multiple key beats');
   log('annual-narrative-prompt', { passed: true });
@@ -3872,7 +3888,7 @@ async function main(): Promise<void> {
   smokeSaveLoadBackwardCompat();
   smokeSaveLoadCorruptionRecovery();
   smokePlayerVisibleTextAuditScriptSelfCheck();
-  smokeBlueprintDocsCoverage();
+  await smokeBlueprintDocsCoverage();
   // AI-37 宗门关系图
   smokeSectRelationLabelsMapping();
   smokeSectRelationIntensityRange();
@@ -4395,8 +4411,9 @@ function smokeAi103RumorReliability(): void {
   pgRunPhaseJAWorkerASmokes();
   pgRunPhaseKCWorkerCSmokes();
   pgRunPhaseKAWorkerASmokes();
-  pgRunPhaseLSmokes();
-  pgRunPhaseAlphaTribulationSmokes();
+  // pgRunPhaseLSmokes() / pgRunPhaseAlphaTribulationSmokes() 不在此处重复调用：
+  // 二者已由 smokeBlueprintDocsCoverage() 里那段编排（见 pgRunPhaseAlphaTribulationSmokes 调用处）跑过一遍，
+  // 这里再跑一次会让 phase-L / phase-α 的测例整组执行两遍。
 }
 
 function smokeCombatLabelsDisplay(): void {
@@ -6010,7 +6027,7 @@ function smokeSectRelationBlueprint(): void {
   log('sect-relation-blueprint', { passed: true });
 }
 
-function smokeBlueprintDocsCoverage(): void {
+async function smokeBlueprintDocsCoverage(): Promise<void> {
   // AI-31 + AI-35: 蓝图文档覆盖度
   const blueprints = [
     'docs/blueprints/value-blueprint.md',
@@ -6043,11 +6060,11 @@ function smokeBlueprintDocsCoverage(): void {
       pgRunPhaseRSectStorylineSmokes();
       pgRunPhaseXPageIntegrationSmokes();
       // Phase-Y (TechDoc 18.6.6): memory system — 7 smokes
-      pgRunPhaseYMemorySmokes();
+      await pgRunPhaseYMemorySmokes();
       // Phase-P DSL (TechDoc 18.6.4): 规则引擎 DSL PoC — 10 smokes
       pgRunPhasePDslPoCSmokes();
       // Phase-RAG (TechDoc 18.6.1): RAG 世界观事实检索 PoC — 5 smokes
-      pgRunPhaseRagSmokes();
+      await pgRunPhaseRagSmokes();
       // Phase-EV (TechDoc 19): Event Sourcing projector + 时间旅行工具 PoC — 5 smokes
       pgRunPhaseEvProjectorSmokes();
       // Phase-Events (TechDoc: Event Sourcing PoC 基础设施): reducer 纯函数 — 8 smokes
@@ -6071,7 +6088,7 @@ function smokeBlueprintDocsCoverage(): void {
       // 批 17: Projector 增强（projection rules + 缓存统计 + invalidate）— 5 个静态 smoke
       pgRunPhaseProjectionRuleSmokes();
       // 批 21: Projector 持久化（内存 → SQLite via Prisma）— 4 个 smoke（默认 skip，需 --db）
-      pgRunPhaseEsProjectorPersistSmokes();
+      await pgRunPhaseEsProjectorPersistSmokes();
       // 批 18: event-timeline 工具增强（filter / format / aggregate / causal chain）— 4 个静态 smoke
       pgRunPhaseTimelineSmokes();
       // 批 17: event-replay 工具增强（diff / export / range / type 过滤）— 4 个静态 smoke
@@ -6081,7 +6098,7 @@ function smokeBlueprintDocsCoverage(): void {
       // Phase 5 #2: ECS tick helper + choose/interfere/advance 接入 — 3 个静态 smoke
       pgRunPhaseP5EcsTickHelperSmokes();
       // 批 20b: ES 真实链路集成测试（轻量——import + 返回值结构；完整跑需 --db）— 6 个静态 smoke
-      pgRunPhaseEsIntegrationSmokes();
+      await pgRunPhaseEsIntegrationSmokes();
       // 批 22: page.tsx 主 tab 重构（5 个新 tab：道途/命途/传承/人情/修行）— 5 个静态 smoke
       pgRunPhaseTabRestructureSmokes();
       // ===== 分层架构改造批 · 调用锚点（各 worker 只准动自己那一行下方）=====
@@ -10330,7 +10347,7 @@ async function smokeY007MaybeBuildAllSummaries(): void {
   log('smoke-y-007-maybe-build-all-summaries', { passed: true, hasDay: !!result.day });
 }
 
-function pgRunPhaseYMemorySmokes(): void {
+function pgRunPhaseYMemorySmokes(): Promise<void> {
   const syncCases = [
     { name: 'smoke-y-001-memory-store-add-and-list', fn: smokeY001MemoryStoreAddAndList },
     { name: 'smoke-y-002-memory-keyword-search', fn: smokeY002MemoryKeywordSearch },
@@ -10345,8 +10362,8 @@ function pgRunPhaseYMemorySmokes(): void {
       log(c.name, { passed: false, error: (e && e.message) || String(e) });
     }
   }
-  // 异步 smoke — 整体打包跑
-  (async () => {
+  // 异步 smoke — 整体打包跑，把 promise 交回调用方 await，别让结果和进程退出赛跑
+  return (async () => {
     const asyncCases = [
       { name: 'smoke-y-003-hierarchical-day-summary', fn: smokeY003HierarchicalDaySummary },
       { name: 'smoke-y-003b-hierarchical-week-summary', fn: smokeY003bHierarchicalWeekSummary },
@@ -10475,7 +10492,7 @@ function smokeRag005EmbeddingInterfacePoC(): void {
   })() as any;
 }
 
-function pgRunPhaseRagSmokes(): void {
+function pgRunPhaseRagSmokes(): Promise<void> {
   // rag-005 是 async, 单独跑; 其他 4 个 sync
   const syncCases: Array<{ name: string; fn: () => void }> = [
     { name: 'smoke-rag-001-index-builds-and-counts', fn: smokeRag001IndexBuildsAndCounts },
@@ -10491,8 +10508,8 @@ function pgRunPhaseRagSmokes(): void {
       log(c.name, { passed: false, error: (e && e.message) || String(e) });
     }
   }
-  // async 单独跑
-  (async () => {
+  // async 单独跑 —— promise 交回调用方 await
+  return (async () => {
     try {
       await smokeRag005EmbeddingInterfacePoC();
       log('smoke-rag-005-embedding-interface-poc', { passed: true });
@@ -14501,34 +14518,45 @@ async function smokeP5Esm003RetryThenSuccess(): Promise<void> {
 
 async function smokeP5Esm004CircuitBreakerStates(): Promise<void> {
   const { _esmNewTestCircuit, OpenCircuitError } = require('../src/lib/xianxia/events/middleware');
-  // 隔离实例（threshold=3, cooldownMs=500 加速 smoke）
-  const cb = _esmNewTestCircuit({ threshold: 3, cooldownMs: 500 });
-  // 初始 closed
-  assert(cb.state() === 'closed', `initial state should be closed, got: ${cb.state()}`);
-  // 连续失败 3 次 → open
+  // 拆两个隔离实例，理由：cb.state() 是按 Date.now() - openedAt 惰性推算的，
+  // 只要断言前卡顿超过 cooldownMs，实例已自行滑到 half-open，"应为 open" 的断言就假挂。
+  //
+  // 实例甲（长冷却窗 30s）：只测 closed → open 迁移 / open 期间拒绝 / remainingMs > 0。
+  // 30s 远大于任何 GC 或磁盘卡顿，断言不再和时钟赛跑。
+  const cbLong = _esmNewTestCircuit({ threshold: 3, cooldownMs: 30000 });
+  assert(cbLong.state() === 'closed', `initial state should be closed, got: ${cbLong.state()}`);
   for (let i = 0; i < 3; i += 1) {
     let caught: any = null;
     try {
-      await cb.run(async () => { throw new Error(`fail-${i}`); });
+      await cbLong.run(async () => { throw new Error(`fail-${i}`); });
     } catch (e) { caught = e; }
     assert(caught !== null, `failure ${i} should propagate`);
   }
-  assert(cb.state() === 'open', `state after 3 failures should be open, got: ${cb.state()}`);
+  assert(cbLong.state() === 'open', `state after 3 failures should be open, got: ${cbLong.state()}`);
   // open 期间调用 → 抛 OpenCircuitError
   let openErr: any = null;
   try {
-    await cb.run(async () => 'should-not-run');
+    await cbLong.run(async () => 'should-not-run');
   } catch (e) { openErr = e; }
   assert(openErr instanceof OpenCircuitError, `open-circuit call should throw OpenCircuitError, got: ${openErr?.constructor?.name}`);
   assert(typeof openErr.remainingMs === 'number' && openErr.remainingMs > 0, 'remainingMs should be > 0');
-  // 等 cooldown → state() 显示 half-open
+
+  // 实例乙（短冷却窗 500ms）：只测 cooldown 到点 → half-open → 探测成功 → closed 这条链。
+  // 这条链只需要"等够"，不需要"抢在时限内断言"，所以卡顿只会让它更稳、不会让它假挂。
+  const cbShort = _esmNewTestCircuit({ threshold: 3, cooldownMs: 500 });
+  for (let i = 0; i < 3; i += 1) {
+    try {
+      await cbShort.run(async () => { throw new Error(`short-fail-${i}`); });
+    } catch { /* 失败计数本身由实例甲验过，这里只要攒满阈值 */ }
+  }
+  // 等 cooldown → state() 显示 half-open（等更久也仍是 half-open，不会自己回 closed）
   await new Promise((r) => setTimeout(r, 550));
-  assert(cb.state() === 'half-open', `state after cooldown should be half-open, got: ${cb.state()}`);
+  assert(cbShort.state() === 'half-open', `state after cooldown should be half-open, got: ${cbShort.state()}`);
   // half-open 探测调用成功 → closed
-  const okRes = await cb.run(async () => 'probe-ok');
+  const okRes = await cbShort.run(async () => 'probe-ok');
   assert(okRes === 'probe-ok', `half-open success should return value, got: ${okRes}`);
-  assert(cb.state() === 'closed', `state after half-open success should be closed, got: ${cb.state()}`);
-  log('smoke-p5-esm-004-circuit-breaker-states', { passed: true });
+  assert(cbShort.state() === 'closed', `state after half-open success should be closed, got: ${cbShort.state()}`);
+  log('smoke-p5-esm-004-circuit-breaker-states', { passed: true, longCooldownMs: 30000, shortCooldownMs: 500 });
 }
 
 async function smokeP5Esm005WrapTxInOrOut(): Promise<void> {
@@ -14630,7 +14658,7 @@ async function smokeP5Esm007BackoffFormula(): Promise<void> {
   log('smoke-p5-esm-007-backoff-formula', { passed: true });
 }
 
-function pgRunPhaseEsIntegrationSmokes(): void {
+async function pgRunPhaseEsIntegrationSmokes(): Promise<void> {
   // sync 部分立即跑
   const syncCases = [
     { name: 'smoke-es-integration-001-importable', fn: smokeEsIntegration001Importable },
@@ -14648,8 +14676,8 @@ function pgRunPhaseEsIntegrationSmokes(): void {
       log(c.name, { passed: false, error: (e && e.message) || String(e) });
     }
   }
-  // async 部分 fire-and-forget：smoke 内部已 log，最终 commit 前把状态补救上
-  // 编排函数立即返回——main 同步流不被阻塞。async smoke 通过 Promise.catch 自行兜底。
+  // async 部分必须等齐：以前是 fire-and-forget，7 条 esm 测例的结果和进程退出赛跑,
+  // 失败时内层来不及落日志。现在整批 await，全部结果落盘后编排函数才返回。
   const asyncCases = [
     { name: 'smoke-p5-esm-001-wrapper-required-throws', fn: smokeP5Esm001WrapperRequiredThrows },
     { name: 'smoke-p5-esm-002-wrapper-optional-fallthrough', fn: smokeP5Esm002WrapperOptionalFallthrough },
@@ -14659,11 +14687,13 @@ function pgRunPhaseEsIntegrationSmokes(): void {
     { name: 'smoke-p5-esm-006-route-marker-tags', fn: smokeP5Esm006RouteMarkerTags },
     { name: 'smoke-p5-esm-007-backoff-formula', fn: smokeP5Esm007BackoffFormula },
   ];
-  for (const c of asyncCases) {
-    c.fn()
-      .then(() => log(c.name, { passed: true }))
-      .catch((e) => log(c.name, { passed: false, error: (e && e.message) || String(e) }));
-  }
+  await Promise.all(
+    asyncCases.map((c) =>
+      c.fn()
+        .then(() => log(c.name, { passed: true }))
+        .catch((e) => log(c.name, { passed: false, error: (e && e.message) || String(e) }))
+    )
+  );
 }
 
 // ===== 批 20: ECS 集成 advance（PoC：advance 路由 + advance-sse 路由额外跑一次 world.tick()）=====
@@ -14846,14 +14876,20 @@ function smokeProjectionPersist001ModelAndExports(): void {
   log('smoke-projection-persist-001-model-and-exports', { passed: true });
 }
 
-function smokeProjectionPersist002DualLayerWrite(): void {
+async function smokeProjectionPersist002DualLayerWrite(): Promise<void> {
   // 双层写验证：getProjectedState 后内存 cache + DB ProjectionSnapshot 都应有数据
+  //
+  // 修：原写法把全部断言塞进 `(async () => { ... })()` 后不 await，
+  // 函数体末尾无条件 log({passed:true})——断言永远影响不到落账，结构上不可能报红。
+  // 现在整个函数改 async，断言直接 await 在主干上；清理放 finally，
+  // 断言抛错时资源照样回收，但错误原样冒泡给 runner 落 passed:false。
   const { db } = require('../src/lib/db');
   const projMod = require('../src/lib/xianxia/events/projector');
 
   const testCharId = `pp2-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  (async () => {
+  let createdId: string | null = null;
+  try {
     // 1. 创建测试 character
     const char = await db.character.create({
       data: {
@@ -14869,6 +14905,7 @@ function smokeProjectionPersist002DualLayerWrite(): void {
         lifespan: 80,
       },
     });
+    createdId = char.id;
 
     // 2. 清干净起点
     await projMod.clearProjectionCache();
@@ -14887,23 +14924,31 @@ function smokeProjectionPersist002DualLayerWrite(): void {
     // 5. 内存 cache 也有（size >= 1）
     const stats = projMod.getProjectionCacheStats();
     assert(stats.size >= 1, `mem cache size should be >= 1, got ${stats.size}`);
-
-    // 清理
-    await db.projectionSnapshot.deleteMany({ where: { characterId: char.id } });
-    await db.character.delete({ where: { id: char.id } });
-  })();
+  } finally {
+    // 清理：best-effort，不能吞掉上面的断言错误
+    if (createdId) {
+      try {
+        await db.projectionSnapshot.deleteMany({ where: { characterId: createdId } });
+      } catch { /* 清理失败不改变测例结论 */ }
+      try {
+        await db.character.delete({ where: { id: createdId } });
+      } catch { /* 清理失败不改变测例结论 */ }
+    }
+  }
 
   log('smoke-projection-persist-002-dual-layer-write', { passed: true });
 }
 
-function smokeProjectionPersist003InvalidateClearsDb(): void {
+async function smokeProjectionPersist003InvalidateClearsDb(): Promise<void> {
   // invalidateProjection 清 DB 验证
+  // 修：同 002——原来是 fire-and-forget IIFE + 尾部无条件 passed:true，断言不可达。
   const { db } = require('../src/lib/db');
   const projMod = require('../src/lib/xianxia/events/projector');
 
   const testCharId = `pp3-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  (async () => {
+  let createdId: string | null = null;
+  try {
     // 1. 创建 character + 触发 projection
     const char = await db.character.create({
       data: {
@@ -14919,6 +14964,7 @@ function smokeProjectionPersist003InvalidateClearsDb(): void {
         lifespan: 80,
       },
     });
+    createdId = char.id;
 
     await projMod.clearProjectionCache();
     await projMod.getProjectedState(char.id);
@@ -14941,17 +14987,23 @@ function smokeProjectionPersist003InvalidateClearsDb(): void {
     assert(recovered.characterId === char.id, 'recovered snapshot.characterId should match');
     dbSnap = await db.projectionSnapshot.findUnique({ where: { characterId: char.id } });
     assert(dbSnap !== null, 'DB snapshot should be re-created after second getProjectedState');
-
-    // 清理
-    await db.projectionSnapshot.deleteMany({ where: { characterId: char.id } });
-    await db.character.delete({ where: { id: char.id } });
-  })();
+  } finally {
+    if (createdId) {
+      try {
+        await db.projectionSnapshot.deleteMany({ where: { characterId: createdId } });
+      } catch { /* 清理失败不改变测例结论 */ }
+      try {
+        await db.character.delete({ where: { id: createdId } });
+      } catch { /* 清理失败不改变测例结论 */ }
+    }
+  }
 
   log('smoke-projection-persist-003-invalidate-clears-db', { passed: true });
 }
 
-function smokeProjectionPersist004ClearProjectionClearsDb(): void {
+async function smokeProjectionPersist004ClearProjectionClearsDb(): Promise<void> {
   // clearProjectionCache 清全部验证
+  // 修：同 002/003——原来是 fire-and-forget IIFE + 尾部无条件 passed:true，断言不可达。
   const { db } = require('../src/lib/db');
   const projMod = require('../src/lib/xianxia/events/projector');
 
@@ -14960,7 +15012,8 @@ function smokeProjectionPersist004ClearProjectionClearsDb(): void {
     ids.push(`pp4-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`);
   }
 
-  (async () => {
+  const createdIds: string[] = [];
+  try {
     // 1. 创建 3 个 character + 各自 projection
     for (const id of ids) {
       await db.character.create({
@@ -14977,6 +15030,7 @@ function smokeProjectionPersist004ClearProjectionClearsDb(): void {
           lifespan: 80,
         },
       });
+      createdIds.push(id);
     }
 
     await projMod.clearProjectionCache();
@@ -15000,17 +15054,21 @@ function smokeProjectionPersist004ClearProjectionClearsDb(): void {
     // 4. 内存 cache 也清（size = 0）
     const stats = projMod.getProjectionCacheStats();
     assert(stats.size === 0, `mem cache size should be 0 after clear, got ${stats.size}`);
-
-    // 清理
-    for (const id of ids) {
-      await db.character.delete({ where: { id } });
+  } finally {
+    for (const id of createdIds) {
+      try {
+        await db.projectionSnapshot.deleteMany({ where: { characterId: id } });
+      } catch { /* 清理失败不改变测例结论 */ }
+      try {
+        await db.character.delete({ where: { id } });
+      } catch { /* 清理失败不改变测例结论 */ }
     }
-  })();
+  }
 
   log('smoke-projection-persist-004-clear-projection-clears-db', { passed: true });
 }
 
-function pgRunPhaseEsProjectorPersistSmokes(): void {
+async function pgRunPhaseEsProjectorPersistSmokes(): Promise<void> {
   if (!isProjectionPersistEnabled()) {
     log('smoke-projection-persist-skipped', {
       passed: true,
@@ -15028,7 +15086,9 @@ function pgRunPhaseEsProjectorPersistSmokes(): void {
   ];
   for (const c of cases) {
     try {
-      c.fn();
+      // 002/003/004 是 async：必须 await，否则断言的 reject 逃出 try，
+      // catch 抓不到，又退回「结构上不可能失败」。001 是同步函数，await 它无害。
+      await c.fn();
       log(c.name, { passed: true });
     } catch (e) {
       log(c.name, { passed: false, error: (e && e.message) || String(e) });

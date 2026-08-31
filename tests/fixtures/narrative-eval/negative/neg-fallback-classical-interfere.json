@@ -1,0 +1,47 @@
+{
+  "id": "neg-fallback-classical-interfere",
+  "route": "丙",
+  "kind": "negative",
+  "label": "旧兜底文案 · 半文言（干预）",
+  "prompt": "反面样本 · 旧兜底文案 · 半文言（干预）",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "天机沉寂",
+    "narrative": "天机沉寂，沈砚舟心中闪过「去海边看看」之念，却暂未掀起可见波澜。"
+  },
+  "gateOptions": {
+    "scope": "advance",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "「天机沉寂」「之念」「暂未掀起可见波澜」半文言堆叠",
+    "只交代了「什么都没发生」，玩家得不到任何世界内信息",
+    "长度不足"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "fallback-classical-interfere"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "1c5a090^:src/lib/xianxia/llm.ts:2018 重构前兜底文案",
+    "mustFailGates": []
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：「天机沉寂」「之念」「暂未掀起可见波澜」半文言堆叠；只交代了「什么都没发生」，玩家得不到任何世界内信息；长度不足"
+}

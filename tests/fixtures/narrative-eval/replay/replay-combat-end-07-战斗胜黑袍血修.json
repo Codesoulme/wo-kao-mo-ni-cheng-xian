@@ -1,0 +1,37 @@
+{
+  "id": "replay-combat-end-07-战斗胜黑袍血修",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "combat-end",
+  "stratumLabel": "战斗终局",
+  "prompt": "真实产出重放 · 战斗终局 · eventType=combat · age=78 · title=战斗·胜·黑袍血修",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "战斗·胜·黑袍血修",
+    "narrative": "黑袍血修终被斩落柳溪村外，血雾散入青岚江风，腥气仍久不肯去。沈清萝灵力几近枯竭，伤势牵动经脉，却也在生死交锋间心神愈沉。其遗下血纹残针、血遁符、储物袋、血纹短刃、回元丹与残缺血煞诀皆被收起。村中人遥望不敢近前，此战之后，血幡余踪或有一线可循。"
+  },
+  "gateOptions": {
+    "scope": "combat-end"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "combat-end",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk5guma001xafpkodxy6sll",
+    "createdAt": 1781826458626,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

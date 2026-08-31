@@ -1,0 +1,55 @@
+{
+  "id": "neg-genre-dissonance",
+  "route": "丙",
+  "kind": "negative",
+  "label": "题材违和（天灵根遭失望）",
+  "prompt": "反面样本 · 题材违和（天灵根遭失望）",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "测灵之日",
+    "narrative": "游方道士把测灵石按在李青云掌心，石上腾起一道雷光，映得半个院子发白。道士看了半晌，说这是天灵根。围观的村民甚是失望，纷纷摇头说不过如此，有人还嫌雷光太吵，转身就走了。道士收起测灵石便告辞，说这孩子资质寻常，不必费心。"
+  },
+  "gateOptions": {
+    "scope": "birth",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G3"
+    ]
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "天灵根降生本该震动一方，村民却「甚是失望」「不过如此」，违背题材常识",
+    "游方道士反说天灵根「资质寻常」，与世界设定直接冲突"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [
+      "setting-root-disappoint:天灵根。围观的村民甚是失望，纷纷摇头说不过如此"
+    ],
+    "warn": [
+      "outworld-classical:甚是",
+      "outworld-classical:不过如此"
+    ]
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "genre-dissonance"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "prompt-builder.ts:262 明确记录的错误写法",
+    "mustFailGates": [
+      "G3"
+    ]
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：天灵根降生本该震动一方，村民却「甚是失望」「不过如此」，违背题材常识；游方道士反说天灵根「资质寻常」，与世界设定直接冲突"
+}

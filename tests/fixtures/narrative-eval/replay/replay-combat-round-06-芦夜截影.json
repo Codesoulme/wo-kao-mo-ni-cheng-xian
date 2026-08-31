@@ -1,0 +1,37 @@
+{
+  "id": "replay-combat-round-06-芦夜截影",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "combat-round",
+  "stratumLabel": "战斗回合",
+  "prompt": "真实产出重放 · 战斗回合 · eventType=combat · age=57 · title=芦夜截影",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "芦夜截影",
+    "narrative": "这一年，沈清萝仍居柳溪村外，白日沿江采草换米，夜里借潮声吐纳。入秋后，她携二十二枚灵石自渡口归来，行至寒苇滩，忽有黑袍散修自苇影中拦路，嗅出她身上残留的江底水禁气息，逼问雾门所得。对方祭出血色短幡，阴气卷苇而起。沈清萝灵力未丰，握紧沉水木杖，以水木之气护住经脉，回春符贴在袖内未敢轻用；水刻余悟使她借江潮辨出对方幡影虚实，却也知此劫难以三言避过。"
+  },
+  "gateOptions": {
+    "scope": "combat-round"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "combat-round",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk2y4rg000rafbwdgsw5w0p",
+    "createdAt": 1781822226076,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

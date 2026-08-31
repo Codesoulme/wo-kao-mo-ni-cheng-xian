@@ -104,6 +104,7 @@ model Character {
   // JSON string of current active status entries
   npcRelationships  NpcRelationship[]
   narrativeMemories NarrativeMemory[]
+  narrativeDigests  NarrativeDigest[]
   statusJson      String   @default("[]")
   // JSON string of inventory items
   inventoryJson   String   @default("[]")
@@ -378,4 +379,43 @@ model NarrativeMemory {
   @@index([characterId, resolved])
   @@index([characterId, intensity])
   @@index([sourceEventId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// 历史纪要（NarrativeDigest）—— 旁路派生物，不是 source of truth
+//
+// 定位：EventLog 永久保留逐字原文，本表只存"按境界阶段切段"后的纪要文本，
+// 供叙事连贯与笔触延续使用。硬事实（境界/寿元/物品/关系门槛）一律不进本表，
+// 它们各自走 Character 字段、inventory、NpcRelationship 等结构化通道。
+// 因此本表整行丢失只会让笔触断层，不会让引擎校验失准。
+//
+// level 用 String 存（'year' | 'stage' | 'life'），与 schema 里其它枚举同风格，
+// 保持 SQLite / Postgres 双端兼容。
+// ─────────────────────────────────────────────────────────────
+model NarrativeDigest {
+  id          String   @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  // 'year' = L1 岁纪要 / 'stage' = L2 阶段纪要 / 'life' = L3 生平纲要
+  level       String
+
+  startAge    Int                      // 覆盖区间起始年龄（含）
+  endAge      Int                      // 覆盖区间结束年龄（含）
+  realmAtStart String  @default("")     // 该段起始时的境界 id（切段依据，不作为事实来源）
+
+  summary     String                   // 纪要正文（白话，无硬事实数值）
+  highlightsJson String @default("[]")  // JSON: string[]，该段几条要点标题
+
+  coveredEventCount Int @default(0)     // 本段覆盖的 EventLog 条数（缺口校验用）
+
+  // 边界指纹：由 characterId + level + 区间 + 覆盖事件 id 列表算出。
+  // 同一段边界重复生成时按此去重，不产生重复行。
+  boundaryFingerprint String
+
+  createdAt   DateTime @default(now())
+
+  @@unique([characterId, boundaryFingerprint])
+  @@index([characterId, level, startAge])
+  @@index([characterId, startAge])
 }

@@ -1,0 +1,339 @@
+{
+  "id": "state-near-death",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "濒死重伤 · 被围",
+  "prompt": "状态快照 · 濒死重伤 · 被围 · 气血不足一成且被多人缠住，这一拍可能只能挨打，不许写主角光环",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "沈清萝",
+      "age": 79,
+      "lifespan": 150,
+      "gender": "男",
+      "spiritualRoot": "pure",
+      "rootDetail": "水真灵根",
+      "realm": "foundation",
+      "realmName": "筑基期",
+      "realmLevel": 9,
+      "realmMaxLevel": 9,
+      "cultivationExp": 4800,
+      "expToBreak": 5000,
+      "elements": {
+        "metal": 10,
+        "wood": 40,
+        "water": 55,
+        "fire": 5,
+        "earth": 15
+      },
+      "hp": 38,
+      "maxHp": 640,
+      "mp": 12,
+      "maxMp": 420,
+      "attack": 88,
+      "defense": 40,
+      "speed": 66,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 118,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 85,
+          "description": "当前神魂境界：神魂稳固（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 131,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 118,
+      "soulStrength": 85,
+      "physicalFoundation": 131,
+      "combatProjection": {
+        "force": 107,
+        "guard": 66,
+        "agility": 79,
+        "spiritualAwareness": 118,
+        "soulStability": 85,
+        "bodyTenacity": 131,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "御器斗法：破势107、护持66、机变79",
+        "advantages": [
+          "破势偏盛"
+        ],
+        "vulnerabilities": [
+          "神识锐而魂魄承载不足",
+          "攻锋过盛，护持偏薄"
+        ]
+      },
+      "soulRealmName": "神魂稳固",
+      "soulRealmRank": 3,
+      "soulRealmGap": "身神相称",
+      "luck": 34,
+      "comprehension": 60,
+      "spiritStones": 0,
+      "reputation": 58,
+      "faction": "",
+      "master": "",
+      "location": "深水潮门残垣",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 48
+    },
+    "activeStatuses": [
+      {
+        "rarity": "epic",
+        "duration": 1,
+        "effects": [],
+        "id": "st-bleeding",
+        "name": "气血将竭",
+        "description": "肋下的口子一直在渗，走三步就要扶墙。",
+        "category": "debuff",
+        "source": "半潮门围杀"
+      },
+      {
+        "rarity": "common",
+        "duration": 1,
+        "effects": [],
+        "id": "st-surrounded",
+        "name": "被围",
+        "description": "三个方向都有人堵着，退路只剩塌了一半的残垣。",
+        "category": "debuff",
+        "source": "半潮门围杀"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 2.2,
+    "cultivationInsight": "水真灵根本该顺水行气，此刻灵力见底，连护脉都撑不住。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "半潮门影已到潮候，她本想托外院巡江弟子远远照应。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 79,
+      "focus": {
+        "id": "seh_thread_th-hunt",
+        "kind": "deadline",
+        "priority": 110,
+        "title": "半潮门围杀",
+        "reason": "半潮门四人已合围，为的是她身上那件护身法器。",
+        "sourceThreadId": "th-hunt",
+        "dueAge": 79,
+        "relatedFactIds": [],
+        "requiredAction": "resolve_or_fail",
+        "resolutionStage": "escalating",
+        "resolutionHint": "已到关键关口，本轮应推进到完成、失败、战斗、选择或明确解释无法执行。"
+      },
+      "hints": [
+        {
+          "id": "seh_thread_th-hunt",
+          "kind": "deadline",
+          "priority": 110,
+          "title": "半潮门围杀",
+          "reason": "半潮门四人已合围，为的是她身上那件护身法器。",
+          "sourceThreadId": "th-hunt",
+          "dueAge": 79,
+          "relatedFactIds": [],
+          "requiredAction": "resolve_or_fail",
+          "resolutionStage": "escalating",
+          "resolutionHint": "已到关键关口，本轮应推进到完成、失败、战斗、选择或明确解释无法执行。"
+        }
+      ],
+      "pressureMap": {
+        "topThreat": "半潮门围杀",
+        "likelyEventTypes": [
+          "威胁回响",
+          "限期了结"
+        ],
+        "summary": "最大威胁：半潮门围杀；事件倾向：威胁回响、限期了结"
+      },
+      "warnings": [
+        "存在已经到期或极高优先级的线索，本年必须承接、完成、失败或解释无法执行。"
+      ]
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "道基初成，法力凝实，以稳固道基、神识初放和洞府经营为要",
+      "bottleneck": "道基稳固度、功法后续与结丹资源缺口",
+      "breakthroughTrial": "需结丹因缘、丹药、心性与道基成色相合",
+      "capabilities": [
+        "稳定御器远行",
+        "神识探查周身",
+        "开辟或经营洞府"
+      ],
+      "limitations": [
+        "难驾驭本命法宝",
+        "金丹禁制仍难硬破",
+        "长途斗法耗损明显"
+      ],
+      "worldAccess": [
+        "宗门核心外围",
+        "洞府经营",
+        "秘境外层",
+        "筑基坊市"
+      ],
+      "socialWeight": "已算低阶骨干，炼气修士多有忌惮，小宗门开始重视",
+      "combatStyle": [
+        "御器斗法",
+        "神识预判",
+        "护体灵光维持"
+      ],
+      "resourceNeeds": [
+        "结丹灵物",
+        "高阶功法后续",
+        "洞府灵脉",
+        "稳固道基的丹药"
+      ],
+      "riskTags": [
+        "道基受损",
+        "神识反噬",
+        "结丹失败"
+      ]
+    },
+    "pendingThreads": [
+      {
+        "status": "urgent",
+        "progress": 80,
+        "id": "th-hunt",
+        "title": "半潮门围杀",
+        "description": "半潮门四人已合围，为的是她身上那件护身法器。",
+        "category": "enemy",
+        "startAge": 78,
+        "deadlineAge": 79
+      }
+    ],
+    "questEntries": [
+      {
+        "id": "quest_th-hunt",
+        "title": "半潮门围杀",
+        "summary": "半潮门四人已合围，为的是她身上那件护身法器。",
+        "kind": "enemy",
+        "stage": "urgent",
+        "progress": 80,
+        "startedAtAge": 78,
+        "dueAge": 79,
+        "urgency": 10,
+        "sourceThreadId": "th-hunt",
+        "tags": [
+          "enemy",
+          "urgent"
+        ]
+      }
+    ],
+    "characterIntents": [
+      {
+        "id": "intent_due_th-hunt",
+        "type": "resolve_thread",
+        "title": "应约·半潮门围杀",
+        "description": "「半潮门围杀」已到约期。此事压在心头，须去赴约、入境、应试或还愿；若一时不能成行，也该给自己一个交代。",
+        "priority": 10,
+        "relatedThreadId": "th-hunt"
+      },
+      {
+        "id": "intent_break_79",
+        "type": "breakthrough",
+        "title": "酝酿突破",
+        "description": "修为将满，应闭关参悟、稳固道心、准备突破。若有突破辅助丹药应及早服用。",
+        "priority": 7
+      },
+      {
+        "id": "intent_weapon_79",
+        "type": "gather_resources",
+        "title": "寻觅兵器",
+        "description": "已入修行却无趁手兵器，应主动寻一把剑/刀/杖/法宝防身。",
+        "priority": 6
+      }
+    ],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "near-death"
+  ],
+  "expectedNarrativeTraits": [
+    "不得写主角光环反杀",
+    "被压制的具体表现",
+    "数值不得凭空夸大"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库战斗样本都是胜局，没有濒死态"
+  },
+  "notes": "乙路极端态：气血不足一成且被多人缠住，这一拍可能只能挨打，不许写主角光环"
+}

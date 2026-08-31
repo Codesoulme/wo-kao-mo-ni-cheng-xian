@@ -1,0 +1,37 @@
+{
+  "id": "replay-breakthrough-05-潮前凝关",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "breakthrough",
+  "stratumLabel": "突破",
+  "prompt": "真实产出重放 · 突破 · eventType=breakthrough · age=50 · title=潮前凝关",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "潮前凝关",
+    "narrative": "沈清萝守在柳溪村江畔，不再四处采药，只以残碑方位为界，日夜借雾潮润脉之息运转水木引气残诀。江雾入夜渐厚，水声里隐有石阶回响，她知雾门再开将近，便将沉水木杖横于膝前，反复推演入雾后的退路。数旬吐纳之后，丹田灵液翻涌，筑基关窍已有松动之象，却尚差一线。她没有强冲，只把心神压入青岚江潮声中，待来年大雾真正合门。"
+  },
+  "gateOptions": {
+    "scope": "breakthrough"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "breakthrough",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk2d1dx001lafi001xeho9j",
+    "createdAt": 1781821241925,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

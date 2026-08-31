@@ -1,0 +1,37 @@
+{
+  "id": "replay-advance-02-潮牙旧刃",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "advance",
+  "stratumLabel": "年岁推进",
+  "prompt": "真实产出重放 · 年岁推进 · eventType=normal · age=22 · title=潮牙旧刃",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "潮牙旧刃",
+    "narrative": "今年潮牙集开市，沈清澜把六枚灵石贴身缝入布囊，天未亮便循潮路出村。她知身上资财不足，不去问法器摊，只在旧器棚前逐件试看。摊主见她灵息浅薄，本不愿多言，后见她辨得一柄短刃水锈下仍有韧纹，便让她以六枚灵石并代补三张破网抵价。归途中海雾渐起，她以新刃削桨试锋，虽非灵兵，却比渔刀稳得多。"
+  },
+  "gateOptions": {
+    "scope": "advance"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "advance",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqk8v32x008hafpkj2btocg6",
+    "createdAt": 1781832161626,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

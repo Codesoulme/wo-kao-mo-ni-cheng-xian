@@ -1,0 +1,270 @@
+{
+  "id": "state-tribulation-pending",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "渡劫期 · 天劫将至",
+  "prompt": "状态快照 · 渡劫期 · 天劫将至 · 天劫压力下的行动选择，不能写成轻松过关",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "柳砚清",
+      "age": 412,
+      "lifespan": 520,
+      "gender": "男",
+      "spiritualRoot": "pure",
+      "rootDetail": "水单灵根，至纯",
+      "realm": "golden_core",
+      "realmName": "金丹期",
+      "realmLevel": 8,
+      "realmMaxLevel": 9,
+      "cultivationExp": 9800,
+      "expToBreak": 10000,
+      "elements": {
+        "metal": 10,
+        "wood": 40,
+        "water": 55,
+        "fire": 5,
+        "earth": 15
+      },
+      "hp": 2600,
+      "maxHp": 3000,
+      "mp": 2100,
+      "maxMp": 2400,
+      "attack": 320,
+      "defense": 280,
+      "speed": 260,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 241,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 125,
+          "description": "当前神魂境界：元神出窍（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 399,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 241,
+      "soulStrength": 125,
+      "physicalFoundation": 399,
+      "combatProjection": {
+        "force": 355,
+        "guard": 351,
+        "agility": 286,
+        "spiritualAwareness": 241,
+        "soulStability": 125,
+        "bodyTenacity": 399,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "本命法宝雏形：破势355、护持351、机变286",
+        "advantages": [
+          "破势偏盛",
+          "体魄承压强"
+        ],
+        "vulnerabilities": [
+          "神识锐而魂魄承载不足",
+          "承压有余，转挪偏慢"
+        ]
+      },
+      "soulRealmName": "元神出窍",
+      "soulRealmRank": 4,
+      "soulRealmGap": "身神相称",
+      "luck": 55,
+      "comprehension": 78,
+      "spiritStones": 4200,
+      "reputation": 260,
+      "faction": "青岚宗内门",
+      "master": "",
+      "location": "青岚宗后山寒潭洞府",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 34
+    },
+    "activeStatuses": [
+      {
+        "rarity": "mythic",
+        "duration": 3,
+        "effects": [],
+        "id": "st-tribulation-omen",
+        "name": "劫云初结",
+        "description": "洞府上空的云压得很低，雷声隔三五日就响一次，一次比一次近。",
+        "category": "special",
+        "source": "金丹九转圆满"
+      },
+      {
+        "rarity": "rare",
+        "duration": -1,
+        "effects": [],
+        "id": "st-old-wound",
+        "name": "旧伤未清",
+        "description": "两百年前被同门算计留下的暗伤，逢阴雨天就发作。",
+        "category": "debuff",
+        "source": "同门暗算"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 2.4,
+    "cultivationInsight": "金丹已至九转门前，再进一步便是天劫。近来行气到顶时，头顶总有闷雷般的压迫。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "三百年前在寒潭见过一次别人渡劫，那人连骨灰都没留下。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 412,
+      "hints": [],
+      "pressureMap": {
+        "likelyEventTypes": [],
+        "summary": "事件倾向：日常推进"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "金丹成就，以丹火、本命法宝雏形和金丹品阶为核心",
+      "bottleneck": "金丹成色、本命法宝祭炼与结婴机缘",
+      "breakthroughTrial": "需破丹成婴，资源、心魔、神魂成色缺一不可",
+      "capabilities": [
+        "祭炼本命法宝雏形",
+        "以丹火炼物或对敌",
+        "神识压制低阶修士"
+      ],
+      "limitations": [
+        "元婴秘术尚不可轻用",
+        "高阶大能仍可碾压",
+        "金丹受损代价极大"
+      ],
+      "worldAccess": [
+        "高阶拍卖会",
+        "宗门镇守之位",
+        "金丹秘境",
+        "小宗门权力层"
+      ],
+      "socialWeight": "可镇一方、被拉拢或忌惮，也更容易被围杀夺宝",
+      "combatStyle": [
+        "本命法宝雏形",
+        "丹火焚炼",
+        "阵法与法宝联动"
+      ],
+      "resourceNeeds": [
+        "本命法宝材料",
+        "结婴灵物",
+        "神魂温养之物"
+      ],
+      "riskTags": [
+        "丹毁道消",
+        "心魔劫",
+        "被高阶修士猎杀"
+      ]
+    },
+    "pendingThreads": [],
+    "questEntries": [],
+    "characterIntents": [
+      {
+        "id": "intent_break_412",
+        "type": "breakthrough",
+        "title": "酝酿突破",
+        "description": "修为将满，应闭关参悟、稳固道心、准备突破。若有突破辅助丹药应及早服用。",
+        "priority": 7
+      },
+      {
+        "id": "intent_weapon_412",
+        "type": "gather_resources",
+        "title": "寻觅兵器",
+        "description": "已入修行却无趁手兵器，应主动寻一把剑/刀/杖/法宝防身。",
+        "priority": 6
+      }
+    ],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "tribulation-pending"
+  ],
+  "expectedNarrativeTraits": [
+    "天劫的具体威压",
+    "闭关/备劫的实际动作",
+    "陨落风险不可回避"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库最高只到炼气/筑基，没有角色走到渡劫"
+  },
+  "notes": "乙路极端态：天劫压力下的行动选择，不能写成轻松过关"
+}

@@ -12,7 +12,11 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "smoke:xianxia": "bun scripts/xianxia-regression-smoke.ts",
-    "smoke:xianxia:db": "bun scripts/xianxia-regression-smoke.ts --db"
+    "smoke:xianxia:db": "bun scripts/xianxia-regression-smoke.ts --db",
+    "eval:narrative:gates": "bun scripts/xianxia-narrative-quality.ts --gates-only",
+    "eval:narrative:judge": "bun scripts/xianxia-narrative-quality.ts --judge",
+    "eval:narrative:judge:live": "bun scripts/xianxia-narrative-quality.ts --judge --live --limit=6",
+    "eval:judge:unit": "bun scripts/xianxia-judge-unit.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

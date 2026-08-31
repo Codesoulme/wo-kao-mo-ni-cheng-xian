@@ -1,0 +1,52 @@
+{
+  "id": "neg-mechanism-leak",
+  "route": "丙",
+  "kind": "negative",
+  "label": "机制词泄漏（取样点验证样本）",
+  "prompt": "反面样本 · 机制词泄漏（取样点验证样本）",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "天道干预之后",
+    "narrative": "沈砚舟在药圃里蹲了一整个下午。天道干预降下之后，他手里那株三叶灵芝忽然自己抽了半寸。引擎校验通过，这一年的推演结果落定，他把灵芝挖出来收进布包，抬头看了看天色。傍晚回屋的路上，同门问他今天挖了几株，他说不清，只摇了摇头。"
+  },
+  "gateOptions": {
+    "scope": "advance",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G1"
+    ]
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "出现「天道干预」「引擎校验」「推演」等内部机制词，玩家一眼出戏"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [
+      "leak-zh:天道干预",
+      "leak-zh:引擎"
+    ],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "mechanism-leak"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "display.ts:385-417 机制词替换表 + probe-leak-all.ts 泄漏正则",
+    "mustFailGates": [
+      "G1"
+    ]
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：出现「天道干预」「引擎校验」「推演」等内部机制词，玩家一眼出戏"
+}

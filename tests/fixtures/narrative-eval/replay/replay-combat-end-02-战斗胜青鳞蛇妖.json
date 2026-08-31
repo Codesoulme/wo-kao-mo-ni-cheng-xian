@@ -1,0 +1,37 @@
+{
+  "id": "replay-combat-end-02-战斗胜青鳞蛇妖",
+  "route": "甲",
+  "kind": "narrative-replay",
+  "stratum": "combat-end",
+  "stratumLabel": "战斗终局",
+  "prompt": "真实产出重放 · 战斗终局 · eventType=combat · age=23 · title=战斗·胜·青鳞蛇妖",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "战斗·胜·青鳞蛇妖",
+    "narrative": "青鳞蛇妖嘶鸣渐止，鳞血染湿江畔乱草。沈清萝收剑回息，胸腹仍有妖力震痛，所幸根基未损。村中惊惧稍平，柳溪水雾间传来低低议声，此战虽小，却已使她在乡野间留下一缕名声。剖得青蛇胆后，腥气凝寒，或可入药炼丹；只是蛇妖血气散入江畔，数日内恐引来山泽游物窥探。"
+  },
+  "gateOptions": {
+    "scope": "combat-end"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "real-replay",
+    "combat-end",
+    "pre-sanitize"
+  ],
+  "provenance": {
+    "sourceDb": "prisma/backups/dev.before-worldfacts-20260619-190352.db",
+    "sourceTable": "EventLog",
+    "sourceRowId": "cmqjvz2am000tafcopgx8bjfa",
+    "createdAt": 1781810512222,
+    "preSanitizeEvidence": "d15aea0 (2026-06-23) 引入 sanitizeEventDraft；本库快照于 2026-06-19，早于该提交",
+    "sanitizeWouldChange": false
+  },
+  "notes": "甲路真实重放，取自 sanitize 层落地前的快照库；未经 sanitizeNarrativeText 处理。"
+}

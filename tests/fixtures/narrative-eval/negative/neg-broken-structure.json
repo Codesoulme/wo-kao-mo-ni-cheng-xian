@@ -1,0 +1,54 @@
+{
+  "id": "neg-broken-structure",
+  "route": "丙",
+  "kind": "negative",
+  "label": "结构破损（截断 + 引号不配对）",
+  "prompt": "反面样本 · 结构破损（截断 + 引号不配对）",
+  "expectedSchema": {
+    "title": "string",
+    "narrative": "string"
+  },
+  "expectedOutput": {
+    "title": "井边",
+    "narrative": "沈砚舟走到井边，弯腰去看水里的影子。他忽然想起师父说过的那句话：「你这一路，先把药圃看好，别的以后再"
+  },
+  "gateOptions": {
+    "scope": "advance",
+    "requiredFields": [
+      "title",
+      "narrative"
+    ]
+  },
+  "expectedGates": {
+    "result": "fail",
+    "gates": [
+      "G4"
+    ]
+  },
+  "expectedGrade": "low",
+  "violations": [
+    "冒号后接引文却在句中断尾，明显是被截断的半句",
+    "引号只开不合",
+    "整段不成立，玩家读到的是残句"
+  ],
+  "gateHitSummary": {
+    "nonWarn": [
+      "struct-unbalanced-quote:quote-corner:1/0",
+      "struct-no-sentence-end:badTail:再"
+    ],
+    "warn": []
+  },
+  "tags": [
+    "negative",
+    "judge-calibration",
+    "broken-structure"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-negatives.ts",
+    "source": "G4 结构完整性设计初衷",
+    "mustFailGates": [
+      "G4"
+    ]
+  },
+  "notes": "丙路反面样本，判分器必须打低分。低分理由：冒号后接引文却在句中断尾，明显是被截断的半句；引号只开不合；整段不成立，玩家读到的是残句"
+}

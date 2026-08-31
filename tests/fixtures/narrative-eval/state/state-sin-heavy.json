@@ -1,0 +1,271 @@
+{
+  "id": "state-sin-heavy",
+  "route": "乙",
+  "kind": "state-snapshot",
+  "label": "杀业深重 · 善恶失衡",
+  "prompt": "状态快照 · 杀业深重 · 善恶失衡 · 业重时的世界内回响（夜梦阴魂、手心黑纹），严禁写成功德数值",
+  "expectedSchema": {
+    "character": "object",
+    "activeStatuses": "array",
+    "pendingThreads": "array",
+    "availableAttributes": "array"
+  },
+  "expectedOutput": {
+    "character": {
+      "name": "黑蝉",
+      "age": 66,
+      "lifespan": 180,
+      "gender": "男",
+      "spiritualRoot": "pure",
+      "rootDetail": "阴属水单灵根",
+      "realm": "golden_core",
+      "realmName": "金丹期",
+      "realmLevel": 1,
+      "realmMaxLevel": 9,
+      "cultivationExp": 5200,
+      "expToBreak": 8000,
+      "elements": {
+        "metal": 10,
+        "wood": 40,
+        "water": 55,
+        "fire": 5,
+        "earth": 15
+      },
+      "hp": 1400,
+      "maxHp": 1600,
+      "mp": 900,
+      "maxMp": 1100,
+      "attack": 210,
+      "defense": 150,
+      "speed": 190,
+      "cultivationAttributes": [
+        {
+          "id": "spiritualSense",
+          "name": "神识",
+          "value": 157,
+          "description": "感知、探查、神念压制与高阶禁制判断的基础。",
+          "source": "境界与神魂派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "soulStrength",
+          "name": "魂魄",
+          "value": 92,
+          "description": "当前神魂境界：神魂稳固（身神相称），影响元婴出窍、夺舍风险、心魔承受和神识秘术。",
+          "source": "境界与心性派生",
+          "category": "spirit",
+          "visible": true
+        },
+        {
+          "id": "physicalFoundation",
+          "name": "体魄",
+          "value": 236,
+          "description": "肉身根基与承载力，影响重伤承受、炼体机缘和大境界突破稳定度。",
+          "source": "肉身与境界派生",
+          "category": "body",
+          "visible": true
+        }
+      ],
+      "spiritualSense": 157,
+      "soulStrength": 92,
+      "physicalFoundation": 236,
+      "combatProjection": {
+        "force": 234,
+        "guard": 193,
+        "agility": 206,
+        "spiritualAwareness": 157,
+        "soulStability": 92,
+        "bodyTenacity": 236,
+        "forceLabel": "破势",
+        "guardLabel": "护持",
+        "agilityLabel": "机变",
+        "summary": "本命法宝雏形：破势234、护持193、机变206",
+        "advantages": [
+          "破势偏盛",
+          "体魄承压强"
+        ],
+        "vulnerabilities": [
+          "神识锐而魂魄承载不足",
+          "攻锋过盛，护持偏薄",
+          "心魔牵动神魂"
+        ]
+      },
+      "soulRealmName": "神魂稳固",
+      "soulRealmRank": 3,
+      "soulRealmGap": "身神相称",
+      "luck": 12,
+      "comprehension": 70,
+      "spiritStones": 2600,
+      "reputation": -180,
+      "faction": "半潮门",
+      "master": "",
+      "location": "鬼市夜巷",
+      "alive": true,
+      "ascended": false,
+      "heartDemon": 70
+    },
+    "activeStatuses": [
+      {
+        "rarity": "epic",
+        "duration": -1,
+        "effects": [],
+        "id": "st-sin-mark",
+        "name": "掌心黑纹",
+        "description": "左手掌心浮出一道洗不掉的黑纹，夜里发烫。",
+        "category": "special",
+        "source": "杀业积压"
+      },
+      {
+        "rarity": "rare",
+        "duration": -1,
+        "effects": [],
+        "id": "st-ghost-dream",
+        "name": "夜梦阴魂",
+        "description": "每逢初一十五，梦里都有人排队站在床前，不说话。",
+        "category": "debuff",
+        "source": "杀业积压"
+      }
+    ],
+    "constitutionProfiles": [],
+    "inventory": [],
+    "equipped": [],
+    "storageCapacity": 5,
+    "cultivationMultiplier": 2.1,
+    "cultivationInsight": "采补来的灵气纯，行气也快，只是每回收功都听见有人在耳边数数。",
+    "cultivationFactors": [],
+    "recentEvents": [],
+    "narrativeContractFeedback": [],
+    "longTermMemory": [
+      "七十三条命换来的金丹，他自己记得清清楚楚。"
+    ],
+    "npcs": [],
+    "causalGraph": {
+      "nodes": [],
+      "edges": []
+    },
+    "worldFacts": [],
+    "eventSchedule": {
+      "generatedAtAge": 66,
+      "hints": [],
+      "pressureMap": {
+        "likelyEventTypes": [],
+        "summary": "事件倾向：日常推进"
+      },
+      "warnings": []
+    },
+    "completedFateNodes": [],
+    "availableAttributes": [
+      "lifespan",
+      "cultivationExp",
+      "hp",
+      "maxHp",
+      "mp",
+      "maxMp",
+      "attack",
+      "defense",
+      "speed",
+      "luck",
+      "comprehension",
+      "spiritualSense",
+      "soulStrength",
+      "physicalFoundation",
+      "spiritStones",
+      "reputation",
+      "elementMetal",
+      "elementWood",
+      "elementWater",
+      "elementFire",
+      "elementEarth",
+      "heartDemon"
+    ],
+    "nextFateNode": {
+      "index": 1,
+      "name": "灵根觉醒",
+      "realm": "qi_refining"
+    },
+    "realmTraits": {
+      "cultivationMode": "金丹成就，以丹火、本命法宝雏形和金丹品阶为核心",
+      "bottleneck": "金丹成色、本命法宝祭炼与结婴机缘",
+      "breakthroughTrial": "需破丹成婴，资源、心魔、神魂成色缺一不可",
+      "capabilities": [
+        "祭炼本命法宝雏形",
+        "以丹火炼物或对敌",
+        "神识压制低阶修士"
+      ],
+      "limitations": [
+        "元婴秘术尚不可轻用",
+        "高阶大能仍可碾压",
+        "金丹受损代价极大"
+      ],
+      "worldAccess": [
+        "高阶拍卖会",
+        "宗门镇守之位",
+        "金丹秘境",
+        "小宗门权力层"
+      ],
+      "socialWeight": "可镇一方、被拉拢或忌惮，也更容易被围杀夺宝",
+      "combatStyle": [
+        "本命法宝雏形",
+        "丹火焚炼",
+        "阵法与法宝联动"
+      ],
+      "resourceNeeds": [
+        "本命法宝材料",
+        "结婴灵物",
+        "神魂温养之物"
+      ],
+      "riskTags": [
+        "丹毁道消",
+        "心魔劫",
+        "被高阶修士猎杀"
+      ]
+    },
+    "pendingThreads": [],
+    "questEntries": [],
+    "characterIntents": [
+      {
+        "id": "intent_weapon_66",
+        "type": "gather_resources",
+        "title": "寻觅兵器",
+        "description": "已入修行却无趁手兵器，应主动寻一把剑/刀/杖/法宝防身。",
+        "priority": 6
+      },
+      {
+        "id": "intent_trade_66",
+        "type": "trade",
+        "title": "坊市寻宝",
+        "description": "灵石充裕，可前往坊市淘宝、补充丹药或材料。若有缺武器/防具应优先购置。",
+        "priority": 4
+      }
+    ],
+    "recentEventTypes": [],
+    "recentBlueprintCategories": [],
+    "pets": [],
+    "exploredRealms": [],
+    "discoveredRealms": []
+  },
+  "gateOptions": {
+    "scope": "generic"
+  },
+  "expectedGates": {
+    "result": "pass",
+    "gates": []
+  },
+  "tags": [
+    "state-snapshot",
+    "sin-heavy"
+  ],
+  "expectedNarrativeTraits": [
+    "只写世界内回响",
+    "不得出现业力/功德数值",
+    "旁人态度自然变化"
+  ],
+  "provenance": {
+    "builder": "scripts/build-narrative-eval-states.ts",
+    "constructor": "buildStateContext (src/lib/xianxia/engine/lifecycle.ts:395)",
+    "determinism": "固定入参快照 CharacterState；不引入新种子设施，派生字段全部由引擎计算",
+    "gapReason": "快照库 karma/merit/sin 全为初值"
+  },
+  "notes": "乙路极端态：业重时的世界内回响（夜梦阴魂、手心黑纹），严禁写成功德数值"
+}
