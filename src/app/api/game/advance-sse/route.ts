@@ -564,6 +564,50 @@ export async function POST(req: NextRequest) {
           console.warn('[advance-sse] 风险纠偏失败（非致命，沿用原输出）:', e?.message || e);
         }
 
+        // 3.6) 开笔复读体检
+        //   症候：连着三条主事件起笔几乎一字不差（「秦老客把那张旧帖子又推近了些」两遍、
+        //   「砚书把灶膛边那只旧木匣重新推回灰堆旁」三遍）。生成侧已把上一幕的收尾
+        //   和已用过的起笔喂进提示词，这里做落库前最后一道量尺：真撞上了就重写一次。
+        //   与风险纠偏同一形状——单轮、不递归、只在新稿确实更不像时才采纳。
+        try {
+          const { detectOpeningRepeat, buildRepeatAdvisory, openingClause, bigramSimilarity } = await import('@/lib/xianxia/narrative-repeat');
+          const priorNarratives = (recentEvents || []).map((e: any) => String(e?.narrative || ''));
+          const verdict = detectOpeningRepeat(String(aiOutput.narrative || ''), priorNarratives);
+          if (verdict.repeated) {
+            console.log(`[SSE] 开笔撞前文 ratio=${verdict.ratio.toFixed(2)} 「${verdict.opening}」≈「${verdict.against}」`);
+            const { callLLMText } = await import('@/lib/xianxia/llm');
+            const prevAdvisory = (ctx as any).repeatAdvisoryPrompt;
+            (ctx as any).repeatAdvisoryPrompt = buildRepeatAdvisory(verdict);
+            try {
+              const rewritten = await callLLMText(fullSystem, buildAdvancePrompt(ctx, isFateNode, 'light'), { qualityMode: 'light' });
+              let revised: any = sanitizeEventOutput(parseJSON(rewritten), ctx.character.age);
+              revised.narrative = stripInfluenceMarkers(
+                cleanNarrativeAge(revised.narrative, ctx.character.age, ctx.character.name),
+              );
+              if (!String(revised.narrative || '').trim()) throw new Error('重写稿无 narrative，弃用');
+              const after = bigramSimilarity(openingClause(revised.narrative), verdict.against);
+              if (after < verdict.ratio) {
+                console.log(`[SSE] 采纳重写稿 开笔相似 ${verdict.ratio.toFixed(2)} → ${after.toFixed(2)}`);
+                if (Array.isArray(revised.extraEvents)) {
+                  revised.extraEvents = revised.extraEvents.map((e: any) => ({
+                    ...e,
+                    narrative: stripInfluenceMarkers(cleanNarrativeAge(String(e?.narrative || ''), ctx.character.age, ctx.character.name)),
+                  }));
+                }
+                aiOutput = revised;
+                // 流式已把原稿推给前端了，补推一次让它覆盖显示。
+                send('narrative_complete', { type: 'narrative_complete', narrative: aiOutput.narrative });
+              } else {
+                console.log(`[SSE] 弃用重写稿（没更不像 ${verdict.ratio.toFixed(2)} → ${after.toFixed(2)}），沿用原稿`);
+              }
+            } finally {
+              (ctx as any).repeatAdvisoryPrompt = prevAdvisory;
+            }
+          }
+        } catch (e: any) {
+          console.warn('[SSE] 开笔复读体检跳过（非致命，沿用原稿）:', e?.message || e);
+        }
+
         // 4) 若 AI 输出包含选择，进入选择状态（和 non-SSE advance 保持一致）
         if (aiOutput.hasChoice) {
           state.isAtChoice = true;

@@ -11,6 +11,8 @@ import { renderFewShotExamples } from '../prompt-examples';
 import { karmaNarrativeTone } from '../karma';
 // 2026-08-31：提示词过去从不报此刻时辰，模型无从得知天已擦黑，写出来自然全是白日戏。
 import { worldTimeStamp } from '../world-time';
+// 2026-08-31：开笔复读体检的生成侧——列出已用过的起笔，明写不得再用。
+import { formatUsedOpenings } from '../narrative-repeat';
 // 2026-08-29 接线：Phase-K 造好了 snippet 注册表与施加器，却没有任何生产调用点去用
 // （phase-k-augmentation.ts 头注原话："were not actually wired into the live system prompt...
 // the call sites can use"）。结果生成侧从不知道 displaySlots 这个字段存在，
@@ -635,9 +637,21 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
   const eqList = eqArr.length
     ? eqArr.map((it: any) => `- [id:${it.id}] ${it.name}（${it.rarity}/${it.item_type}）${it.equipNote ? `·${it.equipNote}` : ''}：${it.description}${it.effects?.length ? '；效果：' + it.effects.map((e: any) => `${e.operation === 'add' ? '+' : '×'}${e.value} ${e.target_attribute}`).join('，') : ''}`).join('\n')
     : '无';
-  const recentEvts = ctx.recentEvents.length
-    ? ctx.recentEvents.map(e => `${e.age}岁：${e.title}——${e.narrative.slice(0, 80)}`).join('\n')
+  // 2026-08-31：上一幕单独另排，并且给它的是**收尾**。
+  //   旧写法对每条一律取前 80 字，也就是每一幕怎么开头的。模型被告知"紧接上一幕"，
+  //   手上却只有上一幕的开场，不知道那一幕收在哪里——它能做的最合理的事，
+  //   就是把那个开场再写一遍。实跑里同一句起笔连写三遍，病根在此。
+  const evtList = ctx.recentEvents;
+  const recentEvts = evtList.length
+    ? evtList.map((e, i) => {
+      const isLast = i === evtList.length - 1;
+      const text = String(e.narrative || '');
+      if (!isLast) return `${e.age}岁：${e.title}——${text.slice(0, 80)}`;
+      const tail = text.replace(/[\s　]+$/, '').slice(-140);
+      return `${e.age}岁：${e.title}（上一幕）\n  起笔：${text.replace(/^[\s　]+/, '').slice(0, 40)}……\n  收在这里：……${tail}`;
+    }).join('\n')
     : '无';
+  const usedOpenings = formatUsedOpenings(evtList.map(e => String(e.narrative || '')));
   // Task 21: 提取最近事件标题，明确禁止 AI 用相同/相似标题
   const recentTitles = ctx.recentEvents.map(e => e.title).filter(Boolean);
   const recentTitlesStr = recentTitles.length ? recentTitles.join(' / ') : '无';
@@ -801,7 +815,7 @@ ${(ctx as any).worldEventAvailablePrompt ? `\n${(ctx as any).worldEventAvailable
 
 ${(ctx as any).achievementPromptHint ? `\n${(ctx as any).achievementPromptHint}\n` : ''}
 
-${(ctx as any).riskAdvisoryPrompt ? `\n${(ctx as any).riskAdvisoryPrompt}\n` : ''}
+${(ctx as any).riskAdvisoryPrompt ? `\n${(ctx as any).riskAdvisoryPrompt}\n` : ''}${(ctx as any).repeatAdvisoryPrompt ? `\n${(ctx as any).repeatAdvisoryPrompt}\n` : ''}
 
 【角色牵挂与主动意图区】（这是 AI 的提示池：高优先级必须承接；低优先级应在合适时自然回响）
 ${ctx.characterIntents && ctx.characterIntents.length
@@ -871,7 +885,7 @@ ${acquiredFactLedger}
 
 【短期对话区】最近事件：
 ${recentEvts}
-
+${usedOpenings ? `\n${usedOpenings}\n` : ''}
 ${buildContinuityFocusBlock(ctx)}
 
 ${ctx.nextFateNode ? `【命节点参考】下一个长期参考锚点为 #${ctx.nextFateNode.index}「${ctx.nextFateNode.name}」（对应境界：${ctx.nextFateNode.realm}）。它只供你理解长期方向，不是本轮必须发生的命运，也不得强行定性角色。` : '【命节点参考】暂无明确锚点，按角色处境自然推进。'}
