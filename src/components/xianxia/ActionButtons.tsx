@@ -327,19 +327,43 @@ export function ActionButtons() {
         setPlaceholder(null);
       }
 
+      // 2026-08-31 分镜气泡：服务端把模型拆的 extraEvents 逐条落库并盖了时间戳，
+      //   这里按 450ms 间隔逐条浮现——一次性 forEach 推进去会整屏一起冒出来，
+      //   连续态那几条本该读起来是同一场戏往下走的。
+      const extraBubbles: any[] = Array.isArray(doneData.extraEvents) ? doneData.extraEvents : [];
+      extraBubbles.forEach((ex: any, i: number) => {
+        window.setTimeout(() => {
+          addEvent({
+            id: ex.id || `extra-${Date.now()}-${i}`,
+            age: ex.age,
+            title: ex.title,
+            narrative: ex.narrative,
+            eventType: ex.eventType || 'normal',
+            effects: [],
+            timeAdvance: ex.timeAdvance,
+            worldTime: ex.worldTime,
+            createdAt: ex.createdAt || new Date().toISOString(),
+          });
+        }, (i + 1) * 450);
+      });
+      const extraTailDelay = extraBubbles.length * 450;
+
       // 2026-07-12：临终追加事件——若本轮跨过 alive=false，服务端会返回 deathEvent，
       // 前端把它追加到事件流末尾，作为独立一条剧情气泡显示（避免死亡突兀）。
+      // 排在分镜之后浮现，免得死亡先冒出来、分镜再补上。
       if (doneData.deathEvent) {
         const de = doneData.deathEvent;
-        addEvent({
-          id: de.id || `death-${Date.now()}`,
-          age: de.age,
-          title: de.title,
-          narrative: de.narrative,
-          eventType: 'death',
-          effects: [],
-          createdAt: de.createdAt || new Date().toISOString(),
-        });
+        window.setTimeout(() => {
+          addEvent({
+            id: de.id || `death-${Date.now()}`,
+            age: de.age,
+            title: de.title,
+            narrative: de.narrative,
+            eventType: 'death',
+            effects: [],
+            createdAt: de.createdAt || new Date().toISOString(),
+          });
+        }, extraTailDelay + 450);
       }
 
       finishStreamingNarrative();

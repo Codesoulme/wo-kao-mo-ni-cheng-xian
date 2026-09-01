@@ -188,6 +188,9 @@ export const ExtraEventSchema = z.object({
     reason: z.string().optional(),
     ageDeltaYears: z.number().optional(),
     elapsedDays: z.number().optional(),
+    // 2026-08-31 报时改制：日内小跳那一档靠 setDayHour（同日绝对时点，非偏移）
+    setDayHour: z.number().optional(),
+    elapsedHours: z.number().optional(),
   }).optional(),
   actionProjections: z.array(z.any()).optional(),
 });
@@ -200,6 +203,8 @@ export const TimeAdvanceSchema = z.object({
   reason: z.string().optional(),
   ageDeltaYears: z.number().optional(),
   elapsedDays: z.number().optional(),
+  setDayHour: z.number().optional(),
+  elapsedHours: z.number().optional(),
 }).optional();
 
 /** realmProfilePatch 字段 */

@@ -9,9 +9,9 @@ import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { buildStateContext, executeAIEvent, stateToResponse, applyAnnualAttributeGrowth } from '@/lib/xianxia/engine';
 import { parseAchievementMarkers, applyAchievements } from '@/lib/xianxia/achievements';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, inferDayHourFromText, hourNameOf, phaseOf, CONTINUOUS_TIME } from '@/lib/xianxia/world-time';
+import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, inferDayHourFromText, hourNameOf, phaseOf, CONTINUOUS_TIME, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
-import { truncateNarrativeAtSentence } from '@/lib/xianxia/display';
+import { truncateNarrativeAtSentence, completeNarrative, sanitizeEventDraft } from '@/lib/xianxia/display';
 import { appendEvent } from '@/lib/xianxia/events/store';
 // 摘要层接线 · 甲步：纪要生成排在响应关闭之后，不进 prompt、不改模型输入。
 // scheduleDigestRefresh 同步返回且不返回 promise，签名上就堵死了 await。
@@ -433,6 +433,14 @@ export async function POST(req: NextRequest) {
             timeAdvance = clampTimeAdvance(declared, timeAdvance);
             if (worldCalendarBefore) worldCalendar = advanceWorldCalendar(worldCalendarBefore, timeAdvance);
             console.log('[SSE] 采纳模型自报时间量:', timeAdvance.unit, timeAdvance.label);
+          } else {
+            // 2026-08-31：量采纳率用。分三种没采纳的缘由，跑一批就能看出是模型不报、
+            //   报了跨岁被拦，还是引擎已按线索定了跨度。
+            const why = !declared || !declared.unit ? '模型未报'
+              : declared.unit === 'continuous' ? '模型报连续态'
+              : Number(declared.ageDeltaYears || 0) !== 0 ? `模型报跨岁被拦(${declared.unit})`
+              : `引擎已定跨度(${timeAdvance.unit})`;
+            console.log('[SSE] 主事件报时未采纳:', why);
           }
         } catch (e: any) {
           console.warn('[SSE] 模型自报时间量采纳跳过:', e?.message);
@@ -547,6 +555,8 @@ export async function POST(req: NextRequest) {
         let deathEvent: any = null;
         let displayEffects: any[] = [];
         let createdEvent: any = null;
+        // 2026-08-31：分镜事件（extraEvents）落库结果，done 里逐条回给前端分气泡。
+        let extraCreated: any[] = [];
         try {
           const execResult = executeAIEvent(state, aiOutput);
           finalState = execResult.state;
@@ -623,14 +633,6 @@ displayEffects = buildEventDisplayEffects({
 
           // 持久化事件：刷新页面后 state 接口能读到，避免气泡消失
           const eventEffects = [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime: stampedWorldTime })];
-          // 2026-08-31：追加事件（临终 / 逆向补叙）与主事件同一时刻发生。
-          //   过去它们的 effects 是 '[]'，读回来 worldTime 是 undefined，
-          //   时间分隔条拿不到锚点，实跑里就出现过一条"时间无处安放"的卡片。
-          //   盖连续态戳：同刻发生，不另起时点，界面上自然不渲染任何时间元素。
-          const appendedEventMeta = hiddenEventMeta({
-            timeAdvance: { ...CONTINUOUS_TIME, reason: '与上一幕同刻' },
-            worldTime: { ...stampedWorldTime, displayLabel: '' },
-          });
           createdEvent = await db.eventLog.create({
             data: {
               characterId,
@@ -640,6 +642,81 @@ displayEffects = buildEventDisplayEffects({
               eventType: aiOutput.eventType || 'normal',
               effects: JSON.stringify(eventEffects),
             },
+          });
+
+          // 2026-08-31 分镜落库：把模型拆的 extraEvents 逐条写成独立事件行。
+          //   过去这段只实现在 advance/route.ts（已停用的旧路由）里，活路径上
+          //   extraEvents 只被洗了一遍正文然后丢掉——于是提示词讲的
+          //   「同一场戏用分镜配连续态，另起时点的那条才报时」在活路径上从未成立，
+          //   每轮永远只有一条事件，模型分的节拍进不了库也进不了界面。
+          //   时间处理与旧路由一致：逐条推日历游标，逐条盖戳；没报时的那条按正文回查，
+          //   查不出就当同刻（连续态），界面上自然不画时间元素。
+          let extraCalendarCursor = worldCalendar;
+          let lastStampedTime: any = stampedWorldTime;
+          const extras = Array.isArray(aiOutput.extraEvents) ? aiOutput.extraEvents : [];
+          for (const extra of extras) {
+            try {
+              const inferred = inferInlineTimeAdvance(extra.title, extra.narrative);
+              // 模型自报优先；没报就按正文回查；都没有则同刻续写。
+              // 跨岁一律不认——岁数在 advance-preload 就加过了，事后改会与已执行的状态脱节。
+              const declared = extra.timeAdvance || inferred;
+              let extraTime = declared
+                ? clampTimeAdvance(declared, CONTINUOUS_TIME)
+                : { ...CONTINUOUS_TIME, reason: '与上一幕同刻' };
+              if (Number(extraTime.ageDeltaYears || 0) > 0) {
+                extraTime = { ...CONTINUOUS_TIME, reason: '跨岁归引擎，本条按同刻续写' };
+              }
+              extraCalendarCursor = advanceWorldCalendar(extraCalendarCursor, extraTime);
+              const phaseHint = phaseHintForTime(extraTime.label, `${extra.title || ''} ${extra.narrative || ''}`);
+              const extraStamp = worldTimeStamp(extraCalendarCursor || undefined, phaseHint);
+              const extraWorldTime = {
+                ...extraStamp,
+                displayLabel: formatWorldTimeDisplay({ age: finalState.age, timeAdvance: extraTime, worldTime: extraStamp, includeAge: false }),
+              };
+              const extraActions = sanitizeActionProjections(extra.actionProjections);
+              const draft = sanitizeEventDraft({
+                title: extra.title || '余波',
+                narrative: truncateNarrativeAtSentence(completeNarrative(extra.narrative || ''), 1500),
+              }, finalState.age);
+              if (!String(draft.narrative || '').trim()) continue;
+              const row = await db.eventLog.create({
+                data: {
+                  characterId,
+                  age: finalState.age,
+                  title: draft.title || '余波',
+                  narrative: draft.narrative,
+                  eventType: extra.eventType || 'normal',
+                  effects: JSON.stringify([hiddenEventMeta({ timeAdvance: extraTime, worldTime: extraWorldTime, actionProjections: extraActions })]),
+                },
+              });
+              extraCreated.push({
+                id: row.id,
+                age: row.age,
+                title: row.title,
+                narrative: row.narrative,
+                eventType: row.eventType,
+                createdAt: row.createdAt,
+                timeAdvance: extraTime,
+                worldTime: extraWorldTime,
+              });
+              lastStampedTime = extraWorldTime;
+              if (extraTime.unit !== 'continuous') {
+                console.log('[SSE] 分镜报时:', extraTime.unit, extraTime.label, extra.timeAdvance ? '(模型自报)' : '(正文回查)');
+              }
+            } catch (e: any) {
+              console.warn('[advance-sse] 分镜事件落库失败（非致命，跳过该条）:', e?.message || e);
+            }
+          }
+          // 分镜推过日历的，角色身上的日历也要跟着走到最后一条的位置
+          if (extras.length && extraCalendarCursor) worldCalendar = extraCalendarCursor;
+
+          // 2026-08-31：追加事件（临终 / 逆向补叙）与最后一幕同一时刻发生。
+          //   过去它们的 effects 是 '[]'，读回来 worldTime 是 undefined，
+          //   时间分隔条拿不到锚点，实跑里就出现过一条"时间无处安放"的卡片。
+          //   盖连续态戳：同刻发生，不另起时点，界面上自然不渲染任何时间元素。
+          const appendedEventMeta = hiddenEventMeta({
+            timeAdvance: { ...CONTINUOUS_TIME, reason: '与上一幕同刻' },
+            worldTime: { ...lastStampedTime, displayLabel: '' },
           });
 
           // 沉浸版·临终追加事件（2026-07-12 用户反馈"结局突兀"）：
@@ -1176,6 +1253,8 @@ displayEffects = buildEventDisplayEffects({
             eventType: 'death',
             createdAt: deathEvent.createdAt,
           } : null,
+          // 2026-08-31：模型拆的分镜，已各自落库并盖好时间戳，前端逐条浮现
+          extraEvents: extraCreated,
           state: stateToResponse(finalState),
           changes: displayEffects,
           breakthrough: null, // simplified for now

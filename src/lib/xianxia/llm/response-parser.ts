@@ -408,6 +408,12 @@ export function sanitizeEventOutput(raw: any, currentAge = 0): AIEventOutput {
       title: String(e?.title || '余波').slice(0, 32),
       narrative: String(e?.narrative || '').slice(0, 1500),
       eventType: ['normal','fate_node','choice','combat','breakthrough','death','ascension'].includes(e?.eventType) ? e.eventType : 'normal',
+      // 2026-08-31：这两个字段过去在此处蒸发。提示词要求每条分镜自带 timeAdvance
+      //   （同一场戏往下续写用连续态，真隔了一段光景才另起的那条才报时），
+      //   类型与 schema 都收了它，唯独这里重建对象时只留三个字段——模型报得再准也没人接得到。
+      //   此处刻意不 clamp：兜底要拿主事件的 timeAdvance，那是路由才有的上下文。
+      timeAdvance: e?.timeAdvance && typeof e.timeAdvance === 'object' ? e.timeAdvance : undefined,
+      actionProjections: sanitizeActionProjections(e?.actionProjections),
     })).filter((e: any) => e.narrative.trim()).slice(0, 3) : [],
     causedDeath: Boolean(raw?.causedDeath),
     deathReason: raw?.deathReason ? String(raw.deathReason) : undefined,
