@@ -9,7 +9,7 @@ import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { buildStateContext, executeAIEvent, stateToResponse, applyAnnualAttributeGrowth } from '@/lib/xianxia/engine';
 import { parseAchievementMarkers, applyAchievements } from '@/lib/xianxia/achievements';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, inferDayHourFromText, hourNameOf, phaseOf, CONTINUOUS_TIME, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections } from '@/lib/xianxia/world-time';
+import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, inferDayHourFromText, hourNameOf, phaseOf, CONTINUOUS_TIME, MAX_CONTINUOUS_BEFORE_FORCE_ACCEPT, mentionsTimeInProse, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import { truncateNarrativeAtSentence, completeNarrative, sanitizeEventDraft } from '@/lib/xianxia/display';
 import { appendEvent } from '@/lib/xianxia/events/store';
@@ -232,6 +232,10 @@ export async function POST(req: NextRequest) {
           forceTimeAdvance || candidate.timeAdvance,
           candidate.timeAdvance
         );
+        // 2026-08-31 报时出处。矛盾体检要凭它判断这次跨度是引擎拍的还是行文自己报的：
+        //   引擎拍的可以撤回（正文没交代就算引擎判错），行文自己报的不能撤（那就是它要写的）。
+        let timeSource: 'engine' | 'model' | 'prose' = 'engine';
+        const consecutiveContinuous = Number((candidate as any)?.ctx?.consecutiveContinuous ?? (candidate as any)?.consecutiveContinuous ?? 0);
 
         // 构建 worldCalendar
         let worldCalendar = char.worldCalendarJson ? JSON.parse(char.worldCalendarJson) : null;
@@ -431,6 +435,7 @@ export async function POST(req: NextRequest) {
             Number(declared.ageDeltaYears || 0) === 0
           ) {
             timeAdvance = clampTimeAdvance(declared, timeAdvance);
+            timeSource = 'model';
             if (worldCalendarBefore) worldCalendar = advanceWorldCalendar(worldCalendarBefore, timeAdvance);
             console.log('[SSE] 采纳模型自报时间量:', timeAdvance.unit, timeAdvance.label);
           } else {
@@ -475,10 +480,41 @@ export async function POST(req: NextRequest) {
               worldCalendar = advanceWorldCalendar(worldCalendarBefore, timeAdvance);
               console.log('[SSE] 日内时点按正文回校:', timeAdvance.label, hourNameOf(proseHour));
             }
+            timeSource = 'prose';
           }
         } catch (e: any) {
           // 回校失败一律沿用引擎原值，绝不阻断主流程。
           console.warn('[SSE] 日内时点回校跳过:', e?.message);
+        }
+
+        // 3.45) 矛盾体检：引擎判了要跳，正文却当没这回事
+        //   报时约定要求"跨度归引擎、正文照它写"，可模型并不总照办：戳上盖着「月余后」，
+        //   正文却直接接着上一幕的动作往下写。玩家读到的就是自相矛盾——
+        //   时间元件说过了一个月，字里行间分明是紧接着的下一句话。
+        //   此处只做一件事：这种情形下把这次跨度撤回，本幕按接着刚才处理，下一幕再跳。
+        //   三道边界：
+        //     一、只撤引擎自己拍的。模型自报或行文回校出来的时点是它要写的东西，不动；
+        //     二、只撤不跨岁的。岁数在 advance-preload 里早已加过并跑完年度结算，
+        //         事后撤岁会与已执行的状态脱节；
+        //     三、连续态积压到更大一档（8 条）就不再撤，改为认下这次跨度。
+        //         否则遇上一个始终不肯交代时间的模型，光景会永远停在同一天。
+        try {
+          const firstClause = String(aiOutput.narrative || '').split(/[，。！？；\n]/).slice(0, 2).join('，');
+          const opening = `${aiOutput.title || ''}\n${firstClause.slice(0, 48)}`;
+          if (
+            timeSource === 'engine' &&
+            timeAdvance.unit !== 'continuous' &&
+            Number(timeAdvance.ageDeltaYears || 0) === 0 &&
+            consecutiveContinuous < MAX_CONTINUOUS_BEFORE_FORCE_ACCEPT &&
+            !mentionsTimeInProse(opening)
+          ) {
+            const dropped = timeAdvance.label;
+            timeAdvance = { ...CONTINUOUS_TIME, reason: '正文未交代跨度，本幕按接着刚才处理' };
+            if (worldCalendarBefore) worldCalendar = advanceWorldCalendar(worldCalendarBefore, timeAdvance);
+            console.log('[SSE] 跨度撤回（正文未交代）:', dropped, '积压', consecutiveContinuous);
+          }
+        } catch (e: any) {
+          console.warn('[SSE] 矛盾体检跳过:', e?.message);
         }
 
         // 3.5) 行动前影子试算 + 高风险单轮自我纠偏

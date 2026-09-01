@@ -174,13 +174,23 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     ? buildSameYearContinuationBlueprint(sameYearThread.title)
     : pickEventBlueprint(state, recentBlueprintCategories);
 
+  // 2026-08-31：此刻的日内时点。挑档要用它——「当晚」和「次日清晨」差别全在这里，
+  //   跨度档也要靠它判断该不该拨回清晨（落在后半夜的「月余后」无从下笔）。
+  const calendarForHour = (() => {
+    if (options.worldCalendar) return options.worldCalendar;
+    try { return char.worldCalendarJson ? JSON.parse(char.worldCalendarJson as any) : null; } catch { return null; }
+  })();
+  const currentDayHour = Number.isFinite(Number(calendarForHour?.dayHour)) ? Number(calendarForHour.dayHour) : undefined;
+  const consecutiveContinuous = countTrailingContinuous(recentEvents);
+
   const rawSuggestedTimeAdvance = suggestTimeAdvance({
     age: state.age,
     pendingThreads: state.pendingThreads || [],
     sameYearThread,
     blueprint,
     // 2026-08-31：连续态防冻结闸门的入参。
-    consecutiveContinuous: countTrailingContinuous(recentEvents),
+    consecutiveContinuous,
+    currentDayHour,
   });
   // 2026-07-12\uff1a\u53bb\u6389\u201c\u6709\u91cd\u590d\u4e8b\u4ef6\u5c31\u5f3a\u5236\u8986\u76d6\u4e3a 1 \u5e74\u201d\u7684\u903b\u8f91\u2014\u2014\u4e4b\u524d dedup \u68c0\u6d4b\u628a\u65f6\u95f4\u8de8\u5ea6\u4e5f\u4e00\u8d77\u6539\uff0c
   // \u662f\u201c\u90a3\u51e0\u4e2a\u6708\u5462\u5e73\u4f9d\u8df3\u4e86\u201d\u7684\u5143\u51f6\u4e4b\u4e00\u3002\u65f6\u95f4\u8de8\u5ea6\u7531 suggestTimeAdvance / blueprint / sameYearThread 
@@ -210,6 +220,11 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   ctx.blueprint = blueprint;
   ctx.suggestedTimeAdvance = timeAdvance;
   if (options.worldCalendar) ctx.worldCalendar = options.worldCalendar;
+  // 2026-08-31：入参没给历法就退回角色自己那份，好让提示词能报出此刻时辰。
+  //   过去这条通路是空的，模型无从得知天已擦黑，写出来自然全是白日戏。
+  else if (calendarForHour) ctx.worldCalendar = calendarForHour;
+  // 矛盾体检（引擎判了跨度、正文却当没这回事）要靠它决定能不能把这次跨度撤回。
+  (ctx as any).consecutiveContinuous = consecutiveContinuous;
   if (Array.isArray(options.previousWorldLegacies)) ctx.previousWorldLegacies = options.previousWorldLegacies;
 
   // ===== 风格锚定 + 实体库：把历史 AI 风格与已用实体喂给 AI 续写（并行加载） =====
@@ -288,6 +303,9 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     baseAge: char.age,
     baseStateHash: buildAdvanceStateHash(char),
     timeAdvance,
+    // 2026-08-31：连续态积压条数。路由做矛盾体检时要凭它设一道止损——
+    //   撤回跨度不能无限撤，否则遇上一个始终不肯交代时间的模型，光景就永远停住了。
+    consecutiveContinuous,
   };
 }
 

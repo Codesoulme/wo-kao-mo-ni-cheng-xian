@@ -9,6 +9,8 @@ import {
 import { deriveWorldFactStateProfile } from '../event-scheduler';
 import { renderFewShotExamples } from '../prompt-examples';
 import { karmaNarrativeTone } from '../karma';
+// 2026-08-31：提示词过去从不报此刻时辰，模型无从得知天已擦黑，写出来自然全是白日戏。
+import { worldTimeStamp } from '../world-time';
 // 2026-08-29 接线：Phase-K 造好了 snippet 注册表与施加器，却没有任何生产调用点去用
 // （phase-k-augmentation.ts 头注原话："were not actually wired into the live system prompt...
 // the call sites can use"）。结果生成侧从不知道 displaySlots 这个字段存在，
@@ -684,10 +686,24 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
   // 顺手把量词从"一月/一时辰"改成裸单位，旧写法拼出来是"3 一月""1 一时辰"。
   const taUnitCn = ({ continuous: '（接着刚才）', moment: '瞬', hour: '个时辰', day: '日', month: '个月', season: '季', year: '年', decade: '十年', century: '百年' } as Record<string, string>)[ta.unit] || ta.unit;
   const taSpanDesc = ta.ageDeltaYears === 0 ? '（同年补完，不跨岁）' : `（跨 ${ta.ageDeltaYears} 岁 / 约 ${ta.elapsedDays} 日）`;
+  // 2026-08-31 此刻时辰：过去提示词只报年岁，不报天色，模型于是把每一幕都写成白日戏，
+  //   一局下来没有一场夜戏。天色是写景的第一笔，得先让它知道现在窗外什么光。
+  const nowStamp = (() => {
+    const wc = (ctx as any).worldCalendar;
+    if (!wc) return null;
+    try { return worldTimeStamp(wc); } catch { return null; }
+  })();
+  const nowLine = nowStamp
+    ? `\n此刻天色：${nowStamp.monthName}${nowStamp.day}日 · ${nowStamp.phase}（${nowStamp.hourName}）。开笔的光线、人声、冷暖都要跟这个时辰对得上；这一幕若还接着上一幕，就照这个天色写，不必另报时间。`
+    : '';
   const taHead = taIsContinuous
     ? '引擎本轮没有期限或牵挂可依据，因此不替你拍板：这一段该不该另起时点，由你按剧情定——紧接上一幕就走连续态，该隔一夜或隔一段光景，就报时并把时间词写进正文开头。'
+    // 日内小跳那一档：引擎已按场景把时点定在夜里或天不亮（宴席、守夜、赶早船），
+    // 这时候要的是「正文照它写」，而不是含糊地报个"跨度一个时辰"。
+    : ta.unit === 'hour' && ta.setDayHour !== undefined
+    ? `引擎按本段场景把时点定在「${ta.label}」（同一天里的时辰挪动，不跨岁）。请把这个词写进 narrative 开头分句，例：「${ta.label}，柴门被人叩响。」——随后的光线、人声、寒暖都照这个时辰写。timeAdvance 照抄 {"amount":1,"unit":"hour","label":"${ta.label}","ageDeltaYears":0,"elapsedDays":0,"setDayHour":${ta.setDayHour}}。`
     : `引擎按线索算出本轮跨度是 ${ta.amount} ${taUnitCn}${taSpanDesc}，可用的时间词是「${ta.label}」。跨度是既定事实，请照它写；这一天里落在什么时点，仍由你按剧情定。`;
-  const timeRangeHint = `[本轮报时约定]\n${taHead}\n报时分三档，按本段实际需要挑一档，不要每条都报——像网络小说那样：没提时间，读者就默认是现在正在发生；提了时间，读者才知道跳到了哪里。\n\n一、连续态（缺省，最常用）。本段紧接上一幕，narrative 一个时间词都不写，直接从动作、对白或感官切入。timeAdvance 给 {"amount":1,"unit":"continuous","label":"","ageDeltaYears":0,"elapsedDays":0}。前端拿到空 label 就不画时间元素，相邻两条黏成同一场戏。\n\n二、日内小跳：当晚 / 入夜后 / 次日清晨 / 午后 / 凌晨。这个词必须写进 narrative 开头分句，例：「当晚，柴门被人叩响。」timeAdvance 给 unit:"hour" 并附 setDayHour——它是同一天里的绝对时点，常用取值：凌晨 3、拂晓 5.5、清晨 7、日中 12、午后 14.5、黄昏 18.5、入夜 20.5、夜半 0.5。示例：{"amount":1,"unit":"hour","label":"当晚","ageDeltaYears":0,"elapsedDays":0,"setDayHour":20.5}。留意「当晚」说的是同一天的夜里，不是往后推十二个时辰。\n\n三、大跨越：三月后 / 闭关五年后。同样把这个词写进 narrative 开头分句，timeAdvance 用 month / season / year 级 unit，配齐 ageDeltaYears 与 elapsedDays（一月约 30 日、一季 90 日、一年 365 日）。大跨越还必须在正文里交代过渡：这段光景角色靠什么过活、做成了什么、身上留下什么变化；只贴一句"三月后"就跳过去，玩家会觉得那段日子凭空蒸发。\n\n[对齐硬规矩]\n- 正文与 timeAdvance 必须说同一件事：开头写了时间词，unit 就不能是 continuous；unit 报了跨度，正文就必须把这个词写出来。一边写"一年后"一边给连续态，或者反过来，都算违规。\n- 同一场戏往下续写，用 extraEvents 配连续态；真的隔了一段光景才另起的那条，才在它自己的 timeAdvance 上报时。\n- 跨年的后续（一年后再赴约、三年后重回旧地）不要在本轮硬写完，用 newThreads(deadlineAge) 或 dueInSameYear=true 交给下次推进承接。\n`;
+  const timeRangeHint = `[本轮报时约定]\n${taHead}${nowLine}\n报时分三档，按本段实际需要挑一档，不要每条都报——像网络小说那样：没提时间，读者就默认是现在正在发生；提了时间，读者才知道跳到了哪里。\n\n一、连续态（缺省，最常用）。本段紧接上一幕，narrative 一个时间词都不写，直接从动作、对白或感官切入。timeAdvance 给 {"amount":1,"unit":"continuous","label":"","ageDeltaYears":0,"elapsedDays":0}。前端拿到空 label 就不画时间元素，相邻两条黏成同一场戏。\n\n二、日内小跳：当晚 / 入夜后 / 次日清晨 / 午后 / 凌晨。这个词必须写进 narrative 开头分句，例：「当晚，柴门被人叩响。」timeAdvance 给 unit:"hour" 并附 setDayHour——它是同一天里的绝对时点，常用取值：凌晨 3、拂晓 5.5、清晨 7、日中 12、午后 14.5、黄昏 18.5、入夜 20.5、夜半 0.5。示例：{"amount":1,"unit":"hour","label":"当晚","ageDeltaYears":0,"elapsedDays":0,"setDayHour":20.5}。留意「当晚」说的是同一天的夜里，不是往后推十二个时辰。\n\n三、大跨越：三月后 / 闭关五年后。同样把这个词写进 narrative 开头分句，timeAdvance 用 month / season / year 级 unit，配齐 ageDeltaYears 与 elapsedDays（一月约 30 日、一季 90 日、一年 365 日）。大跨越还必须在正文里交代过渡：这段光景角色靠什么过活、做成了什么、身上留下什么变化；只贴一句"三月后"就跳过去，玩家会觉得那段日子凭空蒸发。\n\n[对齐硬规矩]\n- 正文与 timeAdvance 必须说同一件事：开头写了时间词，unit 就不能是 continuous；unit 报了跨度，正文就必须把这个词写出来。一边写"一年后"一边给连续态，或者反过来，都算违规。\n- 同一场戏往下续写，用 extraEvents 配连续态；真的隔了一段光景才另起的那条，才在它自己的 timeAdvance 上报时。\n- 跨年的后续（一年后再赴约、三年后重回旧地）不要在本轮硬写完，用 newThreads(deadlineAge) 或 dueInSameYear=true 交给下次推进承接。\n`;
 
   return `${cultivationCriticalAlert}${choiceIntervalNotice}${timeRangeHint}
 【状态快照区】

@@ -123,9 +123,14 @@ export function clampTimeAdvance(raw: any, fallback?: TimeAdvance): TimeAdvance 
   const setDayHour = Number.isFinite(rawDayHour) ? Math.max(0, Math.min(23.99, rawDayHour)) : undefined;
 
   if (unit === 'continuous') {
-    // 连续态不接受任何题签与跨度——否则它就不是连续态了。
+    // 连续态不接受题签与跨日跨岁——否则它就不是连续态了。
+    // 但日内那点推移要留：2026-08-31 之前此处把 elapsedHours 一并抹零，
+    // 于是一局下来天色永远停在清晨七点，宴席、守夜、赶早船全成了白日戏。
+    // 一幕戏花掉一两个时辰不需要谁来报时，天色自己会走到午后、黄昏、上灯。
+    const drift = Math.max(0, Math.min(4, Number(raw?.elapsedHours ?? fb.elapsedHours) || 0));
     return {
       ...CONTINUOUS_TIME,
+      elapsedHours: drift,
       reason: String(raw?.reason || fb.reason || CONTINUOUS_TIME.reason).slice(0, 120),
       ...(setDayHour !== undefined ? { setDayHour } : {}),
     };
@@ -262,10 +267,74 @@ export function phaseHintForTime(label?: string, narrative?: string): string | u
  */
 export const MAX_CONSECUTIVE_CONTINUOUS = 4;
 
-export function suggestTimeAdvance(args: { age: number; pendingThreads?: PendingThread[]; sameYearThread?: PendingThread | null; blueprint?: EventBlueprint | null; consecutiveContinuous?: number }): TimeAdvance {
+/**
+ * 撤回跨度的止损线。
+ *
+ * 矛盾体检会把「引擎判了跨度、正文却没交代」的那次跨度撤回，让本幕按接着刚才处理。
+ * 但撤回不能无限撤：万一模型始终不肯在开头交代时间，光景就永远停在同一天了。
+ * 积压到这一档就不再撤，认下跨度——时间元件与正文对不齐总好过时间冻死。
+ */
+export const MAX_CONTINUOUS_BEFORE_FORCE_ACCEPT = 8;
+
+/**
+ * 一幕戏大致占掉的日内光景（小时）。
+ *
+ * 2026-08-31：实跑十轮，日内时点全卡在清晨七点——整整一局没有一场夜戏。
+ * 缘由有二：连续态一律 0 小时（一日永不走动），跨度档又都写死回落七点。
+ * 于是给连续态一个不带题签的小推移：一场对话、一趟脚程本来就要花掉一段光景，
+ * 读者不需要谁来宣告「过了一个时辰」。几幕之后天色自己就走到午后、黄昏、上灯。
+ */
+export const SCENE_DRIFT_HOURS = 1.5;
+
+/** 夜里才对味的场景。命中就把时点抬到入夜，夜戏靠它出现。 */
+const NIGHT_SCENE_HINTS = ['夜宴', '宴席', '守夜', '夜袭', '夜行', '月下', '灯会', '上灯', '打更', '巡夜', '潜入', '摸黑', '篝火', '投宿', '夜话', '值夜'];
+/** 天不亮就动身的场景。 */
+const DAWN_SCENE_HINTS = ['启程', '远行', '出城', '赶路', '上路', '早船', '送行', '拔营'];
+
+/**
+ * 按场景内容挑一个日内时点，挑不出返回 undefined（那便还是接着刚才）。
+ * 只在时点确实该换时才挑：本来就在夜里的，不必再入夜一次。
+ */
+export function pickSceneDayHour(text: string, currentDayHour: number): number | undefined {
+  const h = Number.isFinite(currentDayHour) ? currentDayHour : DEFAULT_DAY_HOUR;
+  if (hasAny(text, NIGHT_SCENE_HINTS) && h < 17) return 20.5;
+  if (hasAny(text, DAWN_SCENE_HINTS) && (h < 4 || h > 8)) return 5.5;
+  return undefined;
+}
+
+const SCENE_HOUR_WORD: Record<string, string> = {
+  '0.5': '夜半', '3': '凌晨', '5.5': '拂晓', '7': '清晨',
+  '12': '日中', '14.5': '午后', '18.5': '黄昏', '20.5': '入夜',
+};
+
+/**
+ * 时点题签。跨没跨过午夜决定该写「当晚」还是「次日清晨」——
+ * 网文里这两个词读者一看便知落在哪，写错一个就全乱了。
+ */
+export function sceneHourLabel(target: number, currentDayHour: number): string {
+  const word = SCENE_HOUR_WORD[String(target)] || phaseOf(target);
+  const h = Number.isFinite(currentDayHour) ? currentDayHour : DEFAULT_DAY_HOUR;
+  const rolled = target <= h + 1e-6;
+  if (!rolled) return target >= 19.5 ? '当晚' : `${word}时分`;
+  return `次日${word}`;
+}
+
+/** 正文里有没有交代时间。给「引擎判了跨度、正文却当没这回事」那种矛盾做体检。 */
+export function mentionsTimeInProse(text?: string): boolean {
+  const t = String(text || '');
+  if (inferDayHourFromText(t) !== undefined) return true;
+  return /翌日|次日|明日|昨夜|昨日|隔日|数日|旬日|半月|月余|一月|数月|三月|半年|一年|数年|几年|一季|开春|入秋|入冬|年后|载后|闭关|光景|转眼|不觉|自那|此后|后来/.test(t);
+}
+
+export function suggestTimeAdvance(args: { age: number; pendingThreads?: PendingThread[]; sameYearThread?: PendingThread | null; blueprint?: EventBlueprint | null; consecutiveContinuous?: number; currentDayHour?: number }): TimeAdvance {
   const { age, pendingThreads = [], sameYearThread, blueprint, consecutiveContinuous = 0 } = args;
   const bpCat = blueprint?.category || '';
   const bpText = `${blueprint?.name || ''} ${blueprint?.description || ''}`;
+  const nowHour = Number.isFinite(Number(args.currentDayHour)) ? Number(args.currentDayHour) : DEFAULT_DAY_HOUR;
+  // 跨度档不再一律回落清晨：只有落进深夜（后半夜到天不亮）才拨回七点。
+  // 「月余后」落在凌晨三点无从下笔，落在黄昏却是好戏。
+  const jumpHour = (nowHour < 5 || nowHour >= 22) ? DEFAULT_DAY_HOUR : undefined;
+  const withJumpHour = jumpHour === undefined ? {} : { setDayHour: jumpHour };
 
   // 闭关是唯一「内容本身就写着跨度」的一档：闭关一年就是一年，读者一眼便知落到哪个时点。
   // 只认「闭关」这个明写的词。修炼 / 参悟 / 破境 这些不必然占掉一年，
@@ -279,27 +348,36 @@ export function suggestTimeAdvance(args: { age: number; pendingThreads?: Pending
   //   这种紧接着的动作也被推走一个月。期限压着，恰恰说明下一幕就在眼前，不是该跳过去。
   //   该不该推交给连续态积压（防冻结闸门），推多远才轮到牵挂发话。
   if (consecutiveContinuous < MAX_CONSECUTIVE_CONTINUOUS) {
-    return { ...CONTINUOUS_TIME, reason: '紧接上一幕，未另起时点' };
+    // 场景本身写着夜里或天不亮，就在同一天里换个时点——这是日内小跳那一档，
+    // 不动跨度、不动岁数，只把戏挪到该演的时辰。
+    const sceneHour = pickSceneDayHour(bpText, nowHour);
+    if (sceneHour !== undefined) {
+      return {
+        amount: 1, unit: 'hour', label: sceneHourLabel(sceneHour, nowHour),
+        reason: '场景落在该有的时辰', ageDeltaYears: 0, elapsedDays: 0, elapsedHours: 0, setDayHour: sceneHour,
+      };
+    }
+    return { ...CONTINUOUS_TIME, elapsedHours: SCENE_DRIFT_HOURS, reason: '紧接上一幕，未另起时点' };
   }
 
   // 以下都是「连续数幕没另起时点，该抬一档了」之后的挑档：期限越近，抬得越轻。
   if (sameYearThread?.dueInSameYear) {
-    return { amount: 3, unit: 'day', label: '\u6570\u65e5\u540e', reason: `\u627f\u63a5\u540c\u5e74\u56e0\u7f18\uff1a${sameYearThread.title}`, ageDeltaYears: 0, elapsedDays: 3, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
+    return { amount: 3, unit: 'day', label: '\u6570\u65e5\u540e', reason: `\u627f\u63a5\u540c\u5e74\u56e0\u7f18\uff1a${sameYearThread.title}`, ageDeltaYears: 0, elapsedDays: 3, elapsedHours: 0, ...withJumpHour };
   }
   const urgent = pendingThreads
     .filter((t) => t.status === 'urgent' || (t.status === 'pending' && t.deadlineAge - age <= 1))
     .sort((a, b) => a.deadlineAge - b.deadlineAge)[0];
   if (urgent) {
-    return { amount: 1, unit: 'day', label: '翌日', reason: `临近因缘关口：${urgent.title}`, ageDeltaYears: 0, elapsedDays: 1, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
+    return { amount: 1, unit: 'day', label: '翌日', reason: `临近因缘关口：${urgent.title}`, ageDeltaYears: 0, elapsedDays: 1, elapsedHours: 0, ...withJumpHour };
   }
   const cat = bpCat;
   const text = bpText;
-  if (cat === 'combat' || hasAny(text, COMBAT_HINTS)) return { amount: 1, unit: 'day', label: '翌日', reason: '争斗因缘迫近，不宜跨年略过', ageDeltaYears: 0, elapsedDays: 1 };
-  if (cat === 'trade' || hasAny(text, TRADE_HINTS)) return { amount: 1, unit: 'day', label: '次日入市', reason: '市井机缘多在短期内展开', ageDeltaYears: 0, elapsedDays: 1 };
-  if (cat === 'exploration' || hasAny(text, EXPLORATION_HINTS)) return { amount: 10, unit: 'day', label: '旬日后', reason: '循线探查需要数日准备', ageDeltaYears: 0, elapsedDays: 10 };
-  if (cat === 'cultivation' || hasAny(text, CULTIVATION_HINTS)) return { amount: 1, unit: 'season', label: '一季后', reason: '打坐参悟不觉时日', ageDeltaYears: 0, elapsedDays: 90, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
+  if (cat === 'combat' || hasAny(text, COMBAT_HINTS)) return { amount: 1, unit: 'day', label: '翌日', reason: '争斗因缘迫近，不宜跨年略过', ageDeltaYears: 0, elapsedDays: 1, elapsedHours: 0, ...withJumpHour };
+  if (cat === 'trade' || hasAny(text, TRADE_HINTS)) return { amount: 1, unit: 'day', label: '次日入市', reason: '市井机缘多在短期内展开', ageDeltaYears: 0, elapsedDays: 1, elapsedHours: 0, ...withJumpHour };
+  if (cat === 'exploration' || hasAny(text, EXPLORATION_HINTS)) return { amount: 10, unit: 'day', label: '旬日后', reason: '循线探查需要数日准备', ageDeltaYears: 0, elapsedDays: 10, elapsedHours: 0, ...withJumpHour };
+  if (cat === 'cultivation' || hasAny(text, CULTIVATION_HINTS)) return { amount: 1, unit: 'season', label: '一季后', reason: '打坐参悟不觉时日', ageDeltaYears: 0, elapsedDays: 90, elapsedHours: 0, ...withJumpHour };
   // 手上一条牵挂都没有，才真是「一段光景就这么过去了」。
-  return { amount: 1, unit: 'month', label: '月余后', reason: '连续数幕未另起时点，顺势推过一段光景', ageDeltaYears: 0, elapsedDays: 30, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
+  return { amount: 1, unit: 'month', label: '月余后', reason: '连续数幕未另起时点，顺势推过一段光景', ageDeltaYears: 0, elapsedDays: 30, elapsedHours: 0, ...withJumpHour };
 }
 
 export function advanceWorldCalendar(world: Partial<WorldCalendarState> | undefined, time: TimeAdvance): WorldCalendarState {
@@ -339,7 +417,10 @@ function cleanTimeSegmentLabel(value?: string) {
   const internalOrAction = /\u540c\u5e74\u7eed\u7bc7|\u7eed\u7bc7|\u6d41\u5e74\u56e0|\u547d\u8282\u70b9|\u6267\u884c\u7ea6\u5b9a|\u524d\u5f80|\u8ffd\u67e5|\u8ffd\u5bfb|\u63a2\u5165|\u5165\u5e02|\u8d74\u7ea6|\u6253\u542c|\u53ef\u5411|\u8be2\u95ee|\u5bfb\u8bbf|\u62dc\u8bbf|\u4fee\u58eb/.test(text);
   if (internalOrAction) return '';
   const hasTimeSignal = /\u540e|\u524d|\u95f4|\u65e5|\u591c|\u6668|\u66ae|\u6708|\u5e74|\u8f7d|\u5b63|\u65ec|\u7247\u523b|\u5c11\u9877|\u987b\u81fe|\u7fcc\u65e5|\u5f53\u591c|\u5b50\u65f6|\u5348\u65f6|\u6668\u949f|\u66ae\u9f13/.test(text);
-  if (!hasTimeSignal) return '';
+  // 2026-08-31 \u8865\u4e00\u7ec4\u65e5\u5185\u65f6\u70b9\u8bcd\u3002\u65e7\u8868\u53ea\u8ba4\u300c\u591c\u300d\u4e0d\u8ba4\u300c\u665a\u300d\uff0c\u4e8e\u662f\u300c\u5f53\u665a\u300d\u88ab\u5f53\u6210\u65e0\u65f6\u95f4\u4fe1\u53f7
+  // \u6574\u6761\u4e22\u6389\uff0c\u56de\u843d\u6210\u300c\u5c11\u9877\u300d\u2014\u2014\u65e5\u5185\u5c0f\u8df3\u90a3\u4e00\u6863\u7684\u9898\u7b7e\u5168\u519b\u8986\u6ca1\uff0c\u9ec4\u660f\u3001\u62c2\u6653\u540c\u7406\u3002
+  const hasDayHourSignal = /\u665a|\u660f|\u51cc\u6668|\u62c2\u6653|\u6e05\u6668|\u65f6\u5206|\u5165\u591c|\u591c\u534a|\u65e5\u4e2d|\u5348\u540e|\u508d/.test(text);
+  if (!hasTimeSignal && !hasDayHourSignal) return '';
   return text.slice(0, 24);
 }
 
