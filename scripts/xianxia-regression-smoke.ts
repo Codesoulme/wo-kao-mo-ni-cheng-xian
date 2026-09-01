@@ -13905,9 +13905,18 @@ function smokeEcs007AgingSystemIncrementsAge(): void {
   const metaBefore = entity.getComponent('Meta');
   assert(metaBefore.age === 99, 'initial age should be 99');
   assert(metaBefore.alive === true, 'initial alive should be true');
+  // 2026-08-31 新契约：不喂 ageDelta 就不长岁。
+  //   旧版每 tick 写死 +1，而 tick 被 11 条路由共用（坊市买卖 / 斗法每回合 / 炼丹 …），
+  //   于是"买一件东西过一年"。年岁归时序推进独家掌管。
+  world.tick();
+  const metaIdle = entity.getComponent('Meta');
+  assert(metaIdle.age === 99, `age should stay 99 without ageDelta, got ${metaIdle.age}`);
+  assert(metaIdle.alive === true, 'alive should stay true without ageDelta');
+  // 喂增量才推进，并在寿元线上判死
+  (entity.getComponent('Meta') as any).ageDelta = 1;
   world.tick();
   const metaAfter = entity.getComponent('Meta');
-  assert(metaAfter.age === 100, `age after tick should be 100, got ${metaAfter.age}`);
+  assert(metaAfter.age === 100, `age after ageDelta=1 tick should be 100, got ${metaAfter.age}`);
   assert(metaAfter.alive === false, 'alive should be false at lifespan boundary');
   log('smoke-ecs-007-aging-system-increments-age', { passed: true });
 }
@@ -14017,9 +14026,14 @@ function smokeP5EcsTickHelper002TickAdvancesAgeAndExp(): void {
     inventory: [],
   };
 
-  const result = tickEcsForCharacter(characterId, baseSnapshot);
+  // 2026-08-31：缺省 tick 不动年岁（helper 不传 ageDeltaYears）
+  const idle = tickEcsForCharacter(characterId, baseSnapshot);
+  assert(idle !== null, 'idle tick should return result');
+  assert(idle.age === 20, `age should stay 20 without ageDeltaYears, got ${idle.age}`);
+
+  const result = tickEcsForCharacter(characterId, baseSnapshot, { ageDeltaYears: 1 });
   assert(result !== null, 'tickEcsForCharacter should return non-null result');
-  // AgingSystem: age + 1
+  // AgingSystem: 按显式增量推进
   assert(result.age === 21, `age should advance to 21, got ${result.age}`);
   // CultivationSystem: cultivationSpeed(1.0) * comprehension(0) * 0.1 = 0 → cultivationExp 不变（默认 comprehension=0）
   assert(result.cultivationExp === 50, `cultivationExp should stay 50 (comprehension=0), got ${result.cultivationExp}`);
@@ -14037,7 +14051,7 @@ function smokeP5EcsTickHelper002TickAdvancesAgeAndExp(): void {
     characterId: dyingCharId,
     age: 199,
     lifespan: 200,
-  });
+  }, { ageDeltaYears: 1 });
   assert(dyingResult !== null, 'dying tick should return result');
   assert(dyingResult.age === 200, `dying age should be 200, got ${dyingResult.age}`);
   assert(dyingResult.alive === false, 'should be dead when age >= lifespan');

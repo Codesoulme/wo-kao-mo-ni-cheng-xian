@@ -183,14 +183,14 @@ export function defaultTimeLabel(unit: TimeAdvanceUnit, amount: number) {
  */
 export function inferDayHourFromText(text?: string): number | undefined {
   const t = String(text || '');
-  if (/凌晨|五更|寅时|丑时/.test(t)) return 3;
+  if (/凌晨|五更|寅时|丑时|后半夜|更深/.test(t)) return 3;
   if (/夜半|子夜|三更|半夜/.test(t)) return 0.5;
-  if (/入夜|当夜|当晚|夜里|掌灯|戌时|亥时/.test(t)) return 20.5;
-  if (/黄昏|傍晚|暮色|暮鼓|日落|酉时/.test(t)) return 18.5;
-  if (/午后|晌午|未时|申时/.test(t)) return 14.5;
+  if (/入夜|当夜|当晚|夜里|掌灯|上灯|灯火|戌时|亥时/.test(t)) return 20.5;
+  if (/黄昏|傍晚|暮色|暮鼓|日落|日头偏西|太阳落山|酉时/.test(t)) return 18.5;
+  if (/午后|晌午|日头当顶|未时|申时/.test(t)) return 14.5;
   if (/日中|正午|午时/.test(t)) return 12;
-  if (/清晨|晨起|天亮|晨光|晨钟|卯时|辰时/.test(t)) return 7;
-  if (/拂晓|黎明|破晓|天光/.test(t)) return 5.5;
+  if (/清晨|晨起|天亮|晨光|晨风|晨雾|晨钟|卯时|辰时/.test(t)) return 7;
+  if (/拂晓|黎明|破晓|天光|蒙蒙亮|天不亮|天色微明|熹微|鸡鸣|鸡叫|头遍鸡/.test(t)) return 5.5;
   return undefined;
 }
 
@@ -264,28 +264,42 @@ export const MAX_CONSECUTIVE_CONTINUOUS = 4;
 
 export function suggestTimeAdvance(args: { age: number; pendingThreads?: PendingThread[]; sameYearThread?: PendingThread | null; blueprint?: EventBlueprint | null; consecutiveContinuous?: number }): TimeAdvance {
   const { age, pendingThreads = [], sameYearThread, blueprint, consecutiveContinuous = 0 } = args;
+  const bpCat = blueprint?.category || '';
+  const bpText = `${blueprint?.name || ''} ${blueprint?.description || ''}`;
+
+  // 闭关是唯一「内容本身就写着跨度」的一档：闭关一年就是一年，读者一眼便知落到哪个时点。
+  // 只认「闭关」这个明写的词。修炼 / 参悟 / 破境 这些不必然占掉一年，
+  // 一个道者天天在修炼，若照它跳，就又回到「随手做点事，一年没了」。
+  if (bpText.includes('闭关')) {
+    return { amount: 1, unit: 'year', label: '闭关一年后', reason: '闭关本身就是一段光景', ageDeltaYears: 1, elapsedDays: 365 };
+  }
+
+  // 2026-08-31 反转一条要紧的：牵挂与期限只决定「推多远」，不决定「该不该推」。
+  //   旧版反着来 —— 手上有急迫牵挂就每一幕都盖「月余后」，于是「老客把青玉包好塞进怀里」
+  //   这种紧接着的动作也被推走一个月。期限压着，恰恰说明下一幕就在眼前，不是该跳过去。
+  //   该不该推交给连续态积压（防冻结闸门），推多远才轮到牵挂发话。
+  if (consecutiveContinuous < MAX_CONSECUTIVE_CONTINUOUS) {
+    return { ...CONTINUOUS_TIME, reason: '紧接上一幕，未另起时点' };
+  }
+
+  // 以下都是「连续数幕没另起时点，该抬一档了」之后的挑档：期限越近，抬得越轻。
   if (sameYearThread?.dueInSameYear) {
-    return { amount: 3, unit: 'month', label: '\u6570\u6708\u540e', reason: `\u627f\u63a5\u540c\u5e74\u56e0\u7f18\uff1a${sameYearThread.title}`, ageDeltaYears: 0, elapsedDays: 90 };
+    return { amount: 3, unit: 'day', label: '\u6570\u65e5\u540e', reason: `\u627f\u63a5\u540c\u5e74\u56e0\u7f18\uff1a${sameYearThread.title}`, ageDeltaYears: 0, elapsedDays: 3, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
   }
   const urgent = pendingThreads
     .filter((t) => t.status === 'urgent' || (t.status === 'pending' && t.deadlineAge - age <= 1))
     .sort((a, b) => a.deadlineAge - b.deadlineAge)[0];
   if (urgent) {
-    return { amount: 1, unit: 'month', label: '月余后', reason: `临近因缘关口：${urgent.title}`, ageDeltaYears: 0, elapsedDays: 30 };
+    return { amount: 1, unit: 'day', label: '翌日', reason: `临近因缘关口：${urgent.title}`, ageDeltaYears: 0, elapsedDays: 1, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
   }
-  const cat = blueprint?.category || '';
-  const text = `${blueprint?.name || ''} ${blueprint?.description || ''}`;
+  const cat = bpCat;
+  const text = bpText;
   if (cat === 'combat' || hasAny(text, COMBAT_HINTS)) return { amount: 1, unit: 'day', label: '翌日', reason: '争斗因缘迫近，不宜跨年略过', ageDeltaYears: 0, elapsedDays: 1 };
   if (cat === 'trade' || hasAny(text, TRADE_HINTS)) return { amount: 1, unit: 'day', label: '次日入市', reason: '市井机缘多在短期内展开', ageDeltaYears: 0, elapsedDays: 1 };
   if (cat === 'exploration' || hasAny(text, EXPLORATION_HINTS)) return { amount: 10, unit: 'day', label: '旬日后', reason: '循线探查需要数日准备', ageDeltaYears: 0, elapsedDays: 10 };
-  if (cat === 'cultivation' || hasAny(text, CULTIVATION_HINTS)) return { amount: 1, unit: 'year', label: '闭关一年后', reason: '修行沉淀可跨过较长岁月', ageDeltaYears: 1, elapsedDays: 365 };
-  // 防冻结：连续态积到上限就抬一档，别让角色卡死在同一天。
-  if (consecutiveContinuous >= MAX_CONSECUTIVE_CONTINUOUS) {
-    return { amount: 1, unit: 'month', label: '月余后', reason: '连续数幕未另起时点，顺势推过一段光景', ageDeltaYears: 0, elapsedDays: 30, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
-  }
-  // 2026-08-31：此处过去返回「一年后」。信息不足 → 跳最大档，方向是反的；
-  // 网文缺省是接着刚才，跨越才需要理由。
-  return { ...CONTINUOUS_TIME, reason: '无急迫牵挂，紧接上一幕' };
+  if (cat === 'cultivation' || hasAny(text, CULTIVATION_HINTS)) return { amount: 1, unit: 'season', label: '一季后', reason: '打坐参悟不觉时日', ageDeltaYears: 0, elapsedDays: 90, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
+  // 手上一条牵挂都没有，才真是「一段光景就这么过去了」。
+  return { amount: 1, unit: 'month', label: '月余后', reason: '连续数幕未另起时点，顺势推过一段光景', ageDeltaYears: 0, elapsedDays: 30, elapsedHours: 0, setDayHour: DEFAULT_DAY_HOUR };
 }
 
 export function advanceWorldCalendar(world: Partial<WorldCalendarState> | undefined, time: TimeAdvance): WorldCalendarState {

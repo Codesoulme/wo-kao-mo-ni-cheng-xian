@@ -92,7 +92,11 @@ export async function isAdvancePreloadUsable(char: NonNullable<CharacterRecord>,
 async function getRecentEvents(characterId: string) {
   const recentEventsDb = await db.eventLog.findMany({
     where: { characterId },
-    orderBy: { age: 'desc' },
+    // 2026-08-31：补 createdAt 次序键。原先只按 age 排，而缺省成连续态后同岁能堆十几条，
+    //   同岁之间的先后就成了随机的——reverse() 之后"末尾"未必是最新一条，
+    //   连续态计数因此虚高（实跑里闸门第 8 幕才响，本该第 5 幕），
+    //   喂给模型的近期上下文也是乱序的。
+    orderBy: [{ age: 'desc' }, { createdAt: 'desc' }],
     take: 20,
   });
   return recentEventsDb.reverse().map(e => ({

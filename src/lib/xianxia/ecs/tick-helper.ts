@@ -12,6 +12,7 @@ import { World, Entity } from './core';
 import { createCharacterEntity, entityToSnapshot } from './character-entity';
 import { AgingSystem } from './systems/aging-system';
 import { CultivationSystem } from './systems/cultivation-system';
+import type { MetaComponent } from './components';
 import type { CharacterStateSnapshot } from '../events/types';
 
 export interface TickEcsOptions {
@@ -19,10 +20,17 @@ export interface TickEcsOptions {
   bench?: boolean;
   /** 路由标识（用于日志前缀，方便定位） */
   source?: string;
+  /**
+   * 本次 tick 该推进的年岁（年）。缺省 0 —— 不喂就不长。
+   *
+   * 2026-08-31：只有时序推进算出跨年时才该填。坊市 / 斗法 / 炼丹 / 抉择
+   * 这些路由一律留空，它们没有资格动年岁。
+   */
+  ageDeltaYears?: number;
 }
 
 export interface TickEcsResult {
-  /** tick 后年龄（AgingSystem +1） */
+  /** tick 后年龄（按 options.ageDeltaYears 推进，缺省不变） */
   age: number;
   /** tick 后修为（CultivationSystem 累加） */
   cultivationExp: number;
@@ -47,7 +55,12 @@ export function tickEcsForCharacter(
 ): TickEcsResult | null {
   const startedAt = Date.now();
   const world = new World();
-  createCharacterEntity(world, baseSnapshot);
+  const seeded = createCharacterEntity(world, baseSnapshot);
+  // 把年岁增量交给 Meta，由 AgingSystem 读。不传即 0。
+  const seededMeta = seeded.getComponent<MetaComponent>('Meta');
+  if (seededMeta) {
+    (seededMeta as any).ageDelta = Number(options.ageDeltaYears) || 0;
+  }
   world.addSystem(AgingSystem);
   world.addSystem(CultivationSystem);
   world.tick();

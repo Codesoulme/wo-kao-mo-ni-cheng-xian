@@ -9,7 +9,7 @@ import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { buildStateContext, executeAIEvent, stateToResponse, applyAnnualAttributeGrowth } from '@/lib/xianxia/engine';
 import { parseAchievementMarkers, applyAchievements } from '@/lib/xianxia/achievements';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, inferDayHourFromText, hourNameOf, phaseOf } from '@/lib/xianxia/world-time';
+import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, inferDayHourFromText, hourNameOf, phaseOf, CONTINUOUS_TIME } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import { truncateNarrativeAtSentence } from '@/lib/xianxia/display';
 import { appendEvent } from '@/lib/xianxia/events/store';
@@ -414,6 +414,30 @@ export async function POST(req: NextRequest) {
         }
         if (!aiOutput.narrative) aiOutput.narrative = stripInfluenceMarkers(prevNarrative || rawText);
 
+        // 3.35) 采纳模型自报的时间量（只在引擎没发话、且不跨岁时）
+        //   提示词里给模型讲了三档报时，模型也会在 JSON 里回 timeAdvance，
+        //   但活路由过去从不读它——整套约定在活路径上是空转的。
+        //   两条闸门：
+        //     一、只有引擎自己给的是连续态（= 没有牵挂/期限可依据）时才听模型，
+        //         引擎已按线索算出跨度的，跨度仍归引擎，那是事实而非行文；
+        //     二、只收 ageDeltaYears === 0 的档。岁数在 advance-preload.ts:187
+        //         就已经加过了（早于本次 LLM 调用），事后改岁会与已执行的状态脱节；
+        //         跨年及以上一律留给引擎。
+        try {
+          const declared = aiOutput?.timeAdvance;
+          if (
+            timeAdvance.unit === 'continuous' &&
+            declared && declared.unit && declared.unit !== 'continuous' &&
+            Number(declared.ageDeltaYears || 0) === 0
+          ) {
+            timeAdvance = clampTimeAdvance(declared, timeAdvance);
+            if (worldCalendarBefore) worldCalendar = advanceWorldCalendar(worldCalendarBefore, timeAdvance);
+            console.log('[SSE] 采纳模型自报时间量:', timeAdvance.unit, timeAdvance.label);
+          }
+        } catch (e: any) {
+          console.warn('[SSE] 模型自报时间量采纳跳过:', e?.message);
+        }
+
         // 3.4) 按正文回校日内时点
         //   引擎在正文写出来之前就把日历推走了（上面第 239 行附近），那时还不知道
         //   这段会写成"当晚"还是"翌日清晨"。于是过去会出现：正文说入夜，戳上写晨。
@@ -599,6 +623,14 @@ displayEffects = buildEventDisplayEffects({
 
           // 持久化事件：刷新页面后 state 接口能读到，避免气泡消失
           const eventEffects = [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime: stampedWorldTime })];
+          // 2026-08-31：追加事件（临终 / 逆向补叙）与主事件同一时刻发生。
+          //   过去它们的 effects 是 '[]'，读回来 worldTime 是 undefined，
+          //   时间分隔条拿不到锚点，实跑里就出现过一条"时间无处安放"的卡片。
+          //   盖连续态戳：同刻发生，不另起时点，界面上自然不渲染任何时间元素。
+          const appendedEventMeta = hiddenEventMeta({
+            timeAdvance: { ...CONTINUOUS_TIME, reason: '与上一幕同刻' },
+            worldTime: { ...stampedWorldTime, displayLabel: '' },
+          });
           createdEvent = await db.eventLog.create({
             data: {
               characterId,
@@ -640,7 +672,7 @@ displayEffects = buildEventDisplayEffects({
                   title: deathTitles[seed % deathTitles.length],
                   narrative: deathNarrative || fallbackNarrative,
                   eventType: 'death',
-                  effects: '[]',
+                  effects: JSON.stringify([appendedEventMeta]),
                 },
               });
             } catch (e) {
@@ -680,7 +712,7 @@ displayEffects = buildEventDisplayEffects({
                   title: draft.title,
                   narrative: draft.narrative,
                   eventType: draft.eventType,
-                  effects: JSON.stringify(draft.effects),
+                  effects: JSON.stringify([...(Array.isArray(draft.effects) ? draft.effects : []), appendedEventMeta]),
                 },
               });
               console.log(`[advance-sse] 逆向因果补叙已落库（code=${draft.code}，反指 ${draft.refEventId}）`);
@@ -794,6 +826,8 @@ displayEffects = buildEventDisplayEffects({
                   if (!metaComp || !cultivationComp) {
                     throw new Error('ECS entity missing required Meta/Cultivation components');
                   }
+                  // 年岁已在 advance-preload 里按 ageDeltaYears 加过，ECS 这一 tick 不再动它。
+                  (metaComp as any).ageDelta = 0;
                   ecsCache = {
                     world: freshWorld,
                     entity: freshEntity,
@@ -808,6 +842,7 @@ displayEffects = buildEventDisplayEffects({
                   metaComp.age = finalState.age;
                   metaComp.alive = finalState.alive;
                   metaComp.lifespan = finalState.lifespan || 100;
+                  (metaComp as any).ageDelta = 0;
                   cultivationComp.cultivationExp = finalState.cultivationExp;
                   ecsCache.baseAge = metaComp.age;
                   ecsCache.baseCultivationExp = cultivationComp.cultivationExp;
@@ -1035,6 +1070,29 @@ displayEffects = buildEventDisplayEffects({
                 lastEventAge: finalState.age,
               }),
             });
+          } else {
+            // 2026-08-31：补 else 分支。
+            //   上面那个 if 只在「岁数变了 / 陨落 / 卡在抉择」时才写角色表——它是绕着
+            //   年表推演 / NPC 结算 / 世界大事那一大段建的，那些确实该按年边界跑。
+            //   但角色状态本身不该跟着一起被跳过：时序改制后缺省是连续态，岁数常年不动，
+            //   于是 worldCalendarJson 连同 hp / 灵石 / 行囊 / 牵挂 全都写不回库，
+            //   实跑里表现为「防冻结闸门推了 30 天，下一条又退回第 0 天」。
+            //   这里只补最小的一次状态落库，不碰上面那段按年跑的推演。
+            try {
+              await db.character.update({
+                where: isProdMode
+                  ? { id: characterId, userId: user!.id, age: ageBefore }
+                  : { id: characterId, age: ageBefore },
+                data: buildAdvanceStateData(finalState, {
+                  pendingChoiceJson,
+                  worldCalendar,
+                  causeOfDeath: finalState.causeOfDeath || '',
+                  lastEventAge: finalState.age,
+                }),
+              });
+            } catch (e: any) {
+              console.error('[advance-sse] 同岁状态落库失败（非致命）:', e?.message);
+            }
           }
 
         // 修仙界感改进 - 任务 D：寿元边界检查。

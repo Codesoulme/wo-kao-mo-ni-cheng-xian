@@ -11,6 +11,15 @@ export interface MetaComponent extends Component {
   age: number;
   lifespan: number;
   alive: boolean;
+  /**
+   * 本次 tick 应推进的年岁（年）。缺省 0。
+   *
+   * 2026-08-31：原先 AgingSystem 每 tick 写死 +1，而 tick 被 11 条路由调用
+   * （坊市买卖 / 斗法每回合 / 炼丹 / 拍卖 / 探秘 / 抉择 / 干预 …），
+   * 于是"买一件东西过一年"。年岁的唯一主人是时序推进（ageDeltaYears），
+   * 这里只作为它的传声筒；不喂就不长。
+   */
+  ageDelta?: number;
 }
 
 export interface RealmComponent extends Component {
