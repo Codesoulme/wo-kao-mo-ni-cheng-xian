@@ -27,19 +27,27 @@
 import type { CharacterState } from './types';
 import { detectBodyModifier } from './narrative-body-modifier';
 import { baseLifespanFor } from './npc-growth';
+import { canonicalRealm, type CanonicalRealm } from './types/realm';
 
 // 各境界的"凡人成年体"基线（attack/defense/speed/maxHp）
 // 凡人=1x，炼气=1.5x，筑基=2x，金丹=3x，元婴=4x...
-const REALM_BODY_MULTIPLIER: Record<string, number> = {
+//
+// 2026-08-31：原表键写的是 soul_transformation / immortal 两个玩法不产出的别名，
+// 化神(spirit_severing)、大乘(great_vehicle)、飞升(ascension) 三个真键反而缺席，
+// 取值处的 ?? 1.0 让这三档拿了凡人倍率——元婴 21/208 一步跌到 5/52，
+// 突破一次反而变弱，渡劫又跳回 34/341。改用权威九键并按境界单调递增。
+const REALM_BODY_MULTIPLIER: Record<CanonicalRealm, number> = {
   mortal: 1.0,
   qi_refining: 1.5,
   foundation: 2.2,
   golden_core: 3.0,
   nascent_soul: 4.0,
-  soul_transformation: 5.0,
-  tribulation: 6.5,
-  immortal: 8.0,
+  spirit_severing: 5.0,
+  great_vehicle: 6.5,
+  tribulation: 8.0,
+  ascension: 10.0,
 };
+
 
 // 凡人成年 baseline（25 岁壮年）— attack 5、defense 5、speed 5、maxHp 50
 const MORTAL_PEAK = {
@@ -220,7 +228,7 @@ export function computeBodyBaseline(
   const ethPeak = ETHNICITY_PEAK[ethnicity] || DEFAULT_ETHNICITY_PEAK;
   const linGrowth = (lineage !== 'unknown' && LINEAGE_GROWTH[lineage]) || DEFAULT_LINEAGE_GROWTH;
   const factor = ageGrowthFactor(age, linGrowth.earlyBoost, linGrowth.tailBoost, realm);
-  const realmMult = REALM_BODY_MULTIPLIER[realm] ?? 1.0;
+  const realmMult = REALM_BODY_MULTIPLIER[canonicalRealm(realm)];
   const peakBonus = linGrowth.peakBonus;
   return {
     attack: Math.max(1, Math.round(MORTAL_PEAK.attack * factor * realmMult * ethPeak.attack * peakBonus)),
@@ -256,7 +264,7 @@ export function applyAgeBasedBodyGrowth(state: CharacterState, newAge: number, n
   const linGrowth = (lineage !== 'unknown' && LINEAGE_GROWTH[lineage]) || DEFAULT_LINEAGE_GROWTH;
 
   const factor = ageGrowthFactor(newAge, linGrowth.earlyBoost, linGrowth.tailBoost, state.realm);
-  const realmMult = REALM_BODY_MULTIPLIER[state.realm] ?? 1.0;
+  const realmMult = REALM_BODY_MULTIPLIER[canonicalRealm(state.realm)];
   const bodyMod = detectBodyModifier(narrative || '');
   const effectiveMult = realmMult * bodyMod.multiplier;
   const peakBonus = linGrowth.peakBonus;

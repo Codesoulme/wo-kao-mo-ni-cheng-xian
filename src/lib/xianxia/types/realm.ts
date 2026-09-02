@@ -42,6 +42,66 @@ export type Realm =
 
   | 'ascension';       // 飞升
 
+/**
+ * 玩法真正产出的九个境界 id。
+ *
+ * 2026-08-31：Realm 联合里另有六个「(旧)」别名，正常玩法一个都不会产出，
+ * 但类型放行它们，于是四处系统各自拿别名当表键、当闸门值，全都通过了 tsc：
+ *   - body-growth 的体魄倍率表漏掉化神/大乘/飞升 → 走 ?? 1.0 拿凡人倍率
+ *   - deriveTribulationTrigger 名单六个里四个是别名 → 化神、大乘突破不触发雷劫
+ *   - checkAscensionEligibility 的 realmOrder 漏掉筑基/化神/大乘 → indexOf 返 -1
+ *   - AscensionRequirement.minRealm 写 'mahayana' → 大乘那条飞升路径死锁
+ * 凡以境界为键的表、凡拿境界做闸门的判定，一律用 CanonicalRealm 收口，
+ * 并在 assertRealmKeyCoverage 里验一遍覆盖，别再让别名静默吞掉整段玩法。
+ */
+export type CanonicalRealm =
+  | 'mortal'
+  | 'qi_refining'
+  | 'foundation'
+  | 'golden_core'
+  | 'nascent_soul'
+  | 'spirit_severing'
+  | 'great_vehicle'
+  | 'tribulation'
+  | 'ascension';
+
+/** 别名 → 权威 id。旧存档里带别名的境界靠它归位，而不是被 realmIndexSafe 当凡人处理。 */
+export const LEGACY_REALM_ALIAS: Record<string, CanonicalRealm> = {
+  foundation_building: 'foundation',
+  soul_formation: 'golden_core',
+  deity_transformation: 'spirit_severing',
+  soul_transformation: 'spirit_severing',
+  void_refinement: 'spirit_severing',
+  unity: 'great_vehicle',
+  mahayana: 'great_vehicle',
+  immortal: 'ascension',
+};
+
+export const CANONICAL_REALM_IDS: CanonicalRealm[] = [
+  'mortal', 'qi_refining', 'foundation', 'golden_core', 'nascent_soul',
+  'spirit_severing', 'great_vehicle', 'tribulation', 'ascension',
+];
+
+/** 把任意境界值（含别名、脏值）归到权威 id；认不出来时退回凡人。 */
+export function canonicalRealm(realm: string | null | undefined): CanonicalRealm {
+  const key = String(realm || '');
+  if ((CANONICAL_REALM_IDS as string[]).includes(key)) return key as CanonicalRealm;
+  return LEGACY_REALM_ALIAS[key] || 'mortal';
+}
+
+/**
+ * 校验一张以境界为键的表是否盖满九个权威 id。
+ * 回归里当断言用；开发态顺手把缺口打到控制台，免得下次改名又静默退档。
+ */
+export function assertRealmKeyCoverage(tableName: string, keys: string[]): string[] {
+  const present = new Set(keys);
+  const missing = CANONICAL_REALM_IDS.filter(id => !present.has(id));
+  if (missing.length && process.env.NODE_ENV !== 'production') {
+    console.warn(`[realm] ${tableName} 漏了权威境界键：${missing.join('、')}`);
+  }
+  return missing;
+}
+
 
 
 

@@ -5,6 +5,11 @@ import {
   realmDiff,
 } from '../realm-power';
 import {
+  canonicalRealm,
+  CANONICAL_REALM_IDS,
+  type CanonicalRealm,
+} from '../types/realm';
+import {
   CharacterState,
   AttributeChange,
   StatusEntry,
@@ -372,7 +377,11 @@ export function computeTribulationOutcome(state: CharacterState, targetRealm: Re
 
   const fatalRange = Math.max(0.0, Math.min(0.30, 0.05 + sin * 0.01) + (hpRatio < 0.3 ? 0.15 : 0) - tribulationDefenseBonus);
   const fallRange = Math.max(0.0, Math.min(0.25, 0.10 + sin * 0.005 + (karma < 0 ? -karma * 0.05 : 0)) - tribulationSoulBonus);
-  const adjusted = fateRoll - karmaDelta - tribulationEnlightenBonus;
+  // 2026-08-31：原式是 fateRoll - karmaDelta - tribulationEnlightenBonus，
+  // 而下面 adjusted 越小越靠 failed_fatal——等于善念与悟性都被当成惩罚项。
+  // 实测千次采样：大恶者致命 0%、最佳结局 62%；大善者致命 23%、最佳 32%。
+  // 与本函数上方注释「高 karma（善）提升 passed_with_refinement 概率」正好相反，改回加号。
+  const adjusted = fateRoll + karmaDelta + tribulationEnlightenBonus;
 
   let verdict: TribulationVerdict = 'passed_barely';
   let refinementBonus: TribulationOutcome['refinementBonus'] | undefined;
@@ -411,7 +420,7 @@ const ASCENSION_REQUIREMENTS: Record<WorldTier, AscensionRequirement> = {
   humanWorld: {
     fromTier: 'humanWorld',
     toTier: 'spiritWorld',
-    minRealm: 'mahayana',
+    minRealm: 'great_vehicle',
     tribulationPassed: true,
     lifespanMin: 500,
     reputationMin: 5000,
@@ -456,14 +465,14 @@ export function checkAscensionEligibility(
 ): { eligible: boolean; missing: string[] } {
   const missing: string[] = [];
   // 境界顺序比对（避免硬编码 enum 索引）
-  const realmOrder: Realm[] = [
-    'qi_refining', 'foundation_building', 'golden_core', 'nascent_soul',
-    'deity_transformation', 'void_refinement', 'unity', 'tribulation',
-    'mahayana', 'ascension',
-  ];
-  const charIdx = realmOrder.indexOf(character.realm);
-  const reqIdx = realmOrder.indexOf(requirements.minRealm);
+  // 2026-08-31：原数组混着别名（foundation_building / deity_transformation /
+  // void_refinement / unity / mahayana），真键筑基、化神、大乘全缺，indexOf 返 -1，
+  // 于是"境界不足"这条会对正常存档误报。改成直接引权威顺序表。
+  const realmOrder = CANONICAL_REALM_IDS;
+  const charIdx = realmOrder.indexOf(canonicalRealm(character.realm));
+  const reqIdx = realmOrder.indexOf(canonicalRealm(requirements.minRealm));
   if (charIdx < reqIdx) missing.push(`境界不足（需 ${requirements.minRealm}）`);
+
   if (!requirements.tribulationPassed) missing.push('未渡天劫');
   if (character.lifespan < requirements.lifespanMin) missing.push(`寿命不足（需 ${requirements.lifespanMin}）`);
   if (character.reputation < requirements.reputationMin) missing.push(`声望不足（需 ${requirements.reputationMin}）`);
@@ -476,8 +485,12 @@ export function checkAscensionEligibility(
  * AI-68: 派生飞升触发（年龄 + 境界触发）
  */
 export function deriveAscensionTrigger(age: number, realm: Realm): { triggered: boolean; reason: string } {
-  if (realm === 'mahayana' && age >= 500) return { triggered: true, reason: '大乘期 500 岁可尝试飞升' };
-  if (realm === 'ascension' && age >= 2000) return { triggered: true, reason: '渡劫期 2000 岁可尝试飞升仙界' };
+  // 2026-08-31：原判定是 realm === 'mahayana'（别名，玩法不产出）与
+  // realm === 'ascension'（这个 id 的名字本身就是「飞升」）——等于"先飞升才能触发飞升"，
+  // 想飞升的正常路径（大乘、渡劫期）两条全堵死。按权威 id 重接。
+  const r = canonicalRealm(realm);
+  if (r === 'great_vehicle' && age >= 500) return { triggered: true, reason: '大乘期 500 岁可尝试飞升' };
+  if (r === 'tribulation' && age >= 2000) return { triggered: true, reason: '渡劫期 2000 岁可尝试飞升仙界' };
   return { triggered: false, reason: `${realm} @ ${age} 岁，未达飞升条件` };
 }
 
@@ -658,11 +671,15 @@ export function deriveTribulationTrigger(
 ): { triggered: boolean; reason: string } {
   if (!realmBefore) return { triggered: false, reason: '无前境' };
   if (realmBefore === realmAfter) return { triggered: false, reason: '同境' };
-  const tribulationRealms: Realm[] = [
-    'deity_transformation', 'void_refinement', 'unity', 'tribulation',
-    'mahayana', 'ascension',
+  // 2026-08-31：原名单六项里四项是玩法不产出的别名（deity_transformation /
+  // void_refinement / unity / mahayana），真正可达的化神与大乘反而不在列，
+  // 于是后期两次大突破整段没有雷劫。改用权威 id 并先把入参归一。
+  const tribulationRealms: CanonicalRealm[] = [
+    'spirit_severing', 'great_vehicle', 'tribulation', 'ascension',
   ];
-  const isTrigger = tribulationRealms.includes(realmAfter);
+  const after = canonicalRealm(realmAfter);
+  const isTrigger = tribulationRealms.includes(after);
+
   return isTrigger
     ? { triggered: true, reason: `${realmBefore} → ${realmAfter} 需渡天劫` }
     : { triggered: false, reason: `${realmAfter} 不在天劫境界之列` };
