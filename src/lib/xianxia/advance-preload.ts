@@ -275,6 +275,41 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
     }
   }
 
+  // ===== 开笔复读体检（非流式路径）=====
+  //   2026-08-31：这道量尺原先只长在 advance-sse 里，而玩家点「连推」走的是
+  //   advance-batch → advance/route.ts → 本函数，一路没人量。连推十年里
+  //   起笔一字不差的重灾正出在这条路上。
+  //   流式路由传 skipLlm:true、自己生成、自己量，不走这里，不会量两遍。
+  //   与风险纠偏同一形状：单轮、不递归、只在新稿确实更不像时才采纳。
+  if (!options.skipLlm && !sameYearThread && aiOutput && aiOutput.narrative && !aiOutput.isFallbackGenerated) {
+    try {
+      const { detectOpeningRepeat, buildRepeatAdvisory, openingClause, bigramSimilarity } = await import('./narrative-repeat');
+      const priorNarratives = (recentEvents || []).map((e: any) => String(e?.narrative || ''));
+      const verdict = detectOpeningRepeat(String(aiOutput.narrative || ''), priorNarratives);
+      if (verdict.repeated) {
+        console.log(`[advance-prepare] 开笔撞前文 ratio=${verdict.ratio.toFixed(2)} 「${verdict.opening}」≈「${verdict.against}」`);
+        const prevAdvisory = (ctx as any).repeatAdvisoryPrompt;
+        (ctx as any).repeatAdvisoryPrompt = buildRepeatAdvisory(verdict);
+        try {
+          const revised = await generateAgeEvent(ctx, isFateNode, 'light');
+          const revisedText = String(revised?.narrative || '').trim();
+          if (!revisedText) throw new Error('重写稿无 narrative，弃用');
+          const after = bigramSimilarity(openingClause(revisedText), verdict.against);
+          if (after < verdict.ratio) {
+            console.log(`[advance-prepare] 采纳重写稿 开笔相似 ${verdict.ratio.toFixed(2)} → ${after.toFixed(2)}`);
+            aiOutput = revised;
+          } else {
+            console.log(`[advance-prepare] 弃用重写稿（没更不像 ${verdict.ratio.toFixed(2)} → ${after.toFixed(2)}），沿用原稿`);
+          }
+        } finally {
+          (ctx as any).repeatAdvisoryPrompt = prevAdvisory;
+        }
+      }
+    } catch (e: any) {
+      console.warn('[advance-prepare] 开笔复读体检跳过（非致命，沿用原稿）:', e?.message || e);
+    }
+  }
+
   // ===== 写回：把本次 AI 输出的风格 + 实体合并到 character =====
   if (aiOutput && aiOutput.narrative && typeof aiOutput.narrative === 'string' && !aiOutput.isFallbackGenerated) {
     try {

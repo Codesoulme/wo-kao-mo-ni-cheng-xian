@@ -9,7 +9,7 @@ import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { buildStateContext, executeAIEvent, stateToResponse, applyAnnualAttributeGrowth } from '@/lib/xianxia/engine';
 import { parseAchievementMarkers, applyAchievements } from '@/lib/xianxia/achievements';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, inferDayHourFromText, hourNameOf, phaseOf, CONTINUOUS_TIME, MAX_CONTINUOUS_BEFORE_FORCE_ACCEPT, mentionsTimeInProse, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections } from '@/lib/xianxia/world-time';
+import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, CONTINUOUS_TIME, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import { truncateNarrativeAtSentence, completeNarrative, sanitizeEventDraft } from '@/lib/xianxia/display';
 import { appendEvent } from '@/lib/xianxia/events/store';
@@ -451,70 +451,24 @@ export async function POST(req: NextRequest) {
           console.warn('[SSE] 模型自报时间量采纳跳过:', e?.message);
         }
 
-        // 3.4) 按正文回校日内时点
-        //   引擎在正文写出来之前就把日历推走了（上面第 239 行附近），那时还不知道
-        //   这段会写成"当晚"还是"翌日清晨"。于是过去会出现：正文说入夜，戳上写晨。
-        //   这里拿写完的开头分句反查一次绝对时点，只改 setDayHour，不碰
-        //   elapsedDays / ageDeltaYears——跨度归引擎，时点归行文，两边不打架。
+        // 3.4 + 3.45) 报时对账：日内时点按正文回校 + 引擎跨度与正文的矛盾体检
+        //   两段已抽到 advance-time-reconcile，连推路径（advance/route.ts）调的是同一份。
         try {
-          // 只看标题 + 正文开头分句。按报时约定，时间词落在首句才算报时；
-          // 扫全篇会把"他想起那年黄昏"这类回忆误当成当下时点。
-          const firstClause = String(aiOutput.narrative || '').split(/[，。！？；\n]/)[0] || '';
-          const opening = `${aiOutput.title || ''}\n${firstClause.slice(0, 24)}`;
-          const proseHour = inferDayHourFromText(opening);
-          if (proseHour !== undefined && proseHour !== timeAdvance.setDayHour) {
-            const HOUR_LABELS: Record<string, string> = {
-              '0.5': '夜半', '3': '凌晨', '5.5': '拂晓', '7': '清晨',
-              '12': '日中', '14.5': '午后', '18.5': '黄昏', '20.5': '入夜后',
-            };
-            const isContinuous = timeAdvance.unit === 'continuous';
-            timeAdvance = {
-              ...timeAdvance,
-              // 连续态被行文改口了：正文既然报了时点，它就不再是"接着刚才"。
-              unit: isContinuous ? 'hour' : timeAdvance.unit,
-              label: isContinuous ? (HOUR_LABELS[String(proseHour)] || phaseOf(proseHour)) : timeAdvance.label,
-              elapsedHours: 0,
-              setDayHour: proseHour,
-            };
-            if (worldCalendarBefore) {
-              worldCalendar = advanceWorldCalendar(worldCalendarBefore, timeAdvance);
-              console.log('[SSE] 日内时点按正文回校:', timeAdvance.label, hourNameOf(proseHour));
-            }
-            timeSource = 'prose';
-          }
+          const { reconcileNarrativeTime } = await import('@/lib/xianxia/advance-time-reconcile');
+          const rec = reconcileNarrativeTime({
+            title: aiOutput.title,
+            narrative: aiOutput.narrative,
+            timeAdvance,
+            timeSource,
+            worldCalendarBefore,
+            consecutiveContinuous,
+          });
+          timeAdvance = rec.timeAdvance;
+          if (worldCalendarBefore && rec.worldCalendar) worldCalendar = rec.worldCalendar;
+          timeSource = rec.timeSource;
+          for (const n of rec.notes) console.log('[SSE]', n);
         } catch (e: any) {
-          // 回校失败一律沿用引擎原值，绝不阻断主流程。
-          console.warn('[SSE] 日内时点回校跳过:', e?.message);
-        }
-
-        // 3.45) 矛盾体检：引擎判了要跳，正文却当没这回事
-        //   报时约定要求"跨度归引擎、正文照它写"，可模型并不总照办：戳上盖着「月余后」，
-        //   正文却直接接着上一幕的动作往下写。玩家读到的就是自相矛盾——
-        //   时间元件说过了一个月，字里行间分明是紧接着的下一句话。
-        //   此处只做一件事：这种情形下把这次跨度撤回，本幕按接着刚才处理，下一幕再跳。
-        //   三道边界：
-        //     一、只撤引擎自己拍的。模型自报或行文回校出来的时点是它要写的东西，不动；
-        //     二、只撤不跨岁的。岁数在 advance-preload 里早已加过并跑完年度结算，
-        //         事后撤岁会与已执行的状态脱节；
-        //     三、连续态积压到更大一档（8 条）就不再撤，改为认下这次跨度。
-        //         否则遇上一个始终不肯交代时间的模型，光景会永远停在同一天。
-        try {
-          const firstClause = String(aiOutput.narrative || '').split(/[，。！？；\n]/).slice(0, 2).join('，');
-          const opening = `${aiOutput.title || ''}\n${firstClause.slice(0, 48)}`;
-          if (
-            timeSource === 'engine' &&
-            timeAdvance.unit !== 'continuous' &&
-            Number(timeAdvance.ageDeltaYears || 0) === 0 &&
-            consecutiveContinuous < MAX_CONTINUOUS_BEFORE_FORCE_ACCEPT &&
-            !mentionsTimeInProse(opening)
-          ) {
-            const dropped = timeAdvance.label;
-            timeAdvance = { ...CONTINUOUS_TIME, reason: '正文未交代跨度，本幕按接着刚才处理' };
-            if (worldCalendarBefore) worldCalendar = advanceWorldCalendar(worldCalendarBefore, timeAdvance);
-            console.log('[SSE] 跨度撤回（正文未交代）:', dropped, '积压', consecutiveContinuous);
-          }
-        } catch (e: any) {
-          console.warn('[SSE] 矛盾体检跳过:', e?.message);
+          console.warn('[SSE] 报时对账跳过:', e?.message);
         }
 
         // 3.5) 行动前影子试算 + 高风险单轮自我纠偏

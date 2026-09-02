@@ -9,7 +9,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { PendingThreadsCard } from '@/components/xianxia/PendingThreadsCard';
 import { CharacterIntentsCard } from '@/components/xianxia/CharacterIntentsCard';
 import { HeartDemonCard } from '@/components/xianxia/HeartDemonCard';
-import { CultivationSpeedCard } from '@/components/xianxia/CultivationSpeedCard';
 import { characterDisplayEntries, entriesForSlot, groupDisplayEntries, type DisplayEntry } from '@/lib/xianxia/display-registry';
 import { cn } from '@/lib/utils';
 
@@ -25,8 +24,6 @@ export function StatusList() {
 
   return (
     <div className="space-y-3">
-      <CultivationSpeedCard />
-
       <Collapsible open={open} onOpenChange={setOpen}>
         <Card className="paper-texture">
           <CollapsibleTrigger asChild>

@@ -518,8 +518,20 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* 命途(mingtu):轮回投影 + 因缘长河 + 命运终章 */}
+                  {/* 命途(mingtu):身上带的 + 走过的 + 轮回投影
+                      2026-08-31：statusPage / threadPage 两个投影槽位此前只由 StatusList /
+                      PendingThreadsCard 消费，而这两者只挂在 status/scroll 兼容 tab 上，
+                      全仓无一处 setTab('status'|'scroll')，玩家进不去。
+                      于是 display-registry 的兜底 return ['statusPage'] 等于把 AI 注册的
+                      状态、以及引擎侧「宗门实力 / 可达性」投影，全丢进关灯的屋子。
+                      心魔卡、角色意图卡同样零可达。此处把四张卡接到最空的命途页。 */}
                   <div className="h-full overflow-y-auto xianxia-scroll px-3 pb-4 space-y-2" style={{ width: `${100 / MAIN_TAB_ORDER.length}%` }}>
+                    <div data-testid="status-list-section">
+                      <StatusList />
+                    </div>
+                    <div data-testid="milestones-log-section">
+                      <MilestonesLog />
+                    </div>
                     <div data-testid="cycle-projection-section">
                       <CycleProjectionPanel
                         character={character}

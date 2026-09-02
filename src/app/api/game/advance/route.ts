@@ -103,6 +103,28 @@ export async function POST(req: NextRequest) {
       timeAdvance = clampTimeAdvance(forceTimeAdvance, timeAdvance);
     }
     let worldCalendar = advanceWorldCalendar(inputWorldCalendar, timeAdvance);
+
+    // 2026-08-31 报时对账：日内时点按正文回校 + 引擎跨度与正文的矛盾体检。
+    //   这两道校对原先只长在 advance-sse 上，而玩家点「连推」走的是本路由，
+    //   同一个存档单步推进对得上、连推十年对不上。现在两边调同一份实现。
+    //   按月推进是玩家自己拍的跨度，不参与撤回——把它当模型自报处理。
+    try {
+      const { reconcileNarrativeTime } = await import('@/lib/xianxia/advance-time-reconcile');
+      const rec = reconcileNarrativeTime({
+        title: aiOutput?.title,
+        narrative: aiOutput?.narrative,
+        timeAdvance,
+        timeSource: forceTimeAdvance ? 'model' : 'engine',
+        worldCalendarBefore: inputWorldCalendar,
+        consecutiveContinuous: Number(candidate.consecutiveContinuous || 0),
+      });
+      timeAdvance = rec.timeAdvance;
+      if (rec.worldCalendar) worldCalendar = rec.worldCalendar;
+      for (const n of rec.notes) console.log('[advance]', n);
+    } catch (e: any) {
+      console.warn('[advance] 报时对账跳过:', e?.message);
+    }
+
     const worldTime = worldTimeStamp(worldCalendar);
     const isFateNode = candidate.isFateNode;
     const fateNode = candidate.fateNode;
@@ -670,14 +692,14 @@ ${narrative || ''}`);
       console.warn('[advance] tickAllNpcsForYear failed:', e);
     }
 
-    // ===== 后台预热下一岁：玩家点第二次推进时 0 等待 =====
-    if (finalState.alive && !finalState.ascended && !aiOutput.causedDeath && !aiOutput.hasChoice && !aiOutput.triggerCombat) {
-      setImmediate(() => {
-        prepareAdvanceCandidate(char).catch(err => {
-          console.warn('[prefetch-next-age] failed:', err?.message);
-        });
-      });
-    }
+    // ===== 2026-08-31 移除「后台预热下一岁」=====
+    //   原先此处 setImmediate(() => prepareAdvanceCandidate(char))，本意是让玩家点第二次
+    //   推进时 0 等待。但两头都不成立：
+    //     一、prepareAdvanceCandidate 只算不存，要写库得再调 saveAdvanceCandidate，
+    //         这里没调，一整次全量档生成算完就丢；
+    //     二、本路由唯一的调用方是 advance-batch，它固定发 skipPreload:true，
+    //         就算存下来也永远不会被读。
+    //   净效果是连推十年白烧十次全量档 LLM，且传的 char 还是推进前的旧快照。
 
     return NextResponse.json({
       success: true,
