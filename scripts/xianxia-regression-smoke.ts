@@ -629,6 +629,9 @@ function pgRunPhaseRSectStorylineSmokes(): void {
 
 import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } from '../src/lib/xianxia/advance-preload';
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
+import { CANONICAL_REALM_IDS, LEGACY_REALM_ALIAS, canonicalRealm } from '../src/lib/xianxia/types/realm';
+import { REALM_LIFESPAN_TABLE, getLifespanByRealm } from '../src/lib/xianxia/realm-lifespan';
+import { REALMS } from '../src/lib/xianxia/types';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItem, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStalemateExit, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse, unequipItem, buildEmptyWorldMap, discoverLocation, deriveTravelFeasibility, generateRandomEncounter, summarizeWorldForPrompt, recordNPCMemory, clusterNPCMemories, decayNPCMemories, deriveNPCBehaviorFromMemory, summarizeNPCForPrompt, buildEmptySectGraph, addSectNode, setSectRelation, derivePlayerSectAffinity, queryRelationsTowards, deriveInheritanceEligibility, claimInheritance, resolveInheritanceContest, propagateInheritance, summarizeInheritanceForPrompt, deriveCraftingEligibility, startCraftingSession, resolveCraftingStep, deriveTechniqueProgress, resolveTechniqueBreakthrough,
   evaluateSectPhase, projectSectPowerDecade, detectSectCrisis, generateSectEvent, summarizeSectTrajectoryForPrompt,
@@ -6113,6 +6116,7 @@ async function smokeBlueprintDocsCoverage(): Promise<void> {
       // [ANCHOR-CALL-W7] 投影槽位接线测例组调用插此行下方
       // 生成侧→注册器→噪声过滤→投影→取槽 全链路真实数据流 — 6 个 smoke，只验数据流不 grep 源码
       pgRunPhaseW7SlotWireSmokes();
+      pgRunRealmKeyCoverageSmokes();
       // ===== Phase-Z (TechDoc 18.6.7): 测试策略改进（属性测试 + AI 回归 fixture）=====
       // 独立 console.log，不计入主 smoke 计数（不破 430 pass）。
       // 同步 require + try/catch：smoke 同步执行流，不引入 async 改动。
@@ -16437,6 +16441,54 @@ function pgRunPhaseW7SlotWireSmokes(): void {
     { name: 'smoke-w7-004-dark-slots-light-up-end-to-end', fn: smokeW7004DarkSlotsLightUpEndToEnd },
     { name: 'smoke-w7-005-default-inference-unchanged', fn: smokeW7005DefaultInferenceUnchanged },
     { name: 'smoke-w7-006-prompt-carries-slot-vocabulary', fn: smokeW7006PromptCarriesSlotVocabulary },
+  ];
+  for (const c of cases) {
+    try {
+      c.fn();
+    } catch (e) {
+      log(c.name, { passed: false, error: (e && (e as any).message) || String(e) });
+    }
+  }
+}
+
+
+// ─── 境界键覆盖 ───────────────────────────────────────────────
+// 2026-08-31：加这一组的由头——按境界索引的表各写各的，缺一行不报错，
+// 只是那个境界的整段玩法静默失灵。soul_transformation 在寿元表没有行，
+// 一个化神期就按凡人 80 岁算寿，没有任何一处会喊。
+function smokeRealmLifespanCoversAllCanonical(): void {
+  const missing = CANONICAL_REALM_IDS.filter(id => !REALM_LIFESPAN_TABLE[id]);
+  assert(missing.length === 0, `寿元表缺境界行：${missing.join(',')}`);
+  log('smoke-realm-001-lifespan-covers-canonical', { passed: true });
+}
+
+function smokeRealmAliasesResolveToRealRows(): void {
+  const broken: string[] = [];
+  for (const alias of Object.keys(LEGACY_REALM_ALIAS)) {
+    const viaAlias = getLifespanByRealm(alias, 3);
+    const viaCanonical = getLifespanByRealm(canonicalRealm(alias), 3);
+    if (viaAlias !== viaCanonical) broken.push(`${alias}:${viaAlias}≠${viaCanonical}`);
+  }
+  assert(broken.length === 0, `旧名与权威名寿元不一致：${broken.join(' ')}`);
+  log('smoke-realm-002-alias-lifespan-matches-canonical', { passed: true });
+}
+
+function smokeRealmLifespanMatchesRealmsTable(): void {
+  const drift: string[] = [];
+  for (const id of CANONICAL_REALM_IDS) {
+    const r = REALMS.find(x => x.id === id);
+    const cfg = REALM_LIFESPAN_TABLE[id];
+    if (r && cfg && r.baseLifespan !== cfg.base) drift.push(`${id}:${r.baseLifespan}≠${cfg.base}`);
+  }
+  assert(drift.length === 0, `两张寿元表基数对不上：${drift.join(' ')}`);
+  log('smoke-realm-003-two-lifespan-tables-agree', { passed: true });
+}
+
+function pgRunRealmKeyCoverageSmokes(): void {
+  const cases = [
+    { name: 'smoke-realm-001-lifespan-covers-canonical', fn: smokeRealmLifespanCoversAllCanonical },
+    { name: 'smoke-realm-002-alias-lifespan-matches-canonical', fn: smokeRealmAliasesResolveToRealRows },
+    { name: 'smoke-realm-003-two-lifespan-tables-agree', fn: smokeRealmLifespanMatchesRealmsTable },
   ];
   for (const c of cases) {
     try {

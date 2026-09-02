@@ -32,6 +32,7 @@ import { PetPanel } from './PetPanel';
 import { formatItemEffectLabel, sanitizeNarrative } from '@/lib/xianxia/display';
 import { characterDisplayEntries, entriesForSlot } from '@/lib/xianxia/display-registry';
 import { filterMeaningfulStatuses } from '@/lib/xianxia/engine';
+import { DEFAULT_STORAGE_CAPACITY } from '@/lib/xianxia/types/item';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -238,7 +239,7 @@ export function InventoryPanel() {
   const groupOrder: ItemType[] = ['scripture', 'weapon', 'armor', 'accessory', 'artifact', 'consumable', 'tool', 'material'];
 
   // 储物袋容量
-  const storageCap = character.storageCapacity ?? 5;
+  const storageCap = character.storageCapacity ?? DEFAULT_STORAGE_CAPACITY;
   const invCount = inventory.length;
   const hasBag = inventory.some(i => isStorageBag(i));
   const capacityRatio = storageCap > 0 ? invCount / storageCap : 0;

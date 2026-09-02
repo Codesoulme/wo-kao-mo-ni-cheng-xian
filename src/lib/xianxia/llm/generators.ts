@@ -42,6 +42,7 @@ import { buildFallbackBackground, buildOriginPrompt, rollOrigin, type OriginRoll
 import { IDENTITY_PROMPT, SCENE_PROMPTS, assembleZonePrompt, buildAdvancePrompt, buildChoosePrompt, buildInterferePrompt, loadWorldKnowledge } from './prompt-builder';
 import { callLLM, callLLMText, callLLMStream } from './client';
 import { parseJSON, postParseSchemaCheck, sanitizeEventOutput, sanitizeChoiceOutput, sanitizeInterfereOutput, cleanNarrativeAge } from './response-parser';
+import { DEFAULT_STORAGE_CAPACITY } from '../types/item';
 
 export async function generateAgeEvent(ctx: EngineStateContext, isFateNode: boolean, qualityMode: 'full' | 'light' = 'full'): Promise<AIEventOutput> {
   // AI-61: 异步预加载 L1 世界观知识，并拼入 userPrompt
@@ -223,7 +224,7 @@ export async function generateItemActionNarrative(
   const eqList = eqArr.length
     ? eqArr.map((it: any) => `${it.name}(id:${it.id})${it.equipNote ? `·${it.equipNote}` : ''}`).join('，')
     : '无';
-  const storageCap = ctx.storageCapacity ?? 5;
+  const storageCap = ctx.storageCapacity ?? DEFAULT_STORAGE_CAPACITY;
   const invCount = ctx.inventory.length;
   const hasBag = invCount > 0 && ctx.inventory.some(i => i.item_type === 'tool' && (i.effects || []).some(e => e.target_attribute === 'storageCapacity'));
   const storageDesc = `${invCount}/${storageCap}件${hasBag ? '（已有储物袋）' : '（无储物袋）'}`;

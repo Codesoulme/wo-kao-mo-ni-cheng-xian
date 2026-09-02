@@ -22,6 +22,7 @@ import { formatUsedOpenings } from '../narrative-repeat';
 import { wireSlotMappingToLLMPrompt } from '../engine/validation';
 import { UI_SLOT_NAMES, UI_SLOT_TONES, UI_SLOT_RENDER_HINTS } from '../rules/ui-slot-rules';
 import { applyPhaseKLLMPromptAugmentation, registerPhaseKSlotMappingSnippet } from './phase-k-augmentation';
+import { DEFAULT_STORAGE_CAPACITY } from '../types/item';
 
 // 词表来自规则表本身，不另造。每个槽位名给一条描述，
 // summarizeSlotMappingForPrompt 才能把七个槽位都列进 "registered displaySlots"。
@@ -676,7 +677,7 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
   // 引擎权威计算的来源条目（灵根 + 已装备功法 + 状态中的 cultivationExp 效果）
   // 这些数字是准确的，与顶部倍率一致；AI 必须在 cultivationInsight 文本中引用这些准确数字
   // 储物袋容量信息
-  const storageCap = ctx.storageCapacity ?? 5;
+  const storageCap = ctx.storageCapacity ?? DEFAULT_STORAGE_CAPACITY;
   const invCount = ctx.inventory.length;
   const hasBag = invCount > 0 && ctx.inventory.some(i => i.item_type === 'tool' && (i.effects || []).some(e => e.target_attribute === 'storageCapacity'));
   const storageDesc = `${invCount}/${storageCap}件${hasBag ? '（已有储物袋）' : '（无储物袋，上限仅 5 件）'}`;
@@ -1279,7 +1280,7 @@ export function buildInterferePrompt(ctx: EngineStateContext, playerInput: strin
   const eqList = eqArr.length
     ? eqArr.map((it: any) => `${it.name}(id:${it.id})${it.equipNote ? `·${it.equipNote}` : ''}`).join('，')
     : '无';
-  const storageCap = ctx.storageCapacity ?? 5;
+  const storageCap = ctx.storageCapacity ?? DEFAULT_STORAGE_CAPACITY;
   const invCount = ctx.inventory.length;
   const hasBag = invCount > 0 && ctx.inventory.some(i => i.item_type === 'tool' && (i.effects || []).some(e => e.target_attribute === 'storageCapacity'));
   const storageDesc = `${invCount}/${storageCap}件${hasBag ? '（已有储物袋）' : '（无储物袋，上限 5 件）'}`;

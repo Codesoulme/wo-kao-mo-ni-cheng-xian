@@ -1,3 +1,13 @@
+/**
+ * 储物容量缺省值。
+ *
+ * 2026-08-31：此前六处各写各的——引擎判满按 5、属性派生按 9、
+ * 数据库 @default 也是 9。于是同一个没设过容量的角色，
+ * 引擎认为他能装 5 件、面板显示 5 格、属性派生却报 9。
+ * 统一取数据库那档，别处一律引这里。
+ */
+export const DEFAULT_STORAGE_CAPACITY = 9;
+
 import type { Realm } from './realm';
 import type { SpiritualRoot, ElementType } from './spiritual-root';
 import type { StatusEffect } from './status';

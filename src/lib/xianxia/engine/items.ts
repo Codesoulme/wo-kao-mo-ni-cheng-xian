@@ -1,5 +1,6 @@
 // AUTO-SPLIT from engine.ts — physical extraction only, logic unchanged.
 
+import { DEFAULT_STORAGE_CAPACITY } from '../types/item';
 import {
   combatVerdict,
   realmDiff,
@@ -849,7 +850,7 @@ export function countItemsThatWontFit(state: CharacterState, items: ItemEntry[])
       }
     }
   }
-  const projectedCapacity = (state.storageCapacity || 5) + bagBoost;
+  const projectedCapacity = (state.storageCapacity || DEFAULT_STORAGE_CAPACITY) + bagBoost;
   const availableSlots = Math.max(0, projectedCapacity - state.inventory.length);
   const bags = normalized.filter(isStorageBag);
   const nonBags = normalized.filter(it => !isStorageBag(it));
@@ -873,7 +874,7 @@ export function addItems(state: CharacterState, items: ItemEntry[]): CharacterSt
       }
     }
   }
-  const projectedCapacity = (state.storageCapacity || 5) + bagBoost;
+  const projectedCapacity = (state.storageCapacity || DEFAULT_STORAGE_CAPACITY) + bagBoost;
   const currentCount = state.inventory.length;
   const availableSlots = Math.max(0, projectedCapacity - currentCount);
   // 储物袋优先放入（因其扩容），其余按顺序填满

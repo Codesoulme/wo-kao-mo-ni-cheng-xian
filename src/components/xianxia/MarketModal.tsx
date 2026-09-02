@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { formatItemEffectLabel, sanitizeNarrative } from '@/lib/xianxia/display';
 import { humanizeError } from '@/lib/xianxia/error-humanize';
+import { DEFAULT_STORAGE_CAPACITY } from '@/lib/xianxia/types/item';
 
 // 稀有度配色（与 InventoryPanel 保持一致）
 const RARITY_COLORS: Record<string, string> = {
@@ -158,7 +159,7 @@ export function MarketModal() {
 
   const spiritStones = character.spiritStones || 0;
   const inventoryCount = character.inventory?.length || 0;
-  const storageCapacity = character.storageCapacity || 5;
+  const storageCapacity = character.storageCapacity || DEFAULT_STORAGE_CAPACITY;
   const bagFull = inventoryCount >= storageCapacity;
 
   // 购买

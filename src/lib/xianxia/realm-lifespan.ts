@@ -6,6 +6,7 @@
 
 import type { Realm } from './types';
 import { REALMS } from './types';
+import { canonicalRealm } from './types/realm';
 
 export interface RealmLifespanConfig {
   base: number;        // 基础寿元（进入该境界时的寿元）
@@ -23,18 +24,16 @@ export const REALM_LIFESPAN_TABLE: Record<string, RealmLifespanConfig> = {
   great_vehicle:        { base: 5000, perLevel: 1000 },  // 大乘
   tribulation:          { base: 10000, perLevel: 0   },  // 渡劫（perLevel=0，因 1 层）
   ascension:            { base: 99999, perLevel: 0   },  // 飞升
-  // 别名（旧名）：
-  foundation_building:  { base: 200,  perLevel: 30   },
-  soul_formation:       { base: 500,  perLevel: 50   },
-  mahayana:             { base: 5000, perLevel: 1000 },
-  deity_transformation: { base: 2000, perLevel: 200  },
-  void_refinement:      { base: 3000, perLevel: 500  },
-  unity:                { base: 5000, perLevel: 1000 },
 };
+
+// 2026-08-31：这里原先手抄了一批旧名行。手抄的下场有二——
+// void_refinement 抄成 3000/500，而它归一后是化神(2000/200)，同一角色两个寿数；
+// soul_transformation 压根没抄，落到兜底 80 岁，一个化神期按凡人寿命算。
+// 现改为查表前先归一，旧名不再各留一份。
 
 /** 由"境界 id + 境界层(0-based)"算寿元。优先级：REALM_LIFESPAN_TABLE 显式配置 → REALMS 表 baseLifespan。 */
 export function getLifespanByRealm(realm: string | undefined | null, level: number = 0): number {
-  const id = realm || 'mortal';
+  const id = canonicalRealm(realm);
   const cfg = REALM_LIFESPAN_TABLE[id];
   if (cfg) {
     return Math.max(1, cfg.base + Math.max(0, level) * cfg.perLevel);
@@ -112,7 +111,7 @@ export interface DeriveLifespanInput {
  * 修真者 current 已 > base 时仍 max() 取 current。
  */
 export function deriveLifespan(input: DeriveLifespanInput): number {
-  const realm = String(input.realm || 'mortal');
+  const realm = canonicalRealm(input.realm);
   const realmLevel = Math.max(0, Math.floor(input.realmLevel || 0));
   const cfg = REALM_LIFESPAN_TABLE[realm];
   const base = cfg ? cfg.base + realmLevel * cfg.perLevel : 80;

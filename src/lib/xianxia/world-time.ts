@@ -110,13 +110,28 @@ const UNIT_MAX: Record<TimeAdvanceUnit, number> = {
   continuous: 1, moment: 8, hour: 12, day: 60, month: 24, season: 16, year: 30, decade: 10, century: 3,
 };
 
+/**
+ * 取有限数，取不到就用兜底。
+ *
+ * 2026-08-31：裁剪函数原先直接 Number() 再 Math.round/min/max。
+ * 这一串遇上 NaN 全程放行——min(x, NaN) 是 NaN，max(0, NaN) 还是 NaN。
+ * 模型偶尔把 amount 写成「三」、把 elapsedDays 写成空串，
+ * NaN 就顺着写进世界日历，此后光景再也走不动，且不报错。
+ */
+function finiteOr(value: any, fallbackValue: number): number {
+  // 空串走 Number() 会变成 0，那是「没给」不是「给了零」，一并当没给。
+  if (value === null || value === undefined || value === '') return fallbackValue;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallbackValue;
+}
+
 export function clampTimeAdvance(raw: any, fallback?: TimeAdvance): TimeAdvance {
   // 2026-08-31：缺省从「一年后」翻成连续态。信息不足就跳一年，正是玩家反馈里
   // "上一条还说十万火急，下一条就一年后了"的直接来源；网文的缺省是接着刚才，
   // 跨越才需要理由。
   const fb = fallback || CONTINUOUS_TIME;
   const unit: TimeAdvanceUnit = (Object.keys(UNIT_DAYS) as TimeAdvanceUnit[]).includes(raw?.unit) ? raw.unit : fb.unit;
-  const amount = Math.max(1, Math.min(UNIT_MAX[unit], Math.round(Number(raw?.amount || fb.amount || 1))));
+  const amount = Math.max(1, Math.min(UNIT_MAX[unit], Math.round(finiteOr(raw?.amount, finiteOr(fb.amount, 1)))));
 
   // 绝对时点优先：命中"当晚/凌晨"等词时，语义是跳到同日该时点。
   const rawDayHour = Number(raw?.setDayHour ?? fb.setDayHour);
@@ -127,7 +142,7 @@ export function clampTimeAdvance(raw: any, fallback?: TimeAdvance): TimeAdvance 
     // 但日内那点推移要留：2026-08-31 之前此处把 elapsedHours 一并抹零，
     // 于是一局下来天色永远停在清晨七点，宴席、守夜、赶早船全成了白日戏。
     // 一幕戏花掉一两个时辰不需要谁来报时，天色自己会走到午后、黄昏、上灯。
-    const drift = Math.max(0, Math.min(4, Number(raw?.elapsedHours ?? fb.elapsedHours) || 0));
+    const drift = Math.max(0, Math.min(4, finiteOr(raw?.elapsedHours ?? fb.elapsedHours, 0)));
     return {
       ...CONTINUOUS_TIME,
       elapsedHours: drift,
@@ -144,12 +159,12 @@ export function clampTimeAdvance(raw: any, fallback?: TimeAdvance): TimeAdvance 
     raw.label != null || raw.ageDeltaYears != null
   );
   const elapsedDays = rawHasAnyTimeFields
-    ? Math.max(0, Math.min(36500 * 3, Math.round(Number(raw?.elapsedDays ?? naturalDays))))
-    : Math.max(0, Math.min(36500 * 3, Math.round(Number(fb.elapsedDays ?? naturalDays))));
+    ? Math.max(0, Math.min(36500 * 3, Math.round(finiteOr(raw?.elapsedDays, naturalDays))))
+    : Math.max(0, Math.min(36500 * 3, Math.round(finiteOr(fb.elapsedDays, naturalDays))));
   const naturalYears = Math.floor(elapsedDays / 365);
-  const ageDeltaYears = Math.max(0, Math.min(300, Math.round(Number(raw?.ageDeltaYears ?? fb.ageDeltaYears ?? naturalYears))));
+  const ageDeltaYears = Math.max(0, Math.min(300, Math.round(finiteOr(raw?.ageDeltaYears, finiteOr(fb.ageDeltaYears, naturalYears)))));
   const naturalHours = amount * UNIT_HOURS[unit];
-  const elapsedHours = Math.max(0, Math.min(23.99, Number(raw?.elapsedHours ?? naturalHours) || 0));
+  const elapsedHours = Math.max(0, Math.min(23.99, finiteOr(raw?.elapsedHours ?? naturalHours, 0)));
   const rawLabel = String(raw?.label || fb.label || '').slice(0, 36);
   const label = cleanTimeSegmentLabel(rawLabel) || defaultTimeLabel(unit, amount);
   const reason = String(raw?.reason || fb.reason || '\u56e0\u7f18\u81ea\u7136\u63a8\u8fdb').slice(0, 120);

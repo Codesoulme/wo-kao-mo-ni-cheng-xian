@@ -291,8 +291,11 @@ export function tryBreakthrough(
       lastRealm = nextRealm;
     }
 
-    // 无强因果时，永远只允许一跳，防止「资质普通无奇遇，炼气一层直筑基」。
-    if (!allowChain) break;
+    // 无强因果时不许跨大境界，防止「资质普通无奇遇，炼气一层直筑基」。
+    // 2026-08-31：旧版在这里无条件 break，上面按悟性算出的 maxSteps 根本走不到——
+    // 悟性 85 与悟性 10 连破表现完全一样，那个档位是个空旋钮。
+    // 现在改成：跨大境界仍需强因果，小层连破交给悟性放行。
+    if (!allowChain && major) break;
 
     // 若 AI 给了明确目标，到达目标后停止；目标是显示层数（1基），内部 realmLevel 为0基。
     if (requestedTargetRealm && next.realm === requestedTargetRealm) {
