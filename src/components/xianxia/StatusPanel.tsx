@@ -444,7 +444,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                       <div
                         key={stat.label}
                         className="rounded-md border border-primary/20 bg-primary/5 px-1.5 py-1 text-center shadow-sm"
-                        title={`${stat.label}?${stat.value}`}
+                        title={`${stat.label}：${stat.value}`}
                       >
                         <div className="flex items-center justify-center gap-0.5 text-[9px] text-muted-foreground">
                           <span style={{ color: stat.color }}>{stat.icon}</span>
@@ -462,7 +462,7 @@ export function StatusPanel({ character }: StatusPanelProps) {
                       <div
                         key={stat.label}
                         className="rounded-md border border-border/50 bg-background/45 px-1.5 py-1 text-center shadow-sm"
-                        title={`${stat.label}?${stat.value}`}
+                        title={`${stat.label}：${stat.value}`}
                       >
                         <div className="flex items-center justify-center gap-0.5 text-[9px] text-muted-foreground">
                           <span style={{ color: stat.color }}>{stat.icon}</span>

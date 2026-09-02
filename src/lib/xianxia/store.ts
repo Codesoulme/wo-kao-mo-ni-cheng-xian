@@ -265,6 +265,8 @@ interface GameState {
   lastInterfere: { classification: string; accepted: boolean; narrative: string } | null;
   // 干预冷却：上次成功干预时的年龄（十载一次）
   lastInterfereAge: number | null;
+  /** 上次干预时的世界流逝天数。按月/连续推进不涨年岁，只认年岁的冷却会永远卡住。 */
+  lastInterfereDays: number | null;
 
   // 新增：事件详情抽屉
   selectedEventId: string | null;
@@ -319,6 +321,7 @@ interface GameState {
   setLastBreakthrough: (b: any | null) => void;
   setLastInterfere: (i: any | null) => void;
   setLastInterfereAge: (age: number | null) => void;
+  setLastInterfereDays: (days: number | null) => void;
   setSelectedEventId: (id: string | null) => void;
   setBreakthroughCeremony: (b: BreakthroughCeremony | null) => void;
   // AI-77: TribulationModal setters / actions
@@ -394,6 +397,7 @@ export const useGameStore = create<GameState>()(
       lastBreakthrough: null,
       lastInterfere: null,
       lastInterfereAge: null,
+      lastInterfereDays: null,
       selectedEventId: null,
       breakthroughCeremony: null,
       tribulationCeremony: null,
@@ -435,6 +439,7 @@ export const useGameStore = create<GameState>()(
       setLastBreakthrough: (b) => set({ lastBreakthrough: b }),
       setLastInterfere: (i) => set({ lastInterfere: i }),
       setLastInterfereAge: (age) => set({ lastInterfereAge: age }),
+      setLastInterfereDays: (days) => set({ lastInterfereDays: days }),
       setSelectedEventId: (id) => set({ selectedEventId: id }),
       setBreakthroughCeremony: (b) => set({ breakthroughCeremony: b }),
       // AI-77: TribulationModal state
@@ -828,7 +833,7 @@ export const useGameStore = create<GameState>()(
       })),
       resetWorldLocal: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
-        loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null, lastInterfereAge: null,
+        loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null, lastInterfereAge: null, lastInterfereDays: null,
         selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
         explorationOpen: false, lastExploration: null, settlementResult: null,
         heritageVault: [], selectedHeritage: {}, hallOfSimulations: [],
@@ -839,7 +844,7 @@ export const useGameStore = create<GameState>()(
       }),
       reset: () => set({
         character: null, events: [], choices: [], pendingChoice: null, fateNodes: [],
-        loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null, lastInterfereAge: null,
+        loading: false, error: null, lastChange: null, lastBreakthrough: null, lastInterfere: null, lastInterfereAge: null, lastInterfereDays: null,
         selectedEventId: null, breakthroughCeremony: null, marketOpen: false,
         explorationOpen: false, lastExploration: null, settlementResult: null,
       }),
@@ -853,6 +858,7 @@ export const useGameStore = create<GameState>()(
           fateNodes: s.fateNodes,
           pendingChoice: s.pendingChoice,
           lastInterfereAge: s.lastInterfereAge,
+          lastInterfereDays: s.lastInterfereDays,
           heritageVault: s.heritageVault,
           selectedHeritage: s.selectedHeritage,
           hallOfSimulations: s.hallOfSimulations,

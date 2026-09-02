@@ -260,6 +260,29 @@ export function phaseHintForTime(label?: string, narrative?: string): string | u
   if (/\u6e05\u6668|\u6668\u8d77|\u5929\u4eae|\u6668\u5149|\u6668\u949f/.test(text)) return '\u6668\u949f\u540e';
   return undefined;
 }
+/**
+ * 各档时段措辞各自认得的钟点区间(0..24)。
+ *
+ * phaseHintForTime 给的是从正文里猜出来的措辞，phaseOf 给的是日内游标算出来的。
+ * 两边词表本就不同(子夜 / 夜半、晨钟后 / 晨间)，措辞一旦与游标对不上，
+ * 同一枚戳里 phase 写着子夜、hourName 却写着辰时——自己跟自己打架。
+ * 所以措辞只在与游标相容时才采纳，不相容一律听游标的。
+ */
+const PHASE_HINT_WINDOWS: Record<string, Array<[number, number]>> = {
+  '子夜': [[19.5, 24], [0, 4]],
+  '暮鼓时': [[16.5, 19.5]],
+  '日中': [[10, 16.5]],
+  '晨钟后': [[4, 10]],
+};
+
+/** 措辞与钟点是否相容。措辞不在表里(如「降生时」这类非钟点说法)一律视为相容。 */
+export function phaseHintFitsClock(hint: string | undefined, dayHour: number): boolean {
+  if (!hint) return false;
+  const windows = PHASE_HINT_WINDOWS[hint];
+  if (!windows) return true;
+  const h = ((Number(dayHour) || 0) % 24 + 24) % 24;
+  return windows.some(([lo, hi]) => h >= lo && h < hi);
+}
 
 /**
  * 连续态连着出现多少条之后强制推一把。
@@ -446,7 +469,9 @@ export function worldTimeStamp(world?: Partial<WorldCalendarState>, phaseHint?: 
   const day = Math.max(1, Math.min(30, (dayOfYear % 30) + 1));
   // 2026-08-31：时段改由真实日内游标算。旧版是 PHASES[floor(dayOfYear/7)]，
   // 与角色实际在干嘛无关——叙事写了"入夜"，戳上照样可能显示"晨"。
-  const phase = String(phaseHint || phaseOf(base.dayHour)).slice(0, 16);
+  // 2026-08-31：改为钟点优先。旧版 phaseHint 无条件盖掉游标，
+  // 于是推出过 phase=子夜 而 hourName=辰时 这种自相矛盾的戳。
+  const phase = String(phaseHintFitsClock(phaseHint, base.dayHour) ? phaseHint : phaseOf(base.dayHour)).slice(0, 16);
   const hourName = hourNameOf(base.dayHour);
   const monthName = MONTHS[monthIndex] || '岁末';
   return {

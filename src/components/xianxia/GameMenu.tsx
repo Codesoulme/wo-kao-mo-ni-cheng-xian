@@ -24,6 +24,7 @@ import {
 import { Home, RotateCcw, ScrollText, Info, Settings, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { AIConfigDialog } from '@/components/xianxia/AIConfigDialog';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 export function GameMenu() {
   const { character, events, choices, setSettlementResult } = useGameStore();
@@ -56,7 +57,7 @@ export function GameMenu() {
       setSettlementResult(data.settlementResult);
       toast('此世已入轮回结算', { description: '请从浮现的旧缘中择一带入下一世。' });
     } catch (err: any) {
-      toast.error('结算此世失败', { description: err?.message || '请稍后再试。' });
+      toast.error('结算此世失败', { description: humanizeError(err) });
     } finally {
       setSettling(false);
     }

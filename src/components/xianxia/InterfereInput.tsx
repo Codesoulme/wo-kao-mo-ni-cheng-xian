@@ -10,18 +10,25 @@ import { toast } from 'sonner';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 import { humanizeError } from '@/lib/xianxia/error-humanize';
 
-const INTERFERE_COOLDOWN = 10; // \u5341\u8f7d\u4e00\u6b21
+const INTERFERE_COOLDOWN = 10; // 十载一次
+const INTERFERE_COOLDOWN_DAYS = INTERFERE_COOLDOWN * 365;
 
 export function InterfereInput() {
-  const { character, setLoading, setError, setCharacter, addEvent, setLastInterfere, lastInterfereAge, setLastInterfereAge } = useGameStore();
+  const { character, setLoading, setError, setCharacter, addEvent, setLastInterfere, lastInterfereAge, setLastInterfereAge, lastInterfereDays, setLastInterfereDays, worldCalendar } = useGameStore();
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
 
   if (!character || !character.alive) return null;
 
-  const remaining = lastInterfereAge != null
-    ? Math.max(0, INTERFERE_COOLDOWN - (character.age - lastInterfereAge))
-    : 0;
+  // 2026-08-31：冷却改按世界流逝的天数算。
+  // 旧版只减年岁，可按月推进 / 接着刚才这两档都不涨年岁——
+  // 干预过一次之后，玩家怎么推都等不到解冻。
+  const elapsedDays = Math.max(0, Number(worldCalendar?.elapsedDays) || 0);
+  const remaining = lastInterfereDays != null
+    ? Math.ceil(Math.max(0, INTERFERE_COOLDOWN_DAYS - (elapsedDays - lastInterfereDays)) / 365)
+    : lastInterfereAge != null
+      ? Math.max(0, INTERFERE_COOLDOWN - (character.age - lastInterfereAge))
+      : 0;
   const onCooldown = remaining > 0;
 
   const submit = async () => {
@@ -51,6 +58,7 @@ export function InterfereInput() {
       // \u4ec5\u5728\u5929\u9053\u63a5\u7eb3\u5e72\u9884\u65f6\u8d77\u51b7\u5374\uff08\u8d8a\u754c/\u64cd\u7eb5\u88ab\u62d2\u4e0d\u6d88\u8017\u5341\u8f7d\uff09
       if (data.accepted) {
         setLastInterfereAge(ageAtInterfere);
+        setLastInterfereDays(elapsedDays);
       }
 
       // \u8bb0\u5f55\u4e8b\u4ef6
@@ -129,7 +137,7 @@ export function InterfereInput() {
       )}
       {!busy && onCooldown && (
         <div className="text-[10px] text-muted-foreground/80 mt-1 px-1 font-serif-cn">
-          {`\u4e00\u8650\u5929\u673a\uff0c\u987b\u9759\u5019\u5341\u8f7d\u65b9\u80fd\u518d\u6b21\u5e72\u9884\uff08\u8fd8\u9700 ${remaining} \u8f7d\uff09`}
+          {`\u4e00\u6270\u5929\u673a\uff0c\u987b\u9759\u5019\u5341\u8f7d\u65b9\u80fd\u518d\u6b21\u5e72\u9884\uff08\u8fd8\u9700 ${remaining} \u8f7d\uff09`}
         </div>
       )}
     </div>

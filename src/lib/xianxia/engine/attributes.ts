@@ -935,6 +935,9 @@ export interface AnnualAttributeGrowth {
   };
 }
 
+/** 凡人肉身地板的封顶岁数：过了壮年，肉身不再随年岁自然见长。 */
+export const MORTAL_BASELINE_PEAK_AGE = 60;
+
 export function applyAnnualAttributeGrowth(state: CharacterState): AnnualAttributeGrowth {
   const age = Math.max(0, Number(state.age || 0));
   const realm = String(state.realm || 'mortal');
@@ -943,14 +946,21 @@ export function applyAnnualAttributeGrowth(state: CharacterState): AnnualAttribu
   const effectiveMul = realm === 'mortal' ? Math.max(0.1, mul) : 1.0;
   // 凡人 baseline：放大成长系数，确保每年都能涨一点（避免「出生定值 > 年龄公式」导致 delta 一直 0）
   // 修真者 current 远高于 baseline 时仍 max() 取 current，逻辑不变
-  const baselineAttack = Math.max(1, Math.floor(age * 1.2 * effectiveMul));
-  const baselineDefense = Math.max(1, Math.floor(age * 0.8 * effectiveMul));
-  const baselineSpeed = Math.max(3, 3 + Math.floor(age * 0.7 * effectiveMul));
-  const baselinePF = Math.max(1, Math.round(5 + age * 2.5 * effectiveMul));
-  const baselineSS = Math.max(1, 3 + Math.floor(age * 0.8 * effectiveMul));
-  const baselineSoul = Math.max(1, 3 + Math.floor(age * 0.7 * effectiveMul));
-  const baselineMaxHp = Math.max(10, 30 + age * 4);
-  const baselineMaxMp = Math.max(0, 10 + Math.floor(age * 0.8));
+  // 2026-08-31：兜底按岁数封顶。
+  // 旧版这几条随年龄无限线性涨，活到三百岁体魄兜底就有七百多，
+  // 而寿元又按体魄算加成——活得久 → 体魄高 → 活得更久，自己喂自己。
+  // 这几条本就只是凡人肉身的地板，肉身过了壮年不再长，所以按壮年封顶；
+  // 修真者的真实数值由 deriveCoreCultivationAttributes 按境界推，不受这里影响。
+  // 取 max() 保底，老存档已经涨上去的数值不会被压回。
+  const bodyAge = Math.min(age, MORTAL_BASELINE_PEAK_AGE);
+  const baselineAttack = Math.max(1, Math.floor(bodyAge * 1.2 * effectiveMul));
+  const baselineDefense = Math.max(1, Math.floor(bodyAge * 0.8 * effectiveMul));
+  const baselineSpeed = Math.max(3, 3 + Math.floor(bodyAge * 0.7 * effectiveMul));
+  const baselinePF = Math.max(1, Math.round(5 + bodyAge * 2.5 * effectiveMul));
+  const baselineSS = Math.max(1, 3 + Math.floor(bodyAge * 0.8 * effectiveMul));
+  const baselineSoul = Math.max(1, 3 + Math.floor(bodyAge * 0.7 * effectiveMul));
+  const baselineMaxHp = Math.max(10, 30 + bodyAge * 4);
+  const baselineMaxMp = Math.max(0, 10 + Math.floor(bodyAge * 0.8));
 
   // 修真后 8 维由 deriveCoreCultivationAttributes 按 age × profile_power 推——为了保证"每年成长可见"，
   // 在这里按 age 增量强制刷一次（每次 +age 时 derive 都会重算，但 firstNumber 短路会读到 state 上的旧值；

@@ -356,9 +356,23 @@ export const HIDDEN_EFFECT_ATTRIBUTES = new Set([
   'formationType',
 ]);
 
-export function attributeLabel(attr?: string): string {
-  if (!attr) return '变化';
-  return ATTRIBUTE_LABEL[attr] || '变化';
+/**
+ * 属性名转白话。
+ *
+ * 2026-08-31：旧版把所有认不出的键一律压成「变化」——
+ * AI 注册了三条新属性，玩家那边就看到三行一模一样的「变化+5」，等于没说。
+ * 现按三级取名：内置词表 → 效果自带的名字 → 键本身若已是汉字就直接用。
+ * 都取不到才落回「变化」，且仍不把英文键 / 下划线这类内部写法露给玩家。
+ */
+export function attributeLabel(attr?: string, fallback?: string): string {
+  const fb = String(fallback || '').trim();
+  const usableFallback = fb && !isInternalLikeAttr(fb) ? fb.slice(0, 12) : '';
+  if (!attr) return usableFallback || '变化';
+  const known = ATTRIBUTE_LABEL[attr];
+  if (known) return known;
+  if (usableFallback) return usableFallback;
+  if (/[一-龥]/.test(attr) && !isInternalLikeAttr(attr)) return attr.slice(0, 12);
+  return '变化';
 }
 
 export function isInternalLikeAttr(attr?: string): boolean {
@@ -569,7 +583,7 @@ export function formatEventEffectLabel(eff: any): string {
     return reason || (delta > 0 ? '装备入手' : '装备失去');
   }
 
-  const label = attributeLabel(attr);
+  const label = attributeLabel(attr, (eff as any).label || (eff as any).displayLabel || (eff as any).name);
   const amount = `${delta > 0 ? '+' : ''}${delta}`;
   return `${label}${amount}`;
 }
@@ -585,7 +599,7 @@ export function eventEffectTone(eff: { attribute?: string; delta?: number; kind?
 export function formatItemEffectLabel(eff: any): string {
   const attr = String(eff?.target_attribute || eff?.attribute || '');
   if (!attr || HIDDEN_EFFECT_ATTRIBUTES.has(attr)) return '';
-  const zh = attributeLabel(attr);
+  const zh = attributeLabel(attr, eff?.label || eff?.displayLabel || eff?.name);
   const op = eff?.operation || 'add';
   const value = eff?.value ?? eff?.delta ?? '';
   if (op === 'add') return `${zh}${Number(value) > 0 ? '+' : ''}${value}`;

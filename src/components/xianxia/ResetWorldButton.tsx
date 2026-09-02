@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { useGameStore } from '@/lib/xianxia/store';
+import { humanizeError } from '@/lib/xianxia/error-humanize';
 
 const CONFIRM_WORD = '重置';
 
@@ -61,7 +62,7 @@ export function ResetWorldButton() {
       setConfirmText('');
       setTimeout(() => window.location.reload(), 500);
     } catch (err: any) {
-      toast.error('重置世界失败', { description: err?.message || '请稍后重试' });
+      toast.error('重置世界失败', { description: humanizeError(err) });
     } finally {
       setBusy(false);
     }
@@ -81,7 +82,7 @@ export function ResetWorldButton() {
       toast.success('历练痕迹已清', { description: `已清空 ${data.cleared?.events || 0} 条事件 / ${data.cleared?.preload || 0} 条天机待启 / ${data.cleared?.interferences || 0} 条私念余响。` });
       setCleanOpen(false);
     } catch (err: any) {
-      toast.error('清理失败', { description: err?.message || '请稍后重试' });
+      toast.error('清理失败', { description: humanizeError(err) });
     } finally {
       setCleanBusy(false);
     }

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { REALMS } from '@/lib/xianxia/types';
-import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect, sanitizeNarrative } from '@/lib/xianxia/display';
+import { formatEventEffectLabel, eventEffectTone, isVisibleNumericEventEffect, sanitizeNarrative, ATTRIBUTE_LABEL } from '@/lib/xianxia/display';
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#6b7280', uncommon: '#22c55e', rare: '#3b82f6',
@@ -425,14 +425,9 @@ function Empty({ text }: { text: string }) {
   return <p className="text-xs text-muted-foreground text-center py-3">{text}</p>;
 }
 
+// 2026-08-31：并到 display.ts 的总表，只在这里补里程碑独有的几条。
 const ATTR_LABEL: Record<string, string> = {
-  age: '年龄', lifespan: '寿元',
-  cultivationExp: '修为',
-  hp: '生命', maxHp: '生命上限',
-  mp: '灵力', maxMp: '灵力上限',
-  attack: '攻击', defense: '防御', speed: '速度',
-  luck: '气运', comprehension: '悟性',
-  spiritStones: '灵石', reputation: '声望',
+  ...ATTRIBUTE_LABEL,
   elementMetal: '金', elementWood: '木', elementWater: '水', elementFire: '火', elementEarth: '土',
   spiritualRoot: '灵根',
   bloodline: '血脉',

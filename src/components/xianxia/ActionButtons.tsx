@@ -11,7 +11,7 @@ import { REALMS } from '@/lib/xianxia/types';
 import type { CharacterState, GameEvent } from '@/lib/xianxia/store';
 import { ensureAIConfigured } from '@/lib/xianxia/ai-config-client';
 import { generateSettlementResult } from '@/lib/xianxia/settlement';
-import { LOADING_LABELS } from '@/lib/xianxia/display';
+import { LOADING_LABELS, ATTRIBUTE_LABEL } from '@/lib/xianxia/display';
 import { humanizeError } from '@/lib/xianxia/error-humanize';
 import { useStreamingPlaceholder } from '@/hooks/useStreamingPlaceholder';
 
@@ -23,13 +23,10 @@ function latestActionProjections(events: GameEvent[]) {
   };
 }
 
-const ATTR_LABEL: Record<string, string> = {
-  age: '年龄', lifespan: '寿元', cultivationExp: '修为',
-  hp: '生命', maxHp: '生命上限', mp: '灵力', maxMp: '灵力上限',
-  attack: '\u7834\u52bf', defense: '\u62a4\u6301', speed: '\u673a\u53d8',
-  luck: '气运', comprehension: '悟性',
-  spiritStones: '灵石', reputation: '声望',
-};
+// 2026-08-31：本地词表并到 display.ts 的总表。
+// 各处各抄一份的下场：这里写「生命上限」、总表写「气血上限」，
+// 同一个数在两个面板叫两个名字；里程碑那份还停在攻击/防御/速度。
+const ATTR_LABEL: Record<string, string> = ATTRIBUTE_LABEL;
 
 export function ActionButtons() {
   const {
@@ -612,7 +609,7 @@ export function ActionButtons() {
                 disabled={loading || atChoice}
                 variant="outline"
                 className="h-10 px-2.5 shrink-0 border-primary/30 text-primary hover:bg-primary/10"
-                title="推进数月（age 不变，同年内流转）"
+                title="推进数月（年岁不变，同一年之内流转）"
               >
                 <Clock className="w-3.5 h-3.5 mr-1" />
                 <span className="text-xs font-serif-cn">数月</span>
