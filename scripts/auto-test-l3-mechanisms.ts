@@ -29,15 +29,20 @@ function expect(label: string, cond: unknown, detail?: string): void {
 
 // --- 飞升机制 ---
 const ascReq = deriveAscensionRequirements('humanWorld');
-expect('ascension-req-human-world', ascReq.toTier === 'spiritWorld' && ascReq.minRealm === 'mahayana');
+// 2026-08-31：这几条原本断言的是 'mahayana' / 'deity_transformation' 这类别名。
+// 别名在 Realm 联合里放行、玩法一个都不产出，于是断言绿着、玩家那边整段机制是死的。
+// 改断言权威 id；别名单独留一条，量的是旧存档归一，不再兼作主用例。
+expect('ascension-req-human-world', ascReq.toTier === 'spiritWorld' && ascReq.minRealm === 'great_vehicle');
 
-const charOk = { realm: 'mahayana' as const, cultivationExp: 200000, lifespan: 600, reputation: 8000, daoHeart: 90 };
-const charBad = { realm: 'mahayana' as const, cultivationExp: 1000, lifespan: 100, reputation: 100, daoHeart: 30 };
+const charOk = { realm: 'great_vehicle' as const, cultivationExp: 200000, lifespan: 600, reputation: 8000, daoHeart: 90 };
+const charBad = { realm: 'great_vehicle' as const, cultivationExp: 1000, lifespan: 100, reputation: 100, daoHeart: 30 };
 expect('ascension-eligible-ok', checkAscensionEligibility(charOk, ascReq).eligible === true);
 expect('ascension-not-eligible-bad', checkAscensionEligibility(charBad, ascReq).eligible === false);
 
-expect('ascension-trigger-mahayana-500', deriveAscensionTrigger(500, 'mahayana').triggered === true);
-expect('ascension-trigger-young', deriveAscensionTrigger(50, 'mahayana').triggered === false);
+expect('ascension-trigger-great-vehicle-500', deriveAscensionTrigger(500, 'great_vehicle').triggered === true);
+expect('ascension-trigger-young', deriveAscensionTrigger(50, 'great_vehicle').triggered === false);
+// 旧存档里存的是别名，归一后应与权威 id 同判
+expect('ascension-trigger-legacy-alias', deriveAscensionTrigger(500, 'mahayana').triggered === true);
 
 expect('ascension-outcome-passed', resolveAscensionOutcome({
   characterRoll: 0.9, daoHeart: 100, tribulationPassed: true, requirements: ascReq,
@@ -51,7 +56,9 @@ expect('cross-realm-humanWorld', deriveCrossRealmPaths('humanWorld').length >= 1
 expect('cross-realm-immortalWorld', deriveCrossRealmPaths('immortalWorld').length >= 2);
 
 // --- 天劫机制 ---
-expect('tribulation-trigger-deity', deriveTribulationTrigger('golden_core', 'deity_transformation').triggered === true);
+expect('tribulation-trigger-spirit-severing', deriveTribulationTrigger('golden_core', 'spirit_severing').triggered === true);
+expect('tribulation-trigger-great-vehicle', deriveTribulationTrigger('spirit_severing', 'great_vehicle').triggered === true);
+expect('tribulation-trigger-legacy-alias', deriveTribulationTrigger('golden_core', 'deity_transformation').triggered === true);
 expect('tribulation-trigger-no', deriveTribulationTrigger('mortal', 'qi_refining').triggered === false);
 
 expect('bolt-1-passed', resolveTribulationBolt({

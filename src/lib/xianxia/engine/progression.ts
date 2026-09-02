@@ -695,17 +695,34 @@ export function resolveTribulationBolt(opts: {
   heartDemon: number;            // 0-100
   soulStrength: number;          // 0-100
   bondedArtifactResonance: boolean;
-}): { passed: boolean; hpRemaining: number; narrative: string } {
+  /** 挨这道雷之前的实际气血。旧调用方不传时按满血 100 起算（与改动前一致）。 */
+  hpBefore?: number;
+  /** 气血上限。旧调用方不传时按 100。 */
+  maxHp?: number;
+}): { passed: boolean; hpRemaining: number; hpDelta: number; narrative: string } {
   const baseThreshold = 0.3 + opts.boltNumber * 0.07;
   const heartDemonPenalty = Math.max(0, (opts.heartDemon - 30) / 200);
   const soulBonus = opts.soulStrength / 500;
   const artifactBonus = opts.bondedArtifactResonance ? 0.1 : 0;
   const effectiveRoll = opts.characterRoll + soulBonus + artifactBonus - heartDemonPenalty;
   const passed = effectiveRoll >= baseThreshold;
-  const hpDelta = passed ? -Math.max(5, opts.boltNumber * 5) : -30;
+  // 2026-08-31：扣血改按上限折算，并且从真实气血往下扣。
+  //   旧写法 hpRemaining = clamp(100 + hpDelta)，每道雷都从凭空的满血 100 重算，
+  //   九道雷连着挨下来气血一点没少；更荒唐的是挡不住反而比挡住剩得多——
+  //   第七道扛过去扣 35 剩 65，扛不过去只扣 30 剩 70。
+  //   现在从真实气血往下扣，扣量按上限折算，且失败恒重于成功。
+  //   曲线按「九道全挡下来约耗上限五成半」定：挡住 boltNumber×1.2%，破防 15%+boltNumber×2%。
+  //   上限 100 时全挡合计 55 点，留得下一线生机；每道破防都比挡住疼两三倍。
+  const maxHp = Math.max(1, Math.round(Number(opts.maxHp) || 100));
+  const hpBefore = Math.max(0, Math.min(maxHp, Math.round(Number(opts.hpBefore ?? maxHp))));
+  const passCost = Math.max(2, Math.round(maxHp * opts.boltNumber * 0.012));
+  const failCost = Math.max(passCost + 3, Math.round(maxHp * (0.15 + opts.boltNumber * 0.02)));
+  const hpDelta = -(passed ? passCost : failCost);
+  const hpRemaining = Math.max(0, Math.min(maxHp, hpBefore + hpDelta));
   return {
     passed,
-    hpRemaining: Math.max(0, Math.min(100, 100 + hpDelta)),
+    hpRemaining,
+    hpDelta: hpRemaining - hpBefore,
     narrative: passed
       ? `第 ${opts.boltNumber} 道天雷落下，险中求胜，气血大损。`
       : `第 ${opts.boltNumber} 道天雷破防，气血暴跌！`,

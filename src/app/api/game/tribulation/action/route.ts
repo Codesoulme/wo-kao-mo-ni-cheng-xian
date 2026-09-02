@@ -133,7 +133,21 @@ export async function POST(req: NextRequest) {
       heartDemon: char.heartDemon ?? 0,
       soulStrength,
       bondedArtifactResonance,
+      hpBefore: char.hp ?? char.maxHp ?? 100,
+      maxHp: char.maxHp ?? 100,
     });
+    // 2026-08-31：把气血真写回库。
+    //   此前这里只 appendEvent 记一笔 hp.changed，没有 db.character.update，
+    //   而事件投影器只算读模型、不回写角色表。于是九道雷挨完气血分毫未动，
+    //   事件流里却躺着九条「掉到 65」——账面与事实两张皮。
+    try {
+      await db.character.update({
+        where: { id: char.id },
+        data: { hp: result.hpRemaining },
+      });
+    } catch (e) {
+      console.error('[tribulation/action] hp 写回失败:', e);
+    }
     // 批 16: tribulation 路由接 Event Sourcing——bolt 试算触发 hp.changed
     try {
       const charBefore = { hp: char.hp ?? 100 };

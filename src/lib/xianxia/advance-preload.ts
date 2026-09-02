@@ -3,7 +3,7 @@ import { db } from '@/lib/db';
 import { dbToState, buildStateContext, tickStatusDurations, tickNaturalRecovery, checkFateNode, pickEventBlueprint, tickFormations, tickHeartDemon, tickPets, getSameYearThreads, buildThreadContinuationEvent } from '@/lib/xianxia/engine';
 import { generateAgeEvent } from '@/lib/xianxia/llm';
 import { FATE_NODES, EventBlueprint } from '@/lib/xianxia/types';
-import { clampTimeAdvance, suggestTimeAdvance, extractEventMeta } from '@/lib/xianxia/world-time';
+import { clampTimeAdvance, suggestTimeAdvance, extractEventMeta, advanceWorldCalendar } from '@/lib/xianxia/world-time';
 import { buildFallbackAgeEvent } from '@/lib/xianxia/advance-fallback';
 import { extractNarrativeContractFeedback } from '@/lib/xianxia/state-change-log';
 
@@ -199,7 +199,22 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
 
   if (!sameYearThread) {
     state.age += timeAdvance.ageDeltaYears;
-    const yearlyTicks = Math.max(0, timeAdvance.ageDeltaYears);
+    // 2026-08-31：年度结算改按世界历累计天数计，不再只认 ageDeltaYears。
+    //   旧写法 yearlyTicks = ageDeltaYears，而「按月推进」发的 ageDeltaYears 恒为 0，
+    //   于是只跑一次自然恢复，状态倒计时 / 灵阵耗材 / 心魔 / 灵宠 一概不动。
+    //   只按月推进的玩家，这四样永远冻在原地——心魔不加深也不消解，
+    //   带倒计时的状态永不到期，寿元压力也不逼近。
+    //   新写法拿累计天数跨没跨过 365 的整数界来判，零头留在日历里下次接着算，
+    //   十二次按月推进与一次按年推进结算次数一致，且不需要额外存字段。
+    const daysBefore = Math.max(0, Math.round(Number(calendarForHour?.elapsedDays) || 0));
+    const daysAfter = Math.max(daysBefore, Math.round(
+      Number(advanceWorldCalendar(calendarForHour, timeAdvance)?.elapsedDays) || daysBefore,
+    ));
+    const accruedTicks = Math.floor(daysAfter / 365) - Math.floor(daysBefore / 365);
+    // 日历缺失（极旧存档）时退回旧口径，宁可少结算也不凭空多结算。
+    const yearlyTicks = calendarForHour
+      ? Math.max(0, accruedTicks)
+      : Math.max(0, timeAdvance.ageDeltaYears);
     for (let i = 0; i < yearlyTicks; i += 1) {
       state = tickStatusDurations(state);
       state = tickNaturalRecovery(state);

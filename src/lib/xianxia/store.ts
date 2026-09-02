@@ -359,7 +359,6 @@ interface GameState {
   setSettlementResult: (result: SettlementResult | null) => void;
   addHallRecord: (record: SimulationHallRecord) => void;
   setWorldCalendar: (world: WorldCalendarState) => void;
-  advanceWorldCalendar: (time?: TimeAdvance | null) => WorldCalendarState;
   addWorldLegacy: (record: WorldLegacyRecord) => void;
   // Phase-M #3: 继承池运行时 setter + claimInheritanceCandidate action
   setInheritancePool: (pool: any[], candidates: any[], summary?: string | null) => void;
@@ -409,7 +408,7 @@ export const useGameStore = create<GameState>()(
       selectedHeritage: {},
       hallOfSimulations: [],
       settlementResult: null,
-      worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
+      worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0, dayHour: 7 },
       worldLegacies: [],
       // Phase-M #3: 继承池初始为空（运行时由调用方填入）
       inheritancePool: [],
@@ -824,20 +823,6 @@ export const useGameStore = create<GameState>()(
         // 注意：不重置 inheritancePool — 让玩家继续浏览候选；不重置 settlementResult — 玩家可阅读结局
       }),
 
-      advanceWorldCalendar: (time) => {
-        let nextWorld: WorldCalendarState = { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 };
-        set((s) => {
-          const addDays = Math.max(0, Math.round(Number(time?.elapsedDays ?? ((time?.ageDeltaYears || 0) * 365))));
-          const elapsedDays = Math.max(0, (s.worldCalendar?.elapsedDays || 0) + addDays);
-          nextWorld = {
-            eraName: s.worldCalendar?.eraName || '青岚仙历',
-            calendarYear: 5000 + Math.floor(elapsedDays / 365),
-            elapsedDays,
-          };
-          return { worldCalendar: nextWorld };
-        });
-        return nextWorld;
-      },
       addWorldLegacy: (record) => set((s) => ({
         worldLegacies: [record, ...s.worldLegacies.filter((it) => it.id !== record.id)].slice(0, 80),
       })),
@@ -849,7 +834,7 @@ export const useGameStore = create<GameState>()(
         heritageVault: [], selectedHeritage: {}, hallOfSimulations: [],
         // Phase-M #3: 继承池清空
         inheritancePool: [], inheritanceCandidates: [], inheritanceEndingSummary: null,
-        worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0 },
+        worldCalendar: { eraName: '青岚仙历', calendarYear: 5000, elapsedDays: 0, dayHour: 7 },
         worldLegacies: [],
       }),
       reset: () => set({

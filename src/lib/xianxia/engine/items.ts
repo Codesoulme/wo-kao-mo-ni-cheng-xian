@@ -828,6 +828,35 @@ export function unequipItemsByIds(state: CharacterState, ids: string[]): ItemEff
 // ==================== 炼丹炉系统 ====================
 
 // 丹药命名表：按元素 + rarity
+/**
+ * 这批东西塞不塞得下——返回会被丢掉的件数（储物袋自带扩容，永不被丢）。
+ *
+ * 2026-08-31：addItems 装不下时只 console.warn 一句就把东西扔了，调用方毫不知情。
+ * 拍场那条路尤其难看：灵石先扣，再调 addItems，容量满了物品无声蒸发，
+ * 玩家付了钱两手空空，连一句提示都没有。凡是"先付后取"的地方，
+ * 都该拿这个函数在扣款之前问一句。
+ */
+export function countItemsThatWontFit(state: CharacterState, items: ItemEntry[]): number {
+  if (!items.length) return 0;
+  const normalized = items.map(normalizeCultivationBearingItem);
+  let bagBoost = 0;
+  for (const it of normalized) {
+    if (isStorageBag(it)) {
+      for (const eff of it.effects || []) {
+        if (eff.target_attribute === 'storageCapacity' && eff.operation === 'add' && eff.value > 0) {
+          bagBoost += eff.value;
+        }
+      }
+    }
+  }
+  const projectedCapacity = (state.storageCapacity || 5) + bagBoost;
+  const availableSlots = Math.max(0, projectedCapacity - state.inventory.length);
+  const bags = normalized.filter(isStorageBag);
+  const nonBags = normalized.filter(it => !isStorageBag(it));
+  const kept = nonBags.slice(0, Math.max(0, availableSlots - bags.length));
+  return nonBags.length - kept.length;
+}
+
 export function addItems(state: CharacterState, items: ItemEntry[]): CharacterState {
   if (!items.length) return state;
   // 规整化物品：确保储物袋、功法、玉简/心得等可被后续修炼速度归算识别。

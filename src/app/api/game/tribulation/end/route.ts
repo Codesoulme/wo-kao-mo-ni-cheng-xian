@@ -73,9 +73,26 @@ export async function POST(req: NextRequest) {
       } catch (ecsErr) {
         console.error('[tribulation/end] ECS tick failed (non-fatal):', ecsErr);
       }
+      // 2026-08-31：气血上限不再写死 100——满血 400 的角色被 clamp 到 100 等于凭空掉三百。
+      const endMaxHp = Math.max(1, Number(owningChar.maxHp) || 100);
       const hpDelta = -Math.max(5, boltsCompleted * 5);
-      const newHp = Math.max(0, Math.min(100, (owningChar.hp ?? 100) + hpDelta));
+      const newHp = Math.max(0, Math.min(endMaxHp, (owningChar.hp ?? endMaxHp) + hpDelta));
       const passed = outcome === 'ascended' && boltsCompleted === 9;
+
+      // 2026-08-31：结算结果真写回库。
+      //   此前这里只 appendEvent，没有 db.character.update，而事件投影器只算读模型。
+      //   于是「渡劫失败致死」记了一条 alive.changed，角色在库里照旧活蹦乱跳，
+      //   气血也分毫未动。真正会写角色表的只有主推进路由，渡劫是漏网的那条。
+      try {
+        const writeBack: any = { hp: newHp };
+        if (outcome === 'failed' && owningChar.alive) {
+          writeBack.alive = false;
+          writeBack.causeOfDeath = '渡劫失败，形神俱灭';
+        }
+        await db.character.update({ where: { id: owningChar.id }, data: writeBack });
+      } catch (e) {
+        console.error('[tribulation/end] 结算写回失败:', e);
+      }
 
       // hp.changed：每次结算都触发（含 abandoned 也扣点气血）
       if (newHp !== owningChar.hp) {

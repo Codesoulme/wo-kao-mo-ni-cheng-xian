@@ -8,6 +8,7 @@ import { db } from '@/lib/db';
 import { clearAdvancePreload } from '@/lib/xianxia/advance-preload';
 import {
   addItems,
+  countItemsThatWontFit,
   buildStateContext,
   addThreads,
   appendCausalGraph,
@@ -622,6 +623,15 @@ export async function POST(req: NextRequest) {
       }
       if (state.spiritStones < offered) {
         return NextResponse.json({ success: false, error: '囊中灵石不足，举牌只会惹人侧目' }, { status: 400 });
+      }
+      // 2026-08-31：先问装不装得下，再让灵石出手。
+      //   此前顺序是「扣灵石 → addItems」，而 addItems 容量满时只 console.warn 一句
+      //   就把东西丢了。玩家付了钱两手空空，连提示都没有。
+      if (countItemsThatWontFit(state, [lot.item as any]) > 0) {
+        return NextResponse.json({
+          success: false,
+          error: '行囊已满，纵然拍得也无处安放——先腾出地方再来举牌',
+        }, { status: 400 });
       }
       lot.currentBid = offered;
       lot.winner = state.name;
