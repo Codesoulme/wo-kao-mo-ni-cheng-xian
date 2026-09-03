@@ -198,6 +198,8 @@ import {
 } from '../event-scheduler';
 import {
   attemptTribulation,
+  TRIBULATION_FATAL_KILLS,
+  TRIBULATION_PILL_PATTERN,
 } from '../tribulation/engine';
 import {
   realmToMajor,
@@ -832,6 +834,11 @@ const procCultivationInsight: AIEventProcessor = (ctx) => {
 // 5. 处理突破 + α: 大境突破引雷劫判定（沉浸版 PoC）
 const procBreakthrough: AIEventProcessor = (ctx) => {
   const { aiOutput } = ctx;
+  // 2026-08-31：先把突破前的境界记下。
+  //   tryBreakthrough 一成功 ctx.next 就已经是新境界了，底下雷劫那段却拿 next.realm
+  //   当「从哪来」，写进事件流的 fromRealm 一直等于 toRealm；跌境要回退更非得有原值不可。
+  const realmBefore = ctx.next.realm;
+  const realmLevelBefore = ctx.next.realmLevel;
   if (aiOutput.triggeredBreakthrough) {
     const br = tryBreakthrough(ctx.next, {
       reason: aiOutput.breakthroughReason,
@@ -851,28 +858,42 @@ const procBreakthrough: AIEventProcessor = (ctx) => {
     }
   }
 
-  // ===== Phase-α 批 1 α-1: 沉浸版 PoC —— 大境突破引雷劫判定 =====
+  // ===== 大境突破引雷劫判定 =====
   if (ctx.breakthroughHappened && ctx.breakthroughMajor && ctx.newRealm && ctx.next.id) {
     try {
       const targetMajor = realmToMajor(ctx.newRealm);
       if (targetMajor) {
         const next = ctx.next;
+        const inventory: any[] = Array.isArray((next as any).inventory) ? (next as any).inventory : [];
+        // 本命法宝认物品自带的 bonded 标记——types/item.ts 那一行写明「仅能一件，渡劫时共鸣」。
+        // 原判据是「身上有任何装备」，等于人人常驻一份加成，本命二字形同虚设。
+        const hasBondedArtifact = inventory.some((it) => it?.bonded === true);
+        // 渡劫丹按名目认。调用处此前把这一项写死 false，丹药兜底那条规则从来没生效过。
+        const pillIndex = inventory.findIndex(
+          (it) => it?.item_type === 'consumable' && TRIBULATION_PILL_PATTERN.test(String(it?.name || '')),
+        );
+        const hasTribulationPill = pillIndex >= 0;
+        // 神识字段量程是 0-9999（attributes.ts），雷劫引擎的入参契约却是 0-100。
+        // 原先把四位数直接塞进「大于 70」的判断里，稍微修出点神识就永久挂着加成。
+        const soulStrength = Math.round(
+          Math.max(0, Math.min(100, (Number((next as any).soulStrength) || 0) / 9999 * 100)),
+        );
         const tribulationInput = {
           character: {
             id: next.id,
             name: next.name,
             age: next.age,
-            realm: realmToMajor(next.realm) || 'mortal',
+            realm: realmToMajor(realmBefore) || 'mortal',
           },
           targetRealm: targetMajor,
           hpRatio: next.maxHp > 0 ? Math.max(0, Math.min(1, next.hp / next.maxHp)) : 0.5,
-          soulStrength: (next as any).soulStrength ?? 50,
+          soulStrength,
           heartDemon: (next as any).heartDemon ?? 30,
-          hasBondedArtifact: Array.isArray((next as any).equipment) && (next as any).equipment.length > 0,
-          hasTribulationPill: false,
+          hasBondedArtifact,
+          hasTribulationPill,
         };
         const tribulationResult = attemptTribulation(tribulationInput);
-        const fromRealm = next.realm;
+        const fromRealm = realmBefore;
         const toRealm = ctx.newRealm;
         const tribKarmaDelta = (() => {
           if (tribulationResult.outcome === 'success') return applyKarmaDelta({ karma: next.karma, merit: next.merit, sin: next.sin }, { meritDelta: 2 });
@@ -887,6 +908,46 @@ const procBreakthrough: AIEventProcessor = (ctx) => {
         } : undefined;
         // 渡劫这笔功过已入账（进事件流），标记之，procKarmaShift 见此即让位，避免同事件双记。
         if (karmaShiftPayload) ctx.karmaShiftedByTribulation = true;
+
+        // ===== 2026-08-31：判定结果真落到角色身上 =====
+        //   此前这一段只入功过账 + 写一条事件流，算出来的 hpDelta 从没赋给 next.hp，
+        //   outcome 为 fatal 也不置 alive，跌境不退境。于是天劫的全部后果
+        //   就是功过表上 ±1 —— 劫数等于没渡。
+        const maxHpForTrib = Math.max(1, Number(next.maxHp) || 100);
+        // 引擎给的 hpDelta 是按满血 100 写的，这里按真实上限折算，
+        // 免得满血四百的角色挨一记「重伤 60」只掉一成半。
+        const scaledDelta = Math.round(maxHpForTrib * (tribulationResult.hpDelta / 100));
+        const hpBeforeTrib = Math.max(0, Number(next.hp) || 0);
+        let appliedHp = Math.max(0, Math.min(maxHpForTrib, hpBeforeTrib + scaledDelta));
+        if (tribulationResult.outcome === 'fall_realm') {
+          // 跌境：突破不算成立，境界与层数都退回去。
+          //   顺手把 breakthroughHappened 撤掉，否则下游还会照「突破成功」投影一遍。
+          //   耗掉的修为不退——功亏一篑，代价照付。
+          next.realm = realmBefore as any;
+          next.realmLevel = realmLevelBefore;
+          ctx.breakthroughHappened = false;
+          ctx.breakthroughMajor = false;
+          ctx.newRealm = undefined;
+        }
+        if (tribulationResult.outcome === 'fatal') {
+          if (TRIBULATION_FATAL_KILLS) {
+            appliedHp = 0;
+            next.alive = false;
+            next.causeOfDeath = tribulationResult.cause || '渡劫失败，形神俱灭';
+            ctx.died = true;
+            ctx.deathReason = next.causeOfDeath;
+          } else {
+            // 生死闸门还关着：陨落先落到濒死一线，留住角色也留住痛感。
+            appliedHp = 1;
+          }
+        }
+        next.hp = appliedHp;
+        if (hasTribulationPill) {
+          // 认了丹药的加成就得扣掉这瓶丹，否则一瓶护一世。
+          (next as any).inventory = inventory.filter((_, idx) => idx !== pillIndex);
+        }
+        const appliedHpDelta = appliedHp - hpBeforeTrib;
+
         if (!(next as any).__shadowRun) appendEvent({
           characterId: next.id,
           type: 'character.tribulation.attempted',
@@ -897,7 +958,8 @@ const procBreakthrough: AIEventProcessor = (ctx) => {
             outcome: tribulationResult.outcome,
             kind: tribulationResult.kind,
             difficulty: tribulationResult.difficulty,
-            hpDelta: tribulationResult.hpDelta,
+            // 记真扣掉的那个数，不记引擎按满血 100 算出来的名义值。
+            hpDelta: appliedHpDelta,
             cause: tribulationResult.cause,
             ...(karmaShiftPayload ? { karmaShift: karmaShiftPayload } : {}),
           },
@@ -906,12 +968,12 @@ const procBreakthrough: AIEventProcessor = (ctx) => {
           createdAtAge: next.age,
         }).catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e);
-          console.error(`[tribulation PoC] appendEvent failed (non-fatal): ${msg}`);
+          console.error(`[tribulation] appendEvent failed (non-fatal): ${msg}`);
         });
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      console.error(`[tribulation PoC] breakthrough tribulation attempt failed (non-fatal): ${msg}`);
+      console.error(`[tribulation] breakthrough tribulation attempt failed (non-fatal): ${msg}`);
     }
   }
 };

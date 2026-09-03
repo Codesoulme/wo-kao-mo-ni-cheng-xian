@@ -22,16 +22,23 @@ import {
   type NarrativeHook,
   type TribulationOutcome,
   type TribulationProfile,
+  realmToMajor,
 } from './types';
 
 // ==================== 概率配置（修仙常识）====================
 
 /**
- * BaseProbabilities：每个大境界的基础四级概率（百分比）。
- * 来源：凡人修仙 + 诛仙综合常识 + 修仙游戏设计经验。
- * - 金丹→元婴：30/10/20/40（用户硬约束）
- * - 元婴→化神：50/10/20/20（用户硬约束）
- * - 其余：参考修仙小说"低阶易渡、高阶难渡"的常识
+ * BASE_PROBABILITIES: 目标境界 -> 基础四档概率(百分比, 和为 100)。
+ *
+ * 2026-08-31 三处改动:
+ *   1. 键的语义从「起始境界」改成「突破到哪个境界」, 与取值方式对齐。
+ *      原表注释写的是「筑基 -> 金丹」却挂在 foundation 键上, 而取值用的是目标境界,
+ *      于是突破到筑基的人吃了本该给金丹的那一行, 整体错行一位。
+ *   2. 按本主 2026-08-31 的要求, 每一档陨落各加 10 个点, 成功各减 10 个点。
+ *      「元婴突破到化神再低一点, 前后境界也是」——落到表上就是 spirit_severing 一行
+ *      成功 20 减到 10、陨落 50 抬到 60, 其余各行同幅平移。
+ *   3. 补齐大乘 / 渡劫 / 飞升三行。此前这三个境界连键都没有, 顶上三次大突破整段无劫。
+ *      这三行的数是照难度梯度续的, 未经玩法定夺, 要调直接改这里。
  */
 interface BaseProbabilities {
   success: number;
@@ -40,19 +47,38 @@ interface BaseProbabilities {
   fatal: number;
 }
 
-const BASE_PROBABILITIES: Record<string, BaseProbabilities> = {
-  // 凡人 → 炼气（难度 2，几乎不陨落）
-  mortal: { success: 85, fall_realm: 0, severe: 15, fatal: 0 },
-  // 炼气 → 筑基（难度 4，偶有跌境）
-  qi_refining: { success: 70, fall_realm: 15, severe: 13, fatal: 2 },
-  // 筑基 → 金丹（难度 6，开始有陨落）
-  foundation: { success: 55, fall_realm: 20, severe: 18, fatal: 7 },
-  // 金丹 → 元婴（难度 7，陨落概率高）
-  golden_core: { success: 40, fall_realm: 10, severe: 20, fatal: 30 },
-  // 元婴 → 化神（难度 9，陨落概率最高）
-  nascent_soul: { success: 20, fall_realm: 10, severe: 20, fatal: 50 },
-  // 化神 → 大乘（难度 10，飞升前奏）
-  soul_formation: { success: 10, fall_realm: 5, severe: 25, fatal: 60 },
+/**
+ * TRIBULATION_FATAL_KILLS: 陨落是否真判死。
+ *
+ * 2026-08-31: 结果落地这一步接通时, 生死曲线本主尚未定夺, 故先关着闸门——
+ * outcome 为 fatal 时角色落到濒死一线(气血 1)而不身死道消。
+ * 要开真死亡把这里改 true, 一处改完全局生效; 回归里也盯着这个常量,
+ * 免得哪天被顺手翻开却没人知道。
+ */
+export const TRIBULATION_FATAL_KILLS = false;
+
+/** 渡劫辅助丹药的名目特征。物名由模型注册, 引擎只据名目做事实校验, 与本命法宝同一路数。 */
+export const TRIBULATION_PILL_PATTERN = /渡劫|渡厄|护心|保命|化劫|抗雷|避雷/;
+
+export const BASE_PROBABILITIES: Record<string, BaseProbabilities> = {
+  // 无人突破到凡人; 占位保覆盖。
+  mortal:          { success: 100, fall_realm: 0,  severe: 0,  fatal: 0 },
+  // 凡人 -> 炼气: 几乎稳成, 偶有走火。
+  qi_refining:     { success: 75,  fall_realm: 0,  severe: 15, fatal: 10 },
+  // 炼气 -> 筑基: 开始有跌境。
+  foundation:      { success: 60,  fall_realm: 15, severe: 13, fatal: 12 },
+  // 筑基 -> 金丹: 雷火初临。
+  golden_core:     { success: 45,  fall_realm: 20, severe: 18, fatal: 17 },
+  // 金丹 -> 元婴: 陨落已成常事。
+  nascent_soul:    { success: 30,  fall_realm: 10, severe: 20, fatal: 40 },
+  // 元婴 -> 化神: 全程最险的一关。
+  spirit_severing: { success: 10,  fall_realm: 10, severe: 20, fatal: 60 },
+  // 化神 -> 大乘: 净胜已无, 全靠带伤过关。
+  great_vehicle:   { success: 0,   fall_realm: 5,  severe: 25, fatal: 70 },
+  // 大乘 -> 渡劫期。
+  tribulation:     { success: 0,   fall_realm: 5,  severe: 25, fatal: 70 },
+  // 渡劫期 -> 飞升。
+  ascension:       { success: 0,   fall_realm: 5,  severe: 25, fatal: 70 },
 };
 
 /**
@@ -70,47 +96,52 @@ function normalizeProbs(probs: BaseProbabilities): BaseProbabilities {
 }
 
 /**
- * applyModifiers：根据角色状态修正基础概率。
- * 返回调整后的概率（未归一化）。
+ * applyModifiers: 按角色状态修正基础概率。
+ *
+ * 2026-08-31: 单位对齐。底表是百分数(成功 30 表示三成), 而这里的修正项原本写成小数——
+ * 「气血不足陨落 +20%」落到代码里是 fatal += 0.20, 加在 30 上变 30.2。
+ * 实测裸身与「神识满 + 本命法宝 + 渡劫丹」齐备两组分布完全重合, 残血带心魔也照旧,
+ * 五条修正项一条都没在生效。现统一改成百分点。
+ * 返回值未归一, 由 normalizeProbs 收口。
  */
 function applyModifiers(base: BaseProbabilities, input: TribulationInput): BaseProbabilities {
   const adjusted = { ...base };
-  // 气血修正：hpRatio < 0.3 → fatal +20%
+  // 气血不足: 硬脆, 陨落大涨。
   if (input.hpRatio < 0.3) {
-    adjusted.fatal += 0.20;
-    adjusted.success -= 0.10;
-    adjusted.fall_realm -= 0.05;
-    adjusted.severe -= 0.05;
+    adjusted.fatal += 20;
+    adjusted.success -= 10;
+    adjusted.fall_realm -= 5;
+    adjusted.severe -= 5;
   }
-  // 心魔修正：heartDemon > 70 → fatal +15%
+  // 心魔深重: 内劫先溃。
   if (input.heartDemon > 70) {
-    adjusted.fatal += 0.15;
-    adjusted.success -= 0.10;
-    adjusted.fall_realm -= 0.03;
-    adjusted.severe -= 0.02;
+    adjusted.fatal += 15;
+    adjusted.success -= 10;
+    adjusted.fall_realm -= 3;
+    adjusted.severe -= 2;
   }
-  // 神识修正：soulStrength > 70 → success +10%
+  // 神识强盛: 守得住神魂。
   if (input.soulStrength > 70) {
-    adjusted.success += 0.10;
-    adjusted.fatal -= 0.05;
-    adjusted.fall_realm -= 0.02;
-    adjusted.severe -= 0.03;
+    adjusted.success += 10;
+    adjusted.fatal -= 5;
+    adjusted.fall_realm -= 2;
+    adjusted.severe -= 3;
   }
-  // 法宝修正：hasBondedArtifact → success +10%
+  // 本命法宝: 器灵护主。
   if (input.hasBondedArtifact) {
-    adjusted.success += 0.10;
-    adjusted.fatal -= 0.05;
-    adjusted.fall_realm -= 0.03;
-    adjusted.severe -= 0.02;
+    adjusted.success += 10;
+    adjusted.fatal -= 5;
+    adjusted.fall_realm -= 3;
+    adjusted.severe -= 2;
   }
-  // 丹药修正：hasTribulationPill → fatal -10%
+  // 渡劫丹: 保命而已, 换来的是重伤而非身死。
   if (input.hasTribulationPill) {
-    adjusted.fatal -= 0.10;
-    adjusted.success += 0.05;
-    adjusted.severe += 0.03;
-    adjusted.fall_realm += 0.02;
+    adjusted.fatal -= 10;
+    adjusted.success += 5;
+    adjusted.severe += 3;
+    adjusted.fall_realm += 2;
   }
-  // 下界保护：任何项不能为负
+  // 下界保护: 任何一项不能为负。
   adjusted.success = Math.max(0, adjusted.success);
   adjusted.fall_realm = Math.max(0, adjusted.fall_realm);
   adjusted.severe = Math.max(0, adjusted.severe);
@@ -151,7 +182,12 @@ function rollOutcome(probs: BaseProbabilities, seed: string): TribulationOutcome
  * - 把 narrativeHooks 喂给 LLM 生成叙事
  */
 export function attemptTribulation(input: TribulationInput): TribulationResult {
-  const profile: TribulationProfile | undefined = TRIBULATION_PROFILES[input.targetRealm];
+  // 2026-08-31: 先把目标境界归到权威键, 再查表。
+  //   原先两张表都拿原始字符串直接取键, 于是 deity_transformation / soul_formation /
+  //   mahayana / immortal 这些旧写法一律查不着 —— 落进下面的降级分支, 成功且无劫。
+  //   realmToMajor 本来就是为这件事写的, 之前根本没在这里用上。
+  const realmKey = realmToMajor(input.targetRealm);
+  const profile: TribulationProfile | undefined = realmKey ? TRIBULATION_PROFILES[realmKey] : undefined;
   if (!profile) {
     // 目标境界不在 PoC 映射表内——返回降级结果（成功但无叙事）。
     return {
@@ -164,7 +200,7 @@ export function attemptTribulation(input: TribulationInput): TribulationResult {
     };
   }
 
-  const base = BASE_PROBABILITIES[input.targetRealm] || { success: 80, fall_realm: 5, severe: 10, fatal: 5 };
+  const base = BASE_PROBABILITIES[realmKey!] || { success: 80, fall_realm: 5, severe: 10, fatal: 5 };
   const adjusted = applyModifiers(base, input);
   const normalized = normalizeProbs(adjusted);
 

@@ -15126,7 +15126,7 @@ async function pgRunPhaseEsProjectorPersistSmokes(): Promise<void> {
 // ====================================================================
 
 function smokeAlpha001TribulationSuccess(): void {
-  // 凡人 → 炼气：基础概率 success=85%，无致命/降境。强制 hpRatio=0.95 soul=80 heartDemon=10（有法宝+丹药）。
+  // 凡人 → 炼气：基础 success=75%。强制 hpRatio=0.95 soul=80 heartDemon=10（有法宝+丹药）。
   const mod = require('../src/lib/xianxia/tribulation/engine.ts');
   const typesMod = require('../src/lib/xianxia/tribulation/types.ts');
   const result = mod.attemptTribulation({
@@ -15141,12 +15141,14 @@ function smokeAlpha001TribulationSuccess(): void {
   assert(result && typeof result === 'object', 'should return object');
   assert(typeof result.outcome === 'string', 'outcome should be string, got=' + typeof result.outcome);
   assert(['success', 'fall_realm', 'severe', 'fatal'].includes(result.outcome), 'outcome should be one of 4 enum values, got=' + result.outcome);
-  // 凡人 → 炼气 难度 2：success 概率极高（85% + 法宝丹药 +10%/-10%）；陨落概率 0%。应当不会陨落。
-  assert(result.outcome !== 'fatal', '凡人→炼气 不应陨落（基础致命概率 0），got=' + result.outcome);
-  // 凡人 → 炼气 基础 possibleOutcomes = ['success', 'severe']，无 fall_realm
-  // 注：targetRealm='qi_refining'（炼气期），对应 profile 是心火劫
-  assert(result.kind === 'heart_fire', '凡人→炼气 劫型应为心火劫（炼气 profile），got=' + result.kind);
-  assert(result.difficulty === 4, '炼气期 艰难度应为 4，got=' + result.difficulty);
+  // 2026-08-31 契约变更（不是把测例掰弯迁就实现，是原实现取错了行）：
+  //   两张表原先按「起始境界」命名、却按「目标境界」取值，整体错行一位。
+  //   本例注释一直写着「凡人→炼气 难度 2」，底下断言却要 4 —— 4 是筑基那一行的凶险度，
+  //   等于把该给筑基的劫扣在了炼气头上。现两表统一按目标境界立键，此处回到 2。
+  // 炼气一关基础陨落 10%，但入参带满神识 + 本命法宝 + 渡劫丹（-5 -5 -10）压到 0，仍不该陨落。
+  assert(result.outcome !== 'fatal', '凡人→炼气 且三样齐备时不该陨落，got=' + result.outcome);
+  assert(result.kind === 'heart_demon', '凡人→炼气 劫型应为心魔劫（道心初立），got=' + result.kind);
+  assert(result.difficulty === 2, '炼气期 艰难度应为 2，got=' + result.difficulty);
   assert(Array.isArray(result.narrativeHooks), 'narrativeHooks 应该是数组');
   assert(result.narrativeHooks.length >= 3, '至少应有 3 条 narrative hooks，got=' + result.narrativeHooks.length);
   // hooks 应有 setting + emotion/action/aftermath 至少 3 类
@@ -15159,16 +15161,19 @@ function smokeAlpha001TribulationSuccess(): void {
   assert(typesMod.TRIBULATION_PROFILES.qi_refining, '应包含 qi_refining 配置');
   assert(typesMod.TRIBULATION_PROFILES.golden_core, '应包含 golden_core 配置');
   assert(typesMod.TRIBULATION_PROFILES.nascent_soul, '应包含 nascent_soul 配置');
-  assert(typesMod.TRIBULATION_PROFILES.soul_formation, '应包含 soul_formation 配置');
-  // 金丹 → 元婴 概率：30 fatal / 10 fall / 20 severe / 40 success
+  // 原先这里要 soul_formation。那个键是金丹的旧别名，被劫型表私自借去指化神，
+  // 同一串字符在两个模块指两个境界。现改按权威 id 立键，化神就写 spirit_severing。
+  assert(typesMod.TRIBULATION_PROFILES.spirit_severing, '应包含 spirit_severing（化神）配置');
+  assert(!typesMod.TRIBULATION_PROFILES.soul_formation, 'soul_formation 是金丹别名，不该再当化神的键');
+  // 金丹 → 元婴：success 30 / fall 10 / severe 20 / fatal 40
   const nascentSoulProfile = typesMod.TRIBULATION_PROFILES.nascent_soul;
-  assert(nascentSoulProfile.difficulty === 9, '元婴 艰难度 9');
-  assert(nascentSoulProfile.kind === 'heart_demon', '元婴 劫型心魔');
+  assert(nascentSoulProfile.difficulty === 7, '元婴 艰难度 7，got=' + nascentSoulProfile.difficulty);
+  assert(nascentSoulProfile.kind === 'thunder_fire', '元婴 劫型雷火，got=' + nascentSoulProfile.kind);
   log('smoke-α-001-tribulation-success', { passed: true, outcome: result.outcome, hooks: result.narrativeHooks.length });
 }
 
 function smokeAlpha002TribulationFatal(): void {
-  // 金丹 → 元婴：基础概率 fatal=30%。强制低 hpRatio=0.1 + 心魔 90 → fatal +20% +15% = 65%。
+  // 金丹 → 元婴：基础 fatal=40%。强制低 hpRatio=0.1 + 心魔 90 → fatal +20 +15 = 75%。
   // 应当出现 fatal。但因为是概率函数（hash seed），无法 100% 保证；只校验接口正确性。
   const mod = require('../src/lib/xianxia/tribulation/engine.ts');
   const result = mod.attemptTribulation({
@@ -15218,10 +15223,21 @@ function smokeAlpha003TribulationFallRealm(): void {
   const prompt = mod.pickNarrativeHooks(result, 300);
   assert(typeof prompt === 'string', 'pickNarrativeHooks 应返回字符串');
   assert(prompt.length <= 300, 'prompt 长度应 <= 300，got=' + prompt.length);
-  // fallback 路径：targetRealm='deity_transformation'（不在表内）→ 降级
+  // 别名归位：deity_transformation 是化神的旧写法。原先它落不进表、被当「查无此境」整段免劫 ——
+  // 顶上几个大境全靠这个洞逃过天劫。现在它必须解析成化神那一行。
+  const aliased = mod.attemptTribulation({
+    character: { id: 'test-char-3b', name: '测试化神', age: 400, realm: 'nascent_soul' },
+    targetRealm: 'deity_transformation' as any,
+    hpRatio: 0.9,
+    soulStrength: 50,
+    heartDemon: 30,
+  });
+  assert(aliased.difficulty === 9, 'deity_transformation 应归到化神（艰难度 9），got=' + aliased.difficulty);
+  assert(aliased.narrativeHooks.length >= 3, '别名归位后应照常出钩子，got=' + aliased.narrativeHooks.length);
+  // 真·查无此境才降级：脏值不认，也不许悄悄兜底成凡人拿一张 0 难度免劫牌。
   const fallback = mod.attemptTribulation({
     character: { id: 'test-char-3', name: 'test', age: 100, realm: 'golden_core' },
-    targetRealm: 'deity_transformation' as any, // 不在 TRIBULATION_PROFILES 内
+    targetRealm: 'not_a_realm_at_all' as any,
     hpRatio: 0.5,
     soulStrength: 50,
     heartDemon: 30,
@@ -15229,6 +15245,160 @@ function smokeAlpha003TribulationFallRealm(): void {
   assert(fallback.outcome === 'success', 'fallback 应降级为 success，got=' + fallback.outcome);
   assert(fallback.narrativeHooks.length === 0, 'fallback 应无 narrative hooks');
   log('smoke-α-003-tribulation-fall-realm', { passed: true, outcome: result.outcome, promptLen: prompt.length });
+}
+
+// ====================================================================
+// 2026-08-31 天劫接线闸门（α-007 / 008 / 009）
+// 起因：天劫此前算完就丢 —— 判定结果只入功过账、写一条事件流，
+//       hpDelta 从没赋回 hp，fatal 不置 alive，跌境不退境；
+//       两张劫表还按起始境界立键却按目标境界取值，整体错行一位；
+//       五个修正项写的是小数、加进百分数基表里等于没加。
+// 这三关分别盯：表的键、修正项的量纲、判定落到角色身上。
+// ====================================================================
+
+// α-007：两张劫表盖满权威九境，且按「目标境界」对行
+function smokeAlpha007TribulationTableKeys(): void {
+  const engineMod = require('../src/lib/xianxia/tribulation/engine.ts');
+  const typesMod = require('../src/lib/xianxia/tribulation/types.ts');
+  const { assertRealmKeyCoverage, CANONICAL_REALM_IDS } = require('../src/lib/xianxia/types/realm.ts');
+
+  const profileKeys = Object.keys(typesMod.TRIBULATION_PROFILES);
+  const probKeys = Object.keys(engineMod.BASE_PROBABILITIES);
+  const missingProfiles = assertRealmKeyCoverage('TRIBULATION_PROFILES', profileKeys);
+  const missingProbs = assertRealmKeyCoverage('BASE_PROBABILITIES', probKeys);
+  assert(missingProfiles.length === 0, '劫型表漏了权威境界：' + missingProfiles.join('、'));
+  assert(missingProbs.length === 0, '概率表漏了权威境界：' + missingProbs.join('、'));
+  // 反向也要干净：表里不许再留别名键，否则同一境界两行、改一行漏一行。
+  const strays = profileKeys.filter((k) => !CANONICAL_REALM_IDS.includes(k));
+  assert(strays.length === 0, '劫型表混入非权威键：' + strays.join('、'));
+
+  // 对行：突破到金丹，吃的必须是金丹那一行（艰难度 6），不是元婴那行（7）。
+  // 错行时这里会读到 7 —— 这条断言就是当初那个 off-by-one 的照妖镜。
+  const toGoldenCore = engineMod.attemptTribulation({
+    character: { id: 'key-check-1', name: '测试', age: 120, realm: 'foundation' },
+    targetRealm: 'golden_core', hpRatio: 0.9, soulStrength: 50, heartDemon: 20,
+  });
+  assert(toGoldenCore.difficulty === 6, '突破到金丹 应取金丹行(艰难度 6)，got=' + toGoldenCore.difficulty);
+  assert(typesMod.TRIBULATION_PROFILES.golden_core.difficulty === 6, '金丹行 艰难度 6');
+  assert(typesMod.TRIBULATION_PROFILES.nascent_soul.difficulty === 7, '元婴行 艰难度 7');
+  // 顶上三境不许再是「查无此境」——原先大乘/渡劫期/飞升根本不在表内，整段无劫。
+  for (const top of ['great_vehicle', 'tribulation', 'ascension']) {
+    assert(typesMod.TRIBULATION_PROFILES[top], `${top} 应有劫型配置`);
+    assert(engineMod.BASE_PROBABILITIES[top], `${top} 应有概率配置`);
+  }
+  // 整张别名表都得能归位。旧存档里写的是别名，查不着表就等于免劫，
+  // 一条漏网就是一条无声的免死金牌。
+  const { LEGACY_REALM_ALIAS } = require('../src/lib/xianxia/types/realm.ts');
+  for (const [alias, canonical] of Object.entries(LEGACY_REALM_ALIAS) as [string, string][]) {
+    if (canonical === 'mortal') continue; // 凡人那行本就 0 难度，无从分辨
+    const r = engineMod.attemptTribulation({
+      character: { id: 'alias-' + alias, name: '测试', age: 200, realm: 'foundation' },
+      targetRealm: alias as any, hpRatio: 0.9, soulStrength: 50, heartDemon: 20,
+    });
+    assert(r.difficulty === typesMod.TRIBULATION_PROFILES[canonical].difficulty,
+      `别名 ${alias} 应归到 ${canonical}，艰难度 want=${typesMod.TRIBULATION_PROFILES[canonical].difficulty} got=${r.difficulty}`);
+  }
+  log('smoke-α-007-tribulation-table-keys', { passed: true, profiles: profileKeys.length, probs: probKeys.length });
+}
+
+// α-008：五个修正项真的在挪概率（量纲对了才算接上）
+function smokeAlpha008TribulationModifiers(): void {
+  const mod = require('../src/lib/xianxia/tribulation/engine.ts');
+  // 采样：种子由 characterId 等入参拼出，换 id 即换结果，故可重现。
+  // n 取 1200：齐备与裸身的真实差距约 16 点，n=400 时抽样噪声能吃掉 3 点，闸门会时红时绿。
+  const sample = (extra: Record<string, unknown>, n = 1200): number => {
+    let fatal = 0;
+    for (let i = 0; i < n; i++) {
+      const r = mod.attemptTribulation({
+        character: { id: 'mod-check-' + i, name: '测试', age: 300, realm: 'golden_core' },
+        targetRealm: 'nascent_soul', hpRatio: 0.9, soulStrength: 40, heartDemon: 20,
+        hasBondedArtifact: false, hasTribulationPill: false,
+        ...extra,
+      });
+      if (r.outcome === 'fatal') fatal++;
+    }
+    return Math.round((fatal / n) * 100);
+  };
+
+  const bare = sample({});
+  const equipped = sample({ soulStrength: 95, hasBondedArtifact: true, hasTribulationPill: true });
+  const wounded = sample({ hpRatio: 0.2, heartDemon: 80 });
+  // 基表元婴一行 fatal=40。裸身应落在 40 附近。
+  assert(bare >= 30 && bare <= 50, '裸身 元婴关 陨落率应在 30-50 之间，got=' + bare);
+  // 三样齐备（神识 -5、本命法宝 -5、渡劫丹 -10）必须显著拉低；
+  // 修正项写成小数时这里和裸身分毫不差 —— 差距要求就是量纲的闸门。
+  assert(bare - equipped >= 12, `齐备应比裸身低至少 12 点陨落率，裸身=${bare} 齐备=${equipped}`);
+  // 残血 + 心魔（+20、+15）必须显著推高。
+  assert(wounded - bare >= 15, `残血带心魔应比裸身高至少 15 点，裸身=${bare} 残血=${wounded}`);
+  log('smoke-α-008-tribulation-modifiers', { passed: true, bare, equipped, wounded });
+}
+
+// α-009：判定结果真落到角色身上（掉血 / 跌境退回 / 陨落触底 / 丹药被吃掉）
+function smokeAlpha009TribulationConsequences(): void {
+  const mod = require('../src/lib/xianxia/tribulation/engine.ts');
+  assert(mod.TRIBULATION_FATAL_KILLS === false,
+    '生死闸门当前应为关（false）。要开得连着死亡投影一起改，别顺手翻开：got=' + mod.TRIBULATION_FATAL_KILLS);
+
+  // 金丹满层 + 修为溢出 → 一步大境突破到元婴，必引天劫。
+  const makeGoldenCore = (id: string, inventory: any[] = []) => w3MakeState({
+    id, name: '测试金丹', age: 300, realm: 'golden_core', realmLevel: 8,
+    cultivationExp: 1800, expToBreak: 1800,
+    hp: 100, maxHp: 100, soulStrength: 4000, heartDemon: 20, inventory,
+  });
+  const breakOutput = w3MakeOutput({
+    title: '结婴',
+    narrative: '金丹既圆，元婴欲生。',
+    triggeredBreakthrough: true,
+    breakthroughTargetRealm: 'nascent_soul',
+  });
+
+  const seen: Record<string, number> = { success: 0, severe: 0, fall_realm: 0, fatal: 0 };
+  for (let i = 0; i < 40; i++) {
+    const before = makeGoldenCore('conseq-' + i);
+    // 先按 procBreakthrough 会传的同一套入参问引擎要判词，再看状态有没有照做。
+    // 注意 tryBreakthrough 成功时会把 hp 顶满新上限，故 hpRatio 恒为 1。
+    const expected = mod.attemptTribulation({
+      character: { id: before.id, name: before.name, age: before.age, realm: 'nascent_soul' },
+      targetRealm: 'nascent_soul',
+      hpRatio: 1,
+      soulStrength: Math.round(Math.max(0, Math.min(100, before.soulStrength / 9999 * 100))),
+      heartDemon: before.heartDemon,
+      hasBondedArtifact: false,
+      hasTribulationPill: false,
+    });
+    const s: any = executeAIEvent(before, breakOutput).state;
+    seen[expected.outcome] = (seen[expected.outcome] || 0) + 1;
+
+    if (expected.outcome === 'fall_realm') {
+      assert(s.realm === 'golden_core', `跌境应退回金丹，got=${s.realm}`);
+      assert(s.realmLevel === 8, `跌境应退回原层数 8，got=${s.realmLevel}`);
+      assert(s.hp < s.maxHp, `跌境应掉血，hp=${s.hp} maxHp=${s.maxHp}`);
+    } else if (expected.outcome === 'fatal') {
+      // 闸门关着：陨落落到濒死一线而不判死。
+      assert(s.hp === 1, `陨落(闸门关)应触底到 1，got=${s.hp}`);
+      assert(s.alive === true, '闸门关着时不应判死');
+    } else {
+      assert(s.realm === 'nascent_soul', `${expected.outcome} 应升到元婴，got=${s.realm}`);
+      assert(s.hp < s.maxHp, `${expected.outcome} 也该有代价，hp=${s.hp} maxHp=${s.maxHp}`);
+      // 掉血量按真实上限折算：引擎的 hpDelta 是按满血 100 写的。
+      const want = s.maxHp + Math.round(s.maxHp * (expected.hpDelta / 100));
+      assert(s.hp === want, `掉血应按上限折算，want=${want} got=${s.hp}（maxHp=${s.maxHp}）`);
+    }
+  }
+  // 防空转：这一关必须真见过跌境和陨落，否则断言全被 else 分支绕开，绿得没有意义。
+  assert(seen.fall_realm > 0, '40 次采样里没出现跌境，闸门形同空转');
+  assert(seen.fatal > 0, '40 次采样里没出现陨落，闸门形同空转');
+
+  // 渡劫丹：认了它的加成，就得把这瓶扣掉，否则一瓶护一世。
+  const withPill = makeGoldenCore('pill-check', [
+    { id: 'p1', name: '九转渡劫丹', item_type: 'consumable', quantity: 1 },
+    { id: 'k1', name: '寻常铁剑', item_type: 'weapon', quantity: 1 },
+  ]);
+  const afterPill: any = executeAIEvent(withPill, breakOutput).state;
+  const pillLeft = (afterPill.inventory || []).filter((it: any) => String(it?.name || '').includes('渡劫丹'));
+  assert(pillLeft.length === 0, '渡劫丹应被消耗，got 剩 ' + pillLeft.length + ' 份');
+  assert((afterPill.inventory || []).some((it: any) => it?.id === 'k1'), '不该顺手扣掉别的物品');
+  log('smoke-α-009-tribulation-consequences', { passed: true, ...seen });
 }
 
 function smokeAlpha006ScriptureProgress(): void {
@@ -15361,6 +15531,9 @@ function pgRunPhaseAlphaTribulationSmokes(): void {
     { name: 'smoke-α-003-tribulation-fall-realm', fn: smokeAlpha003TribulationFallRealm },
     { name: 'smoke-α-004-karma-watch', fn: smokeAlpha004KarmaWatch },
     { name: 'smoke-α-006-scripture-progress', fn: smokeAlpha006ScriptureProgress },
+    { name: 'smoke-α-007-tribulation-table-keys', fn: smokeAlpha007TribulationTableKeys },
+    { name: 'smoke-α-008-tribulation-modifiers', fn: smokeAlpha008TribulationModifiers },
+    { name: 'smoke-α-009-tribulation-consequences', fn: smokeAlpha009TribulationConsequences },
   ];
   for (const c of cases) {
     try {
