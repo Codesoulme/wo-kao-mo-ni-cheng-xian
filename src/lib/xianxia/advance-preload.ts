@@ -6,6 +6,7 @@ import { FATE_NODES, EventBlueprint } from '@/lib/xianxia/types';
 import { clampTimeAdvance, suggestTimeAdvance, extractEventMeta, advanceWorldCalendar } from '@/lib/xianxia/world-time';
 import { buildFallbackAgeEvent } from '@/lib/xianxia/advance-fallback';
 import { extractNarrativeContractFeedback } from '@/lib/xianxia/state-change-log';
+import { listDigests } from '@/lib/xianxia/memory/digest-store';
 
 type CharacterRecord = Awaited<ReturnType<typeof db.character.findUnique>>;
 
@@ -130,6 +131,31 @@ function countTrailingContinuous(events: Array<{ effects?: string }>): number {
   return n;
 }
 
+/**
+ * 逐字窗口之外的更早经历 + 已生成好的纪要。
+ * 2026-08-31：过去只取末尾 20 条、再切 5 条喂模型,前面几百年在提示词里根本不存在。
+ * 这里把更早的那些一并取来交给预算选路——它自己决定拼纪要还是列标题。
+ * 纪要读失败不算错:那一档本来就允许 miss,落到按重要度列标题即可。
+ */
+async function getEarlierHistory(characterId: string, verbatimTailCount: number) {
+  let rows: Array<{ id: string; age: number; title: string; narrative: string; eventType: string }> = [];
+  try {
+    const found = await db.eventLog.findMany({
+      where: { characterId },
+      orderBy: [{ age: 'asc' }, { createdAt: 'asc' }],
+      take: 400,
+      select: { id: true, age: true, title: true, narrative: true, eventType: true },
+    });
+    rows = found;
+  } catch { rows = []; }
+  const earlier = rows.slice(0, Math.max(0, rows.length - Math.max(0, verbatimTailCount)));
+  let digests: any[] = [];
+  try {
+    digests = await listDigests(characterId, { limit: 40 });
+  } catch { digests = []; }
+  return { earlierEvents: earlier, digests };
+}
+
 async function getNarrativeContractFeedback(characterId: string) {
   const auditEvents = await db.eventLog.findMany({
     where: { characterId },
@@ -231,7 +257,14 @@ export async function prepareAdvanceCandidate(char: NonNullable<CharacterRecord>
   const fateNodeIdx = sameYearThread || timeAdvance.ageDeltaYears <= 0 ? null : checkFateNode(state);
   const referenceFateNode = fateNodeIdx !== null ? FATE_NODES.find(n => n.index === fateNodeIdx) : null;
   const isFateNode = false;
-  const ctx = buildStateContext(state, recentEvents.slice(qualityMode === 'light' ? -3 : -5), narrativeContractFeedback.slice(-3));
+  const verbatimTail = qualityMode === 'light' ? 3 : 5;
+  const earlierHistory = await getEarlierHistory(char.id, verbatimTail);
+  const ctx = buildStateContext(
+    state,
+    recentEvents.slice(-verbatimTail),
+    narrativeContractFeedback.slice(-3),
+    { earlierEvents: earlierHistory.earlierEvents, digests: earlierHistory.digests },
+  );
   ctx.blueprint = blueprint;
   ctx.suggestedTimeAdvance = timeAdvance;
   if (options.worldCalendar) ctx.worldCalendar = options.worldCalendar;

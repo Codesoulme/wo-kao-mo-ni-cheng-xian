@@ -133,6 +133,21 @@ export interface EngineStateContext {
   cultivationMultiplier: number;
 
   recentEvents: { age: number; title: string; narrative: string; eventType: string; timeLabel?: string; worldTimeLabel?: string }[];
+  /**
+   * 更早的经历怎么带进去的决策结果。
+   * 逐字窗口只装得下末尾几条；活到高龄的角色，前面几百年在提示词里是一片空白。
+   * 这里给出预算选路的产物：有纪要就拼纪要，没纪要就按重要度取标题单行。
+   */
+  historyPlan?: {
+    tier: 1 | 2 | 3;
+    reason: string;
+    digests: string[];
+    highlights: string[];
+    estimatedChars: number;
+    budgetChars: number;
+    overBudget: boolean;
+    droppedCount: number;
+  };
 
   worldCalendar?: { eraName: string; calendarYear: number; elapsedDays: number; label?: string };
 

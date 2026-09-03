@@ -482,6 +482,14 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
     }
   }, [events.length]);
 
+  // 最后一条突破事件的下标；-1 表示还没有过突破
+  const lastBreakthroughIdx = useMemo(() => {
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (events[i]?.eventType === 'breakthrough') return i;
+    }
+    return -1;
+  }, [events]);
+
   const toggle = (idx: number) => {
     setExpandedSet(prev => {
       const next = new Set(prev);
@@ -697,7 +705,13 @@ export function EventTimeline({ events, defaultExpandedCount = 3, showToolbar = 
                     })()}
                     {/* 生成式 UI DEMO #5 —— 突破闪耀卡：eventType === 'breakthrough' */}
                     {event.eventType === 'breakthrough' && (
-                      <BreakthroughFlashCard narrative={event.narrative} />
+                      <BreakthroughFlashCard
+                        narrative={event.narrative}
+                        // 只有最后一条突破才和角色当下的境界对得上。
+                        // 往上翻的历史突破如果也拿当下境界去填,元婴期回看炼气那次
+                        // 会写成「突破入元婴」——卡片上写的不是那一刻的事。
+                        isLatest={idx === lastBreakthroughIdx}
+                      />
                     )}
                     {/* 效果 */}
                     {visibleEffects.length > 0 ? (

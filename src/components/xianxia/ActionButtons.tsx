@@ -15,11 +15,20 @@ import { LOADING_LABELS, ATTRIBUTE_LABEL } from '@/lib/xianxia/display';
 import { humanizeError } from '@/lib/xianxia/error-humanize';
 import { useStreamingPlaceholder } from '@/hooks/useStreamingPlaceholder';
 
+// 2026-08-31：只放行有真去处的种类。
+// 原先 cultivate / rest / custom 也画成按钮,点下去只弹一句「后续将随剧情承接」,
+// 引擎侧没有任何一处接住它——按了等于没按。thread 早就因为同样原因被挡在外面,
+// 这里把口径统一,不再给玩家一个按不动的按钮。
+// 要让这几种真能按,得先给它们一个去处,那是玩法决定,不在这里替人定。
+const PROJECTION_KINDS_WITH_DESTINATION = ['market', 'trade', 'exploration'] as const;
+
 function latestActionProjections(events: GameEvent[]) {
   const latest = events[events.length - 1];
   return {
     sourceLabel: latest?.title || latest?.blueprint?.name || '近期事件',
-    projections: (latest?.actionProjections || []).filter((a: any) => ['market', 'exploration', 'thread', 'trade', 'cultivate', 'rest', 'custom'].includes(a.kind)).slice(0, 4),
+    projections: (latest?.actionProjections || [])
+      .filter((a: any) => (PROJECTION_KINDS_WITH_DESTINATION as readonly string[]).includes(a?.kind))
+      .slice(0, 4),
   };
 }
 
@@ -318,6 +327,7 @@ export function ActionButtons() {
                 effects: doneData.changes || [],
                 timeAdvance: savedTimeAdvance,
                 worldTime: savedWorldTime,
+                actionProjections: doneData.actionProjections || [],
               }
             : e
         ));
@@ -339,6 +349,7 @@ export function ActionButtons() {
             effects: [],
             timeAdvance: ex.timeAdvance,
             worldTime: ex.worldTime,
+            actionProjections: ex.actionProjections || [],
             createdAt: ex.createdAt || new Date().toISOString(),
           });
         }, (i + 1) * 450);
@@ -640,20 +651,20 @@ export function ActionButtons() {
       </div>
 
       {/* 行动投影：后端/AI 注册此刻可做之事，前端只负责投影 */}
-      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && aiOpportunity.projections.filter((a: any) => a.kind !== 'thread').length > 0 && (
+      {!isDead && !isAscended && !inCombat && !atChoice && !isAutoRunning && aiOpportunity.projections.length > 0 && (
         <div className="space-y-1.5 rounded-lg border border-primary/15 bg-primary/5 p-2">
           <div className="text-[10px] text-muted-foreground font-serif-cn truncate">
             因缘所至：{aiOpportunity.sourceLabel}
           </div>
           <div className="grid gap-2" style={{ gridTemplateColumns: aiOpportunity.projections.length > 1 ? '1fr 1fr' : '1fr' }}>
-            {aiOpportunity.projections.filter((action: any) => action.kind !== 'thread').map((action: any) => {
+            {aiOpportunity.projections.map((action: any) => {
               const isMarket = action.kind === 'market' || action.kind === 'trade';
               const isExplore = action.kind === 'exploration';
               const Icon = isMarket ? Store : isExplore ? Compass : ScrollText;
               const onClick = () => {
                 if (isMarket) setMarketOpen(true);
                 else if (isExplore) setExplorationOpen(true);
-                else toast(action.label, { description: action.description || '此因缘已入心中，后续将随剧情承接。' });
+                else toast(action.label, { description: action.description || '' });
               };
               return (
                 <Button

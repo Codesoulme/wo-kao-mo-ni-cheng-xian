@@ -9,7 +9,7 @@ import { prepareAdvanceCandidate } from '@/lib/xianxia/advance-preload';
 import { buildStateContext, executeAIEvent, stateToResponse, applyAnnualAttributeGrowth } from '@/lib/xianxia/engine';
 import { parseAchievementMarkers, applyAchievements } from '@/lib/xianxia/achievements';
 import { buildEventDisplayEffects } from '@/lib/xianxia/event-effects';
-import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, CONTINUOUS_TIME, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections } from '@/lib/xianxia/world-time';
+import { clampTimeAdvance, advanceWorldCalendar, worldTimeStamp, hiddenEventMeta, formatWorldTimeDisplay, CONTINUOUS_TIME, inferInlineTimeAdvance, phaseHintForTime, sanitizeActionProjections, deriveActionProjections } from '@/lib/xianxia/world-time';
 import { buildAdvanceStateData } from '@/lib/xianxia/persist-advance-state';
 import { truncateNarrativeAtSentence, completeNarrative, sanitizeEventDraft } from '@/lib/xianxia/display';
 import { appendEvent } from '@/lib/xianxia/events/store';
@@ -665,8 +665,24 @@ displayEffects = buildEventDisplayEffects({
             displayLabel: formatWorldTimeDisplay({ age: finalState.age, timeAdvance, worldTime: worldTimeStamp(worldCalendar || undefined), includeAge: true }),
           };
 
+          // 2026-08-31：这一行原本不带 actionProjections。
+          // 模型按提示词产的因缘投影,解析器留着,到这里落账时被丢掉,
+          // 前端读 latest.actionProjections 永远是空数组——「因缘所至」那一排按钮
+          // 在活路径上一次都没露过面。旧的 advance 路径是带的,两边口径对齐。
+          const baseActionProjections = sanitizeActionProjections(
+            (aiOutput as any).actionProjections,
+            deriveActionProjections({
+              title: aiOutput.title,
+              narrative: aiOutput.narrative,
+              eventType: aiOutput.eventType,
+              blueprint,
+              threads: finalState.pendingThreads || [],
+              realms: (finalState as any).discoveredRealms || [],
+            }),
+          );
+
           // 持久化事件：刷新页面后 state 接口能读到，避免气泡消失
-          const eventEffects = [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime: stampedWorldTime })];
+          const eventEffects = [...displayEffects, hiddenEventMeta({ timeAdvance, worldTime: stampedWorldTime, actionProjections: baseActionProjections })];
           createdEvent = await db.eventLog.create({
             data: {
               characterId,
@@ -732,6 +748,7 @@ displayEffects = buildEventDisplayEffects({
                 createdAt: row.createdAt,
                 timeAdvance: extraTime,
                 worldTime: extraWorldTime,
+                actionProjections: extraActions,
               });
               lastStampedTime = extraWorldTime;
               if (extraTime.unit !== 'continuous') {
@@ -1298,6 +1315,9 @@ displayEffects = buildEventDisplayEffects({
           fallbackGenerated: !!aiOutput.isFallbackGenerated,
           title: aiOutput.title,
           narrative: aiOutput.narrative,
+          // 落库的那份在 effects 的隐藏元信息里,刷新页面走 extractEventMeta 能读到;
+          // 本轮不刷新页面,所以这条也得随响应发一份,否则要等下次刷新才见按钮。
+          actionProjections: baseActionProjections,
         });
 
         close();

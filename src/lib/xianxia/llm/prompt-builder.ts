@@ -652,6 +652,20 @@ export function buildAdvancePrompt(ctx: EngineStateContext, isFateNode: boolean,
       return `${e.age}岁：${e.title}（上一幕）\n  起笔：${text.replace(/^[\s　]+/, '').slice(0, 40)}……\n  收在这里：……${tail}`;
     }).join('\n')
     : '无';
+  // 2026-08-31：逐字窗口之外的更早经历。
+  // 只有末尾几条能逐字带,活到高龄的角色前面几百年在提示词里是空白,
+  // 模型于是把每一段人生都当第一段写。这里按引擎给的选路结果补一段概览。
+  const earlierHistoryBlock = (() => {
+    const plan = ctx.historyPlan;
+    if (!plan) return '';
+    const lines: string[] = [];
+    if (plan.digests.length) lines.push(...plan.digests.map((d) => `- ${d}`));
+    else if (plan.highlights.length) lines.push(...plan.highlights.map((h) => `- ${h}`));
+    if (!lines.length) return '';
+    const head = plan.digests.length ? '【更早的经历】（分段纪要，按年岁顺序）' : '【更早的经历】（择要列目，只给年岁与事由）';
+    return `${head}：\n${lines.join('\n')}\n- 以上是已经过去的事，本轮不要重演，只作为角色此刻记得什么的依据。`;
+  })();
+
   const usedOpenings = formatUsedOpenings(evtList.map(e => String(e.narrative || '')));
   // Task 21: 提取最近事件标题，明确禁止 AI 用相同/相似标题
   const recentTitles = ctx.recentEvents.map(e => e.title).filter(Boolean);
@@ -884,6 +898,7 @@ ${acquiredFactLedger}
 - 若功法/法宝/物品已在上列清单或长期记忆中，禁止再写成“偶然所得”“又获赠”“再次拾得”。正确写法是回到修习、门槛、代价、来源追溯的新线索或与赠予者的后续因果。
 - 若某人已明确赠予/传授功法，禁止让角色再去问他“这本功法哪里可以获得”；应改为请教修习要诀、询问来历秘辛、承接人情或引出新因缘。
 
+${earlierHistoryBlock ? `${earlierHistoryBlock}\n` : ''}
 【短期对话区】最近事件：
 ${recentEvts}
 ${usedOpenings ? `\n${usedOpenings}\n` : ''}

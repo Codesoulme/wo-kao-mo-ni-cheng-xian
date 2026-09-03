@@ -631,6 +631,9 @@ import { clearAdvancePreload, isAdvancePreloadUsable, prepareAdvanceCandidate } 
 import { validateAIBoundary } from '../src/lib/xianxia/ai-boundary-validator';
 import { CANONICAL_REALM_IDS, LEGACY_REALM_ALIAS, canonicalRealm } from '../src/lib/xianxia/types/realm';
 import { REALM_LIFESPAN_TABLE, getLifespanByRealm } from '../src/lib/xianxia/realm-lifespan';
+import { planHistoryInjection } from '../src/lib/xianxia/memory/history-budget';
+import { DEFAULT_HISTORY_BUDGET_CHARS } from '../src/lib/xianxia/engine/lifecycle';
+import { deriveActionProjections, sanitizeActionProjections, extractEventMeta, hiddenEventMeta } from '../src/lib/xianxia/world-time';
 import { REALMS } from '../src/lib/xianxia/types';
 import { buildEventSchedulerPlan, buildWorldPressureOpportunityMap, deriveWorldFactStateProfile } from '../src/lib/xianxia/event-scheduler';
 import { addThreads, advanceThread, buildCombatActionPalette, buildCombatCauseChain, buildCombatVictorySpoils, buildLearnedCombatArts, buildStateContext, buildThreadContinuationEvent, checkCombatResourceSufficient, completeThread, computeCultivationFactors, computeEffectiveCultivationRate, deriveBidderAction, deriveBidderProfile, deriveBottleSpiritAffect, deriveBreakthroughStage, deriveCombatProjection, deriveCombatResource, deriveCombatStance, deriveComboChain, deriveCultivationAttributes, deriveFormationStack, deriveLootFromOpponent, deriveNPCBehavior, deriveNPCMemoryUpdate, derivePetCultivationSuggestion, deriveRealmTraits, deriveRecipeUnlock, deriveRumorTrigger, deriveSecretRealmAccess, deriveSoulRealm, deriveStatusExpiry, deriveSwordAptitudeProgress, deriveThreadChain, deriveWorldEventConsequences, deriveWorldFactsFromState, detectCombatStalemate, endCombat, equipItem, equipItemsByIds, evaluateTechniqueCompatibility, executeAIEvent, executeCombatRoundWithProposal, failThread, filterMeaningfulStatuses, getSameYearThreads, normalizeCultivationState, novelizeCombatLog, recordActionCausality, refreshWorldFacts, removeItemsByIds, resolveAuctionEnd, resolveBreakthroughOutcome, resolveCombatResourceDrain, resolveCombatStanceShift, resolveComboDamage, resolveFakeDeath, resolveFormationConflict, resolveLootConditions, resolvePetSkillLearn, resolvePillCrafting, resolveRumorReliability, resolveSecretRealmEntry, resolveStalemateBreak, resolveStalemateExit, resolveStatusRemoval, resolveThreadContinuation, sanitizeCombatLog, simulateBiddingRound, startCombat, stateToResponse, unequipItem, buildEmptyWorldMap, discoverLocation, deriveTravelFeasibility, generateRandomEncounter, summarizeWorldForPrompt, recordNPCMemory, clusterNPCMemories, decayNPCMemories, deriveNPCBehaviorFromMemory, summarizeNPCForPrompt, buildEmptySectGraph, addSectNode, setSectRelation, derivePlayerSectAffinity, queryRelationsTowards, deriveInheritanceEligibility, claimInheritance, resolveInheritanceContest, propagateInheritance, summarizeInheritanceForPrompt, deriveCraftingEligibility, startCraftingSession, resolveCraftingStep, deriveTechniqueProgress, resolveTechniqueBreakthrough,
@@ -6117,6 +6120,8 @@ async function smokeBlueprintDocsCoverage(): Promise<void> {
       // 生成侧→注册器→噪声过滤→投影→取槽 全链路真实数据流 — 6 个 smoke，只验数据流不 grep 源码
       pgRunPhaseW7SlotWireSmokes();
       pgRunRealmKeyCoverageSmokes();
+      pgRunHistoryBudgetSmokes();
+      pgRunProjectionWireSmokes();
       // ===== Phase-Z (TechDoc 18.6.7): 测试策略改进（属性测试 + AI 回归 fixture）=====
       // 独立 console.log，不计入主 smoke 计数（不破 430 pass）。
       // 同步 require + try/catch：smoke 同步执行流，不引入 async 改动。
@@ -16496,5 +16501,103 @@ function pgRunRealmKeyCoverageSmokes(): void {
     } catch (e) {
       log(c.name, { passed: false, error: (e && (e as any).message) || String(e) });
     }
+  }
+}
+
+
+// ─── 更早经历的预算选路 ───────────────────────────────────────
+// 2026-08-31：这层库写好之后零调用点,生产里喂的一直是末尾定长几条。
+// 接线后必须有例子盯着,否则下次谁把调用删了也没人知道。
+function mkHistoryItems(n: number) {
+  return Array.from({ length: n }, (_, i) => ({
+    id: `h${i}`,
+    age: Math.floor(i / 2) + 1,
+    title: `第${i}事`,
+    narrative: '他走了一段路，见了一个人，说了两句话。'.repeat(2),
+    eventType: 'normal',
+  }));
+}
+
+function smokeHistoryPlanTiersByVolume(): void {
+  const young = planHistoryInjection({ budgetChars: DEFAULT_HISTORY_BUDGET_CHARS, verbatim: mkHistoryItems(8), digests: [], protection: { currentAge: 5 } });
+  assert(young.tier === 1, `事件少时该走第 1 档，实为第 ${young.tier} 档`);
+  const old = planHistoryInjection({ budgetChars: DEFAULT_HISTORY_BUDGET_CHARS, verbatim: mkHistoryItems(295), digests: [], protection: { currentAge: 148 } });
+  assert(old.tier === 3, `无纪要且事件多时该落第 3 档，实为第 ${old.tier} 档`);
+  assert(old.fallbackTitles.length > 0, '第 3 档必须给出标题列，不能是空的');
+  assert(old.droppedCount > 0, '第 3 档丢了条目却报 droppedCount=0，仪表不实');
+  log('smoke-hist-001-tier-by-volume', { passed: true });
+}
+
+function smokeHistoryPlanUsesDigestsWhenPresent(): void {
+  const p = planHistoryInjection({
+    budgetChars: DEFAULT_HISTORY_BUDGET_CHARS,
+    verbatim: mkHistoryItems(295),
+    protection: { currentAge: 148 },
+    digests: [
+      { id: 'd1', level: 'stage', startAge: 1, endAge: 50, summary: '幼年在山村，习字采药。', coveredEventCount: 100 },
+      { id: 'd2', level: 'stage', startAge: 51, endAge: 100, summary: '入宗门，与同辈结怨。', coveredEventCount: 100 },
+    ],
+  });
+  assert(p.tier === 2, `有纪要时该走第 2 档，实为第 ${p.tier} 档`);
+  assert(p.digests.length === 2, `第 2 档该拼上 2 段纪要，实为 ${p.digests.length}`);
+  log('smoke-hist-002-digest-tier', { passed: true });
+}
+
+function smokeHistoryPlanNeverExceedsBudgetWithoutSaying(): void {
+  const p = planHistoryInjection({ budgetChars: 40, verbatim: mkHistoryItems(120), digests: [], protection: { currentAge: 60 } });
+  const cost = p.tier === 3
+    ? p.fallbackTitles.reduce((s, t) => s + t.length, 0)
+    : p.estimatedChars;
+  assert(p.overBudget || cost <= p.budgetChars * 3, `超了预算却没标 overBudget（估 ${cost} / 预算 ${p.budgetChars}）`);
+  log('smoke-hist-003-budget-honesty', { passed: true });
+}
+
+function pgRunHistoryBudgetSmokes(): void {
+  const cases = [
+    { name: 'smoke-hist-001-tier-by-volume', fn: smokeHistoryPlanTiersByVolume },
+    { name: 'smoke-hist-002-digest-tier', fn: smokeHistoryPlanUsesDigestsWhenPresent },
+    { name: 'smoke-hist-003-budget-honesty', fn: smokeHistoryPlanNeverExceedsBudgetWithoutSaying },
+  ];
+  for (const c of cases) {
+    try { c.fn(); } catch (e) { log(c.name, { passed: false, error: (e && (e as any).message) || String(e) }); }
+  }
+}
+
+// ─── 因缘投影落账通路 ─────────────────────────────────────────
+// 2026-08-31：模型产的因缘投影,解析器留着,活路径落账时被丢掉,
+// 前端读到的永远是空数组。四处断链修完,这里盯住"投影进得去也出得来"。
+function smokeProjectionSurvivesEventMeta(): void {
+  const derived = deriveActionProjections({ title: '坊市偶遇', narrative: '他在坊市摊前停下，问了个价。', eventType: 'normal', threads: [] });
+  assert(derived.length > 0, '坊市叙事该派生出投影，实为空');
+  const base = sanitizeActionProjections(undefined, derived);
+  const effects = [hiddenEventMeta({ timeAdvance: undefined as any, worldTime: undefined as any, actionProjections: base })];
+  const back = extractEventMeta(effects)?.actionProjections;
+  assert(Array.isArray(back) && back.length === base.length, `落账再反解丢了投影：写入 ${base.length} 读出 ${Array.isArray(back) ? back.length : 'null'}`);
+  log('smoke-proj-001-survives-event-meta', { passed: true });
+}
+
+function smokeProjectionQuietOnPlainNarrative(): void {
+  const derived = deriveActionProjections({ title: '灶间余话', narrative: '他把碗推到一边，没喝。', eventType: 'normal', threads: [] });
+  assert(derived.length === 0, `平淡叙事不该硬派投影，实得 ${derived.length} 条`);
+  log('smoke-proj-002-quiet-on-plain', { passed: true });
+}
+
+function smokeProjectionAiSuppliedWins(): void {
+  const out = sanitizeActionProjections(
+    [{ id: 'a1', kind: 'market', label: '去问那人', description: '把话头接下去' }],
+    deriveActionProjections({ title: '坊市偶遇', narrative: '他在坊市摊前停下。', eventType: 'normal', threads: [] }),
+  );
+  assert(out.length === 1 && out[0].label === '去问那人', `模型自供该盖过派生兜底，实得 ${JSON.stringify(out)}`);
+  log('smoke-proj-003-ai-supplied-wins', { passed: true });
+}
+
+function pgRunProjectionWireSmokes(): void {
+  const cases = [
+    { name: 'smoke-proj-001-survives-event-meta', fn: smokeProjectionSurvivesEventMeta },
+    { name: 'smoke-proj-002-quiet-on-plain', fn: smokeProjectionQuietOnPlainNarrative },
+    { name: 'smoke-proj-003-ai-supplied-wins', fn: smokeProjectionAiSuppliedWins },
+  ];
+  for (const c of cases) {
+    try { c.fn(); } catch (e) { log(c.name, { passed: false, error: (e && (e as any).message) || String(e) }); }
   }
 }

@@ -241,6 +241,15 @@ import {
   buildQuestEntriesFromThreads,
   generateCharacterIntents,
 } from './threads';
+import {
+  planHistoryInjection,
+  FALLBACK_TOP_N_DEFAULT,
+  type HistoryItem,
+  type DigestRef,
+} from '../memory/history-budget';
+
+/** 更早经历的默认字符预算。取值偏保守：先只多带一段概览，不动逐字窗口。 */
+export const DEFAULT_HISTORY_BUDGET_CHARS = 1200;
 
 export function summarizeConstitutionProfiles(state: CharacterState): { name: string; category: string; stage: number; maxStage: number; resonance: string[]; riskHint?: string; hooks: string[] }[] {
   return activeConstitutionStatuses(state).map(status => {
@@ -396,6 +405,14 @@ export function buildStateContext(
   state: CharacterState,
   recentEvents: { age: number; title: string; narrative: string; eventType?: string }[],
   narrativeContractFeedback: EngineStateContext['narrativeContractFeedback'] = [],
+  historyOptions?: {
+    /** 逐字窗口之外的更早经历候选（调用方从库里多取一些传进来） */
+    earlierEvents?: { id?: string; age: number; title: string; narrative: string; eventType?: string }[];
+    /** 已生成好的纪要；空则落到按重要度取标题那一档 */
+    digests?: DigestRef[];
+    /** 字符预算 */
+    budgetChars?: number;
+  },
 ): EngineStateContext {
   const realmInfo = getRealmInfo(state.realm);
   const completedFateNodes = Array.isArray(state.fateNodes) ? state.fateNodes : [];
@@ -430,6 +447,57 @@ export function buildStateContext(
   const coreAttrs = deriveCoreCultivationAttributes(state);
   const soulRealm = deriveSoulRealm({ ...state, ...coreAttrs });
   const realmTraits = deriveRealmTraits(state);
+
+  // ── 更早的经历：预算选路 ──────────────────────────────────
+  // 2026-08-31：这一层原先只有库、没有调用点——planHistoryInjection 零引用，
+  // 而生产里喂进去的永远是末尾定长几条。三百岁的角色，前面二百九十年不存在。
+  // 这里把它接上：逐字窗口照旧不动，另加一段更早经历,有纪要拼纪要,没有就按重要度列标题。
+  const historyPlan = (() => {
+    const earlier = Array.isArray(historyOptions?.earlierEvents) ? historyOptions!.earlierEvents! : [];
+    const digestRefs = Array.isArray(historyOptions?.digests) ? historyOptions!.digests! : [];
+    if (!earlier.length && !digestRefs.length) return undefined;
+    try {
+      const items: HistoryItem[] = earlier.map((e, i) => ({
+        id: String(e.id || `${e.age}-${i}`),
+        age: Number(e.age) || 0,
+        title: String(e.title || ''),
+        narrative: String(e.narrative || ''),
+        eventType: e.eventType,
+      }));
+      const plan = planHistoryInjection({
+        budgetChars: Math.max(0, Number(historyOptions?.budgetChars) || DEFAULT_HISTORY_BUDGET_CHARS),
+        verbatim: items,
+        digests: digestRefs,
+        protection: {
+          currentAge: state.age,
+          unresolvedMemories: safeLongTermMemory.map((m) => ({ category: 'memory', title: String(m || '') })),
+          questEntries: questEntries.map((q: any) => ({ id: String(q?.id || ''), title: String(q?.title || ''), urgency: Number(q?.urgency) || 0 })),
+        },
+      });
+      const digestLines = plan.digests.map((d) => `${d.startAge}-${d.endAge}岁：${d.summary}`);
+      const highlightLines = plan.tier === 3
+        ? plan.fallbackTitles
+        : plan.verbatimItems.map((i) => `${i.age}岁：${i.title}`);
+      // estimatedChars 报的是「实际注入了多少」，不是选路自己估的那个数。
+      // 第 1 档选路算的是逐字全文的开销，而这里只列年岁与事由——
+      // 照抄它那个数，仪表读的就不是喂出去的东西。
+      const emittedChars = (digestLines.length ? digestLines : highlightLines)
+        .reduce((sum, line) => sum + line.length + 2, 0);
+      return {
+        tier: plan.tier,
+        reason: plan.reason,
+        digests: digestLines,
+        highlights: highlightLines,
+        estimatedChars: emittedChars,
+        budgetChars: plan.budgetChars,
+        overBudget: plan.overBudget,
+        droppedCount: plan.droppedCount,
+      };
+    } catch {
+      // 选路是旁路增补，出岔子就当没有这一段，绝不拖垮主推进。
+      return undefined;
+    }
+  })();
   const combatProjection = deriveCombatProjection({ ...state, ...coreAttrs });
   return {
     character: {
@@ -473,6 +541,7 @@ export function buildStateContext(
     cultivationInsight: state.cultivationInsight,
     cultivationFactors: safeCultivationFactors,
     recentEvents: safeRecentEvents.slice(-5).map(e => ({ age: e.age, title: e.title, narrative: e.narrative, eventType: e.eventType || 'normal' })),
+    historyPlan,
     narrativeContractFeedback: (narrativeContractFeedback || []).slice(-8),
     longTermMemory: safeLongTermMemory.slice(-10),
     npcs: safeNpcs.slice(-20),
